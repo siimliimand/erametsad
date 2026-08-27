@@ -9,7 +9,7 @@ const STATUS_MAP = {
   scheduled: { label: 'Plaanitud', color: 'status-scheduled' },
 } as const
 
-type StatusKey = keyof typeof STATUS_MAP
+export type StatusKey = keyof typeof STATUS_MAP
 
 interface StatusPillProps {
   status: StatusKey
