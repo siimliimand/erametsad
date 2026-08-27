@@ -32,11 +32,11 @@ jobs:
         id: deploy
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            npx wrangler pages deploy .vercel/output/static \
+            npx wrangler pages deploy apps/platform/.vercel/output/static \
               --project-name=eametsad-api \
               --branch="${{ github.head_ref }}"
           else
-            npx wrangler pages deploy .vercel/output/static \
+            npx wrangler pages deploy apps/platform/.vercel/output/static \
               --project-name=eametsad-api \
               --branch=main
           fi
