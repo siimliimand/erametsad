@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "generatedAt": "2026-08-27T09:43:39.786Z",
+  "harnessVersion": "2.3.0",
+  "opencodeVersion": "1.18.23",
+  "platform": {
+    "backlog": "github",
+    "repo": "github"
+  },
+  "models": {
+    "plan": "openrouter/deepseek/deepseek-v4-pro",
+    "build": "openrouter/deepseek/deepseek-v4-flash",
+    "fast": "openrouter/xiaomi/mimo-v2.5"
+  },
+  "agents": {
+    "maxConcurrent": 5
+  },
+  "source": {
+    "mode": "current",
+    "roots": [
+      "/home/sim/www/erametsad"
+    ]
+  },
+  "tools": {
+    "rtk": true,
+    "quota": true,
+    "simpleEnglish": true,
+    "codegraph": true,
+    "memory": true,
+    "humanizer": true
+  },
+  "preexisting": {
+    "design": false,
+    "architecture": false,
+    "openspec": false
+  }
+}

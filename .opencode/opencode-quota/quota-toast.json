@@ -1,0 +1,8 @@
+{
+  "enabledProviders": "auto",
+  "formatStyle": "singleWindow",
+  "percentDisplayMode": "used",
+  "showSessionTokens": true,
+  "enableToast": false,
+  "tuiCommandDisplay": "inline"
+}

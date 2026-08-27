@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "agentmemory-agents": {
+      "source": "rohitg00/agentmemory",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/agentmemory-agents/SKILL.md",
+      "computedHash": "d07fce3e42bc10fd1ec2b9ad492b493c49663d10c259b2ab607ad91b1471523c"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf"
+    },
+    "humanizer": {
+      "source": "blader/humanizer",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "a9e52ffc97e9d8fdda35a6fb3967ace6fbc1ae3a0b7703774ad077fcf1e27153"
+    },
+    "simple-english": {
+      "source": "AminBlg/SimpleEnglish",
+      "sourceType": "github",
+      "skillPath": "skills/simple-english/SKILL.md",
+      "computedHash": "53a34747a05a3b8d9178b78cf2843d26beab30e01a18bc8d3bc8dd41e2230f5f"
+    },
+    "user-story": {
+      "source": "deanpeters/product-manager-skills",
+      "sourceType": "github",
+      "skillPath": "skills/user-story/SKILL.md",
+      "computedHash": "ca8f8869c1597af5f979130b9b2805c32e6e985e04cdeefe4c99a9a537360b79"
+    }
+  }
+}
