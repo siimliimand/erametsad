@@ -1,5 +1,8 @@
 # timber.ee (main marketing site) — Structural & Functional Map
 
+> **In brief (for the client):** this maps the reference competitor's public website so we can learn from it without copying it. What it does well — deep SEO content, a simple "leave your details" form repeated on every page, and strong trust signals (vetted-buyer counts) — we adopt. What it lacks — any visitor analytics and proper cookie consent — we deliberately improve on.
+
+
 Scraped 2026-08-27. Stack: **Gatsby 5.16.1** static site (`<meta name="generator" content="Gatsby 5.16.1">`), Estonian only (`<html lang="et">`), CSS with **Tailwind utilities using `tw-` prefix** (365+ utility classes in homepage HTML), font **Nunito**, images served from **Contentful CDN** (`images.ctfassets.net` / `assets.ctfassets.net`), so headless CMS = **Contentful**. Forms are plain `method="post"` with a hidden `form-name` field and no action URL → serverless-function / Netlify-style form handling baked into the Gatsby build.
 
 No client-side analytics, tag manager, chat widget, or marketing pixel was found in the served HTML of any of the 14 pages (no GTM/GA/fbq/Hotjar/Clarity strings). No JSON-LD structured data on any page. No hreflang/alternate language versions. No `<iframe>` or `<video>` embeds; social links point to YouTube channel but video is not embedded on these pages.

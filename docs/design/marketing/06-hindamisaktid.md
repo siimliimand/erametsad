@@ -1,4 +1,6 @@
 # Hindamisaktid — Valuation reports
+
+> **In brief:** Sells valuation reports (from €480): methodology, price factors and how to order.
 | Area | marketing |
 |---|---|
 | **Route** | `/hindamisaktid` |

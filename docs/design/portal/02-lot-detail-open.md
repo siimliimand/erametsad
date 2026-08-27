@@ -1,4 +1,6 @@
 # Avatud oksjoni leht — Open (ascending) auction detail & bidding
+
+> **In brief:** Full details of an open ascending auction, with the bidding panel, auto-bidder and bid history.
 | Area | portal |
 |---|---|
 | **Route** | `/oksjon/:id` (variant of shared lot-detail layout for `auctionType: "open"`, `auctionStatus: "active"`) |

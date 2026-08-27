@@ -1,4 +1,6 @@
 # Avaleht — Association home
+
+> **In brief:** Association landing: subsidy teasers, service chips and a join call-to-action.
 | Area | uhistu |
 |---|---|
 | **Route** | `metsauhistu.eametsad.ee/` |

@@ -1,4 +1,6 @@
 # Statistika — Statistics dashboard
+
+> **In brief:** Auction outcomes and funnel analytics, with export.
 | Area | admin |
 |---|---|
 | **Route** | `/statistika` |

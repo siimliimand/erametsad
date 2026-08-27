@@ -1,5 +1,8 @@
 # oksjonid.timber.ee — Structure, Functionality & Data Model Map
 
+> **In brief (for the client):** this reverse-engineers the reference auction platform's rules and data so our version can be fair and complete. We keep the proven mechanics — four lot types, open vs sealed bidding, anti-sniping, anonymised bid history, no deposits — and add what the reference hides: a proper customer area and a staff admin, both specified in the main plan.
+
+
 Reverse-engineered 2026-08-27 from public HTTP endpoints (no scraping of authenticated views).
 Artifacts in `/tmp/`: `oksjon-*.html` (SPA shells), `oksj-app.js` (React bundle), `b-*.json` (API samples).
 

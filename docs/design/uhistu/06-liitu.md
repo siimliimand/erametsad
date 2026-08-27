@@ -1,4 +1,6 @@
 # Liitu — Join the association
+
+> **In brief:** Benefits of joining and the free membership form.
 | Area | uhistu |
 |---|---|
 | **Route** | `metsauhistu.eametsad.ee/liitu` |

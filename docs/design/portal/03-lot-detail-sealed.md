@@ -1,4 +1,6 @@
 # Suletud pakkumise leht — Sealed-bid (pimepakkumine) auction detail
+
+> **In brief:** Full details of a sealed-bid auction, with the single confidential submission form.
 | Area | portal |
 |---|---|
 | **Route** | `/oksjon/:id` (shared lot-detail layout, `auctionType: "sealed"` — all metskinnistu, põllumaa, pakett lots; some raieõigus) |

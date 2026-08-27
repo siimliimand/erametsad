@@ -1,4 +1,6 @@
 # Toetuse lehekülg (template) — Subsidy program detail
+
+> **In brief:** A single subsidy: deadline, amounts, eligibility and how to apply.
 | Area | uhistu |
 |---|---|
 | **Route** | `metsauhistu.eametsad.ee/toetused/<slug>` (e.g. `/toetused/hooldusraie`, `/toetused/metsameede-hooldusraie`) |

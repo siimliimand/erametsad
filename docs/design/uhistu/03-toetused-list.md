@@ -1,4 +1,6 @@
 # Toetused (list) — Subsidies hub
+
+> **In brief:** Index of subsidy programmes with sidebar navigation.
 | Area | uhistu |
 |---|---|
 | **Route** | `metsauhistu.eametsad.ee/toetused` |

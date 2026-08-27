@@ -1,4 +1,6 @@
 # Metsa istutamise päring — Planting request form
+
+> **In brief:** A form to request planting services, with service options.
 | Area | marketing |
 |---|---|
 | **Route** | `/paringud/metsa-istutamine` |

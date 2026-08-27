@@ -1,4 +1,6 @@
 # Lepingud — Contract templates download page
+
+> **In brief:** Downloads of the contract templates.
 | Area | marketing |
 |---|---|
 | **Route** | `/lepingud` |

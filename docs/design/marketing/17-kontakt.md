@@ -1,4 +1,6 @@
 # Kontakt — Contact
+
+> **In brief:** Contact page: company details, location and enquiry form.
 | Area | marketing |
 |---|---|
 | **Route** | `/kontakt` |

@@ -1,4 +1,6 @@
 # Kontakt — Contact
+
+> **In brief:** Staff cards, office locations and contact form.
 | Area | uhistu |
 |---|---|
 | **Route** | `metsauhistu.eametsad.ee/kontakt` |

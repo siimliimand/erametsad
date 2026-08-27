@@ -1,4 +1,6 @@
 # Meist — About
+
+> **In brief:** The company story, mission and registry details, with a lead form.
 | Area | marketing |
 |---|---|
 | **Route** | `/meist` |

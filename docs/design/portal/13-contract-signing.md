@@ -1,4 +1,6 @@
 # Lepingute allkirjastamine — Contract signing (raamleping + oksjonileping)
+
+> **In brief:** Review and electronically sign the framework and auction contracts.
 | Area | portal |
 |---|---|
 | **Route** | `/lepingud/raamleping?next=…` (framework, once) · `/lepingud/oksjonileping/:auctionId` (per won auction) · `/lepingud` (list of my contracts) |

@@ -1,4 +1,6 @@
 # Päringute suunamine — Service requests (partner marketplace)
+
+> **In brief:** Route service requests to partner companies and track quotes.
 | Area | admin |
 |---|---|
 | **Route** | `/paringud` (tabs: Päringud / Partnerid) |

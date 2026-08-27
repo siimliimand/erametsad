@@ -1,4 +1,6 @@
 # KKK — FAQ hub + 7 kategooria lehte
+
+> **In brief:** The FAQ hub with seven category pages and expandable answers.
 | Area | marketing |
 |---|---|
 | **Route** | `/kkk` (hub) + `/kkk/{oksjonid,myyk,hind,tulumaks,metsaandmed,raie,metsauhistu}` |

@@ -1,4 +1,6 @@
 # Minu pakkumised — My bids (customer portal)
+
+> **In brief:** Your bids: current status (leading or outbid), past results and auto-bidder settings.
 | Area | portal |
 |---|---|
 | **Route** | `/user/bids` |

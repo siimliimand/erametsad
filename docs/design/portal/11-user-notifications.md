@@ -1,4 +1,6 @@
 # Teavitused — Notifications, preferences & saved searches
+
+> **In brief:** Notification history, channel preferences and saved-search subscriptions.
 | Area | portal |
 |---|---|
 | **Route** | `/user/notifications` |

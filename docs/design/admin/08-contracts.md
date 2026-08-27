@@ -1,4 +1,6 @@
 # Lepingud & mallid — Contracts & templates
+
+> **In brief:** Manage contract templates and track signature status.
 | Area | admin |
 |---|---|
 | **Route** | `/lepingud` (tab Lepingud), `/lepingud/mallid` (tab Mallid) |

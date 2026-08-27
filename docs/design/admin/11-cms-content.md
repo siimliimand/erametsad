@@ -1,4 +1,6 @@
 # Sisuhaldus — CMS content
+
+> **In brief:** Edit pages, articles, FAQ, redirects and SEO settings.
 | Area | admin |
 |---|---|
 | **Route** | `/sisu` (collections sidebar), `/sisu/:collection`, `/sisu/:collection/:id` |

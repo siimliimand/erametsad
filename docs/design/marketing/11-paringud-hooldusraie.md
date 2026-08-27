@@ -1,4 +1,6 @@
 # Hooldusraie päring — Tending-cut request form
+
+> **In brief:** A form to request tending/thinning cuts, with file upload.
 | Area | marketing |
 |---|---|
 | **Route** | `/paringud/hooldusraie` |

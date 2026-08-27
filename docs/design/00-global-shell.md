@@ -1,4 +1,6 @@
 # Globaalne kate (Global shell) — Header, footer, kontaktiriba, küpsised, vealehed
+
+> **In brief:** The shared frame around every marketing page — header navigation, footer, contact band, cookie consent and the 404/500 error pages.
 | Area | marketing |
 |---|---|
 | **Route** | kõik `eametsad.ee` leheküljed |

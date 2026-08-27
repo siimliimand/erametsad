@@ -1,4 +1,6 @@
 # Teenused — Services single-page scroll
+
+> **In brief:** All association services in one scrolling page.
 | Area | uhistu |
 |---|---|
 | **Route** | `metsauhistu.eametsad.ee/teenused` (+ anchors `#istutamine` …) |

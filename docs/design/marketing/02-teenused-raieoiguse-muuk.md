@@ -1,4 +1,6 @@
 # Raieõiguse müük oksjonil — Cutting-right sale service page
+
+> **In brief:** How selling cutting rights by auction works — the 9-step process, the success fee, and buyer vetting.
 | Area | marketing |
 |---|---|
 | **Route** | `/teenused/raieoiguse-muuk` |

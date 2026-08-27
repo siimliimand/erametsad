@@ -1,4 +1,6 @@
 # Seaded — Settings (superadmin)
+
+> **In brief:** Fees, anti-snipe defaults, notification templates and maintenance mode.
 | Area | admin |
 |---|---|
 | **Route** | `/seaded` (sections: Üldine / Tasud / Oksjonid / Teavitused / Integratsioonid / Rollid / Hooldus / Lipud) |

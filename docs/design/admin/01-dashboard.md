@@ -1,4 +1,6 @@
 # Töölaud — Dashboard
+
+> **In brief:** Staff home: KPIs, auctions ending today, action queues and system health.
 | Area | admin |
 |---|---|
 | **Route** | `admin.eametsad.ee/` (redirect target after login) |

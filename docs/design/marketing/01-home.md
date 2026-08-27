@@ -1,4 +1,6 @@
 # Avaleht — Homepage
+
+> **In brief:** The landing page — what Eametsad offers, live auctions, trust stats, and how to get in touch.
 | Area | marketing |
 |---|---|
 | **Route** | `/` |

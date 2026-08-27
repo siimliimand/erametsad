@@ -1,4 +1,6 @@
 # Logi sisse — Login
+
+> **In brief:** Sign in with Smart-ID, Mobile-ID, ID-card or a password fallback.
 | Area | portal |
 |---|---|
 | **Route** | `/login?next=/oksjon/:id` |

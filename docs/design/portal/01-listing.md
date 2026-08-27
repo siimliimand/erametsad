@@ -1,4 +1,6 @@
 # Oksjonite avaleht — Listing / home with tabs, map, filters
+
+> **In brief:** Browse active auctions on a list or map, filter by region/species/price, and subscribe to alerts.
 | Area | portal |
 |---|---|
 | **Route** | `/:tab?` — tabs: `raieoigused` (forest) · `metskinnistud` (property) · `polumaad` (field) · `paketid` (package) · `kiiroksjonid` (quick) |

@@ -1,4 +1,6 @@
 # Kinnistu müük oksjonil — Forest-property sale service page
+
+> **In brief:** How selling a whole forest property works, including the sealed-bid (closed-envelope) method.
 | Area | marketing |
 |---|---|
 | **Route** | `/teenused/kinnistu-muuk` |

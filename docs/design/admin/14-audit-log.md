@@ -1,4 +1,6 @@
 # Auditlogi — Audit log viewer
+
+> **In brief:** The immutable record of staff actions on users, bids and contracts.
 | Area | admin |
 |---|---|
 | **Route** | `/audit` |

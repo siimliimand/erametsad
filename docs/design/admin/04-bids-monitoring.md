@@ -1,4 +1,6 @@
 # Pakkumiste jälgimine — Bid monitoring
+
+> **In brief:** Live bid feeds, under-bid approvals and anomaly flags.
 | Area | admin |
 |---|---|
 | **Route** | `/oksjonid/:id/pakkumised` (+ global tab `/pakkumised` alapakkumiste järjekord) |

@@ -1,4 +1,6 @@
 # Minu profiil — My profile (data, rights, security, GDPR)
+
+> **In brief:** Your account details, security settings and GDPR data export/delete.
 | Area | portal |
 |---|---|
 | **Route** | `/user/profile` |

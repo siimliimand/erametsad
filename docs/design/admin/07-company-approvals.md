@@ -1,4 +1,6 @@
 # Ettevõtte taotlused — Company access approvals
+
+> **In brief:** Approve or reject company access requests.
 | Area | admin |
 |---|---|
 | **Route** | `/ettevotted` (tabs: Ootel / Ajalugu) |

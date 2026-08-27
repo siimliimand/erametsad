@@ -1,4 +1,6 @@
 # Kiiroksjon — 48h quick auction
+
+> **In brief:** Explains the 48-hour quick auction and its guaranteed backup offer.
 | Area | marketing |
 |---|---|
 | **Route** | `/kiiroksjon` |

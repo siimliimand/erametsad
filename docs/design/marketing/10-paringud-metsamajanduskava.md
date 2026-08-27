@@ -1,4 +1,6 @@
 # Metsamajanduskava päring — Management-plan request form
+
+> **In brief:** A form to request a forest management plan from partner providers.
 | Area | marketing |
 |---|---|
 | **Route** | `/paringud/metsamajanduskava` |

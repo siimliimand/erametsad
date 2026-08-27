@@ -1,4 +1,6 @@
 # Teenuste päringud — Service-request hub
+
+> **In brief:** Entry point to three service-request forms that are forwarded to partner companies.
 | Area | marketing |
 |---|---|
 | **Route** | `/paringud` |

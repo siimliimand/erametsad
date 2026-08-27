@@ -1,4 +1,6 @@
 # Profiili valik — Profile switcher
+
+> **In brief:** Switch between personal and company profiles.
 | Area | portal |
 |---|---|
 | **Route** | `/select-profile?next=…` |

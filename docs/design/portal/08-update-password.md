@@ -1,4 +1,6 @@
 # Parooli muutmine ja lähtestamine — Set / change / reset password
+
+> **In brief:** Set, change or reset a password.
 | Area | portal |
 |---|---|
 | **Route** | `/update-password` (authed change) · `/reset-password` (request link) · `/reset-password/:token` (set new) |

@@ -1,4 +1,6 @@
 # Oksjonid — Auctions list
+
+> **In brief:** All auctions in one list, with filters and status actions.
 | Area | admin |
 |---|---|
 | **Route** | `/oksjonid` (tabs: Kõik / Raieõigus / Kinnistud / Põllumaad / Paketid / Kiiroksjonid) |

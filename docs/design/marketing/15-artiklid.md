@@ -1,4 +1,6 @@
 # Artiklid — Articles hub + artikli mall
+
+> **In brief:** The articles hub (news and customer stories) and the article detail template.
 | Area | marketing |
 |---|---|
 | **Route** | `/artiklid` (hub) + `/artiklid/<slug>` (artikli mall) + `/artiklid/uudised`, `/artiklid/klientide-lood`, `/artiklid/kasutustingimused` |

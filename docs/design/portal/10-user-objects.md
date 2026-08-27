@@ -1,4 +1,6 @@
 # Minu müügid — My sales (seller view)
+
+> **In brief:** Your lots as a seller: status, interest, under-bid approvals and results.
 | Area | portal |
 |---|---|
 | **Route** | `/user/objects` |

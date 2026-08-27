@@ -1,4 +1,6 @@
 # Metsaspetsialistid — Specialists (+ profiili lehe mall)
+
+> **In brief:** Contact cards for the specialists, plus the template for individual profile pages.
 | Area | marketing |
 |---|---|
 | **Route** | `/meist/metsaspetsialistid` + profiilid `/meist/<nimi>` (6 tk) |

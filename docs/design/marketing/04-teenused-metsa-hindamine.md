@@ -1,4 +1,6 @@
 # Metsa väärtuse hindamine — Valuation SEO-article page (+ SEO-artikli mall)
+
+> **In brief:** A long-form article on what determines forest value — also the reusable template for other SEO pages.
 | Area | marketing |
 |---|---|
 | **Route** | `/teenused/metsa-hindamine` |

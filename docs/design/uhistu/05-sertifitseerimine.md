@@ -1,4 +1,6 @@
 # Sertifitseerimine — PEFC group certification
+
+> **In brief:** The PEFC certification document library.
 | Area | uhistu |
 |---|---|
 | **Route** | `metsauhistu.eametsad.ee/sertifitseerimine` |

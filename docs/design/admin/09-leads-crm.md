@@ -1,4 +1,6 @@
 # Juhtlõimed (CRM) — Leads pipeline
+
+> **In brief:** Track enquiries through the pipeline, assign specialists and export.
 | Area | admin |
 |---|---|
 | **Route** | `/juhtloid` (views: Kanban / Tabel) |

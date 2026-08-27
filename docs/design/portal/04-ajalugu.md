@@ -1,4 +1,6 @@
 # Oksjonite ajalugu — Archive / history
+
+> **In brief:** The archive of ended auctions, filterable by type and year, showing only final prices.
 | Area | portal |
 |---|---|
 | **Route** | `/ajalugu/:tab?` — same 5 tabs as listing (raieoigused/metskinnistud/polumaad/paketid/kiiroksjonid) |

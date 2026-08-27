@@ -1,4 +1,6 @@
 # Registreerimine — Registration (eID-first, private + company)
+
+> **In brief:** Create a private or company account, with business-registry validation for companies.
 | Area | portal |
 |---|---|
 | **Route** | `/register` (flow: identify → profile type → data → consents → done) |

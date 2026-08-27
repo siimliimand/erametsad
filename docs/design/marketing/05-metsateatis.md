@@ -1,4 +1,6 @@
 # Metsateatise esitamine — Metsateatis guide (state-portal tutorial)
+
+> **In brief:** A step-by-step screenshot guide to filing a forest notification in the state portal.
 | Area | marketing |
 |---|---|
 | **Route** | `/metsateatis` (ka `/metsateatise-juhend` suunatakse 301-ga siia) |

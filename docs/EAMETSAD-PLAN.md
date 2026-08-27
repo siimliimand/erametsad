@@ -11,6 +11,36 @@
 
 ---
 
+## Client overview — in plain language
+
+> For the forest-owner client, the buyer, and anyone who wants the "what and why" without the technical detail. The rest of this document is the full build plan.
+
+**What Eametsad is.** A place to sell Estonian forest — cutting rights (_raieõigus_) and forest properties (_metsakinnistu_) — by auction, and for vetted buyers to bid on it. The promise to the owner is simple: the auction finds the market price, and you only pay if the sale succeeds.
+
+**What we build:**
+
+| Product | In one sentence |
+|---|---|
+| `eametsad.ee` | The public website — explains the service, answers questions, collects enquiries. |
+| `oksjonid.eametsad.ee` | The auction platform — browse lots on a map, place bids, sell your own forest, sign contracts. |
+| `admin.eametsad.ee` | The staff control room — manage auctions, bidders, leads, contracts and content. |
+
+**How Eametsad earns money:** a **3% + VAT success fee** on the final price, paid only when the auction completes. Secondary income comes from **valuation reports** (from €480 + VAT) and **48-hour quick auctions** (_kiiroksjon_) where Eametsad itself backs the lot with a purchase offer if no buyer wins.
+
+**The experience for a forest owner:**
+1. Leave your details on the website → a free consultation, no obligation.
+2. A specialist prepares the forest for sale.
+3. The lot goes live — cutting rights sell by open ascending auction, properties by sealed "closed-envelope" bid.
+4. The winner signs electronically (Smart-ID / Mobile-ID / ID-card) and the deal completes.
+
+**The experience for a buyer:** register, get bidding rights, sign a framework agreement once, then bid with an optional auto-bidder and anti-sniping rules keeping it fair. Bid history is anonymised; only the winning price is ever public.
+
+**Timeline:** a sellable version (website + open auctions + admin) in **~10–12 weeks**; full scope in **~20–28 weeks**.
+
+**What we need from you** — the ten open questions at the end of this document, most importantly: the legal entity, confirmation of the fee model, and the buyer network that will make auctions liquid.
+
+---
+
 ## 1. Executive summary
 
 The reference (AS Timber / timber.ee) runs a three-property ecosystem:

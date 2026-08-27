@@ -1,4 +1,6 @@
 # Kasutajad & õigused — Users & rights
+
+> **In brief:** Find users, grant bidding rights, manage access and impersonate for support.
 | Area | admin |
 |---|---|
 | **Route** | `/kasutajad` (list), `/kasutajad/:id` (detail) |

@@ -1,4 +1,6 @@
 # Oksjoni koostamine — Auction editor (wizard)
+
+> **In brief:** Create and edit an auction through a step-by-step wizard.
 | Area | admin |
 |---|---|
 | **Route** | `/oksjonid/uus` and `/oksjonid/:id/muuda` |

@@ -1,4 +1,6 @@
 # Sul. avamine — Sealed-bid opening ceremony
+
+> **In brief:** The sealed-bid opening ceremony: freeze, reveal and confirm the winner.
 | Area | admin |
 |---|---|
 | **Route** | `/oksjonid/:id/avamine` |
