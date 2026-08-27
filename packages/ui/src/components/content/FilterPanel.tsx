@@ -96,7 +96,7 @@ function RangeFilterInput({
       name={filter.id}
       min={filter.range.min}
       max={filter.range.max}
-      step={filter.range.step}
+      step={filter.range.step ?? 1}
       value={value}
       onChange={onChange}
     />
@@ -119,8 +119,10 @@ function TabFilterInput({
   }));
 
   if (tabs.length === 0) return null;
+  const firstTab = tabs[0];
+  if (!firstTab) return null;
 
-  const activeValue = value || tabs[0].id;
+  const activeValue = value || firstTab.id;
 
   return (
     <div className="flex flex-col gap-2">

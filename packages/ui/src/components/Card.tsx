@@ -6,7 +6,7 @@ import {
   type ElementType,
 } from 'react';
 
-export interface CardProps extends HTMLAttributes<HTMLElement> {
+export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'content'> {
   image?: ReactNode;
   content?: ReactNode;
   actions?: ReactNode;
