@@ -9,7 +9,7 @@ export interface SSEBroadcast {
 }
 
 export function createCache(namespace: string): Cache {
-  const binding = (globalThis as Record<string, unknown>).env as Record<string, unknown>
+  const binding = (globalThis as Record<string, unknown>).env as Record<string, unknown> | undefined
   const kv = binding?.[namespace] as { get: (k: string) => Promise<string | null>; put: (k: string, v: string, opts?: { expirationTtl?: number }) => Promise<void>; delete: (k: string) => Promise<void> } | undefined
 
   if (kv && typeof kv.get === "function") {
@@ -20,7 +20,7 @@ export function createCache(namespace: string): Cache {
 }
 
 export function createSSEBroadcast(namespace: string): SSEBroadcast {
-  const binding = (globalThis as Record<string, unknown>).env as Record<string, unknown>
+  const binding = (globalThis as Record<string, unknown>).env as Record<string, unknown> | undefined
   const kv = binding?.[namespace] as { get: (k: string) => Promise<string | null>; put: (k: string, v: string, opts?: { expirationTtl?: number }) => Promise<void> } | undefined
 
   if (kv && typeof kv.put === "function") {
@@ -57,28 +57,30 @@ class KVCache implements Cache {
 class MemoryCache implements Cache {
   private readonly store = new Map<string, { value: string; expiresAt: number | null }>()
 
-  async get(key: string): Promise<string | null> {
+  get(key: string): Promise<string | null> {
     const entry = this.store.get(key)
 
-    if (!entry) return null
+    if (!entry) return Promise.resolve(null)
 
     if (entry.expiresAt !== null && Date.now() > entry.expiresAt) {
       this.store.delete(key)
-      return null
+      return Promise.resolve(null)
     }
 
-    return entry.value
+    return Promise.resolve(entry.value)
   }
 
-  async set(key: string, value: string, ttl?: number): Promise<void> {
+  set(key: string, value: string, ttl?: number): Promise<void> {
     this.store.set(key, {
       value,
       expiresAt: ttl !== undefined ? Date.now() + ttl * 1000 : null,
     })
+    return Promise.resolve()
   }
 
-  async delete(key: string): Promise<void> {
+  delete(key: string): Promise<void> {
     this.store.delete(key)
+    return Promise.resolve()
   }
 }
 
@@ -91,7 +93,7 @@ class KVSSEBroadcast implements SSEBroadcast {
   async publish(channel: string, event: unknown): Promise<void> {
     const key = `sse:${channel}`
     const raw = await this.kv.get(key)
-    const events: unknown[] = raw ? JSON.parse(raw) : []
+    const events: unknown[] = raw ? (JSON.parse(raw) as unknown[]) : []
     events.push({ ...(event as Record<string, unknown>), _published: Date.now() })
     await this.kv.put(key, JSON.stringify(events), { expirationTtl: 300 })
   }
@@ -102,15 +104,17 @@ class MemorySSEBroadcast implements SSEBroadcast {
 
   subscribe(channel: string): Promise<unknown> {
     return new Promise((resolve) => {
-      if (!this.channels.has(channel)) {
-        this.channels.set(channel, [])
+      const subs = this.channels.get(channel)
+      if (subs) {
+        subs.push({ resolve })
+      } else {
+        this.channels.set(channel, [{ resolve }])
       }
-      this.channels.get(channel)!.push({ resolve })
     })
   }
 
-  async publish(channel: string, event: unknown): Promise<void> {
-    const subs = this.channels.get(channel) || []
+  publish(channel: string, event: unknown): Promise<void> {
+    const subs = this.channels.get(channel) ?? []
     const entry = { ...(event as Record<string, unknown>), _published: Date.now() }
 
     for (const sub of subs) {
@@ -118,5 +122,6 @@ class MemorySSEBroadcast implements SSEBroadcast {
     }
 
     this.channels.set(channel, [])
+    return Promise.resolve()
   }
 }

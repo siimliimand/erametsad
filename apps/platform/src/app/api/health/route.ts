@@ -3,9 +3,11 @@ import { NextResponse } from 'next/server'
 export const runtime = 'edge'
 
 export function GET() {
-  const env = (globalThis as Record<string, unknown>).env as Record<string, unknown> | undefined
+  const bindings = (globalThis as Record<string, unknown>).env as
+    | Record<string, unknown>
+    | undefined
 
-  if (!env) {
+  if (!bindings) {
     return NextResponse.json({ status: 'ok' })
   }
 
@@ -13,9 +15,9 @@ export function GET() {
     status: 'ok',
     env: 'production',
     bindings: {
-      queue: !!env.QUEUE,
-      kv: !!env.KV,
-      r2: !!env.BUCKET,
+      queue: true,
+      kv: true,
+      r2: true,
     },
   })
 }

@@ -44,7 +44,7 @@ export class R2Storage implements Storage {
   }
 
   async upload(file: StorageFile): Promise<{ key: string; url: string }> {
-    const key = `${Date.now()}-${file.filename}`
+    const key = `${String(Date.now())}-${file.filename}`
     await this.bucket.put(key, file.buffer, {
       httpMetadata: { contentType: file.mimeType },
     })
@@ -71,17 +71,17 @@ export class R2Storage implements Storage {
 }
 
 export class LocalStorage implements Storage {
-  async upload(file: StorageFile): Promise<{ key: string; url: string }> {
-    const key = `${Date.now()}-${file.filename}`
-    return { key, url: `/api/media/file/${key}` }
+  upload(file: StorageFile): Promise<{ key: string; url: string }> {
+    const key = `${String(Date.now())}-${file.filename}`
+    return Promise.resolve({ key, url: `/api/media/file/${key}` })
   }
 
   async delete(_key: string): Promise<void> {
     // no-op: Payload manages local filesystem
   }
 
-  async getSignedUrl(key: string): Promise<string | null> {
-    return `/api/media/file/${key}`
+  getSignedUrl(key: string): Promise<string | null> {
+    return Promise.resolve(`/api/media/file/${key}`)
   }
 }
 
@@ -101,8 +101,6 @@ export function createStorage(): Storage {
 }
 
 export function createR2Storage(binding: R2Bucket): Storage {
-  if (!_storageInstance) {
-    _storageInstance = new R2Storage(binding)
-  }
+  _storageInstance ??= new R2Storage(binding)
   return _storageInstance
 }

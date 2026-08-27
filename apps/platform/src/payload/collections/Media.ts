@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+
 import { beforeChangeHook, afterDeleteHook } from '../hooks/r2Hooks'
 
 export const Media: CollectionConfig = {
@@ -8,8 +9,7 @@ export const Media: CollectionConfig = {
     disableLocalStorage: true,
   },
   admin: {
-    preview: (doc) => {
-      if (!doc) return ''
+    preview: (doc: Record<string, unknown>) => {
       return `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/preview?collection=media&id=${String(doc.id)}&draft=true&secret=${process.env.PAYLOAD_PREVIEW_SECRET ?? ''}`
     },
   },

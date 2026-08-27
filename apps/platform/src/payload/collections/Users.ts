@@ -5,9 +5,12 @@ export const Users: CollectionConfig = {
   auth: true,
   admin: {
     useAsTitle: 'email',
-    preview: (doc) => {
-      if (!doc) return ''
-      return `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/preview?collection=users&id=${String(doc.id)}&draft=true&secret=${process.env.PAYLOAD_PREVIEW_SECRET ?? ''}`
+    preview: (doc: Record<string, unknown> | null) => {
+      if (!doc?.id) return ''
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+      const secret = process.env.PAYLOAD_PREVIEW_SECRET ?? ''
+      const id: string = typeof doc.id === 'string' || typeof doc.id === 'number' ? String(doc.id) : ''
+      return `${appUrl}/api/preview?collection=users&id=${id}&draft=true&secret=${secret}`
     },
   },
   versions: { drafts: true },

@@ -1,7 +1,7 @@
 import { Pool as NeonPool, neon as neonQuery } from "@neondatabase/serverless"
 import { Pool as PgPool } from "pg"
 
-type DbClient = {
+interface DbClient {
   pool: NeonPool | PgPool
   query: typeof PgPool.prototype.query
   neon?: ReturnType<typeof neonQuery>
@@ -9,11 +9,15 @@ type DbClient = {
 
 function createDbClient(): DbClient {
   const isNeon =
-    process.env.NEON_DATABASE_URL || process.env.DB_TYPE === "neon"
+    process.env.NEON_DATABASE_URL !== undefined || process.env.DB_TYPE === "neon"
 
   if (isNeon) {
     const connectionString =
-      process.env.NEON_DATABASE_URL ?? process.env.DATABASE_URL!
+      process.env.NEON_DATABASE_URL ?? process.env.DATABASE_URL
+
+    if (!connectionString) {
+      throw new Error('NEON_DATABASE_URL or DATABASE_URL must be set')
+    }
 
     const pool = new NeonPool({ connectionString })
 

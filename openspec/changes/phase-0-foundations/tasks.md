@@ -22,4 +22,4 @@
 - [x] 3.3 Cloudflare Queues job dispatch (auction-ending, notifications) + KV for ephemeral cache + SSE broadcast <!-- agent: fullstack-engineer.build, depends_on: [2.1], touches: [apps/platform/src/lib/queue.ts, apps/platform/src/lib/cache.ts] -->
 - [x] 3.4 R2 bucket for media uploads + signed URLs (replace Payload local-disk media adapter) <!-- agent: fullstack-engineer.build, depends_on: [2.1], touches: [apps/platform/src/lib/storage.ts, apps/platform/src/payload/media/**] -->
 - [x] 3.5 `wrangler.jsonc` with env bindings (Queues, KV, R2, Neon DSN); smoke-deploy a `/health` route <!-- agent: fullstack-engineer.build, depends_on: [3.1, 3.2, 3.3, 3.4], touches: [apps/platform/wrangler.jsonc, apps/platform/src/app/health/route.ts] -->
-- [ ] 3.6 CI deploy step: wrangler deploy preview on PR, production on merge to main <!-- agent: fullstack-engineer.build, depends_on: [1.5, 3.5], touches: [.github/workflows/deploy.yml] -->
+- [x] 3.6 CI deploy step: wrangler deploy preview on PR, production on merge to main <!-- agent: fullstack-engineer.build, depends_on: [1.5, 3.5], touches: [.github/workflows/deploy.yml] -->
