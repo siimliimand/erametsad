@@ -84,6 +84,26 @@ export async function revokeAllUserSessions(userId: string): Promise<void> {
   }
 }
 
+export async function updateUserProfileId(
+  userId: string,
+  profileId: string,
+): Promise<boolean> {
+  let updated = false
+  for (const record of sessions.values()) {
+    if (record.userId === userId && record.active) {
+      record.profileId = profileId
+      updated = true
+    }
+  }
+  return updated
+}
+
+export async function getUserSession(
+  sessionId: string,
+): Promise<SessionRecord | null> {
+  return sessions.get(sessionId) ?? null
+}
+
 export function setSessionCookies(
   response: NextResponse,
   accessToken: string,
