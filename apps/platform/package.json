@@ -8,9 +8,11 @@
     "pages:build": "next build && npx @cloudflare/next-on-pages",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "echo 'TODO: add tests'"
+    "test": "echo 'TODO: add tests'",
+    "seed:reset": "tsx src/payload/seed/reset.ts"
   },
   "dependencies": {
+    "@eametsad/emails": "workspace:*",
     "@eametsad/ui": "workspace:*",
     "@neondatabase/serverless": "^1.1.0",
     "@payloadcms/db-postgres": "^3.0.0",
