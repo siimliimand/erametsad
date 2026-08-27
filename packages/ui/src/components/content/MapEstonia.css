@@ -1,0 +1,24 @@
+.map-estonia {
+  position: relative;
+  width: 100%;
+  min-height: 400px;
+  z-index: 0;
+}
+
+.map-estonia .leaflet-container {
+  width: 100%;
+  min-height: 400px;
+  z-index: 0;
+}
+
+.map-estonia__fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 400px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.875rem;
+  border-radius: 0.5rem;
+}
