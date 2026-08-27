@@ -1,0 +1,27 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "eametsad-api",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "pages_build_output_dir": ".vercel/output/static",
+  "bindings": [
+    { "type": "queue", "binding": "QUEUE", "queue_name": "eametsad-jobs" },
+    { "type": "kv_namespace", "binding": "KV", "id": "KV_NAMESPACE_ID" },
+    { "type": "r2_bucket", "binding": "BUCKET", "bucket_name": "eametsad-media", "preview_bucket_name": "eametsad-media-preview" },
+    { "type": "plain_text", "binding": "NEON_DATABASE_URL", "value": "" },
+    { "type": "plain_text", "binding": "DATABASE_URL", "value": "" }
+  ],
+  "environments": {
+    "preview": {
+      "bindings": [
+        { "type": "kv_namespace", "binding": "KV", "id": "KV_NAMESPACE_ID_PREVIEW" },
+        { "type": "r2_bucket", "binding": "BUCKET", "bucket_name": "eametsad-media-preview" }
+      ]
+    },
+    "production": {
+      "bindings": [
+        { "type": "kv_namespace", "binding": "KV", "id": "KV_NAMESPACE_ID_PROD" }
+      ]
+    }
+  }
+}
