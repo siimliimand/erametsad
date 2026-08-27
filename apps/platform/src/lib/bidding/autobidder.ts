@@ -1,9 +1,10 @@
-import { getPayloadClient } from '@/payload/payloadClient'
 import { placeBid } from './place-bid'
+
+import { getPayloadClient } from '@/payload/payloadClient'
 
 export async function evaluateAutobidders(
   auctionId: string,
-  newBidAmount: number,
+  _newBidAmount: number,
 ): Promise<void> {
   const payload = await getPayloadClient()
 
@@ -16,7 +17,7 @@ export async function evaluateAutobidders(
   const auction = auctionResult.docs[0] as Record<string, unknown> | undefined
   if (!auction) return
 
-  const bidStep = (auction.bidStep as number) ?? 0
+  const bidStep = auction.bidStep as number
 
   const leadingResult = await payload.find({
     collection: 'bids',
@@ -35,12 +36,10 @@ export async function evaluateAutobidders(
 
   let currentAmount = leadingBid ? (leadingBid.amount as number) : 0
   let currentSource = leadingBid
-    ? ((leadingBid.source as string) ?? 'manual')
+    ? (leadingBid.source as string)
     : 'none'
 
-  let placed = true
-  while (placed) {
-    placed = false
+  for (let round = 0; round < 100; round++) {
 
     const autobiddersResult = await payload.find({
       collection: 'autobidders',
@@ -61,7 +60,7 @@ export async function evaluateAutobidders(
 
     if (eligible.length === 0) break
 
-    const chosen = eligible[0] as Record<string, unknown>
+    const chosen = eligible[0]
     const chosenMax = chosen.maxAmount as number
 
     const hasSameMaxTie =
@@ -90,7 +89,6 @@ export async function evaluateAutobidders(
     if (result.success) {
       currentAmount = bidAmount
       currentSource = 'autobidder'
-      placed = true
     } else {
       break
     }

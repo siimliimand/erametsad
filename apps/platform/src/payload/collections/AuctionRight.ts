@@ -58,7 +58,7 @@ export const AuctionRight: CollectionConfig = {
   },
   hooks: {
     beforeChange: [
-      ({ data, originalDoc, operation }) => {
+      ({ data, originalDoc: _originalDoc, operation }) => {
         if (operation === 'create') {
           return data
         }

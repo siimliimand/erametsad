@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { selectActiveProfile } from '@/lib/auth/profile-scope'
 import { verifyRefreshToken } from '@/lib/auth/jwt'
+import { selectActiveProfile } from '@/lib/auth/profile-scope'
 import { getPayloadClient } from '@/payload/payloadClient'
 
 export const runtime = 'edge'
@@ -32,13 +32,13 @@ export async function POST(
     collection: 'profile',
     id: profileId,
     depth: 0,
-  })
+  }) as Record<string, unknown> | null
 
   if (!profileResult) {
     return NextResponse.json({ error: 'Profiili ei leitud' }, { status: 404 })
   }
 
-  const profile = profileResult as Record<string, unknown>
+  const profile = profileResult
   const userId = profile.user as string | undefined
 
   if (!userId) {

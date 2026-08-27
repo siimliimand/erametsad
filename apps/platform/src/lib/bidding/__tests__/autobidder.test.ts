@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { evaluateAutobidders } from '../autobidder'
 
 vi.mock('@/payload/payloadClient', () => ({
   getPayloadClient: vi.fn(),
@@ -9,21 +8,23 @@ vi.mock('../place-bid', () => ({
   placeBid: vi.fn(),
 }))
 
-import { getPayloadClient } from '@/payload/payloadClient'
+import { evaluateAutobidders } from '../autobidder'
 import { placeBid } from '../place-bid'
+
+import { getPayloadClient } from '@/payload/payloadClient'
 
 let mockPayload: { find: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> }
 
 beforeEach(() => {
   vi.clearAllMocks()
   mockPayload = { find: vi.fn(), create: vi.fn(), update: vi.fn() }
-  vi.mocked(getPayloadClient).mockImplementation(async () => mockPayload as never)
+  vi.mocked(getPayloadClient).mockImplementation(() => mockPayload as never)
   vi.mocked(placeBid).mockResolvedValue({ success: true, bid: { id: 'auto-bid-1' } } as never)
 })
 
 describe('evaluateAutobidders', () => {
   function mockSinglePass(maxAmount: number) {
-    mockPayload.find.mockImplementation(async ({ collection }: { collection: string }) => {
+    mockPayload.find.mockImplementation(({ collection }: { collection: string }) => {
       if (collection === 'auctions') return { docs: [{ id: 'auction-1', bidStep: 10 }] }
       if (collection === 'bids') return { docs: [{ id: 'lead-1', amount: 100, source: 'manual' }] }
       if (collection === 'autobidders') {
@@ -61,7 +62,7 @@ describe('evaluateAutobidders', () => {
   })
 
   it('no autobidder response if maxAmount <= current leading amount', async () => {
-    mockPayload.find.mockImplementation(async ({ collection }: { collection: string }) => {
+    mockPayload.find.mockImplementation(({ collection }: { collection: string }) => {
       if (collection === 'auctions') return { docs: [{ id: 'auction-1', bidStep: 10 }] }
       if (collection === 'bids') return { docs: [{ id: 'lead-1', amount: 200, source: 'manual' }] }
       if (collection === 'autobidders') return { docs: [{ id: 'ab-1', user: 'user-auto-1', maxAmount: 200, status: 'active', createdAt: '2024-01-01T00:00:00Z' }] }
@@ -75,7 +76,7 @@ describe('evaluateAutobidders', () => {
 
   describe('tie-breaking', () => {
     it('equal maxAmount resolves to earlier-created autobidder', async () => {
-      mockPayload.find.mockImplementation(async ({ collection }: { collection: string }) => {
+      mockPayload.find.mockImplementation(({ collection }: { collection: string }) => {
         if (collection === 'auctions') return { docs: [{ id: 'auction-1', bidStep: 10 }] }
         if (collection === 'bids') return { docs: [{ id: 'lead-1', amount: 100, source: 'manual' }] }
         if (collection === 'autobidders') {
@@ -98,7 +99,7 @@ describe('evaluateAutobidders', () => {
     })
 
     it('autobidder-vs-autobidder resolves to secondMax + step when maxAmounts differ', async () => {
-      mockPayload.find.mockImplementation(async ({ collection }: { collection: string }) => {
+      mockPayload.find.mockImplementation(({ collection }: { collection: string }) => {
         if (collection === 'auctions') return { docs: [{ id: 'auction-1', bidStep: 10 }] }
         if (collection === 'bids') return { docs: [{ id: 'lead-1', amount: 100, source: 'autobidder' }] }
         if (collection === 'autobidders') {
@@ -121,7 +122,7 @@ describe('evaluateAutobidders', () => {
     })
 
     it('autobidder-vs-autobidder with same maxAmount places bid at maxAmount', async () => {
-      mockPayload.find.mockImplementation(async ({ collection }: { collection: string }) => {
+      mockPayload.find.mockImplementation(({ collection }: { collection: string }) => {
         if (collection === 'auctions') return { docs: [{ id: 'auction-1', bidStep: 10 }] }
         if (collection === 'bids') return { docs: [{ id: 'lead-1', amount: 100, source: 'autobidder' }] }
         if (collection === 'autobidders') {

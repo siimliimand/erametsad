@@ -28,12 +28,11 @@ export const validTransitions: Record<AuctionStatus, AuctionStatus[]> = {
 
 export function validateTransition(from: string, to: string): boolean {
   const allowed = validTransitions[from as AuctionStatus]
-  if (!allowed) return false
   return allowed.includes(to as AuctionStatus)
 }
 
 export function getValidNextStatuses(currentStatus: string): string[] {
-  return validTransitions[currentStatus as AuctionStatus] ?? []
+  return validTransitions[currentStatus as AuctionStatus]
 }
 
 const STATUS_TIMESTAMP_MAP: Partial<Record<AuctionStatus, string>> = {
@@ -46,7 +45,7 @@ const STATUS_TIMESTAMP_MAP: Partial<Record<AuctionStatus, string>> = {
   archived: 'archivedAt',
 }
 
-export const statusTransitionHook: CollectionBeforeChangeHook = async ({
+export const statusTransitionHook: CollectionBeforeChangeHook = ({
   data,
   originalDoc,
 }) => {

@@ -12,7 +12,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   let body: Record<string, unknown>
   try {
-    body = await request.json()
+    body = await request.json() as Record<string, unknown>
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
@@ -34,7 +34,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       email: (body.email as string | undefined) ?? '',
       cadastr: (body.cadastr as string | undefined) ?? '',
       consentAt: body.consentAt as string,
-      source: (body.source as string) ?? 'web',
+      source: (body.source as string | undefined) ?? 'web',
     })
 
     return NextResponse.json(lead, { status: 201 })

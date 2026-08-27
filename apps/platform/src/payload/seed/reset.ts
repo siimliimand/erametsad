@@ -1,7 +1,8 @@
+/* eslint-disable no-console */
 import { getPayload } from 'payload'
 
-import config from '../../payload.config'
 import { seed } from './index'
+import config from '../../payload.config'
 
 const COLLECTIONS_IN_ORDER = [
   // Level 1 — no dependents (leaf collections)
@@ -49,7 +50,7 @@ export async function resetAndSeed(): Promise<void> {
 
   for (const slug of COLLECTIONS_IN_ORDER) {
     let deleted = 0
-    // eslint-disable-next-line no-constant-condition
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
       const result = await payload.find({
         collection: slug,
@@ -67,7 +68,7 @@ export async function resetAndSeed(): Promise<void> {
       }
     }
     if (deleted > 0) {
-      console.log(`  Truncated ${deleted} records from "${slug}"`)
+      console.log(`  Truncated ${String(deleted)} records from "${slug}"`)
     }
   }
 

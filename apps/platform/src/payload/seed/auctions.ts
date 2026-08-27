@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 
-const TREE_SPECIES = ['mänd', 'kuusk', 'kask', 'haab', 'sanglepp', 'tamm', 'hall lepp', 'pihlakas']
-const LOGGING_TYPES = [
+const _TREE_SPECIES = ['mänd', 'kuusk', 'kask', 'haab', 'sanglepp', 'tamm', 'hall lepp', 'pihlakas']
+const _LOGGING_TYPES = [
   { code: 'U' },
   { code: 'L' },
   { code: 'H' },
@@ -63,7 +63,7 @@ interface AuctionSeed {
   contractAt: Date | undefined
   address: string
   packageHeader: string | undefined
-  packageRows: unknown | undefined
+  packageRows: unknown
   packageColumns: string[] | undefined
   descriptionPublic: unknown
 }
@@ -1035,7 +1035,7 @@ export async function seedAuctions(payload: Payload): Promise<void> {
   const countyByCode = new Map(counties.map((c) => [c.code as string, c]))
   const parishByNameAndCounty = new Map<string, string>()
   for (const p of parishes) {
-    const countyId = (p.county as { id: string })?.id
+    const countyId = (p.county as { id: string }).id
     if (countyId) {
       parishByNameAndCounty.set(`${p.name as string}|${countyId}`, p.id as string)
     }
@@ -1045,7 +1045,7 @@ export async function seedAuctions(payload: Payload): Promise<void> {
   for (const a of AUCTIONS) {
     const countyCode = COUNTY_CODES[a.countyIndex]
     if (!countyCode) {
-      console.warn(`Skipping "${a.title}": no county code at index ${a.countyIndex}`)
+      console.warn(`Skipping "${a.title}": no county code at index ${String(a.countyIndex)}`)
       continue
     }
 
@@ -1063,11 +1063,11 @@ export async function seedAuctions(payload: Payload): Promise<void> {
 
     const parishName = countyParishes[a.parishIndex]
     if (!parishName) {
-      console.warn(`Skipping "${a.title}": no parish at index ${a.parishIndex} for ${countyCode}`)
+      console.warn(`Skipping "${a.title}": no parish at index ${String(a.parishIndex)} for ${countyCode}`)
       continue
     }
 
-    const parishId = parishByNameAndCounty.get(`${parishName}|${county.id}`)
+    const parishId = parishByNameAndCounty.get(`${parishName}|${String(county.id)}`)
     if (!parishId) {
       console.warn(`Skipping "${a.title}": parish ${parishName} not found for county ${countyCode}`)
       continue
@@ -1075,13 +1075,13 @@ export async function seedAuctions(payload: Payload): Promise<void> {
 
     const specialist = specialists[a.specialistIndex % specialists.length]
     if (!specialist) {
-      console.warn(`Skipping "${a.title}": specialist at index ${a.specialistIndex} not found`)
+      console.warn(`Skipping "${a.title}": specialist at index ${String(a.specialistIndex)} not found`)
       continue
     }
 
     const seller = users[3 + (a.sellerIndex % (users.length - 3))]
     if (!seller) {
-      console.warn(`Skipping "${a.title}": seller at index ${a.sellerIndex} not found`)
+      console.warn(`Skipping "${a.title}": seller at index ${String(a.sellerIndex)} not found`)
       continue
     }
 
@@ -1122,5 +1122,5 @@ export async function seedAuctions(payload: Payload): Promise<void> {
     created++
   }
 
-  console.log(`Seeded ${created} demo auctions`)
+  console.log(`Seeded ${String(created)} demo auctions`)
 }

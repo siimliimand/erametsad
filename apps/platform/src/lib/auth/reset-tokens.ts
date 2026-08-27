@@ -9,6 +9,7 @@ interface ResetRecord {
 const tokens = new Map<string, ResetRecord>()
 
 export async function createResetToken(userId: string): Promise<string> {
+  await Promise.resolve()
   const token = crypto.randomBytes(48).toString('hex')
   const expiresAt = Date.now() + 2 * 60 * 60 * 1000
 
@@ -20,6 +21,7 @@ export async function createResetToken(userId: string): Promise<string> {
 export async function consumeResetToken(
   token: string,
 ): Promise<string | null> {
+  await Promise.resolve()
   const record = tokens.get(token)
   if (!record) return null
 

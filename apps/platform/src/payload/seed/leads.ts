@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import type { Payload } from 'payload'
 
 export async function seedLeads(payload: Payload): Promise<void> {

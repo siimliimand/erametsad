@@ -26,6 +26,7 @@ export async function createSession(
   userId: string,
   profileId?: string,
 ): Promise<{ accessToken: string; refreshToken: string; sessionId: string }> {
+  await Promise.resolve()
   const sessionId = crypto.randomUUID()
   const tokenFamily = crypto.randomUUID()
 
@@ -47,11 +48,12 @@ export async function createSession(
 export async function refreshSession(
   refreshToken: string,
 ): Promise<{ accessToken: string; refreshToken: string } | null> {
+  await Promise.resolve()
   const payload = verifyRefreshToken(refreshToken)
   if (!payload) return null
 
   const record = sessions.get(payload.sessionId)
-  if (!record || !record.active) return null
+  if (!record?.active) return null
 
   const incomingHash = hashToken(refreshToken)
 
@@ -73,10 +75,12 @@ export async function refreshSession(
 }
 
 export async function revokeSession(sessionId: string): Promise<void> {
+  await Promise.resolve()
   sessions.delete(sessionId)
 }
 
 export async function revokeAllUserSessions(userId: string): Promise<void> {
+  await Promise.resolve()
   for (const [id, record] of sessions) {
     if (record.userId === userId) {
       sessions.delete(id)
@@ -88,6 +92,7 @@ export async function updateUserProfileId(
   userId: string,
   profileId: string,
 ): Promise<boolean> {
+  await Promise.resolve()
   let updated = false
   for (const record of sessions.values()) {
     if (record.userId === userId && record.active) {
@@ -101,6 +106,7 @@ export async function updateUserProfileId(
 export async function getUserSession(
   sessionId: string,
 ): Promise<SessionRecord | null> {
+  await Promise.resolve()
   return sessions.get(sessionId) ?? null
 }
 

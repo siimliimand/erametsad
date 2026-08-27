@@ -22,10 +22,10 @@ export async function computeStats(): Promise<StatisticsResult[]> {
   for (const doc of snapshots.docs) {
     const d = doc as Record<string, unknown>
     const objectType = d.objectType as string
-    const count = (d.count as number) ?? 0
-    const area = (d.area as number) ?? 0
-    const volume = (d.volume as number) ?? 0
-    const eur = (d.eur as number) ?? 0
+    const count = (d.count as number | undefined) ?? 0
+    const area = (d.area as number | undefined) ?? 0
+    const volume = (d.volume as number | undefined) ?? 0
+    const eur = (d.eur as number | undefined) ?? 0
 
     const existing = grouped.get(objectType)
     if (existing) {

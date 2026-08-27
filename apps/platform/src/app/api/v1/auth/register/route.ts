@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     user = (await payload.create({
       collection: 'users',
       data: userData,
-    })) as Record<string, unknown>
+    }))
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : ''
     if (message.includes('duplicate') || message.includes('unique')) {

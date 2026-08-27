@@ -1,13 +1,14 @@
-import type { Payload } from 'payload'
-
-import { getPayloadClient } from '@/payload/payloadClient'
-import { eventBus, type DomainEvent, type DomainEventType } from './event-bus'
 import {
   bidPlatedTemplate,
   outbidTemplate,
   auctionWonTemplate,
   auctionEndedTemplate,
 } from '@eametsad/emails'
+import type { Payload } from 'payload'
+
+import { type DomainEvent, type DomainEventType, type EventBus } from './event-bus'
+
+import { getPayloadClient } from '@/payload/payloadClient'
 
 interface NotificationPreference {
   email: boolean
@@ -60,9 +61,9 @@ async function lookupPreferences(payload: Payload, userId: string | number): Pro
     if (prefs.docs.length > 0) {
       const doc = prefs.docs[0] as Record<string, unknown>
       return {
-        email: (doc.email as boolean) ?? true,
-        sms: (doc.sms as boolean) ?? false,
-        inApp: (doc.inApp as boolean) ?? true,
+        email: (doc.email as boolean | undefined) ?? true,
+        sms: (doc.sms as boolean | undefined) ?? false,
+        inApp: (doc.inApp as boolean | undefined) ?? true,
       }
     }
   } catch {
@@ -72,7 +73,7 @@ async function lookupPreferences(payload: Payload, userId: string | number): Pro
 }
 
 async function dispatchEmail(userId: string | number, event: DomainEvent, body: string, payload: Payload): Promise<void> {
-  console.log(`[NOTIFICATION] Email to user ${userId}: ${body}`)
+  console.log(`[NOTIFICATION] Email to user ${String(userId)}: ${body}`)
 
   await payload.create({
     collection: 'notifications',
@@ -89,7 +90,7 @@ async function dispatchEmail(userId: string | number, event: DomainEvent, body: 
 }
 
 async function dispatchSms(userId: string | number, event: DomainEvent, body: string, payload: Payload): Promise<void> {
-  console.log(`[NOTIFICATION] SMS stub to user ${userId}: ${body}`)
+  console.log(`[NOTIFICATION] SMS stub to user ${String(userId)}: ${body}`)
 
   await payload.create({
     collection: 'notifications',
@@ -120,9 +121,9 @@ async function dispatchInApp(userId: string | number, event: DomainEvent, body: 
   })
 }
 
-export function startListening(bus: import('./event-bus').EventBus): void {
+export function startListening(bus: EventBus): void {
   const handler = async (event: DomainEvent) => {
-    const templateBody = getTemplate(event.type as DomainEventType, event.payload)
+    const templateBody = getTemplate(event.type, event.payload)
     if (!templateBody) return
 
     const affectedUserId = event.payload.userId as string | number | undefined
@@ -131,7 +132,7 @@ export function startListening(bus: import('./event-bus').EventBus): void {
     const pl = await getPayloadClient()
     const prefs = await lookupPreferences(pl, affectedUserId)
 
-    const channels = eventChannels[event.type as DomainEventType] ?? []
+    const channels = eventChannels[event.type]
     for (const channel of channels) {
       if (!prefs[channel]) continue
 
@@ -149,9 +150,9 @@ export function startListening(bus: import('./event-bus').EventBus): void {
     }
   }
 
-  bus.on('bid.created', handler)
-  bus.on('auction.ended', handler)
-  bus.on('contract.ready', handler)
-  bus.on('outbid', handler)
-  bus.on('auction.won', handler)
+  bus.on('bid.created', (event) => { void handler(event) })
+  bus.on('auction.ended', (event) => { void handler(event) })
+  bus.on('contract.ready', (event) => { void handler(event) })
+  bus.on('outbid', (event) => { void handler(event) })
+  bus.on('auction.won', (event) => { void handler(event) })
 }

@@ -9,7 +9,7 @@ export const AuditEntry: CollectionConfig = {
     group: 'System',
     listSearchableFields: ['actor', 'action', 'entityType'],
     hidden: ({ user }) => {
-      if (user?.role === 'admin' || user?.role === 'superadmin') return false
+      if (user.role === 'admin' || user.role === 'superadmin') return false
       return true
     },
   },

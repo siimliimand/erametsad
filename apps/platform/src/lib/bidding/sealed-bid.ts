@@ -28,7 +28,7 @@ async function getSealedRevisionCap(): Promise<number> {
     depth: 0,
   })
   const settings = result.docs[0] as Record<string, unknown> | undefined
-  return (settings?.sealedRevisionCap as number) ?? 3
+  return (settings?.sealedRevisionCap as number | undefined) ?? 3
 }
 
 export async function submitSealedBid(
@@ -151,7 +151,7 @@ export async function submitSealedBid(
       existingBid.docs.map((doc) =>
         payload.update({
           collection: 'bids',
-          id: doc.id as string,
+          id: doc.id,
           data: { status: 'outbid' },
         }),
       ),
@@ -176,12 +176,12 @@ export async function getSealedBidsForAuction(
     limit: 1000,
     depth: 1,
   })
-  return result.docs as Record<string, unknown>[]
+  return result.docs
 }
 
-export async function decryptSealedBids(
+export function decryptSealedBids(
   bids: Record<string, unknown>[],
-): Promise<DecryptedBid[]> {
+): DecryptedBid[] {
   return bids.map((bid) => {
     const rawSnapshot = bid.identitySnapshot as string | undefined
     let amount = 0

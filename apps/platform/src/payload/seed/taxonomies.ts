@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import type { Payload } from 'payload'
 
 const COUNTIES = [
@@ -18,9 +19,9 @@ const COUNTIES = [
   { name: 'Võru', code: 'VO' },
 ]
 
-type CountyDoc = { id: string; name: string; code: string }
+interface CountyDoc { id: string; name: string; code: string }
 
-const PARISHES: Array<{ name: string; code?: string; countyCode: string }> = [
+const PARISHES: { name: string; code?: string; countyCode: string }[] = [
   { name: 'Anija', countyCode: 'HH' },
   { name: 'Harku', countyCode: 'HH' },
   { name: 'Jõelähtme', countyCode: 'HH' },
@@ -124,5 +125,5 @@ export async function seedTaxonomies(payload: Payload): Promise<void> {
     })
   }
 
-  console.log(`Seeded ${COUNTIES.length} counties and ${PARISHES.length} parishes`)
+  console.log(`Seeded ${String(COUNTIES.length)} counties and ${String(PARISHES.length)} parishes`)
 }

@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+
 import { statusTransitionHook } from '../../lib/auction/status-transitions'
 
 export const Auction: CollectionConfig = {

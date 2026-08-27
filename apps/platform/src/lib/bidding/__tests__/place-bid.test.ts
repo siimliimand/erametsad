@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { placeBid } from '../place-bid'
+
+import { placeBid, type BidResult, type BidError } from '../place-bid'
+
+function assertBidError(result: BidResult): asserts result is BidError {
+  expect(result.success).toBe(false)
+}
 
 vi.mock('@/payload/payloadClient', () => ({
   getPayloadClient: vi.fn(),
@@ -12,7 +17,7 @@ let mockPayload: { find: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.
 beforeEach(() => {
   vi.clearAllMocks()
   mockPayload = { find: vi.fn(), create: vi.fn(), update: vi.fn() }
-  vi.mocked(getPayloadClient).mockImplementation(async () => mockPayload as never)
+  vi.mocked(getPayloadClient).mockImplementation(() => mockPayload as never)
 })
 
 describe('placeBid', () => {
@@ -85,7 +90,7 @@ describe('placeBid', () => {
       })
 
       const result = await placeBid({ ...baseParams, amount: 105 })
-      expect(result.success).toBe(false)
+      assertBidError(result)
       expect(result.error).toContain('110')
     })
 
@@ -108,11 +113,10 @@ describe('placeBid', () => {
         user: { id: 'user-1' },
         auction: { minBid: 100, bidStep: 10, status: 'active', endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' },
         hasRights: true,
-        leadingBid: undefined,
       })
 
       const result = await placeBid({ ...baseParams, amount: 50 })
-      expect(result.success).toBe(false)
+      assertBidError(result)
       expect(result.error).toContain('100')
       expect(result.status).toBe(400)
     })
@@ -124,7 +128,7 @@ describe('placeBid', () => {
       mockPayload.find.mockResolvedValueOnce({ docs: [{ minBid: 50, status: 'ended', endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' }] })
 
       const result = await placeBid(baseParams)
-      expect(result.success).toBe(false)
+      assertBidError(result)
       expect(result.error).toBe('Auction is not active')
       expect(result.status).toBe(400)
     })
@@ -136,7 +140,7 @@ describe('placeBid', () => {
       mockPayload.find.mockResolvedValueOnce({ docs: [{ minBid: 50, status: 'active', endsAt: '2020-01-01T00:00:00Z', objectType: 'forest' }] })
 
       const result = await placeBid(baseParams)
-      expect(result.success).toBe(false)
+      assertBidError(result)
       expect(result.error).toBe('Auction has ended')
       expect(result.status).toBe(400)
     })
@@ -175,7 +179,7 @@ describe('placeBid', () => {
       })
 
       const result = await placeBid({ ...baseParams, amount: 100, idempotencyKey: 'dup-key' })
-      expect(result.success).toBe(false)
+      assertBidError(result)
       expect(result.error).toBe('Duplicate bid (idempotency key already used)')
       expect(result.status).toBe(409)
     })

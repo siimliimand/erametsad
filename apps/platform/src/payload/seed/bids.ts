@@ -40,7 +40,7 @@ export async function seedBids(payload: Payload): Promise<void> {
         data: { auction: rae.id, type: 'open', ...b },
       })
     }
-    console.log(`  Created ${bids.length} bids for auction "${rae.title}" (bidding war)`)
+    console.log(`  Created ${String(bids.length)} bids for auction "${String(rae.title)}" (bidding war)`)
   }
 
   // ── Scenario 2: Ended auction — clear winner (raieoigus-saku-ended, minBid 2800) ──
@@ -58,7 +58,7 @@ export async function seedBids(payload: Payload): Promise<void> {
         data: { auction: saku.id, type: 'open', ...b },
       })
     }
-    console.log(`  Created ${bids.length} bids for auction "${saku.title}" (clear winner)`)
+    console.log(`  Created ${String(bids.length)} bids for auction "${String(saku.title)}" (clear winner)`)
   }
 
   // ── Scenario 3: Autobidder duel (kinnistu-elva, minBid 28000) ──
@@ -91,7 +91,7 @@ export async function seedBids(payload: Payload): Promise<void> {
         data: { auction: elva.id, type: 'open', ...b },
       })
     }
-    console.log(`  Created ${bids.length} bids + 1 autobidder for auction "${elva.title}" (autobidder duel)`)
+    console.log(`  Created ${String(bids.length)} bids + 1 autobidder for auction "${String(elva.title)}" (autobidder duel)`)
   }
 
   // ── Scenario 4: Pending alapakkumine (kiire-parnu, minBid 800) ──
@@ -108,7 +108,7 @@ export async function seedBids(payload: Payload): Promise<void> {
         status: 'pending_approval',
       },
     })
-    console.log(`  Created 1 pending-approval bid for auction "${parnu.title}" (alapakkumine)`)
+    console.log(`  Created 1 pending-approval bid for auction "${String(parnu.title)}" (alapakkumine)`)
   }
 
   // ── Scenario 5: Sealed bids (kinnistu-ida-viru) ──
@@ -134,6 +134,6 @@ export async function seedBids(payload: Payload): Promise<void> {
         },
       })
     }
-    console.log(`  Created ${sealedBids.length} sealed bids for auction "${idaViru.title}"`)
+    console.log(`  Created ${String(sealedBids.length)} sealed bids for auction "${String(idaViru.title)}"`)
   }
 }

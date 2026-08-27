@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
-import { encryptSealedData, decryptSealedData } from '../../encryption'
-import { submitSealedBid, decryptSealedBids } from '../sealed-bid'
+
+import { encryptSealedData } from '../../encryption'
+import type { BidResult, BidError } from '../place-bid'
+import { submitSealedBid } from '../sealed-bid'
+
+function assertBidError(result: BidResult): asserts result is BidError {
+  expect(result.success).toBe(false)
+}
 
 const TEST_KEY = 'test-encryption-key-32chars!!'
 const OLD_KEY = process.env.SEALED_BID_ENCRYPTION_KEY
@@ -81,7 +87,7 @@ describe('submitSealedBid', () => {
     mockUser(undefined)
 
     const result = await submitSealedBid(baseParams)
-    expect(result.success).toBe(false)
+    assertBidError(result)
     expect(result.status).toBe(401)
   })
 
@@ -89,7 +95,7 @@ describe('submitSealedBid', () => {
     mockUser({ id: 'user-1', status: 'suspended' })
 
     const result = await submitSealedBid(baseParams)
-    expect(result.success).toBe(false)
+    assertBidError(result)
     expect(result.status).toBe(403)
   })
 
@@ -98,7 +104,7 @@ describe('submitSealedBid', () => {
     mockAuction({ status: 'ended', minBid: 100, endsAt: '2099-01-01T00:00:00Z' })
 
     const result = await submitSealedBid(baseParams)
-    expect(result.success).toBe(false)
+    assertBidError(result)
     expect(result.status).toBe(400)
   })
 
@@ -107,18 +113,18 @@ describe('submitSealedBid', () => {
     mockAuction({ status: 'active', minBid: 100000, endsAt: '2099-01-01T00:00:00Z' })
 
     const result = await submitSealedBid({ ...baseParams, amount: 50000 })
-    expect(result.success).toBe(false)
+    assertBidError(result)
     expect(result.status).toBe(400)
   })
 
   it('enforces revision cap', async () => {
     mockUser({ id: 'user-1' })
     mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z' })
-    mockExistingBids(Array.from({ length: 4 }, (_, i) => ({ id: `bid-${i}`, status: 'leading' })))
+    mockExistingBids(Array.from({ length: 4 }, (_, i) => ({ id: `bid-${String(i)}`, status: 'leading' })))
     mockSettings(3)
 
     const result = await submitSealedBid(baseParams)
-    expect(result.success).toBe(false)
+    assertBidError(result)
     expect(result.error).toContain('Revision limit')
     expect(result.status).toBe(400)
   })
@@ -134,7 +140,8 @@ describe('submitSealedBid', () => {
     const result = await submitSealedBid(baseParams)
     expect(result.success).toBe(true)
     expect(mockPayload.create).toHaveBeenCalled()
-    const createData = mockPayload.create.mock.calls[0][0].data
+    const createCall = mockPayload.create.mock.calls[0]
+    const createData = createCall && (createCall[0] as Record<string, unknown>).data as Record<string, unknown>
     expect(createData.type).toBe('sealed')
     expect(createData.amount).toBe(0)
     expect(createData.identitySnapshot).toBeTruthy()
@@ -148,7 +155,7 @@ describe('submitSealedBid', () => {
     mockIdempotencyCheck(true)
 
     const result = await submitSealedBid({ ...baseParams, idempotencyKey: 'dup-key' })
-    expect(result.success).toBe(false)
+    assertBidError(result)
     expect(result.status).toBe(409)
   })
 })

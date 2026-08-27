@@ -37,5 +37,5 @@ export async function ingestLead(data: LeadInput): Promise<Record<string, unknow
     },
   })
 
-  return doc as unknown as Record<string, unknown>
+  return doc
 }

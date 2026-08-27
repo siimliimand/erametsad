@@ -321,5 +321,5 @@ export async function seedCms(payload: Payload): Promise<void> {
     })
   }
 
-  console.log(`Seeded 1 homepage, ${services.length} service pages, ${FAQ_CATEGORIES.length} FAQ categories, ${FAQ_ITEMS.length} FAQ items, ${ARTICLES.length} articles, ${TESTIMONIALS.length} testimonials, ${LEGAL_DOCS.length} legal documents`)
+  console.log(`Seeded 1 homepage, ${String(services.length)} service pages, ${String(FAQ_CATEGORIES.length)} FAQ categories, ${String(FAQ_ITEMS.length)} FAQ items, ${String(ARTICLES.length)} articles, ${String(TESTIMONIALS.length)} testimonials, ${String(LEGAL_DOCS.length)} legal documents`)
 }

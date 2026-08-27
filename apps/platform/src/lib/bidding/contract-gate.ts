@@ -2,7 +2,7 @@ import { getPayloadClient } from '@/payload/payloadClient'
 
 export async function checkContractGate(
   userId: string,
-  auctionId: string,
+  _auctionId: string,
 ): Promise<{ passed: boolean; redirectUrl?: string }> {
   const payload = await getPayloadClient()
 

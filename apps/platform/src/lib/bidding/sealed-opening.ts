@@ -1,8 +1,7 @@
 import crypto from 'node:crypto'
 
+import { decryptSealedBids, getSealedBidsForAuction, type DecryptedBid } from './sealed-bid'
 import { getPayloadClient } from '../../payload/payloadClient'
-import { decryptSealedBids, getSealedBidsForAuction } from './sealed-bid'
-import type { DecryptedBid } from './sealed-bid'
 import { prepareContract } from '../contracts/service'
 
 interface OpeningSession {
@@ -73,7 +72,7 @@ export async function approveOpeningSession(
   }
 
   const rawBids = await getSealedBidsForAuction(session.auctionId)
-  const decrypted = await decryptSealedBids(rawBids)
+  const decrypted = decryptSealedBids(rawBids)
   const ranked = decrypted.sort((a, b) => b.amount - a.amount)
 
   session.step = 'step-2-complete'
@@ -133,7 +132,7 @@ export async function confirmWinner(
   for (const otherBid of allBids.docs) {
     await payload.update({
       collection: 'bids',
-      id: otherBid.id as string,
+      id: otherBid.id,
       data: { status: 'lost' },
     })
   }

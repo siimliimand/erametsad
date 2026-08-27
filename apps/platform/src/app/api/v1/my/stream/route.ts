@@ -5,7 +5,7 @@ export const runtime = 'edge'
 
 export function GET(request: Request) {
   const cookies = request.headers.get('cookie') ?? ''
-  const match = cookies.match(/(?:^|;\s*)access_token=([^;]+)/)
+  const match = /(?:^|;\s*)access_token=([^;]+)/.exec(cookies)
   const token = match?.[1]
 
   if (!token) {

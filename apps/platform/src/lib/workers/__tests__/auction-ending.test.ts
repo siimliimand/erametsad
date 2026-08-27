@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { processEndedAuctions } from '../auction-ending'
 
 vi.mock('@/payload/payloadClient', () => ({
   getPayloadClient: vi.fn(),
@@ -13,9 +12,11 @@ vi.mock('../../realtime/auction-stream', () => ({
   broadcast: vi.fn(),
 }))
 
-import { getPayloadClient } from '@/payload/payloadClient'
 import { eventBus } from '../../notifications/event-bus'
 import { broadcast } from '../../realtime/auction-stream'
+import { processEndedAuctions } from '../auction-ending'
+
+import { getPayloadClient } from '@/payload/payloadClient'
 
 let mockPayload: { find: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; findByID: ReturnType<typeof vi.fn> }
 
@@ -53,11 +54,13 @@ describe('processEndedAuctions', () => {
       expect.objectContaining({
         collection: 'auctions',
         id: 'auction-1',
-        data: expect.objectContaining({ status: 'ended' }),
+        data: expect.objectContaining({ status: 'ended' }) as Record<string, unknown>,
       }),
     )
-    expect(eventBus.emit).toHaveBeenCalled()
-    expect(broadcast).toHaveBeenCalled()
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(vi.mocked(eventBus).emit).toHaveBeenCalled()
+     
+    expect(vi.mocked(broadcast)).toHaveBeenCalled()
   })
 
   it('transitions auction with leading bid to ended correctly', async () => {
@@ -74,8 +77,8 @@ describe('processEndedAuctions', () => {
       (c: unknown[]) => (c[0] as { collection: string }).collection === 'auctions',
     )
     expect(updateCalls.length).toBe(1)
-    expect(updateCalls[0][0].data.status).toBe('ended')
-    expect(updateCalls[0][0].data.winningBid).toBe('winning-bid')
+    expect((updateCalls[0][0] as Record<string, unknown>).data.status).toBe('ended')
+    expect((updateCalls[0][0] as Record<string, unknown>).data.winningBid).toBe('winning-bid')
   })
 
   it('transitions auction with needsAppraisal to appraised', async () => {
@@ -91,8 +94,8 @@ describe('processEndedAuctions', () => {
     const updateCalls = mockPayload.update.mock.calls.filter(
       (c: unknown[]) => (c[0] as { collection: string }).collection === 'auctions',
     )
-    expect(updateCalls[0][0].data.status).toBe('appraised')
-    expect(updateCalls[0][0].data.appraisedAt).toBeDefined()
+    expect((updateCalls[0][0] as Record<string, unknown>).data.status).toBe('appraised')
+    expect((updateCalls[0][0] as Record<string, unknown>).data.appraisedAt).toBeDefined()
   })
 
   it('goes to unsold when auction has no leading bid', async () => {
@@ -108,7 +111,7 @@ describe('processEndedAuctions', () => {
     const updateCalls = mockPayload.update.mock.calls.filter(
       (c: unknown[]) => (c[0] as { collection: string }).collection === 'auctions',
     )
-    expect(updateCalls[0][0].data.status).toBe('unsold')
+    expect((updateCalls[0][0] as Record<string, unknown>).data.status).toBe('unsold')
   })
 
   it('handles sealed auction type', async () => {
@@ -123,11 +126,12 @@ describe('processEndedAuctions', () => {
     const updateCalls = mockPayload.update.mock.calls.filter(
       (c: unknown[]) => (c[0] as { collection: string }).collection === 'auctions',
     )
-    expect(updateCalls[0][0].data.status).toBe('ended')
-    expect(eventBus.emit).toHaveBeenCalledWith(
+    expect((updateCalls[0][0] as Record<string, unknown>).data.status).toBe('ended')
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(vi.mocked(eventBus).emit).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'auction.ended',
-        payload: expect.objectContaining({ type: 'sealed' }),
+        payload: expect.objectContaining({ type: 'sealed' }) as Record<string, unknown>,
       }),
     )
   })
@@ -160,7 +164,7 @@ describe('processEndedAuctions', () => {
         eur: 5000,
         area: 100,
         count: 1,
-      }),
+      }) as Record<string, unknown>,
       depth: 0,
     })
   })

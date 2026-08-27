@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
 import { checkAntiSnipe } from '../anti-snipe'
 
 const mockPayload = {
@@ -40,7 +41,7 @@ describe('checkAntiSnipe', () => {
     expect(result.extended).toBe(true)
     expect(result.newEndTime).toBeDefined()
     const expectedEnd = new Date(endsAt.getTime() + 5 * 60 * 1000)
-    expect(result.newEndTime!.getTime()).toBe(expectedEnd.getTime())
+    expect((result.newEndTime as unknown as Date).getTime()).toBe(expectedEnd.getTime())
 
     expect(mockPayload.update).toHaveBeenCalledWith({
       collection: 'auctions',
@@ -68,7 +69,7 @@ describe('checkAntiSnipe', () => {
 
     expect(result.extended).toBe(true)
     const expectedEnd = new Date(endsAt.getTime() + 5 * 60 * 1000)
-    expect(result.newEndTime!.getTime()).toBe(expectedEnd.getTime())
+    expect((result.newEndTime as unknown as Date).getTime()).toBe(expectedEnd.getTime())
   })
 
   it('extended auction can be further extended by another bid', async () => {

@@ -26,7 +26,7 @@ export const Profile: CollectionConfig = {
         { label: 'Rejected', value: 'rejected' },
       ],
       admin: {
-        condition: (_, siblingData) => siblingData?.type === 'company',
+        condition: (_, siblingData) => siblingData.type === 'company',
       },
     },
     {
@@ -40,14 +40,14 @@ export const Profile: CollectionConfig = {
       name: 'companyName',
       type: 'text',
       admin: {
-        condition: (_, siblingData) => siblingData?.type === 'company',
+        condition: (_, siblingData) => siblingData.type === 'company',
       },
     },
     {
       name: 'companyRegCode',
       type: 'text',
       admin: {
-        condition: (_, siblingData) => siblingData?.type === 'company',
+        condition: (_, siblingData) => siblingData.type === 'company',
       },
     },
     {

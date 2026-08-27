@@ -1,8 +1,8 @@
 import crypto from 'node:crypto'
 
-import { getPayloadClient } from '../../payload/payloadClient'
 import { renderTemplate } from './render'
 import type { ContractTemplate } from './render'
+import { getPayloadClient } from '../../payload/payloadClient'
 
 export interface Contract {
   id: string
@@ -57,13 +57,13 @@ export async function prepareContract(
     const key = ph.key
     if (key.startsWith('auction.')) {
       const field = key.slice('auction.'.length)
-      data[key] = String(auction[field] ?? '')
+      data[key] = (auction[field] as string | undefined) ?? ''
     } else {
       data[key] = `[${key}]`
     }
   }
-  data.auctionTitle = (auction.title as string) ?? `Auction ${auctionId}`
-  data.date = new Date().toISOString().split('T')[0]!
+  data.auctionTitle = (auction.title as string | undefined) ?? `Auction ${auctionId}`
+  data.date = new Date().toISOString().split('T')[0]
   data.auctionId = auctionId
 
   const template: ContractTemplate = {
@@ -80,7 +80,7 @@ export async function prepareContract(
   const newContract = await payload.create({
     collection: 'contracts',
     data: {
-      template: templateDoc.id as string,
+      template: templateDoc.id,
       lot: auctionId,
       status: 'prepared',
       renderedHtml: rendered.html,

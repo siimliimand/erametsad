@@ -38,13 +38,11 @@ function sign(payload: Record<string, unknown>, expiresIn: number): string {
   return `${headerB64}.${bodyB64}.${base64UrlEncode(signature)}`
 }
 
-function verify<T>(token: string): T | null {
+function verify(token: string): Record<string, unknown> | null {
   const parts = token.split('.')
   if (parts.length !== 3) return null
 
-  const headerB64 = parts[0]!
-  const bodyB64 = parts[1]!
-  const sigB64 = parts[2]!
+  const [headerB64, bodyB64, sigB64] = parts as [string, string, string]
 
   const expectedSig = crypto
     .createHmac('sha256', getSecret())
@@ -61,7 +59,7 @@ function verify<T>(token: string): T | null {
 
   let body: Record<string, unknown>
   try {
-    body = JSON.parse(base64UrlDecode(bodyB64).toString('utf8'))
+    body = JSON.parse(base64UrlDecode(bodyB64).toString('utf8')) as Record<string, unknown>
   } catch {
     return null
   }
@@ -70,7 +68,7 @@ function verify<T>(token: string): T | null {
     return null
   }
 
-  return body as T
+  return body
 }
 
 export interface AccessTokenPayload {
@@ -89,7 +87,7 @@ export function signAccessToken(payload: AccessTokenPayload): string {
 export function verifyAccessToken(
   token: string,
 ): AccessTokenPayload | null {
-  const result = verify<AccessTokenPayload>(token)
+  const result = verify(token)
   if (!result || typeof result.userId !== 'string' || typeof result.role !== 'string') {
     return null
   }
@@ -103,7 +101,7 @@ export function signRefreshToken(payload: RefreshTokenPayload): string {
 export function verifyRefreshToken(
   token: string,
 ): RefreshTokenPayload | null {
-  const result = verify<RefreshTokenPayload>(token)
+  const result = verify(token)
   if (!result || typeof result.sessionId !== 'string') {
     return null
   }
