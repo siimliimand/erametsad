@@ -60,7 +60,8 @@ export async function evaluateAutobidders(
 
     if (eligible.length === 0) break
 
-    const chosen = eligible[0]
+    // eslint-disable-next-line @typescript-eslint/non-nullable-type-assertion-style
+    const chosen = eligible[0] as Record<string, unknown>
     const chosenMax = chosen.maxAmount as number
 
     const hasSameMaxTie =

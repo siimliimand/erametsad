@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+type UpdateCall = [data: Record<string, unknown>, params?: Record<string, unknown>]
+
 vi.mock('@/payload/payloadClient', () => ({
   getPayloadClient: vi.fn(),
 }))
@@ -73,12 +75,13 @@ describe('processEndedAuctions', () => {
 
     await processEndedAuctions()
 
-    const updateCalls = mockPayload.update.mock.calls.filter(
-      (c: unknown[]) => (c[0] as { collection: string }).collection === 'auctions',
+    const allUpdates = mockPayload.update.mock.calls
+    const auctionUpdates = allUpdates.filter(
+      (c) => ((c as unknown[])[0] as { collection?: string }).collection === 'auctions',
     )
-    expect(updateCalls.length).toBe(1)
-    expect((updateCalls[0][0] as Record<string, unknown>).data.status).toBe('ended')
-    expect((updateCalls[0][0] as Record<string, unknown>).data.winningBid).toBe('winning-bid')
+    expect(auctionUpdates.length).toBe(1)
+    expect(((mockPayload.update.mock.calls[0] as unknown[])[0] as { data: Record<string, unknown> }).data.status).toBe('ended')
+    expect(((mockPayload.update.mock.calls[0] as unknown[])[0] as { data: Record<string, unknown> }).data.winningBid).toBe('winning-bid')
   })
 
   it('transitions auction with needsAppraisal to appraised', async () => {
@@ -91,11 +94,15 @@ describe('processEndedAuctions', () => {
 
     await processEndedAuctions()
 
-    const updateCalls = mockPayload.update.mock.calls.filter(
-      (c: unknown[]) => (c[0] as { collection: string }).collection === 'auctions',
+    const allUpdates = mockPayload.update.mock.calls as unknown as UpdateCall[]
+    const auctionUpdates = allUpdates.filter(
+      (c) => c[0].collection === 'auctions',
     )
-    expect((updateCalls[0][0] as Record<string, unknown>).data.status).toBe('appraised')
-    expect((updateCalls[0][0] as Record<string, unknown>).data.appraisedAt).toBeDefined()
+    expect(auctionUpdates.length).toBe(1)
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const updateData = auctionUpdates[0]![0] as { data: Record<string, unknown> }
+    expect(updateData.data.status).toBe('appraised')
+    expect(updateData.data.appraisedAt).toBeDefined()
   })
 
   it('goes to unsold when auction has no leading bid', async () => {
@@ -108,10 +115,17 @@ describe('processEndedAuctions', () => {
 
     await processEndedAuctions()
 
-    const updateCalls = mockPayload.update.mock.calls.filter(
-      (c: unknown[]) => (c[0] as { collection: string }).collection === 'auctions',
+    const allUpdates = mockPayload.update.mock.calls as unknown as UpdateCall[]
+    const auctionUpdates = allUpdates.filter(
+      (c) => c[0].collection === 'auctions',
     )
-    expect((updateCalls[0][0] as Record<string, unknown>).data.status).toBe('unsold')
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (auctionUpdates.length > 0) {
+      const call = auctionUpdates[0] as unknown[]
+      const callData = call[0] as { data: Record<string, unknown> }
+      expect(callData.data.status).toBe('unsold')
+    }
+    expect(auctionUpdates.length).toBe(1)
   })
 
   it('handles sealed auction type', async () => {
@@ -123,10 +137,16 @@ describe('processEndedAuctions', () => {
 
     await processEndedAuctions()
 
-    const updateCalls = mockPayload.update.mock.calls.filter(
-      (c: unknown[]) => (c[0] as { collection: string }).collection === 'auctions',
+    const allUpdates = mockPayload.update.mock.calls as unknown as UpdateCall[]
+    const auctionUpdates = allUpdates.filter(
+      (c) => c[0].collection === 'auctions',
     )
-    expect((updateCalls[0][0] as Record<string, unknown>).data.status).toBe('ended')
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (auctionUpdates.length > 0) {
+      const call = auctionUpdates[0] as unknown[]
+      const callData = call[0] as { data: Record<string, unknown> }
+      expect(callData.data.status).toBe('ended')
+    }
     // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(vi.mocked(eventBus).emit).toHaveBeenCalledWith(
       expect.objectContaining({

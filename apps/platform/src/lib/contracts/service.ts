@@ -63,7 +63,7 @@ export async function prepareContract(
     }
   }
   data.auctionTitle = (auction.title as string | undefined) ?? `Auction ${auctionId}`
-  data.date = new Date().toISOString().split('T')[0]
+  data.date = new Date().toISOString().split('T')[0] ?? ''
   data.auctionId = auctionId
 
   const template: ContractTemplate = {

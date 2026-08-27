@@ -140,8 +140,8 @@ describe('submitSealedBid', () => {
     const result = await submitSealedBid(baseParams)
     expect(result.success).toBe(true)
     expect(mockPayload.create).toHaveBeenCalled()
-    const createCall = mockPayload.create.mock.calls[0]
-    const createData = createCall && (createCall[0] as Record<string, unknown>).data as Record<string, unknown>
+    const createCall = mockPayload.create.mock.calls[0] as unknown[]
+    const createData = (createCall[0] as { data: Record<string, unknown> }).data
     expect(createData.type).toBe('sealed')
     expect(createData.amount).toBe(0)
     expect(createData.identitySnapshot).toBeTruthy()
