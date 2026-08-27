@@ -7,7 +7,11 @@
   "dependencies": {
     "zod": "^3.23.0"
   },
+  "scripts": {
+    "test": "vitest run"
+  },
   "devDependencies": {
-    "@eametsad/config": "workspace:*"
+    "@eametsad/config": "workspace:*",
+    "vitest": "^3.2.0"
   }
 }
