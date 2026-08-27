@@ -1,33 +1,35 @@
 // pc-subagent-tiers: on startup, reads *-engineer.md templates and creates
-// tier variant files with the resolved model, plus the two primary agents the
+// tier variant files with the resolved model, plus the three primary agents the
 // user actually talks to. Everything generated here is gitignored and rebuilt
 // every startup. Model resolution: user override > team config.
 //
 // Agent topology:
-//   build.md / plan.md      mode: primary   the only agents a human selects.
-//                                           Both are fullstack-engineer with a
-//                                           tier model; plan cannot edit.
-//   fullstack-engineer.md   mode: subagent  the shared body of build and plan,
-//                                           and the fallback worker.
+//   build.md / plan.md / fullstack-engineer.md   mode: primary
+//                                           build and plan are fullstack-engineer
+//                                           with their tier model; plan cannot
+//                                           edit. fullstack-engineer is a
+//                                           third selectable primary with write
+//                                           access for direct work.
 //   *-engineer.md           mode: subagent  specialists, spawned by task().
 //   *-engineer.<tier>.md    mode: subagent  the same specialist pinned to a tier.
 //
 // Overriding opencode's built-in build and plan (rather than disabling them, as
-// earlier versions did) means the agent picker offers exactly two entries and
-// both carry our prompt and abilities.
+// earlier versions did) means the agent picker offers the standard two entries
+// plus fullstack-engineer, and all three carry our prompt and abilities.
 
 import fs from "node:fs/promises"
 import path from "node:path"
 
 const TIERS = ["build", "fast", "plan"]
 
-// The two primaries, and the tier each takes its model from. plan denies edit
+// The three primaries, and the tier each takes its model from. plan denies edit
 // so a planning session cannot mutate the tree; bash stays allowed because the
 // planning skills shell out to git and openspec to read state.
 //
-// Their colours are theme keywords rather than derived hexes, and they are
-// fixed: these are the two agents a human picks, so they should look the same
-// in every project regardless of the theme in use.
+// build and plan use theme keywords rather than derived hexes, and they are
+// fixed: these are the two agents the user always sees, so they should look the
+// same in every project regardless of the theme in use. fullstack-engineer has
+// a stable derived colour instead.
 const PRIMARIES = {
   build: {
     tier: "build",
@@ -40,6 +42,12 @@ const PRIMARIES = {
     color: "warning",
     description: "Explore and plan without touching the tree. Read-only: proposes work for build to carry out.",
     permission: { edit: "deny" },
+  },
+  "fullstack-engineer": {
+    tier: "build",
+    color: "#D2D831",
+    description: "Default engineer that accumulates skills from all created persona engineers. Direct implementation with write access.",
+    permission: null,
   },
 }
 
@@ -197,7 +205,10 @@ export const PcSubagentTiers = async ({ directory }) => {
       'mode: primary',
     ]
     if (model) lines.push(`model: ${model}`)
-    lines.push(`color: ${spec.color}`)
+    // Quote the color: unquoted, YAML treats a hex's # as a comment start and
+    // opencode rejects the frontmatter with "got null color". Quoting the
+    // theme keywords too is harmless — they still parse as plain strings.
+    lines.push(`color: "${spec.color}"`)
     lines.push('permission:')
     // plan denies edit; everything else stays allowed so the planning skills can
     // still read the tree, shell out to git and openspec, and spawn engineers.
@@ -238,8 +249,12 @@ export const PcSubagentTiers = async ({ directory }) => {
           const rawFullstack = await fs.readFile(fullstackPath, "utf-8")
           const fullstack = normalizeTemplate(rawFullstack, FULLSTACK_NAME)
           if (fullstack !== rawFullstack) {
-            await writeIfChanged(fullstackPath, fullstack)
-            console.error(`[pc-subagent-tiers] Normalized ${FULLSTACK_TEMPLATE} (mode: subagent)`)
+            // When fullstack-engineer is a primary, keep its frontmatter as-is on
+            // disk. buildPrimary below still replaces it with its own frontmatter.
+            if (!(FULLSTACK_NAME in PRIMARIES)) {
+              await writeIfChanged(fullstackPath, fullstack)
+              console.error(`[pc-subagent-tiers] Normalized ${FULLSTACK_TEMPLATE} (mode: subagent)`)
+            }
           }
 
           for (const [name, spec] of Object.entries(PRIMARIES)) {
@@ -261,7 +276,7 @@ export const PcSubagentTiers = async ({ directory }) => {
               }
             }
           }
-          console.error(`[pc-subagent-tiers] Wrote primaries: build (${models.build ?? 'session model'}), plan (${models.plan ?? 'session model'})`)
+          console.error(`[pc-subagent-tiers] Wrote primaries: build (${models.build ?? 'session model'}), plan (${models.plan ?? 'session model'}), fullstack-engineer (${models.build ?? 'session model'})`)
         } else {
           console.error(`[pc-subagent-tiers] ${FULLSTACK_TEMPLATE} missing: build and plan not generated`)
         }
@@ -307,7 +322,7 @@ export const PcSubagentTiers = async ({ directory }) => {
               cfg.agent[name].mode = 'subagent'
             }
           }
-          if (cfg.agent[FULLSTACK_NAME]) {
+          if (cfg.agent[FULLSTACK_NAME] && !(FULLSTACK_NAME in PRIMARIES)) {
             cfg.agent[FULLSTACK_NAME].mode = 'subagent'
           }
           for (const { name, tier, templateContent } of variantsToWrite) {

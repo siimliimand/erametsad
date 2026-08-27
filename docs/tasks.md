@@ -36,6 +36,7 @@ A demoable, seeded, resettable system that proves the **full end-to-end story**:
 - All three products in one codebase: marketing pages, auction portal (guest + authed customer area), admin backend.
 - Real bidding engine (transactional, server-authoritative), real CMS, real lead capture, realtime updates via SSE.
 - Full design system per [design/README.md](design/README.md) — tokens, components, motion, WCAG 2.1 AA basics.
+- Sealed-bid auctions (encrypted submissions, two-person opening) and e-signing (mocked ceremony) — beyond the plan §13 "first open auction" MVP but required for a complete end-to-end demo.
 - Seed dataset covering every object type, auction status and role.
 
 ### 1.3 Mocked / simplified for prototype (swap-in points designed from day one)
@@ -51,7 +52,10 @@ A demoable, seeded, resettable system that proves the **full end-to-end story**:
 | Maps | Leaflet + Estonian county GeoJSON + Maa-amet WMS orthophoto (free, no key), OSM fallback | Same (already production-grade) |
 | Analytics | Consent infrastructure + server-side event log only | Plausible/GA4 after consent |
 | Payments | None (reference has none either — success fee is invoiced) | Invoicing, not online payment |
-| Hosting | Single deploy (one URL, path-prefixed areas) | Subdomain split: `eametsad.ee` / `oksjonid.` / `api.` / `admin.` |
+| DB production | Neon serverless Postgres via HTTP (`@neondatabase/serverless`) | Managed PostgreSQL |
+| Queue / cache prod | Cloudflare Queues + KV (native Workers platform, no Redis needed in prototype) | Upstash Redis or self-hosted (post-prototype) |
+| Media storage | Cloudflare R2 (S3‑compatible, free tier) | Same (production‑grade) |
+| Hosting | Cloudflare Pages + Workers via `@cloudflare/next-on-pages` (single deploy, path-prefixed areas) | Subdomain split: `eametsad.ee` / `oksjonid.` / `api.` / `admin.` |
 
 ### 1.4 Out of scope for the prototype (tracked as **[L]**)
 
@@ -72,7 +76,7 @@ A demoable, seeded, resettable system that proves the **full end-to-end story**:
 | 4 | Marketing site | ~2 weeks |
 | 5 | Admin backend | ~2.5 weeks |
 | 6 | Hardening, E2E, demo | ~1 week |
-| | **Total** | **~8–12 weeks** (mirrors plan §13 MVP; Phases 3–5 can partially overlap with 2 devs — marketing is independent once Phase 2's lead API + CMS exist) |
+| | **Total** | **~10–14 weeks** (sequential sum ~13.5 wk; compresses to 10–14 with 2 devs overlapping Phases 3–5 — marketing is independent once Phase 2's lead API + CMS exist) |
 
 ---
 
@@ -86,10 +90,11 @@ Follows plan §11 "recommended" stack — the reference was built on exactly thi
 | Apps | **Single Next.js 15 (App Router) app** `apps/platform` embedding **Payload CMS 3** (mounts REST API + media), with route groups `(marketing)`, `(portal)`, `(admin)`. Subdomain split is a deploy-time concern post-prototype. |
 | Shared packages | `packages/ui` (design system), `packages/types` (zod schemas + Estonian validators), `packages/config` (eslint/tsconfig), `packages/emails` (templates) |
 | DB | PostgreSQL 16 (+ `pgcrypto` / app-level encryption for sealed bids) |
-| Queue / cache | Redis 7 + BullMQ (ending worker, notifications, snapshots) |
+| Queue / cache | **Local dev:** Redis 7 + BullMQ (ending worker, notifications, snapshots). **Prod:** Cloudflare Queues + KV — abstracted behind a common job/cache interface so the bidding engine is environment-agnostic. |
 | Realtime | SSE (`/api/auctions/stream`, `/api/my/stream`) — no WebSockets |
 | Styling | Tailwind mapped to CSS-variable design tokens; `next/font` with **`latin-ext` subset** (Estonian diacritics) |
 | Local dev | docker-compose: postgres, redis, Mailpit |
+| Production deployment | **Cloudflare** — Pages + Workers via `@cloudflare/next-on-pages`; Neon serverless Postgres; Queues + KV for jobs/cache; R2 for media |
 
 ---
 
@@ -103,13 +108,21 @@ Follows plan §11 "recommended" stack — the reference was built on exactly thi
 - [ ] CI pipeline: typecheck, lint, build, unit tests on PR **[M]**
 - [ ] Root README: dev setup, seed, reset, demo accounts **[M]**
 - [ ] Logger + request-id + error boundary conventions **[M]**
-- [ ] Turbo remote cache / deploy pipeline **[L]**
+- [ ] Turbo remote cache **[L]**
 
 ### 0.2 Payload scaffold
-- [ ] Payload bootstrap: adapter, auth-disabled default users handling, media collection (local disk storage; object storage post-prototype) **[M]**
+- [ ] Payload bootstrap: adapter, auth-disabled default users handling, media collection (local disk for dev, R2 adapter for staging/prod via Payload's S3 plugin) **[M]**
 - [ ] Access-control helper layer mapping roles (guest / private / company / seller / specialist / admin / superadmin) — plan §5.1 **[M]**
 - [ ] CORS + security headers + API rate-limit middleware skeleton **[M]**
 - [ ] Versioning/draft-preview wiring for CMS collections **[S]**
+
+### 0.3 Cloudflare prototype operations
+- [ ] Wire `@cloudflare/next-on-pages` build pipeline; validate Pages Functions rewrites for API routes + SSE streams **[M]**
+- [ ] Neon serverless Postgres provisioning + pooler connection via `@neondatabase/serverless` (HTTP fetch, no TCP); wrangle `.env` toggles between local PG and Neon **[M]**
+- [ ] Cloudflare Queues setup for BullMQ‑like job dispatch (auction-ending, notifications); KV for ephemeral cache + SSE broadcast channel **[M]**
+- [ ] R2 bucket for media uploads + signed URLs (replace Payload's local‑disk media adapter) **[M]**
+- [ ] wrangler.jsonc with env bindings (Queues, KV, R2, Neon DSN); smoke‑deploy a `/health` route **[M]**
+- [ ] CI deploy step: wrangler deploy preview on PR, production on merge to main **[S]**
 
 ---
 
@@ -206,10 +219,10 @@ Source: plan §5 (functional spec), §8 (data model), §9 (API surface), §6 (au
 ### 2.6 Bidding engine (implementation-critical — plan §5.7)
 - [ ] `placeBid` service: serializable transaction + row lock on auction; validation chain (authed → active → not ended → objectType right → amount ≥ current+step → contract prerequisites); append-only audit trail **[M]**
 - [ ] Autobidder evaluation: proxy to minimum needed to lead; tie-break by earlier creation; autobidder-vs-autobidder resolves to (second-max + step) **[M]**
-- [ ] Anti-sniping: accepted bid within last N min (default 5, per-auction toggle) extends endTime by N; persisted + broadcast **[M]**
+- [ ] Anti-sniping: accepted bid within last N min (configurable from Settings; default 5, range 1–30) extends endTime by N; persisted + broadcast **[M]**
 - [ ] Alapakkumine (under-start bid): allowed when enabled → `pending_seller_approval`; seller approve (becomes leading) / reject (notify bidder); race-guard **[M]**
 - [ ] Sealed bids: one per user (+ configurable revision cap), amount + identity snapshot **encrypted at rest** until opening; double-submit guard w/ idempotency key **[M]**
-- [ ] Auction-ending worker (BullMQ): idempotent `active → ended`, server-authoritative; computes open-auction outcome; fires notifications; writes snapshot **[M]**
+- [ ] Auction-ending worker (BullMQ / Cloudflare Queues): idempotent `active → ended`, server-authoritative; computes open-auction outcome; fires notifications; writes snapshot **[M]**
 - [ ] Sealed-opening service: two-person rule (opener + approver tokens, server-verified), one-shot simultaneous decrypt, rank by amount desc / tie earliest, winner-confirm publishes finalPrice + queues contract + notifies losers; unsold/void paths **[M]**
 - [ ] Contract gate for open bidding: signed framework contract (raamleping) required before first bid **[M]**
 - [ ] Unit tests: every rule above (step math, ties, anti-snipe boundary, alapakkumine, sealed encryption/decrypt ceremony, idempotent ending) **[M]**
@@ -373,7 +386,7 @@ Specs: [design/admin/](design/admin/). Roles: specialist (own lots/leads), selle
 
 ### 6.2 Ops & demo
 - [ ] `seed:reset` + demo script doc (who does what, in which order, expected screen states) **[M]**
-- [ ] Staging deploy (single URL, HTTPS, env badges), smoke test **[M]**
+- [ ] Staging deploy (Cloudflare Pages preview branch, HTTPS, env badges via Workers), smoke test **[M]**
 - [ ] Sentry + uptime check **[S]**
 - [ ] Error boundaries, skeleton loaders, empty states across portal/admin **[M]**
 - [ ] Lighthouse + keyboard-only walkthrough of listing → detail → bid **[S]**
@@ -397,7 +410,7 @@ Specs: [design/admin/](design/admin/). Roles: specialist (own lots/leads), selle
 | Forms | `POST /api/leads`, `POST /api/service-requests`, `POST /api/newsletter`, `POST /api/consent` |
 | Admin | auctions CRUD + `:id/status|end-manual|relist|publish|diff`, `bids/:id/approve|reject`, `:id/open-sealed|confirm-winner|void|mark-unsold`, users `:id/rights|suspend|force-logout`, company-access-requests `:id/approve|reject|hold`, contracts + templates, leads + notes, service-requests + partners, collections, settings, audit |
 
-### Background jobs (BullMQ)
+### Background jobs (local: BullMQ / prod: Cloudflare Queues)
 
 | Job | Trigger | Idempotency note |
 |---|---|---|
@@ -436,6 +449,8 @@ From plan §14 and page specs — none block the prototype start, but resolve be
 6. Buyer-network / specialist account strategy at launch (admin-only lot creation vs specialist accounts day 1).
 7. Uhistu subsite scope & PRIA-calendar content ownership (Phase 5).
 8. Languages at launch (ET only; i18n scaffolding ready).
+9. Anti-sniping default: plan (§5.2) says 5 minutes; admin editor design says default from Settings = 13 minutes. Resolve before production — both paths are implemented, the default is a one‑line Settings value.
+10. Payload `@cloudflare/next-on-pages` compatibility: Payload 3 uses Node.js internals (file system, sharp for image resizing). Verify the `nodejs_compat` flag covers all Payload operations, or isolate Payload's admin panel and media API on a separate Worker with Node.js runtime.
 
 ---
 

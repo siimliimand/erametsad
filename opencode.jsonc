@@ -9,6 +9,18 @@
       "permission": {
         "edit": "deny"
       }
+    },
+    "fullstack-engineer": {
+      "mode": "primary",
+      "model": "openrouter/deepseek/deepseek-v4-flash"
+    },
+    "fullstack-engineer.build": {
+      "mode": "subagent",
+      "model": "openrouter/deepseek/deepseek-v4-flash"
+    },
+    "fullstack-engineer.fast": {
+      "mode": "subagent",
+      "model": "openrouter/xiaomi/mimo-v2.5"
     }
   },
   "default_agent": "plan",
