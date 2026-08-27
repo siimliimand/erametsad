@@ -7,7 +7,7 @@ type LogLevel = 'info' | 'warn' | 'error'
 interface LogEntry {
   level: LogLevel
   message: string
-  requestId?: string
+  requestId: string | undefined
   timestamp: string
   context?: Record<string, unknown>
 }
@@ -36,7 +36,7 @@ function write(level: LogLevel, message: string, context?: Record<string, unknow
 }
 
 export const logger = {
-  info: (message: string, context?: Record<string, unknown>) => write('info', message, context),
-  warn: (message: string, context?: Record<string, unknown>) => write('warn', message, context),
-  error: (message: string, context?: Record<string, unknown>) => write('error', message, context),
+  info: (message: string, context?: Record<string, unknown>) => { write('info', message, context) },
+  warn: (message: string, context?: Record<string, unknown>) => { write('warn', message, context) },
+  error: (message: string, context?: Record<string, unknown>) => { write('error', message, context) },
 }

@@ -1,4 +1,5 @@
-import { withPayload } from '@payloadcms/next'
+import { setupDevPlatform } from '@cloudflare/next-on-pages/next-dev'
+import { withPayload } from '@payloadcms/next/withPayload'
 import { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
@@ -7,4 +8,9 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withPayload(nextConfig)
+export default async () => {
+  if (process.env.NODE_ENV === 'development') {
+    await setupDevPlatform()
+  }
+  return withPayload(nextConfig)
+}

@@ -17,7 +17,7 @@ export default function GlobalError({
     <div role="alert">
       <h2>Midagi läks valesti</h2>
       <p>Juhtus ootamatu viga. Proovi lehte värskendada.</p>
-      <button onClick={() => reset()}>Proovi uuesti</button>
+      <button onClick={() => { reset() }}>Proovi uuesti</button>
     </div>
   )
 }

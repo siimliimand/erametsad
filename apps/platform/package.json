@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "pages:build": "next build && npx @cloudflare/next-on-pages",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "echo 'TODO: add tests'"
@@ -14,11 +15,14 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "payload": "^3.0.0",
+    "zod": "^3.23.0",
     "@payloadcms/db-postgres": "^3.0.0",
     "@payloadcms/next": "^3.0.0",
     "@payloadcms/richtext-slate": "^3.0.0"
   },
   "devDependencies": {
+    "@eametsad/config": "workspace:*",
+    "@cloudflare/next-on-pages": "^1.0.0",
     "@types/node": "^20.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
