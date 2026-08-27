@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { statusTransitionHook } from '../../lib/auction/status-transitions'
 
 export const Auction: CollectionConfig = {
   slug: 'auctions',
@@ -382,11 +383,35 @@ export const Auction: CollectionConfig = {
                 date: { pickerAppearance: 'dayAndTime' },
               },
             },
+            {
+              name: 'appraisedAt',
+              type: 'date',
+              admin: {
+                date: { pickerAppearance: 'dayAndTime' },
+              },
+            },
+            {
+              name: 'contractAt',
+              type: 'date',
+              admin: {
+                date: { pickerAppearance: 'dayAndTime' },
+              },
+            },
+            {
+              name: 'archivedAt',
+              type: 'date',
+              admin: {
+                date: { pickerAppearance: 'dayAndTime' },
+              },
+            },
           ],
         },
       ],
     },
   ],
+  hooks: {
+    beforeChange: [statusTransitionHook],
+  },
   access: {
     read: ({ req: { user } }) => {
       if (!user) {
