@@ -1,0 +1,94 @@
+:root {
+  /* ── Colors ── */
+  --color-primary: #2E6B4F;
+  --color-primary-hover: #25573F;
+  --color-primary-dark: #16382A;
+  --color-primary-light: #E9F0EC;
+  --color-accent: #58B368;
+  --color-cta: #F2A93B;
+  --color-cta-hover: #D98F1F;
+  --color-ink: #1B211D;
+  --color-ink-muted: #6B7570;
+  --color-ink-inverse: #FFFFFF;
+  --color-bg-page: #FFFFFF;
+  --color-bg-mist: #F1F5F2;
+  --color-border: #E3E7E4;
+  --color-danger: #B3261E;
+  --color-danger-light: #FBEAE9;
+  --color-info: #2D6FA8;
+  --color-info-light: #E9F1F7;
+
+  /* Status */
+  --color-status-active: #2E9E5B;
+  --color-status-ending-soon: #F2A93B;
+  --color-status-critical: #B3261E;
+  --color-status-ended: #6B7570;
+  --color-status-draft: #9E9E9E;
+  --color-status-scheduled: #2D6FA8;
+
+  /* ── Spacing ── */
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 24px;
+  --space-lg: 40px;
+  --space-xl: 64px;
+  --space-2xl: 96px;
+  --space-3xl: 128px;
+
+  /* ── Radii ── */
+  --radius-card: 14px;
+  --radius-button: 10px;
+  --radius-input: 10px;
+  --radius-hero: 16px;
+  --radius-modal: 16px;
+  --radius-pill: 9999px;
+
+  /* ── Shadows ── */
+  --shadow-card: 0 2px 12px rgba(22, 56, 42, 0.08);
+  --shadow-card-hover: 0 2px 8px rgba(22, 56, 42, 0.12),
+    0 8px 24px rgba(22, 56, 42, 0.08);
+  --shadow-modal: 0 4px 16px rgba(22, 56, 42, 0.12),
+    0 16px 48px rgba(22, 56, 42, 0.1);
+
+  /* ── Motion ── */
+  --motion-hover-duration: 150ms;
+  --motion-hover-easing: ease-out;
+  --motion-reveal-duration: 300ms;
+  --motion-reveal-easing: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --motion-dropdown-duration: 200ms;
+  --motion-dropdown-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-modal-entry-duration: 200ms;
+  --motion-modal-entry-easing: cubic-bezier(0, 0, 0.2, 1);
+  --motion-toast-duration: 300ms;
+  --motion-toast-easing: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --motion-page-transition-duration: 250ms;
+  --motion-page-transition-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-countdown-pulse-duration: 80ms;
+  --motion-countdown-pulse-easing: ease;
+  --motion-anti-snipe-extend-duration: 500ms;
+  --motion-anti-snipe-extend-easing: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* ── Typography ── */
+  --font-heading: "Manrope", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* ── Layout ── */
+  --layout-container-max: 1280px;
+  --layout-content-narrow: 720px;
+  --layout-sidebar: 280px;
+  --layout-grid-columns: 12;
+  --layout-gutter: 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
