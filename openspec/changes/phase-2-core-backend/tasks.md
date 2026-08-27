@@ -64,7 +64,7 @@
 
 ## 9. Seed & fixtures
 
-- [ ] 9.1 Seed: taxonomies, 6 specialists, demo users for every role (guest+private+company-pending+seller+specialist+admin+superadmin) with documented credentials <!-- agent: fullstack-engineer.build, depends_on: [1.1, 2.1, 2.2, 4.4], touches: [apps/platform/src/payload/seed/index.ts, apps/platform/src/payload/seed/users.ts, apps/platform/src/payload/seed/specialists.ts] -->
+- [x] 9.1 Seed: taxonomies, 6 specialists, demo users for every role (guest+private+company-pending+seller+specialist+admin+superadmin) with documented credentials <!-- agent: fullstack-engineer.build, depends_on: [1.1, 2.1, 2.2, 4.4], touches: [apps/platform/src/payload/seed/index.ts, apps/platform/src/payload/seed/users.ts, apps/platform/src/payload/seed/specialists.ts] -->
 - [x] 9.2 ~30 demo auctions: all 4 object types × open/sealed × statuses (draft/scheduled/active/ending-soon/ended/sold/unsold/archived) incl. kiiroksjon + package table <!-- agent: fullstack-engineer.build, depends_on: [3.1, 9.1], touches: [apps/platform/src/payload/seed/auctions.ts] -->
 - [x] 9.3 Bid history fixtures incl. autobidder duel + pending alapakkumine; sealed bids ready for live opening demo <!-- agent: fullstack-engineer.build, depends_on: [3.3, 6.1, 9.2], touches: [apps/platform/src/payload/seed/bids.ts] -->
 - [x] 9.4 CMS seed: homepage + service pages + FAQ (7 categories) + 6 articles + specialists + legal docs + contract templates + leads in all pipeline stages <!-- agent: fullstack-engineer.build, depends_on: [4.5, 4.1, 9.1], touches: [apps/platform/src/payload/seed/cms.ts, apps/platform/src/payload/seed/contracts.ts, apps/platform/src/payload/seed/leads.ts] -->
