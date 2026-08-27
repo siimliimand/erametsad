@@ -4,6 +4,7 @@ import { buildConfig } from 'payload'
 
 import { Article } from './payload/collections/Article'
 import { Auction } from './payload/collections/Auction'
+import { AuctionRight } from './payload/collections/AuctionRight'
 import { AuditEntry } from './payload/collections/AuditEntry'
 import { Lead } from './payload/collections/Lead'
 import { Notification } from './payload/collections/Notification'
@@ -30,6 +31,7 @@ export default buildConfig({
 collections: [
     Users,
     Auction,
+    AuctionRight,
     County,
     Media,
     Parish,
