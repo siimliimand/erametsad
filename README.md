@@ -5,7 +5,7 @@ cutting rights and forest property by auction. Vetted buyers bid on them.
 
 ## Prerequisites
 
-- **Node.js** 20 or later
+- **Node.js** 22 or later
 - **pnpm** 9.15 (use `corepack enable && corepack prepare pnpm@9.15.0 --activate`)
 - **Docker** and Docker Compose (for local Postgres, Redis, Mailpit)
 
