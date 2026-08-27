@@ -1,15 +1,34 @@
 import type { CollectionConfig } from 'payload'
+import { beforeChangeHook, afterDeleteHook } from '../hooks/r2Hooks'
 
 export const Media: CollectionConfig = {
   slug: 'media',
   upload: {
-    staticDir: 'media',
     mimeTypes: ['image/*', 'application/pdf'],
+    disableLocalStorage: true,
+  },
+  admin: {
+    preview: (doc) => {
+      if (!doc) return ''
+      return `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/preview?collection=media&id=${String(doc.id)}&draft=true&secret=${process.env.PAYLOAD_PREVIEW_SECRET ?? ''}`
+    },
+  },
+  versions: { drafts: true },
+  hooks: {
+    beforeChange: [beforeChangeHook],
+    afterDelete: [afterDeleteHook],
   },
   fields: [
     {
       name: 'alt',
       type: 'text',
+    },
+    {
+      name: 'r2Key',
+      type: 'text',
+      admin: {
+        readOnly: true,
+      },
     },
   ],
   access: {

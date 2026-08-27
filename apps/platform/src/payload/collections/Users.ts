@@ -5,7 +5,12 @@ export const Users: CollectionConfig = {
   auth: true,
   admin: {
     useAsTitle: 'email',
+    preview: (doc) => {
+      if (!doc) return ''
+      return `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/preview?collection=users&id=${String(doc.id)}&draft=true&secret=${process.env.PAYLOAD_PREVIEW_SECRET ?? ''}`
+    },
   },
+  versions: { drafts: true },
   fields: [
     {
       name: 'email',
