@@ -1,13 +1,17 @@
+import nodemailer, { type Transporter } from 'nodemailer'
+import type { Payload } from 'payload'
+
 import {
   bidPlatedTemplate,
   outbidTemplate,
   auctionWonTemplate,
   auctionEndedTemplate,
+  contractReadyTemplate,
 } from '@eametsad/emails'
-import type { Payload } from 'payload'
 
 import { type DomainEvent, type DomainEventType, type EventBus } from './event-bus'
 
+import { env } from '@/env'
 import { getPayloadClient } from '@/payload/payloadClient'
 
 interface NotificationPreference {
@@ -22,6 +26,28 @@ const eventChannels: Record<DomainEventType, (keyof NotificationPreference)[]> =
   'contract.ready': ['email', 'sms', 'inApp'],
   outbid: ['email', 'inApp'],
   'auction.won': ['email', 'sms', 'inApp'],
+}
+
+const eventTitles: Record<DomainEventType, string> = {
+  'bid.created': 'Pakkumus registreeritud',
+  'auction.ended': 'Oksjon on lõppenud',
+  'contract.ready': 'Leping on allkirjastamiseks valmis',
+  outbid: 'Teie pakkumus on üle pakutud',
+  'auction.won': 'Te võitsite oksjoni',
+}
+
+let transporter: Transporter | null = null
+
+function getTransporter(): Transporter {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      secure: false,
+      auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+    })
+  }
+  return transporter
 }
 
 function getTemplate(eventType: DomainEventType, payload: Record<string, unknown>): string | null {
@@ -45,6 +71,10 @@ function getTemplate(eventType: DomainEventType, payload: Record<string, unknown
       return auctionEndedTemplate({
         auctionTitle: payload.auctionTitle as string,
         finalPrice: payload.finalPrice as number,
+      })
+    case 'contract.ready':
+      return contractReadyTemplate({
+        auctionTitle: payload.auctionTitle as string,
       })
     default:
       return null
@@ -72,8 +102,31 @@ async function lookupPreferences(payload: Payload, userId: string | number): Pro
   return { email: true, sms: false, inApp: true }
 }
 
+async function lookupEmail(payload: Payload, userId: string | number): Promise<string | undefined> {
+  try {
+    const user = (await payload.findByID({
+      collection: 'users',
+      id: userId,
+      depth: 0,
+    })) as Record<string, unknown>
+    return user.email as string | undefined
+  } catch {
+    return undefined
+  }
+}
+
 async function dispatchEmail(userId: string | number, event: DomainEvent, body: string, payload: Payload): Promise<void> {
-  console.log(`[NOTIFICATION] Email to user ${String(userId)}: ${body}`)
+  const to = await lookupEmail(payload, userId)
+  if (!to) {
+    console.warn(`[NOTIFICATION] No email address for user ${String(userId)}; email skipped`)
+  } else {
+    await getTransporter().sendMail({
+      from: env.SMTP_FROM,
+      to,
+      subject: eventTitles[event.type],
+      text: body,
+    })
+  }
 
   await payload.create({
     collection: 'notifications',
@@ -81,7 +134,7 @@ async function dispatchEmail(userId: string | number, event: DomainEvent, body: 
       user: userId,
       event: event.type,
       channel: 'email',
-      title: `Event: ${event.type}`,
+      title: eventTitles[event.type],
       body,
       payload: event.payload,
       sentAt: new Date().toISOString(),
@@ -98,7 +151,7 @@ async function dispatchSms(userId: string | number, event: DomainEvent, body: st
       user: userId,
       event: event.type,
       channel: 'sms',
-      title: `Event: ${event.type}`,
+      title: eventTitles[event.type],
       body,
       payload: event.payload,
       sentAt: new Date().toISOString(),
@@ -113,7 +166,7 @@ async function dispatchInApp(userId: string | number, event: DomainEvent, body: 
       user: userId,
       event: event.type,
       channel: 'in_app',
-      title: `Event: ${event.type}`,
+      title: eventTitles[event.type],
       body,
       payload: event.payload,
       sentAt: new Date().toISOString(),
@@ -121,16 +174,23 @@ async function dispatchInApp(userId: string | number, event: DomainEvent, body: 
   })
 }
 
+const dispatched = new Set<string>()
+
+function dedupeKey(event: DomainEvent): string {
+  return `${String(event.userId)}:${event.type}:${JSON.stringify(event.payload)}`
+}
+
 export function startListening(bus: EventBus): void {
   const handler = async (event: DomainEvent) => {
     const templateBody = getTemplate(event.type, event.payload)
     if (!templateBody) return
 
-    const affectedUserId = event.payload.userId as string | number | undefined
-    if (!affectedUserId) return
+    const key = dedupeKey(event)
+    if (dispatched.has(key)) return
+    dispatched.add(key)
 
     const pl = await getPayloadClient()
-    const prefs = await lookupPreferences(pl, affectedUserId)
+    const prefs = await lookupPreferences(pl, event.userId)
 
     const channels = eventChannels[event.type]
     for (const channel of channels) {
@@ -138,21 +198,29 @@ export function startListening(bus: EventBus): void {
 
       switch (channel) {
         case 'email':
-          await dispatchEmail(affectedUserId, event, templateBody, pl)
+          await dispatchEmail(event.userId, event, templateBody, pl)
           break
         case 'sms':
-          await dispatchSms(affectedUserId, event, templateBody, pl)
+          await dispatchSms(event.userId, event, templateBody, pl)
           break
         case 'inApp':
-          await dispatchInApp(affectedUserId, event, templateBody, pl)
+          await dispatchInApp(event.userId, event, templateBody, pl)
           break
       }
     }
   }
 
-  bus.on('bid.created', (event) => { void handler(event) })
-  bus.on('auction.ended', (event) => { void handler(event) })
-  bus.on('contract.ready', (event) => { void handler(event) })
-  bus.on('outbid', (event) => { void handler(event) })
-  bus.on('auction.won', (event) => { void handler(event) })
+  const handleSafely = async (event: DomainEvent) => {
+    try {
+      await handler(event)
+    } catch (error) {
+      console.error(`[NOTIFICATION] Dispatch failed for ${event.type} (user ${String(event.userId)}):`, error)
+    }
+  }
+
+  bus.on('bid.created', (event) => { void handleSafely(event) })
+  bus.on('auction.ended', (event) => { void handleSafely(event) })
+  bus.on('contract.ready', (event) => { void handleSafely(event) })
+  bus.on('outbid', (event) => { void handleSafely(event) })
+  bus.on('auction.won', (event) => { void handleSafely(event) })
 }

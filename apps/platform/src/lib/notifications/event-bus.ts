@@ -2,6 +2,7 @@ export type DomainEventType = 'bid.created' | 'auction.ended' | 'contract.ready'
 
 export interface DomainEvent {
   type: DomainEventType
+  userId: string | number
   payload: Record<string, unknown>
 }
 

@@ -1,3 +1,3 @@
 export function auctionWonTemplate(params: { auctionTitle: string; winningBid: number }): string {
-  return `Congratulations! You won auction ${params.auctionTitle} for €${params.winningBid.toFixed(2)}`
+  return `Palju õnne! Võitsite oksjoni "${params.auctionTitle}" pakkumusega ${params.winningBid.toFixed(2)} €.`
 }
