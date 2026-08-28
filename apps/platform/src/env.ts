@@ -17,11 +17,18 @@ const envSchema = z.object({
   R2_PUBLIC_URL: z.string().url().optional(),
 })
 
-const parsed = envSchema.safeParse(process.env)
+// `next build` imports route modules without runtime secrets present; only
+// enforce the full schema outside the build phase so bundling can complete.
+const schema =
+  process.env.NEXT_PHASE === "phase-production-build"
+    ? envSchema.partial()
+    : envSchema
+
+const parsed = schema.safeParse(process.env)
 
 if (!parsed.success) {
   console.error("Invalid environment variables:", parsed.error.flatten().fieldErrors)
   process.exit(1)
 }
 
-export const env = parsed.data
+export const env = parsed.data as z.infer<typeof envSchema>

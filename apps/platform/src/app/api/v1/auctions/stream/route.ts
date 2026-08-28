@@ -1,7 +1,5 @@
 import { getEventStream } from '@/lib/realtime/auction-stream'
 
-export const runtime = 'edge'
-
 export function GET() {
   const stream = getEventStream()
 

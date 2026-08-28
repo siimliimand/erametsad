@@ -4,8 +4,6 @@ import type { NextRequest } from 'next/server'
 import { authRateLimiter } from '@/lib/rate-limit'
 import { getPayloadClient } from '@/payload/payloadClient'
 
-export const runtime = 'edge'
-
 export async function POST(request: NextRequest) {
   const forwarded = request.headers.get('x-forwarded-for') ?? 'global'
   const rateLimitResult = authRateLimiter.check(forwarded)

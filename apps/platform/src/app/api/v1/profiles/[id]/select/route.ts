@@ -5,8 +5,6 @@ import { verifyRefreshToken } from '@/lib/auth/jwt'
 import { selectActiveProfile } from '@/lib/auth/profile-scope'
 import { getPayloadClient } from '@/payload/payloadClient'
 
-export const runtime = 'edge'
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },

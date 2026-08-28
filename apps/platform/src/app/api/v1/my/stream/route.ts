@@ -1,8 +1,6 @@
 import { verifyAccessToken } from '@/lib/auth/jwt'
 import { getUserEventStream } from '@/lib/realtime/my-stream'
 
-export const runtime = 'edge'
-
 export function GET(request: Request) {
   const cookies = request.headers.get('cookie') ?? ''
   const match = /(?:^|;\s*)access_token=([^;]+)/.exec(cookies)

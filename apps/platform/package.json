@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "pages:build": "next build && npx @cloudflare/next-on-pages",
+    "build:cf": "opennextjs-cloudflare build",
+    "deploy:cf": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -27,8 +28,8 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@cloudflare/next-on-pages": "^1.0.0",
     "@eametsad/config": "workspace:*",
+    "@opennextjs/cloudflare": "^1.20.4",
     "@types/node": "^20.0.0",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.0.0",

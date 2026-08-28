@@ -7,8 +7,6 @@ import { revokeAllUserSessions } from '@/lib/auth/session'
 import { authRateLimiter } from '@/lib/rate-limit'
 import { getPayloadClient } from '@/payload/payloadClient'
 
-export const runtime = 'edge'
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> },

@@ -3,8 +3,6 @@ import type { NextRequest } from 'next/server'
 
 import { getEidProvider } from '@/lib/auth/eid-provider'
 
-export const runtime = 'edge'
-
 export async function POST(request: NextRequest) {
   let body: Record<string, unknown>
   try {

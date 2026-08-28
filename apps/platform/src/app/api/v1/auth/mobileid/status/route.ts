@@ -3,8 +3,6 @@ import type { NextRequest } from 'next/server'
 
 import { getEidProvider } from '@/lib/auth/eid-provider'
 
-export const runtime = 'edge'
-
 export async function GET(request: NextRequest) {
   const sessionRef = request.nextUrl.searchParams.get('sessionRef')
 
