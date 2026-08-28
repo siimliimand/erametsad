@@ -31,11 +31,11 @@ of the previous leading bid to `outbid`.
 - **THEN** the response is HTTP 403 with a redirect path to the contract
 
 ### Requirement: Autobidder evaluation
-When a manual or autobidder bid arrives, the autobidder evaluation service
-SHALL determine the new leading amount as the minimum required to stay
+The autobidder evaluation service SHALL determine the new leading amount
+when a manual or autobidder bid arrives: the minimum required to stay
 ahead, capped at each autobidder's `maxAmount`. Tie-breaks between equal
 autobidder limits SHALL resolve to the autobidder created first.
-Autobidder-vs-autobidder conflict shall resolve to `secondMax + bidStep`.
+Autobidder-vs-autobidder conflict SHALL resolve to `secondMax + bidStep`.
 
 #### Scenario: Autobidder responds to a manual bid
 - **WHEN** a manual bid of €300 arrives and an autobidder is active with
@@ -49,11 +49,11 @@ Autobidder-vs-autobidder conflict shall resolve to `secondMax + bidStep`.
 - **THEN** the new leading bid is €500 for the autobidder created first
 
 ### Requirement: Anti-sniping time extension
-When a bid is accepted in the last N minutes of an auction (where N is the
-Auction's anti-snipe window configured in Settings, default 5, range 1–30),
-the system SHALL extend the auction endTime by N minutes and persist the
-new endTime. The extension SHALL be broadcast via SSE to all connected
-listeners.
+The system SHALL extend the auction endTime by N minutes and persist the
+new endTime when a bid is accepted in the last N minutes of an auction
+(where N is the Auction's anti-snipe window configured in Settings,
+default 5, range 1–30). The extension SHALL be broadcast via SSE to all
+connected listeners.
 
 #### Scenario: Bid in final 5 minutes extends auction
 - **WHEN** a bid arrives 3 minutes before endTime and anti-snipe = 5
@@ -61,8 +61,8 @@ listeners.
   event is sent
 
 ### Requirement: Alapakkumine (under-start bid)
-When alapakkumine is enabled on an auction, a user MAY submit a bid below
-`minBid`. Such a bid SHALL be created with status `pending_approval`. The
+A bid below `minBid` SHALL be permitted when alapakkumine is enabled on
+an auction. Such a bid SHALL be created with status `pending_approval`. The
 seller SHALL be able to approve (status becomes `leading`) or reject
 (notify bidder via notification service). A concurrent approval race
 SHALL be handled with an idempotency guard.

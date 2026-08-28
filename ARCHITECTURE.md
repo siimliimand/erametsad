@@ -38,6 +38,14 @@ eametsad/
 ├── .agents/              # Agent skills and infrastructure
 ├── .codegraph/           # Code intelligence index
 ├── .opencode/            # OpenCode configuration, harness, agents, plugins
+├── apps/
+│   └── platform/         # Core backend: Next.js 15 + Payload CMS 3 (API, admin,
+│                         # bidding engine, auth, SSE, workers, seed data)
+├── packages/
+│   ├── config/           # Shared ESLint, Prettier, and TypeScript configuration
+│   ├── emails/           # Notification e-mail templates (React templates)
+│   ├── types/            # Shared TypeScript types and enums
+│   └── ui/               # Design-system component library (Phase 1)
 ├── docs/
 │   ├── README.md         # Plain-language project overview for all audiences
 │   ├── EAMETSAD-PLAN.md  # Master build plan: features, architecture, data model, timeline
@@ -57,7 +65,7 @@ eametsad/
 └── skills-lock.json      # Installed agent skills manifest
 ```
 
-The project is in pre-implementation state. No source code directories exist yet. Source directories will be added per the delivery phases defined in `docs/EAMETSAD-PLAN.md`.
+The monorepo is under active implementation. `apps/platform` holds the core backend: a Next.js 15 App Router application with an embedded Payload CMS 3 instance covering the API, admin panel, collections, auth flows, bidding engine, SSE streams, the auction-ending worker, and seed data. Remaining phases are defined in `docs/EAMETSAD-PLAN.md`.
 
 ---
 
@@ -134,16 +142,18 @@ All marketing-site content is managed via Payload CMS collections. The site gene
 | **Background jobs** | BullMQ (auction ending worker, notifications, digests, PDF generation) |
 | **Realtime** | SSE for live bid/countdown updates |
 
-**API endpoints (summary):**
+**API endpoints (summary, as implemented in Phase 2):**
 
 | Area | Endpoints |
 |---|---|
-| Public content | `GET /api/v1/auctions`, `/auctions/:id`, `/auctions/:id/bids`, `/counties`, `/statistics` |
-| Auth | `POST /api/v1/auth/{smartid\|mobileid\|idcard}/start\|status\|complete`, `/login` |
-| Portal | `GET /api/v1/my-auctions`, `/bids/create`, `/auto-bidders`, `/profiles` |
-| Contracts | `POST /api/v1/contracts/framework/prepare\|complete`, `/contracts/auction/prepare\|complete` |
-| Admin CRUD | Full CRUD for auctions, users, rights, CMS content, sealed-bid opening |
-| Forms | `POST /api/v1/leads`, `/service-requests`, `/newsletter` |
+| Auth | `POST /api/v1/auth/login`, `/register`, `/reset-password/:token`, `/{smartid\|mobileid\|idcard}/start\|status` (demo eID simulator behind a provider interface) |
+| Bidding | `POST /api/v1/bids/create`, `GET/POST /api/v1/auto-bidders` |
+| Contracts | `POST /api/v1/bids/contract/{prepare\|complete}`, `/api/v1/bids/framework-contract/{prepare\|complete}` |
+| Profiles | `POST /api/v1/profiles/:id/select`, `POST /api/v1/business/request-access` |
+| Realtime | `GET /api/v1/auctions/stream` (public SSE), `GET /api/v1/my/stream` (authenticated SSE) |
+| Public data | `GET /api/v1/statistics`, `GET /api/v1/company-lookup` (registry fixtures) |
+| Admin | `POST /api/v1/admin/auctions/:id/open-sealed`, `/confirm-winner`, plus Payload CRUD |
+| Forms | `POST /api/leads` (honeypot + rate-limited) |
 
 ### 3.4 Admin Backend
 
@@ -197,7 +207,7 @@ Buyer submits bid
 
 ### Core entities
 
-`User`, `Profile` (private/company), `CompanyAccessRequest`, `AuctionRight`, `Auction` (with full field model: location, forest data, pricing, content, packages), `Bid` (append-only), `AutoBidder`, `Contract`, `ContractTemplate`, `Lead`, `ServiceRequest`, `NewsletterSubscriber`, `Specialist`, CMS collections (`Page`, `Article`, `FAQItem`, `Testimonial`, etc.), `County`, `Parish`, `Notification`, `AuditEntry`, `StatisticsSnapshot`.
+`User`, `Profile` (private/company), `CompanyAccessRequest`, `AuctionRight`, `Auction` (with full field model: location, forest data, pricing, content, packages), `Bid` (append-only), `AutoBidder`, `AuctionSubscription`, `Contract`, `ContractTemplate`, `Lead`, `ServiceRequest`, `NewsletterSubscriber`, `Specialist`, CMS collections (`Page`, `Article`, `FAQCategory`, `FAQItem`, `Testimonial`, `PartnerService`, `LegalDocument`, `Redirect`), `County`, `Parish`, `Notification`, `AuditEntry`, `StatisticsSnapshot`, `Settings` (singleton: fees, anti-snipe and alapakkumine defaults, feature flags).
 
 See `docs/EAMETSAD-PLAN.md` §8 for the complete data model.
 
@@ -207,13 +217,13 @@ See `docs/EAMETSAD-PLAN.md` §8 for the complete data model.
 
 | Integration | Purpose | Method | Notes |
 |---|---|---|---|
-| eID (Smart-ID, Mobile-ID, ID-card) | Authentication | Aggregator API (eID Easy or Signicat) | Phase 0 decision |
+| eID (Smart-ID, Mobile-ID, ID-card) | Authentication | Aggregator API (eID Easy or Signicat) | Phase 0 decision. Phase 2 ships a demo simulator behind a provider interface (`lib/auth/eid-provider.ts`) until the aggregator is contracted |
 | e-signing (same provider) | Contract signing | Aggregator API | Wraps Smart-ID/M-ID/ID-card signing |
 | Äriregister (e-Business Register) | Company registry lookup | REST API / X-Road | Validates registrikood on company registration |
 | Maa-amet (Land Board) WMS/orthophoto | Map tiles | Leaflet + WMS | Free, local — primary map provider |
 | Google Maps (fallback) | Map tiles | JS API | Fallback only |
-| Mailgun (SendGrid) | Transactional e-mail | REST API / SMTP | Phase 2 — notification templates |
-| SMS provider (Messente/CM.com) | Bid/auction-critical SMS | REST API | Phase 2 — outbid + ending alerts |
+| Mailgun (SendGrid) | Transactional e-mail | REST API / SMTP | Phase 2 — templates done; e-mail sends via SMTP (Mailpit in dev) until the provider is contracted |
+| SMS provider (Messente/CM.com) | Bid/auction-critical SMS | REST API | Phase 2 — SMS channel is a log stub until the provider is contracted |
 | Gotenberg or Puppeteer | PDF generation | HTTP API | Self-hosted — contract PDFs |
 | Plausible or GA4 | Analytics | JS snippet + API | Phase 1 — GDPR consent gated |
 
@@ -302,28 +312,27 @@ Not evident from the repository: APM tooling, structured logging framework, heal
 
 ## 12. Development Workflow
 
-The project is in pre-implementation state. Build tooling will be set up in Phase 0.
+Build tooling is established: a pnpm workspace driven by a Turborepo pipeline. ESLint, Prettier, and the shared TypeScript configuration live in `packages/config`. Database seed and reset run through `pnpm seed:reset` in `apps/platform`.
 
 | Command | Purpose |
 |---|---|
-| `pnpm install` | Install dependencies (upon setup) |
+| `pnpm install` | Install dependencies |
 | `pnpm dev` | Start development servers |
 | `pnpm build` | Build all packages |
 | `pnpm lint` | Lint check |
 | `pnpm typecheck` | TypeScript type check |
 | `pnpm test` | Run tests |
 
-Not yet established: ESLint/Prettier/Biome configuration, pre-commit hooks, commit message convention.
+Not yet established: pre-commit hooks, commit message convention.
 
 ---
 
 ## 13. Testing Strategy
 
-Not yet defined. Recommended approach based on specification:
+Unit tests are implemented with Vitest in `apps/platform`. They cover the bid engine (place-bid validation chain, autobidder tie-breaks, anti-snipe boundary, alapakkumine approval, sealed-bid encrypt/decrypt) and the auction-ending worker (idempotent double-fire). The remaining layers are still planned:
 
 | Layer | Framework | Scope |
 |---|---|---|
-| **Unit** | Vitest | Utility functions, validators, bid engine rules |
 | **Integration** | Supertest + test DB | API endpoints, auction lifecycle, auth flows |
 | **E2E** | Playwright | Critical user journeys: register → bid → win → sign |
 | **Visual** | Playwright (pc-ops-evidence) | UI snapshot testing in CI |
@@ -349,7 +358,6 @@ Not yet defined. Recommended approach based on specification:
 
 | Item | Type | Impact |
 |---|---|---|
-| **No code written yet** | Status | All architecture is pre-implementation — subject to refinement during build |
 | **Client legal entity not confirmed** | External dependency | Contracts, T&C, and fee invoices blocked |
 | **eID provider not contracted** | External dependency | Auth and e-signing integration gated |
 | **Buyer network not established** | Business risk | Auction liquidity is the make-or-break factor |
@@ -380,7 +388,7 @@ Not yet defined. Recommended approach based on specification:
 | **Primary language** | TypeScript/JavaScript (Next.js, Payload CMS, React) |
 | **Database** | PostgreSQL 16 |
 | **Runtime** | Node.js |
-| **Date of review** | 2026-08-27 |
+| **Date of review** | 2026-08-28 |
 | **Maintainer** | Not yet assigned |
 
 ---
@@ -404,4 +412,4 @@ Not yet defined. Recommended approach based on specification:
 | Specialist | Metsaspetsialist | An Eametsad staff member who manages forest owner relationships |
 | Association | Metsaühistu | Forest owners' cooperative (optional Phase 5) |
 
-<!-- Last updated: 2026-08-27 -->
+<!-- Last updated: 2026-08-28 -->
