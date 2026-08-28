@@ -5,17 +5,17 @@ vi.mock('@/lib/leads/ingestion', () => ({
   validateHoneypot: vi.fn(),
 }))
 
-const { mockCheck, getPayloadClientMock } = vi.hoisted(() => ({
+const { mockCheck, getRepositoriesMock } = vi.hoisted(() => ({
   mockCheck: vi.fn(),
-  getPayloadClientMock: vi.fn(),
+  getRepositoriesMock: vi.fn(),
 }))
 
 vi.mock('@/lib/rate-limit', () => ({
   leadsRateLimiter: { check: mockCheck },
 }))
 
-vi.mock('@/payload/payloadClient', () => ({
-  getPayloadClient: getPayloadClientMock,
+vi.mock('@/lib/data/runtime', () => ({
+  getRepositories: getRepositoriesMock,
 }))
 
 vi.mock('@/lib/bidding/place-bid', () => ({
@@ -92,7 +92,7 @@ describe('POST /api/leads', () => {
       const json = await jsonResponse(res)
       expect(json.status).toBe('ok')
       expect(mockIngest).not.toHaveBeenCalled()
-      expect(getPayloadClientMock).not.toHaveBeenCalled()
+      expect(getRepositoriesMock).not.toHaveBeenCalled()
     })
   })
 
@@ -149,7 +149,7 @@ describe('POST /api/leads', () => {
       const create = vi
         .fn<(arg: { collection: string; data: Record<string, unknown> }) => Promise<{ id: string }>>()
         .mockResolvedValue({ id: 'lead-1' })
-      getPayloadClientMock.mockResolvedValue({ create })
+      getRepositoriesMock.mockResolvedValue({ create })
 
       await ingestLeadActual({
         ...validBody,
@@ -165,7 +165,7 @@ describe('POST /api/leads', () => {
     it('stores no lead row when the honeypot path skips ingestion', async () => {
       mockHoneypot.mockReturnValue(false)
       await POST(makeRequest({ ...validBody, company_website: 'https://spam.com' }))
-      expect(getPayloadClientMock).not.toHaveBeenCalled()
+      expect(getRepositoriesMock).not.toHaveBeenCalled()
     })
   })
 

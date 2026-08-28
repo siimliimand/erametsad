@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 import { verifyAccessToken } from '@/lib/auth/jwt'
+import { hashCredentialPassword, verifyCredentialPassword } from '@/lib/auth/password'
 import { clearSessionCookies, revokeAllUserSessions } from '@/lib/auth/session'
+import { getRepositories } from '@/lib/data/runtime'
 import { authRateLimiter } from '@/lib/rate-limit'
-import { getPayloadClient } from '@/payload/payloadClient'
 
 export async function POST(request: NextRequest) {
   const forwarded = request.headers.get('x-forwarded-for') ?? 'global'
@@ -48,32 +49,35 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const user = (await payload.findByID({
+  const user = await repos.findByID({
     collection: 'users',
     id: tokenPayload.userId,
-    depth: 0,
-  })) as Record<string, unknown>
+  })
 
-  // Payload auth collections never return stored credentials, so verify the
-  // old password through payload.login (Payload's own comparison) instead
-  // of a user.password field that does not exist.
-  try {
-    await payload.login({
-      collection: 'users',
-      data: { email: user.email as string, password: oldPassword },
-      depth: 0,
-    })
-  } catch {
+  // Verify the old password against the stored credential columns (the
+  // scrypt scheme the seed writes); a missing stored credential behaves
+  // exactly like a wrong password.
+  const oldPasswordOk = verifyCredentialPassword(
+    oldPassword,
+    user?.passwordHash ?? null,
+    user?.passwordSalt ?? null,
+  )
+  if (!oldPasswordOk) {
     return NextResponse.json({ error: 'Vale vana parool' }, { status: 400 })
   }
 
-  // Raw password: Payload's auth field applies its own hashing on update.
-  await payload.update({
+  // Hash with the same credential scheme; the raw password never reaches
+  // storage.
+  const credentials = hashCredentialPassword(newPassword)
+  await repos.update({
     collection: 'users',
     id: tokenPayload.userId,
-    data: { password: newPassword },
+    data: {
+      passwordHash: credentials.hash,
+      passwordSalt: credentials.salt,
+    },
   })
 
   // The access token carries no session id, so the session store exposes no

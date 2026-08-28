@@ -3,8 +3,8 @@ import crypto from 'node:crypto'
 
 import { createSession, setSessionCookies } from '@/lib/auth/session'
 import { hash } from '@/lib/crypto'
+import { getRepositories } from '@/lib/data/runtime'
 import { getUserRole } from '@/payload/access/roles'
-import { getPayloadClient } from '@/payload/payloadClient'
 
 export type EidMethod = 'smartid' | 'mobileid' | 'idcard'
 
@@ -155,12 +155,11 @@ export async function completeEidLogin(
     return NextResponse.json({ error: 'Session not completed' }, { status: 400 })
   }
 
-  const payload = await getPayloadClient()
-  const result = await payload.find({
+  const repos = await getRepositories()
+  const result = await repos.find({
     collection: 'users',
     where: { isikukoodHash: { equals: hash(isikukood) } },
     limit: 1,
-    depth: 1,
   })
   const user = (result.docs[0] as Record<string, unknown> | undefined) ?? null
 

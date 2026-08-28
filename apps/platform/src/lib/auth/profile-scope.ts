@@ -1,17 +1,16 @@
 import { updateUserProfileId } from '@/lib/auth/session'
-import { getPayloadClient } from '@/payload/payloadClient'
+import { getRepositories } from '@/lib/data/runtime'
 
 export async function selectActiveProfile(
   userId: string,
   profileId: string,
 ): Promise<string> {
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const result = await payload.find({
+  const result = await repos.find({
     collection: 'profile',
     where: { id: { equals: profileId }, user: { equals: userId } },
     limit: 1,
-    depth: 0,
   })
 
   if (!result.docs.length) {

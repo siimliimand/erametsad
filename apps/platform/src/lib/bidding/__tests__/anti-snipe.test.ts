@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const mockPayload = {
+const mockRepos = {
   find: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
 }
 
-vi.mock('@/payload/payloadClient', () => ({
-  getPayloadClient: vi.fn(() => mockPayload),
+vi.mock('@/lib/data/runtime', () => ({
+  getRepositories: vi.fn(() => mockRepos),
 }))
 
 vi.mock('../../realtime/auction-stream', () => ({
@@ -55,7 +55,7 @@ describe('checkAntiSnipe', () => {
     const expectedEnd = new Date(endsAt.getTime() + 5 * 60 * 1000)
     expect((result.newEndTime as unknown as Date).getTime()).toBe(expectedEnd.getTime())
 
-    expect(mockPayload.update).toHaveBeenCalledWith({
+    expect(mockRepos.update).toHaveBeenCalledWith({
       collection: 'auctions',
       id: 'auction-1',
       data: { endsAt: expectedEnd.toISOString() },
@@ -70,7 +70,7 @@ describe('checkAntiSnipe', () => {
 
     expect(result.extended).toBe(false)
     expect(result.newEndTime).toBeUndefined()
-    expect(mockPayload.update).not.toHaveBeenCalled()
+    expect(mockRepos.update).not.toHaveBeenCalled()
   })
 
   it('uses default 5-minute window when settings value is missing', async () => {
@@ -92,7 +92,7 @@ describe('checkAntiSnipe', () => {
     vi.setSystemTime(new Date(now.getTime() + 3 * 60 * 1000))
 
     const auction2 = makeAuction(new Date(now.getTime() + 6 * 60 * 1000))
-    mockPayload.update.mockClear()
+    mockRepos.update.mockClear()
     const result = await checkAntiSnipe(auction2, { antiSnipeDurationMinutes: 5 })
     expect(result.extended).toBe(true)
   })
@@ -104,7 +104,7 @@ describe('checkAntiSnipe', () => {
     const result = await checkAntiSnipe(auction, { antiSnipeDurationMinutes: 5 })
 
     expect(result.extended).toBe(false)
-    expect(mockPayload.update).not.toHaveBeenCalled()
+    expect(mockRepos.update).not.toHaveBeenCalled()
   })
 
   it('never extends a sealed auction', async () => {
@@ -114,8 +114,8 @@ describe('checkAntiSnipe', () => {
     const result = await checkAntiSnipe(auction, { antiSnipeDurationMinutes: 5 })
 
     expect(result.extended).toBe(false)
-    expect(mockPayload.update).not.toHaveBeenCalled()
-    expect(mockPayload.create).not.toHaveBeenCalled()
+    expect(mockRepos.update).not.toHaveBeenCalled()
+    expect(mockRepos.create).not.toHaveBeenCalled()
     expect(emitAuctionExtended).not.toHaveBeenCalled()
   })
 
@@ -153,7 +153,7 @@ describe('checkAntiSnipe', () => {
     expect(result.extended).toBe(true)
     const expectedEnd = new Date(endsAt.getTime() + 5 * 60 * 1000)
 
-    expect(mockPayload.create).toHaveBeenCalledWith({
+    expect(mockRepos.create).toHaveBeenCalledWith({
       collection: 'audit-entry',
       data: {
         action: 'anti_snipe_extension',
@@ -180,16 +180,15 @@ describe('checkAntiSnipe', () => {
     const endsAt = new Date(now.getTime() + 2 * 60 * 1000)
     const auction = makeAuction(endsAt)
 
-    mockPayload.find.mockReturnValueOnce({
+    mockRepos.find.mockReturnValueOnce({
       docs: [{ antiSnipeDurationMinutes: 7 }],
     })
 
     const result = await checkAntiSnipe(auction)
 
-    expect(mockPayload.find).toHaveBeenCalledWith({
+    expect(mockRepos.find).toHaveBeenCalledWith({
       collection: 'settings',
       limit: 1,
-      depth: 0,
     })
     expect(result.extended).toBe(true)
     expect(result.windowMinutes).toBe(7)
@@ -201,7 +200,7 @@ describe('checkAntiSnipe', () => {
     const endsAt = new Date(now.getTime() + 2 * 60 * 1000)
     const auction = makeAuction(endsAt)
 
-    mockPayload.find.mockReturnValueOnce({ docs: [] })
+    mockRepos.find.mockReturnValueOnce({ docs: [] })
 
     const result = await checkAntiSnipe(auction)
 

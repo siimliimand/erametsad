@@ -40,7 +40,12 @@ export function setD1ForTests(d1: DbDatabase | null): void {
   d1ForTests = d1
 }
 
-async function getD1(): Promise<DbDatabase> {
+/**
+ * The D1 binding for the current invocation, honoring the test seam.
+ * Shared by the raw SQL executor below and the repository runtime
+ * (`src/lib/data/runtime.ts`), so both always see the same database.
+ */
+export async function getD1Database(): Promise<DbDatabase> {
   if (d1ForTests) return d1ForTests
   // Fetched per call, never cached as a module singleton: isolates are
   // reused across requests and a cached binding could outlive its
@@ -79,7 +84,7 @@ export const db = {
     sql: string,
     params?: SqlParams,
   ): Promise<DbResult<T>> {
-    const d1 = await getD1()
+    const d1 = await getD1Database()
     return prepare(d1, sql, params).all<T>()
   },
 
@@ -87,7 +92,7 @@ export const db = {
     statements: readonly SqlStatement[],
   ): Promise<DbResult<T>[]> {
     if (statements.length === 0) return []
-    const d1 = await getD1()
+    const d1 = await getD1Database()
     return d1.batch<T>(
       statements.map((statement) =>
         prepare(d1, statement.sql, statement.params),

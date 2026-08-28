@@ -1,10 +1,9 @@
-import type { Payload } from 'payload'
-
-import { db } from '../db'
 import { bidStatusUpdateStatement } from './place-bid'
-import { getPayloadClient } from '../../payload/payloadClient'
-import { eventBus } from '../notifications/event-bus'
-import type { DomainEvent } from '../notifications/event-bus'
+import type { CoreRepositories } from '../data/repositories'
+import { centsToEuros } from '../data/repositories/money'
+import { getRepositories } from '../data/runtime'
+import { db } from '../db'
+import { type DomainEvent, eventBus } from '../notifications/event-bus'
 
 export interface AlapakkumineResult {
   status: string
@@ -20,16 +19,15 @@ export function isAlapakkumineEnabled(
 type AlapakkumineCollection = 'users' | 'auctions' | 'bids'
 
 async function findDoc(
-  payload: Payload,
+  repos: CoreRepositories,
   collection: AlapakkumineCollection,
   where: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
-  const result = await payload.find({
+  const result = await repos.find({
     collection,
-    where,
+    where: where as never,
     limit: 1,
-    depth: 0,
-  } as Parameters<Payload['find']>[0])
+  })
   return (result.docs[0] as Record<string, unknown> | undefined) ?? null
 }
 
@@ -75,19 +73,19 @@ export async function approveAlapakkumine(
   auctionId: string,
   bidId: string,
 ): Promise<ApproveDecision> {
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
   const events: DomainEvent[] = []
   const now = new Date().toISOString()
 
-  const bid = await findDoc(payload, 'bids', { id: { equals: bidId } })
-  if (!bid || String(relationValue(bid.auction)) !== auctionId) {
+  const bid = await findDoc(repos, 'bids', { id: { equals: bidId } })
+  if (!bid || String(relationValue(bid.auctionId)) !== auctionId) {
     return { outcome: 'bid_not_found' }
   }
   if (bid.status !== 'pending_approval') {
     return { outcome: 'not_pending', status: String(bid.status) }
   }
 
-  const auction = await findDoc(payload, 'auctions', {
+  const auction = await findDoc(repos, 'auctions', {
     id: { equals: auctionId },
   })
   if (!auction) {
@@ -101,12 +99,12 @@ export async function approveAlapakkumine(
 
   const auctionTitle =
     (auction.title as string | undefined) ?? `Auction ${auctionId}`
-  const amount = bid.amount as number
-  const bidderId = relationValue(bid.user)
+  const amount = centsToEuros(bid.amountCents as number)
+  const bidderId = relationValue(bid.userId)
 
   // Per spec the approval wins the lead even over a higher legitimate
   // bid; the displaced leader is demoted in the same atomic D1 batch.
-  const leading = await findDoc(payload, 'bids', {
+  const leading = await findDoc(repos, 'bids', {
     and: [
       { auction: { equals: auctionId } },
       { status: { equals: 'leading' } },
@@ -132,7 +130,7 @@ export async function approveAlapakkumine(
   if (leading) {
     events.push({
       type: 'outbid',
-      userId: relationValue(leading.user),
+      userId: relationValue(leading.userId),
       payload: { auctionId, auctionTitle, currentBid: amount },
     })
   }
@@ -154,8 +152,8 @@ export async function approveAlapakkumine(
     bid: { bidId, bidderId: String(bidderId), amount, auctionTitle },
     displacedLeader: leading
       ? {
-          userId: String(relationValue(leading.user)),
-          amount: leading.amount as number,
+          userId: String(relationValue(leading.userId)),
+          amount: centsToEuros(leading.amountCents as number),
         }
       : null,
   }
@@ -165,19 +163,19 @@ export async function rejectAlapakkumine(
   auctionId: string,
   bidId: string,
 ): Promise<RejectDecision> {
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
   const events: DomainEvent[] = []
   const now = new Date().toISOString()
 
-  const bid = await findDoc(payload, 'bids', { id: { equals: bidId } })
-  if (!bid || String(relationValue(bid.auction)) !== auctionId) {
+  const bid = await findDoc(repos, 'bids', { id: { equals: bidId } })
+  if (!bid || String(relationValue(bid.auctionId)) !== auctionId) {
     return { outcome: 'bid_not_found' }
   }
   if (bid.status !== 'pending_approval') {
     return { outcome: 'not_pending', status: String(bid.status) }
   }
 
-  const auction = await findDoc(payload, 'auctions', {
+  const auction = await findDoc(repos, 'auctions', {
     id: { equals: auctionId },
   })
   if (!auction) {
@@ -186,8 +184,8 @@ export async function rejectAlapakkumine(
 
   const auctionTitle =
     (auction.title as string | undefined) ?? `Auction ${auctionId}`
-  const amount = bid.amount as number
-  const bidderId = relationValue(bid.user)
+  const amount = centsToEuros(bid.amountCents as number)
+  const bidderId = relationValue(bid.userId)
 
   const statement = bidStatusUpdateStatement(
     bidId,

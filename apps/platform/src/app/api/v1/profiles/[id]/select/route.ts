@@ -8,7 +8,7 @@ import {
   issueSessionAccessToken,
   setAccessTokenCookie,
 } from '@/lib/auth/session'
-import { getPayloadClient } from '@/payload/payloadClient'
+import { getRepositories } from '@/lib/data/runtime'
 
 export async function POST(
   request: NextRequest,
@@ -34,20 +34,18 @@ export async function POST(
     return NextResponse.json({ error: 'Sessioon on aegunud' }, { status: 401 })
   }
 
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const profileResult = await payload.findByID({
+  const profile = (await repos.findByID({
     collection: 'profile',
     id: profileId,
-    depth: 0,
-  }) as Record<string, unknown> | null
+  })) as Record<string, unknown> | null
 
-  if (!profileResult) {
+  if (!profile) {
     return NextResponse.json({ error: 'Profiili ei leitud' }, { status: 404 })
   }
 
-  const profile = profileResult
-  const userId = profile.user as string | undefined
+  const userId = profile.userId as string | undefined
 
   if (!userId) {
     return NextResponse.json({ error: 'Profiil ei kuulu kasutajale' }, { status: 403 })

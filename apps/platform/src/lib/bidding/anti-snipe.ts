@@ -1,4 +1,4 @@
-import { getPayloadClient } from '../../payload/payloadClient'
+import { getRepositories } from '../data/runtime'
 import { emitAuctionExtended } from '../realtime/auction-stream'
 
 export const ANTI_SNIPE_DEFAULT_MINUTES = 5
@@ -38,11 +38,10 @@ export function clampAntiSnipeMinutes(value: number | undefined): number {
 }
 
 async function loadAntiSnipeSettings(): Promise<AntiSnipeSettings> {
-  const payload = await getPayloadClient()
-  const result = await payload.find({
+  const repos = await getRepositories()
+  const result = await repos.find({
     collection: 'settings',
     limit: 1,
-    depth: 0,
   })
   const settings = result.docs[0] as AntiSnipeSettings | undefined
   return settings ?? {}
@@ -58,19 +57,14 @@ export interface AntiSnipeAuditInput {
 }
 
 export async function recordAntiSnipeExtension(input: AntiSnipeAuditInput): Promise<void> {
-  const payload = await getPayloadClient()
-  // Relationship fields reject numeric strings for number-typed ids.
-  const actorValue =
-    input.actorId !== undefined && /^\d+$/.test(input.actorId)
-      ? Number(input.actorId)
-      : input.actorId
-  await payload.create({
+  const repos = await getRepositories()
+  await repos.create({
     collection: 'audit-entry',
     data: {
       action: 'anti_snipe_extension',
       entityType: 'auction',
       entityId: input.auctionId,
-      ...(actorValue !== undefined ? { actor: actorValue } : {}),
+      ...(input.actorId !== undefined ? { actor: input.actorId } : {}),
       before: { endsAt: input.previousEndTime.toISOString() },
       after: {
         endsAt: input.newEndTime.toISOString(),
@@ -108,8 +102,8 @@ export async function checkAntiSnipe(
 
   const newEndTime = new Date(endsAt.getTime() + windowMs)
 
-  const payload = await getPayloadClient()
-  await payload.update({
+  const repos = await getRepositories()
+  await repos.update({
     collection: 'auctions',
     id: auction.id,
     data: { endsAt: newEndTime.toISOString() },

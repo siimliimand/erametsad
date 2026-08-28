@@ -1,4 +1,5 @@
-import { getPayloadClient } from '../../payload/payloadClient'
+import { centsToEuros, eurosToCents } from '../data/repositories/money'
+import { getRepositories } from '../data/runtime'
 import { eventBus } from '../notifications/event-bus'
 import { broadcast } from '../realtime/auction-stream'
 import { upsertSnapshot } from '../stats/aggregation'
@@ -34,10 +35,10 @@ function relationUserId(value: unknown): string | number | undefined {
 }
 
 export async function processEndedAuctions(): Promise<ProcessResult> {
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
   const now = nowISO()
 
-  const auctions = await payload.find({
+  const auctions = await repos.find({
     collection: 'auctions',
     where: {
       and: [
@@ -46,7 +47,6 @@ export async function processEndedAuctions(): Promise<ProcessResult> {
       ],
     },
     limit: 100,
-    depth: 0,
   })
 
   let processed = 0
@@ -64,32 +64,28 @@ export async function processEndedAuctions(): Promise<ProcessResult> {
     inProgress.add(auctionId)
 
     try {
-      const current = await payload.findByID({
+      const currentAuction = await repos.findByID({
         collection: 'auctions',
         id: auctionId,
-        depth: 0,
       })
-
-      const currentAuction = current as Record<string, unknown> | null
       if (currentAuction?.status !== 'active') {
         skipped++
         continue
       }
 
-      await payload.update({
+      await repos.update({
         collection: 'auctions',
         id: auctionId,
         data: {
           status: 'ended',
           endedAt: nowISO(),
         },
-        depth: 0,
       })
 
       const objectType = currentAuction.objectType as string
       const auctionTitle = currentAuction.title as string | undefined
       const area = getTotalArea(currentAuction)
-      const seller = relationUserId(currentAuction.seller)
+      const seller = relationUserId(currentAuction.sellerId)
 
       if (isSealedAuction(currentAuction)) {
         if (seller !== undefined) {
@@ -100,7 +96,7 @@ export async function processEndedAuctions(): Promise<ProcessResult> {
           })
         }
 
-        await upsertSnapshot(payload, { objectType, eur: 0, area, count: 1 })
+        await upsertSnapshot(repos, { objectType, eur: 0, area, count: 1 })
 
         broadcast('auction:ended', { auctionId, type: 'sealed' })
 
@@ -108,7 +104,7 @@ export async function processEndedAuctions(): Promise<ProcessResult> {
         continue
       }
 
-      const bids = await payload.find({
+      const bids = await repos.find({
         collection: 'bids',
         where: {
           and: [
@@ -117,28 +113,28 @@ export async function processEndedAuctions(): Promise<ProcessResult> {
           ],
         },
         limit: 1,
-        depth: 0,
       })
 
       const leadingBid = bids.docs[0] as Record<string, unknown> | undefined
-      const leadingAmount = leadingBid === undefined ? 0 : Number(leadingBid.amount) || 0
-      const rawReserve = currentAuction.reservePrice
-      const reserveSet = typeof rawReserve === 'number' && Number.isFinite(rawReserve)
+      const leadingAmount =
+        leadingBid === undefined ? 0 : centsToEuros(leadingBid.amountCents as number)
+      const rawReserveCents = currentAuction.reservePriceCents
+      const reserveSet = typeof rawReserveCents === 'number'
       const reserveMet =
-        leadingBid !== undefined && (!reserveSet || leadingAmount >= rawReserve)
+        leadingBid !== undefined &&
+        (!reserveSet || eurosToCents(leadingAmount) >= (rawReserveCents))
 
       if (leadingBid !== undefined && reserveMet) {
-        await payload.update({
+        await repos.update({
           collection: 'auctions',
           id: auctionId,
           data: {
             status: 'appraised',
-            winningBid: leadingBid.id,
+            winningBid: leadingBid.id as string,
           },
-          depth: 0,
         })
 
-        const winner = relationUserId(leadingBid.user)
+        const winner = relationUserId(leadingBid.userId)
         if (winner !== undefined) {
           eventBus.emit({
             type: 'auction.won',
@@ -160,21 +156,20 @@ export async function processEndedAuctions(): Promise<ProcessResult> {
           })
         }
 
-        await upsertSnapshot(payload, { objectType, eur: leadingAmount, area, count: 1 })
+        await upsertSnapshot(repos, { objectType, eur: leadingAmount, area, count: 1 })
 
         broadcast('auction:ended', { auctionId, type: 'open', hasWinner: true })
       } else {
-        await payload.update({
+        await repos.update({
           collection: 'auctions',
           id: auctionId,
           data: {
             status: 'unsold',
           },
-          depth: 0,
         })
 
         if (leadingBid !== undefined) {
-          const bidder = relationUserId(leadingBid.user)
+          const bidder = relationUserId(leadingBid.userId)
           if (bidder !== undefined) {
             eventBus.emit({
               type: 'auction.ended',
@@ -204,7 +199,7 @@ export async function processEndedAuctions(): Promise<ProcessResult> {
           })
         }
 
-        await upsertSnapshot(payload, { objectType, eur: 0, area, count: 1 })
+        await upsertSnapshot(repos, { objectType, eur: 0, area, count: 1 })
 
         broadcast('auction:ended', { auctionId, type: 'open', hasWinner: false })
       }
@@ -227,15 +222,12 @@ export function scheduleAuctionEnding(intervalMs = 30000): ReturnType<typeof set
 }
 
 export async function checkAndEndAuction(auctionId: string): Promise<boolean> {
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const auction = await payload.findByID({
+  const a = await repos.findByID({
     collection: 'auctions',
     id: auctionId,
-    depth: 0,
-  })
-
-  const a = auction as Record<string, unknown> | null
+  }) as Record<string, unknown> | null
 
   if (a == null) return false
   if (a.status !== 'active') return false

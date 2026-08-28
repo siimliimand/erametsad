@@ -1,34 +1,37 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import type { Payload } from 'payload'
 
 import { verifyAccessToken } from '@/lib/auth/jwt'
 import { checkAntiSnipe } from '@/lib/bidding/anti-snipe'
 import { evaluateAutobidders } from '@/lib/bidding/autobidder'
 import { placeBid } from '@/lib/bidding/place-bid'
 import type { BidResult } from '@/lib/bidding/place-bid'
+import type { CoreRepositories } from '@/lib/data/repositories'
+import { centsToEuros } from '@/lib/data/repositories/money'
+import { getRepositories } from '@/lib/data/runtime'
 import { emitBidCreated } from '@/lib/realtime/auction-stream'
 import { pushOutbid } from '@/lib/realtime/my-stream'
-import { getPayloadClient } from '@/payload/payloadClient'
 
 type RouteCollection = 'auctions' | 'bids'
 
 async function findDoc(
+  repos: CoreRepositories,
   collection: RouteCollection,
   where: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
-  const payload = await getPayloadClient()
-  const result = await payload.find({
+  const result = await repos.find({
     collection,
-    where,
+    where: where as never,
     limit: 1,
-    depth: 0,
-  } as Parameters<Payload['find']>[0])
+  })
   return (result.docs[0] as Record<string, unknown> | undefined) ?? null
 }
 
-function findLeadingBid(auctionId: string): Promise<Record<string, unknown> | null> {
-  return findDoc('bids', {
+function findLeadingBid(
+  repos: CoreRepositories,
+  auctionId: string,
+): Promise<Record<string, unknown> | null> {
+  return findDoc(repos, 'bids', {
     and: [
       { auction: { equals: auctionId } },
       { status: { equals: 'leading' } },
@@ -40,21 +43,22 @@ function findLeadingBid(auctionId: string): Promise<Record<string, unknown> | nu
 // post-commit, so the accepted-bid path only adds the SSE broadcasts and
 // the my-stream pushes.
 async function handleAcceptedBid(input: {
+  repos: CoreRepositories
   auctionId: string
   actorId: string
   bid: Record<string, unknown>
   previousLeading: Record<string, unknown> | null
 }): Promise<void> {
-  const { auctionId, actorId, bid, previousLeading } = input
+  const { repos, auctionId, actorId, bid, previousLeading } = input
   const amount = bid.amount as number
   const placedAt = (bid.createdAt as string | Date | undefined) ?? new Date()
 
   emitBidCreated({ auctionId, amount, placedAt })
 
   if (previousLeading) {
-    pushOutbid(previousLeading.user as string | number, {
+    pushOutbid(previousLeading.userId as string | number, {
       auctionId,
-      previousAmount: previousLeading.amount as number,
+      previousAmount: centsToEuros(previousLeading.amountCents as number),
       newAmount: amount,
       placedAt,
     })
@@ -62,7 +66,7 @@ async function handleAcceptedBid(input: {
 
   // checkAntiSnipe owns the endsAt update, the audit entry and the
   // auction:extended broadcast; sealed auctions never extend.
-  const auction = await findDoc('auctions', { id: { equals: auctionId } })
+  const auction = await findDoc(repos, 'auctions', { id: { equals: auctionId } })
   if (auction) {
     await checkAntiSnipe(
       {
@@ -80,9 +84,9 @@ async function handleAcceptedBid(input: {
   // An autobidder bid placed by evaluateAutobidders goes through the same
   // broadcast path. Its outbid DomainEvent was already emitted by the
   // placeBid call inside evaluateAutobidders.
-  const leading = await findLeadingBid(auctionId)
+  const leading = await findLeadingBid(repos, auctionId)
   if (leading?.source === 'autobidder') {
-    const autobidAmount = leading.amount as number
+    const autobidAmount = centsToEuros(leading.amountCents as number)
     const autobidPlacedAt = (leading.createdAt as string | Date | undefined) ?? new Date()
     emitBidCreated({ auctionId, amount: autobidAmount, placedAt: autobidPlacedAt })
     pushOutbid(bid.user as string | number, {
@@ -130,9 +134,10 @@ export async function POST(request: NextRequest) {
   let previousLeading: Record<string, unknown> | null = null
   let result: BidResult
   try {
+    const repos = await getRepositories()
     // Read the leader before placeBid so the outbid push targets the user
     // this bid displaced.
-    previousLeading = await findLeadingBid(auctionId)
+    previousLeading = await findLeadingBid(repos, auctionId)
     result = await placeBid({
       userId: tokenPayload.userId,
       auctionId,
@@ -166,7 +171,9 @@ export async function POST(request: NextRequest) {
   // the engine follow-ups only apply to accepted (leading) bids.
   if (bid.status === 'leading') {
     try {
+      const repos = await getRepositories()
       await handleAcceptedBid({
+        repos,
         auctionId,
         actorId: tokenPayload.userId,
         bid,

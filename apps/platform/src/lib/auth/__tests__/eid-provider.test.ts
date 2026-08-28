@@ -8,12 +8,12 @@ import {
   getEidProvider,
 } from '../eid-provider'
 
-vi.mock('@/payload/payloadClient', () => ({
-  getPayloadClient: vi.fn(),
+vi.mock('@/lib/data/runtime', () => ({
+  getRepositories: vi.fn(),
 }))
 
 import { hash } from '@/lib/crypto'
-import { getPayloadClient } from '@/payload/payloadClient'
+import { getRepositories } from '@/lib/data/runtime'
 
 process.env.JWT_SECRET = 'test-secret-used-only-by-vitest'
 
@@ -86,7 +86,7 @@ describe('completeEidLogin', () => {
 
   beforeEach(() => {
     find = vi.fn()
-    vi.mocked(getPayloadClient).mockImplementation(
+    vi.mocked(getRepositories).mockImplementation(
       () => ({ find }) as never,
     )
   })

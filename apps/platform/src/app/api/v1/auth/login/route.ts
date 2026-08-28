@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+import { verifyCredentialPassword } from '@/lib/auth/password'
 import { createSession, setSessionCookies } from '@/lib/auth/session'
 import { hash } from '@/lib/crypto'
+import { getRepositories } from '@/lib/data/runtime'
 import { authRateLimiter } from '@/lib/rate-limit'
 import { getUserRole } from '@/payload/access/roles'
-import { getPayloadClient } from '@/payload/payloadClient'
 
 export async function POST(request: NextRequest) {
   const forwarded = request.headers.get('x-forwarded-for') ?? 'global'
@@ -35,26 +36,24 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
   const isEmail = identifier.includes('@')
   let user: Record<string, unknown> | null = null
 
   if (isEmail) {
-    const result = await payload.find({
+    const result = await repos.find({
       collection: 'users',
       where: { email: { equals: identifier } },
       limit: 1,
-      depth: 1,
     })
     user = (result.docs[0] as Record<string, unknown> | undefined) ?? null
   } else {
     const isikukoodHash = hash(identifier)
-    const result = await payload.find({
+    const result = await repos.find({
       collection: 'users',
       where: { isikukoodHash: { equals: isikukoodHash } },
       limit: 1,
-      depth: 1,
     })
     user = (result.docs[0] as Record<string, unknown> | undefined) ?? null
   }
@@ -66,17 +65,16 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // users is a Payload auth collection: credentials live in Payload's own
-  // salt/hash columns, and find() never returns them, so there is no
-  // user.password to compare. payload.login runs Payload's own verification
-  // (plus its lockout counters) and throws on a wrong password.
-  try {
-    await payload.login({
-      collection: 'users',
-      data: { email: user.email as string, password },
-      depth: 0,
-    })
-  } catch {
+  // Credentials live in the password_hash/password_salt columns; verify
+  // the password directly (the scrypt scheme the seed writes). The
+  // comparison below runs regardless of the outcome, so a missing or
+  // malformed stored credential behaves exactly like a wrong password.
+  const passwordOk = verifyCredentialPassword(
+    password,
+    user.passwordHash as string | null,
+    user.passwordSalt as string | null,
+  )
+  if (!passwordOk) {
     return NextResponse.json(
       { error: 'Vale kasutajanimi või parool' },
       { status: 401 },

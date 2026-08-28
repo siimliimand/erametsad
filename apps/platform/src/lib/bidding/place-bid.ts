@@ -1,12 +1,12 @@
 import crypto from 'node:crypto'
-import type { Payload } from 'payload'
 
-import { getPayloadClient } from '../../payload/payloadClient'
-import { eurosToCents } from '../data/repositories/money'
-import { db, type SqlStatement } from '../db'
 import { isAlapakkumineEnabled } from './alapakkumine'
-import { eventBus } from '../notifications/event-bus'
-import type { DomainEvent } from '../notifications/event-bus'
+import type { CoreRepositories } from '../data/repositories'
+import { centsToEuros, eurosToCents } from '../data/repositories/money'
+import type { RepositorySlug } from '../data/repositories/registry'
+import { getRepositories } from '../data/runtime'
+import { db, type SqlStatement } from '../db'
+import { type DomainEvent, eventBus } from '../notifications/event-bus'
 
 export interface PlaceBidParams {
   userId: string
@@ -64,26 +64,21 @@ export function bidStatusUpdateStatement(
   }
 }
 
-type PayloadCollection =
-  | 'users'
-  | 'auctions'
-  | 'auction-rights'
-  | 'settings'
-  | 'contract-templates'
-  | 'contracts'
-  | 'bids'
+type BidFlowCollection = Extract<
+  RepositorySlug,
+  'users' | 'auctions' | 'auction-rights' | 'settings' | 'contract-templates' | 'contracts' | 'bids'
+>
 
 async function findDoc(
-  payload: Payload,
-  collection: PayloadCollection,
+  repos: CoreRepositories,
+  collection: BidFlowCollection,
   where: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
-  const result = await payload.find({
+  const result = await repos.find({
     collection,
-    where,
+    where: where as never,
     limit: 1,
-    depth: 0,
-  } as Parameters<Payload['find']>[0])
+  })
   return (result.docs[0] as Record<string, unknown> | undefined) ?? null
 }
 
@@ -91,7 +86,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
   const { userId, auctionId, amount, type, source, requestIp, idempotencyKey } =
     params
 
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
   const events: DomainEvent[] = []
   const ipHash =
     requestIp !== undefined
@@ -101,7 +96,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
 
   const runBidFlow = async (): Promise<BidResult> => {
     // 1. Verify user exists
-    const user = await findDoc(payload, 'users', { id: { equals: userId } })
+    const user = await findDoc(repos, 'users', { id: { equals: userId } })
     if (!user) {
       return { success: false, error: 'User not found', status: 401 }
     }
@@ -110,7 +105,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
     }
 
     // 2. Auction is active
-    const auction = await findDoc(payload, 'auctions', {
+    const auction = await findDoc(repos, 'auctions', {
       id: { equals: auctionId },
     })
     if (!auction) {
@@ -125,12 +120,13 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
     }
 
     const objectType = auction.objectType as string
-    const minBid = auction.minBid as number
+    const minBidCents = auction.minBidCents as number
+    const minBid = centsToEuros(minBidCents)
     const auctionTitle =
       (auction.title as string | undefined) ?? `Auction ${auctionId}`
 
     // 3. ObjectType right
-    const right = await findDoc(payload, 'auction-rights', {
+    const right = await findDoc(repos, 'auction-rights', {
       and: [
         { user: { equals: userId } },
         { objectType: { equals: objectType } },
@@ -146,7 +142,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
     }
 
     // 4. Settings: alapakkumine flag and the framework-contract gate flag
-    const settings = await findDoc(payload, 'settings', {})
+    const settings = await findDoc(repos, 'settings', {})
     const featureFlags: Record<string, unknown> = settings?.featureFlags
       ? (settings.featureFlags as Record<string, unknown>)
       : {}
@@ -156,7 +152,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
 
     // 5. Amount validity: below minBid is only legal as an alapakkumine
     //    request (pending_approval), and only when Settings enable it.
-    const isUnderStartBid = amount < minBid
+    const isUnderStartBid = eurosToCents(amount) < minBidCents
     if (isUnderStartBid && !isAlapakkumineEnabled(settings)) {
       return {
         success: false,
@@ -168,16 +164,17 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
     // 6. Step validation against the current leader (normal path only)
     let leadingBid: Record<string, unknown> | null = null
     if (!isUnderStartBid) {
-      leadingBid = await findDoc(payload, 'bids', {
+      leadingBid = await findDoc(repos, 'bids', {
         and: [
           { auction: { equals: auctionId } },
           { status: { equals: 'leading' } },
         ],
       })
       if (leadingBid) {
-        const leadingAmount = leadingBid.amount as number
-        const bidStep = auction.bidStep as number | undefined
-        const minimumAmount = leadingAmount + (bidStep ?? 0)
+        const leadingAmount = centsToEuros(leadingBid.amountCents as number)
+        const auctionBidStepCents = auction.bidStepCents as number | null
+        const bidStep = auctionBidStepCents === null ? 0 : centsToEuros(auctionBidStepCents)
+        const minimumAmount = leadingAmount + bidStep
         if (amount < minimumAmount) {
           return {
             success: false,
@@ -190,11 +187,11 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
 
     // 7. Framework contract gate (open auctions, active by default)
     if (type === 'open' && !gateDisabledBySettings) {
-      const template = await findDoc(payload, 'contract-templates', {
+      const template = await findDoc(repos, 'contract-templates', {
         and: [{ type: { equals: 'framework' } }, { active: { equals: true } }],
       })
       if (template) {
-        const signed = await findDoc(payload, 'contracts', {
+        const signed = await findDoc(repos, 'contracts', {
           and: [
             { signedBy: { equals: userId } },
             { status: { equals: 'signed' } },
@@ -215,7 +212,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
 
     // 8. Idempotency check
     if (idempotencyKey) {
-      const existing = await findDoc(payload, 'bids', {
+      const existing = await findDoc(repos, 'bids', {
         idempotencyKey: { equals: idempotencyKey },
       })
       if (existing) {
@@ -231,7 +228,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
     //    touches the current leader until the seller approves it.
     if (isUnderStartBid) {
       // One pending under-start bid at a time: reject the previous one.
-      const oldPending = await findDoc(payload, 'bids', {
+      const oldPending = await findDoc(repos, 'bids', {
         and: [
           { auction: { equals: auctionId } },
           { status: { equals: 'pending_approval' } },
@@ -344,7 +341,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
     )
 
     if (leadingBid) {
-      const displacedUserId = leadingBid.user as string | number
+      const displacedUserId = leadingBid.userId as string | number
       events.push({
         type: 'outbid',
         userId: displacedUserId,

@@ -1,4 +1,10 @@
-import type { CollectionBeforeChangeHook } from 'payload'
+// Structural stand-in for the Payload CollectionBeforeChangeHook args this
+// hook consumed; src/payload/collections/Auction.ts still passes it to a
+// Payload beforeChange slot, so the shape must stay compatible.
+export interface StatusTransitionHookArgs {
+  data: Record<string, unknown>
+  originalDoc?: Record<string, unknown> | null
+}
 
 export const STATUSES = [
   'draft',
@@ -45,13 +51,12 @@ const STATUS_TIMESTAMP_MAP: Partial<Record<AuctionStatus, string>> = {
   archived: 'archivedAt',
 }
 
-export const statusTransitionHook: CollectionBeforeChangeHook = ({
+export const statusTransitionHook = ({
   data,
   originalDoc,
-}) => {
+}: StatusTransitionHookArgs): Record<string, unknown> => {
   const newStatus = data.status as string | undefined
-  const oldStatus = (originalDoc as Record<string, unknown> | undefined)
-    ?.status as string | undefined
+  const oldStatus = originalDoc?.status as string | undefined
 
   if (!newStatus || newStatus === oldStatus) return data
 

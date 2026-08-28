@@ -13,13 +13,13 @@ function assertBidError(result: BidResult): asserts result is BidError {
   expect(result.success).toBe(false)
 }
 
-vi.mock('@/payload/payloadClient', () => ({
-  getPayloadClient: vi.fn(),
+vi.mock('@/lib/data/runtime', () => ({
+  getRepositories: vi.fn(),
 }))
 
-import { getPayloadClient } from '@/payload/payloadClient'
+import { getRepositories } from '@/lib/data/runtime'
 
-let mockPayload: {
+let mockRepos: {
   find: ReturnType<typeof vi.fn>
   create: ReturnType<typeof vi.fn>
   update: ReturnType<typeof vi.fn>
@@ -32,12 +32,12 @@ beforeEach(() => {
   statements = []
   d1 = fakeD1(statements)
   setD1ForTests(d1)
-  mockPayload = {
+  mockRepos = {
     find: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
   }
-  vi.mocked(getPayloadClient).mockImplementation(() => mockPayload as never)
+  vi.mocked(getRepositories).mockImplementation(() => mockRepos as never)
 })
 
 afterEach(() => {
@@ -63,39 +63,39 @@ describe('placeBid', () => {
     signedContract?: Record<string, unknown> | null
     idempotencyDuplicate?: boolean
   }) {
-    mockPayload.find.mockResolvedValueOnce({
+    mockRepos.find.mockResolvedValueOnce({
       docs: opts.user ? [opts.user] : [],
     })
-    mockPayload.find.mockResolvedValueOnce({
+    mockRepos.find.mockResolvedValueOnce({
       docs: opts.auction ? [opts.auction] : [],
     })
     if (opts.hasRights !== undefined) {
-      mockPayload.find.mockResolvedValueOnce({
+      mockRepos.find.mockResolvedValueOnce({
         docs: opts.hasRights ? [{ id: 'right-1' }] : [],
       })
     }
     if (opts.settings !== undefined) {
-      mockPayload.find.mockResolvedValueOnce({
+      mockRepos.find.mockResolvedValueOnce({
         docs: opts.settings ? [opts.settings] : [],
       })
     }
     if (opts.leadingBid !== undefined) {
-      mockPayload.find.mockResolvedValueOnce({
+      mockRepos.find.mockResolvedValueOnce({
         docs: opts.leadingBid ? [opts.leadingBid] : [],
       })
     }
     if (opts.frameworkTemplate !== undefined) {
-      mockPayload.find.mockResolvedValueOnce({
+      mockRepos.find.mockResolvedValueOnce({
         docs: opts.frameworkTemplate ? [opts.frameworkTemplate] : [],
       })
     }
     if (opts.signedContract !== undefined) {
-      mockPayload.find.mockResolvedValueOnce({
+      mockRepos.find.mockResolvedValueOnce({
         docs: opts.signedContract ? [opts.signedContract] : [],
       })
     }
     if (opts.idempotencyDuplicate !== undefined) {
-      mockPayload.find.mockResolvedValueOnce({
+      mockRepos.find.mockResolvedValueOnce({
         docs: opts.idempotencyDuplicate ? [{ id: 'dup' }] : [],
       })
     }
@@ -105,8 +105,8 @@ describe('placeBid', () => {
   // gate reads; every other default mirrors the seed configuration.
   const gateOffSettings = { featureFlags: { requireFrameworkContract: false } }
   const activeAuction = {
-    minBid: 50,
-    bidStep: 10,
+    minBidCents: 5000,
+    bidStepCents: 1000,
     status: 'active',
     endsAt: '2099-01-01T00:00:00Z',
     objectType: 'forest',
@@ -133,7 +133,7 @@ describe('placeBid', () => {
         auction: activeAuction,
         hasRights: true,
         settings: gateOffSettings,
-        leadingBid: { id: 'lead-1', amount: 100, source: 'manual' },
+        leadingBid: { id: 'lead-1', amountCents: 10000, source: 'manual' },
       })
 
       const result = await placeBid({ ...baseParams, amount: 110 })
@@ -146,7 +146,7 @@ describe('placeBid', () => {
         auction: activeAuction,
         hasRights: true,
         settings: gateOffSettings,
-        leadingBid: { id: 'lead-1', amount: 100, source: 'manual' },
+        leadingBid: { id: 'lead-1', amountCents: 10000, source: 'manual' },
       })
 
       const result = await placeBid({ ...baseParams, amount: 105 })
@@ -157,10 +157,10 @@ describe('placeBid', () => {
     it('uses default bidStep of 0 when bidStep is undefined', async () => {
       setupDefaultMocks({
         user: { id: 'user-1' },
-        auction: { ...activeAuction, bidStep: undefined },
+        auction: { ...activeAuction, bidStepCents: null },
         hasRights: true,
         settings: gateOffSettings,
-        leadingBid: { id: 'lead-1', amount: 100, source: 'manual' },
+        leadingBid: { id: 'lead-1', amountCents: 10000, source: 'manual' },
       })
 
       const result = await placeBid({ ...baseParams, amount: 100 })
@@ -172,7 +172,7 @@ describe('placeBid', () => {
     it('rejects bid below minBid', async () => {
       setupDefaultMocks({
         user: { id: 'user-1' },
-        auction: { ...activeAuction, minBid: 100 },
+        auction: { ...activeAuction, minBidCents: 10000 },
         hasRights: true,
         settings: { ...gateOffSettings, alapakkumineEnabled: false },
       })
@@ -186,8 +186,8 @@ describe('placeBid', () => {
 
   describe('auction active check', () => {
     it('rejects bid when auction is not active', async () => {
-      mockPayload.find.mockResolvedValueOnce({ docs: [{ id: 'user-1' }] })
-      mockPayload.find.mockResolvedValueOnce({
+      mockRepos.find.mockResolvedValueOnce({ docs: [{ id: 'user-1' }] })
+      mockRepos.find.mockResolvedValueOnce({
         docs: [{ ...activeAuction, status: 'ended' }],
       })
 
@@ -200,8 +200,8 @@ describe('placeBid', () => {
 
   describe('end time check', () => {
     it('rejects bid when auction has ended', async () => {
-      mockPayload.find.mockResolvedValueOnce({ docs: [{ id: 'user-1' }] })
-      mockPayload.find.mockResolvedValueOnce({
+      mockRepos.find.mockResolvedValueOnce({ docs: [{ id: 'user-1' }] })
+      mockRepos.find.mockResolvedValueOnce({
         docs: [{ ...activeAuction, endsAt: '2020-01-01T00:00:00Z' }],
       })
 
@@ -221,8 +221,8 @@ describe('placeBid', () => {
         settings: gateOffSettings,
         leadingBid: {
           id: 'lead-1',
-          amount: 100,
-          user: 'user-2',
+          amountCents: 10000,
+          userId: 'user-2',
           source: 'manual',
         },
       })
@@ -293,8 +293,8 @@ describe('placeBid', () => {
         settings: gateOffSettings,
         leadingBid: {
           id: 'lead-1',
-          amount: 100,
-          user: 'user-2',
+          amountCents: 10000,
+          userId: 'user-2',
           source: 'manual',
         },
       })
@@ -353,7 +353,7 @@ describe('placeBid', () => {
 
   describe('alapakkumine', () => {
     it('stores a below-minBid bid as pending_approval when enabled', async () => {
-      mockPayload.find.mockResolvedValue({ docs: [] })
+      mockRepos.find.mockResolvedValue({ docs: [] })
       setupDefaultMocks({
         user: { id: 'user-1' },
         auction: activeAuction,
@@ -373,8 +373,8 @@ describe('placeBid', () => {
     })
 
     it('rejects the previous pending bid when a new one arrives', async () => {
-      mockPayload.find.mockResolvedValue({ docs: [] })
-      mockPayload.find
+      mockRepos.find.mockResolvedValue({ docs: [] })
+      mockRepos.find
         .mockResolvedValueOnce({ docs: [{ id: 'user-1' }] })
         .mockResolvedValueOnce({ docs: [activeAuction] })
         .mockResolvedValueOnce({ docs: [{ id: 'right-1' }] })

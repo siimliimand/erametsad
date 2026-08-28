@@ -1,4 +1,5 @@
-import { getPayloadClient } from '../../payload/payloadClient'
+import { centsToEuros, eurosToCents } from '../data/repositories/money'
+import { getRepositories } from '../data/runtime'
 import { encryptSealedData, decryptSealedData } from '../encryption'
 import type { BidResult } from './place-bid'
 
@@ -22,11 +23,10 @@ export interface DecryptedBid {
 }
 
 async function getSealedRevisionCap(): Promise<number> {
-  const payload = await getPayloadClient()
-  const result = await payload.find({
+  const repos = await getRepositories()
+  const result = await repos.find({
     collection: 'settings',
     limit: 1,
-    depth: 0,
   })
   const settings = result.docs[0] as Record<string, unknown> | undefined
   return (settings?.sealedRevisionCap as number | undefined) ?? 3
@@ -37,13 +37,12 @@ export async function submitSealedBid(
 ): Promise<BidResult> {
   const { userId, auctionId, amount, idempotencyKey, identitySnapshot } = params
 
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const userResult = await payload.find({
+  const userResult = await repos.find({
     collection: 'users',
     where: { id: { equals: userId } },
     limit: 1,
-    depth: 0,
   })
   const user = userResult.docs[0] as Record<string, unknown> | undefined
   if (!user) {
@@ -53,11 +52,10 @@ export async function submitSealedBid(
     return { success: false, error: 'User is suspended', status: 403 }
   }
 
-  const auctionResult = await payload.find({
+  const auctionResult = await repos.find({
     collection: 'auctions',
     where: { id: { equals: auctionId } },
     limit: 1,
-    depth: 0,
   })
   const auction = auctionResult.docs[0] as Record<string, unknown> | undefined
   if (!auction) {
@@ -75,7 +73,7 @@ export async function submitSealedBid(
 
   // Same rights check and BidError as placeBid, so a shared route maps
   // both to HTTP 403.
-  const rightsResult = await payload.find({
+  const rightsResult = await repos.find({
     collection: 'auction-rights',
     where: {
       and: [
@@ -85,7 +83,6 @@ export async function submitSealedBid(
       ],
     },
     limit: 1,
-    depth: 0,
   })
   if (rightsResult.docs.length === 0) {
     return {
@@ -95,15 +92,16 @@ export async function submitSealedBid(
     }
   }
 
-  if (amount < (auction.minBid as number)) {
+  const minBidCents = auction.minBidCents as number
+  if (eurosToCents(amount) < minBidCents) {
     return {
       success: false,
-      error: `Bid must be at least ${String(auction.minBid)} EUR`,
+      error: `Bid must be at least ${String(centsToEuros(minBidCents))} EUR`,
       status: 400,
     }
   }
 
-  const existingBid = await payload.find({
+  const existingBid = await repos.find({
     collection: 'bids',
     where: {
       and: [
@@ -114,7 +112,6 @@ export async function submitSealedBid(
       ],
     },
     limit: 100,
-    depth: 0,
   })
 
   const revisionCap = await getSealedRevisionCap()
@@ -131,11 +128,10 @@ export async function submitSealedBid(
   }
 
   if (idempotencyKey) {
-    const duplicate = await payload.find({
+    const duplicate = await repos.find({
       collection: 'bids',
       where: { idempotencyKey: { equals: idempotencyKey } },
       limit: 1,
-      depth: 0,
     })
     if (duplicate.docs.length > 0) {
       return {
@@ -159,28 +155,24 @@ export async function submitSealedBid(
     sealedPayload.identityAuthTag = encryptedIdentity.authTag
   }
 
-  const bidData: Record<string, unknown> = {
-    // Payload's relationship validation rejects numeric strings for
-    // number-typed ids, so coerce before create.
-    auction: Number(auctionId),
-    user: Number(userId),
-    amount: 0,
-    type: 'sealed',
-    source: 'manual',
-    status: 'leading',
-    identitySnapshot: JSON.stringify(sealedPayload),
-  }
-  if (idempotencyKey) bidData.idempotencyKey = idempotencyKey
-
-  const newBid = await payload.create({
+  const newBid = await repos.create({
     collection: 'bids',
-    data: bidData,
+    data: {
+      auction: auctionId,
+      user: userId,
+      amountCents: 0,
+      type: 'sealed',
+      source: 'manual',
+      status: 'leading',
+      identitySnapshot: JSON.stringify(sealedPayload),
+      ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+    },
   })
 
   if (existingCount > 0) {
     await Promise.all(
       existingBid.docs.map((doc) =>
-        payload.update({
+        repos.update({
           collection: 'bids',
           id: doc.id,
           data: { status: 'outbid' },
@@ -189,14 +181,14 @@ export async function submitSealedBid(
     )
   }
 
-  return { success: true, bid: newBid }
+  return { success: true, bid: newBid as unknown as Record<string, unknown> }
 }
 
 export async function getSealedBidsForAuction(
   auctionId: string,
 ): Promise<Record<string, unknown>[]> {
-  const payload = await getPayloadClient()
-  const result = await payload.find({
+  const repos = await getRepositories()
+  const result = await repos.find({
     collection: 'bids',
     where: {
       and: [
@@ -205,7 +197,6 @@ export async function getSealedBidsForAuction(
       ],
     },
     limit: 1000,
-    depth: 1,
   })
   return result.docs
 }
@@ -288,8 +279,8 @@ export function decryptSealedBids(
 
     return {
       id: relationId(bid.id),
-      auction: relationId(bid.auction),
-      user: relationId(bid.user),
+      auction: relationId(bid.auction ?? bid.auctionId),
+      user: relationId(bid.user ?? bid.userId),
       amount,
       identitySnapshot,
       status: bid.status as string,

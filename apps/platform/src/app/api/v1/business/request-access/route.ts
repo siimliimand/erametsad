@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+import { getRepositories } from '@/lib/data/runtime'
 import { authRateLimiter } from '@/lib/rate-limit'
-import { getPayloadClient } from '@/payload/payloadClient'
 
 export async function POST(request: NextRequest) {
   const forwarded = request.headers.get('x-forwarded-for') ?? 'global'
@@ -33,9 +33,9 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const accessRequest = (await payload.create({
+  const accessRequest = (await repos.create({
     collection: 'company-access-request',
     data: {
       regCode,
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       requesterEmail,
       status: 'pending',
     },
-  })) as Record<string, unknown>
+  })) as unknown as Record<string, unknown>
 
   return NextResponse.json({
     accessRequest: {

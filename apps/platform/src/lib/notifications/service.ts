@@ -6,13 +6,13 @@ import {
   contractReadyTemplate,
 } from '@eametsad/emails'
 import nodemailer, { type Transporter } from 'nodemailer'
-import type { Payload } from 'payload'
 
 
 import { type DomainEvent, type DomainEventType, type EventBus } from './event-bus'
 
 import { env } from '@/env'
-import { getPayloadClient } from '@/payload/payloadClient'
+import type { CoreRepositories } from '@/lib/data/repositories'
+import { getRepositories } from '@/lib/data/runtime'
 
 interface NotificationPreference {
   email: boolean
@@ -92,15 +92,18 @@ function getTemplate(eventType: DomainEventType, payload: Record<string, unknown
   }
 }
 
-async function lookupPreferences(payload: Payload, userId: string | number): Promise<NotificationPreference> {
+async function lookupPreferences(repos: CoreRepositories, userId: string | number): Promise<NotificationPreference> {
   try {
-    const prefs = await payload.find({
-      collection: 'notification-preferences',
-      where: { user: { equals: userId } },
+    // 'notification-preferences' is not a real collection (kept from the
+    // Payload call); the UnknownCollectionError lands in the catch below
+    // and the caller falls back to the defaults.
+    const prefs = (await repos.find({
+      collection: 'notification-preferences' as never,
+      where: { user: { equals: String(userId) } },
       limit: 1,
-    })
+    })) as { docs: Record<string, unknown>[] }
     if (prefs.docs.length > 0) {
-      const doc = prefs.docs[0] as Record<string, unknown>
+      const doc = prefs.docs[0] ?? {}
       return {
         email: (doc.email as boolean | undefined) ?? true,
         sms: (doc.sms as boolean | undefined) ?? false,
@@ -113,28 +116,20 @@ async function lookupPreferences(payload: Payload, userId: string | number): Pro
   return { email: true, sms: false, inApp: true }
 }
 
-async function lookupEmail(payload: Payload, userId: string | number): Promise<string | undefined> {
+async function lookupEmail(repos: CoreRepositories, userId: string | number): Promise<string | undefined> {
   try {
-    const user = (await payload.findByID({
+    const user = await repos.findByID({
       collection: 'users',
       id: userId,
-      depth: 0,
-    })) as Record<string, unknown>
-    return user.email as string | undefined
+    })
+    return (user as { email?: string } | null)?.email
   } catch {
     return undefined
   }
 }
 
-// Relationship fields reject numeric strings for number-typed ids, and
-// every emitter (JWT subject, decrypted bids) carries userId as a string.
-function relationUser(value: string | number): string | number {
-  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value)
-  return value
-}
-
-async function dispatchEmail(userId: string | number, event: DomainEvent, body: string, payload: Payload): Promise<void> {
-  const to = await lookupEmail(payload, userId)
+async function dispatchEmail(userId: string | number, event: DomainEvent, body: string, repos: CoreRepositories): Promise<void> {
+  const to = await lookupEmail(repos, userId)
   if (!to) {
     console.warn(`[NOTIFICATION] No email address for user ${String(userId)}; email skipped`)
   } else {
@@ -146,49 +141,49 @@ async function dispatchEmail(userId: string | number, event: DomainEvent, body: 
     })
   }
 
-  await payload.create({
+  await repos.create({
     collection: 'notifications',
     data: {
-      user: relationUser(userId),
+      user: userId,
       event: event.type,
       channel: 'email',
       title: eventTitles[event.type],
       body,
       payload: event.payload,
       sentAt: new Date().toISOString(),
-    },
+    } as never,
   })
 }
 
-async function dispatchSms(userId: string | number, event: DomainEvent, body: string, payload: Payload): Promise<void> {
+async function dispatchSms(userId: string | number, event: DomainEvent, body: string, repos: CoreRepositories): Promise<void> {
   console.log(`[NOTIFICATION] SMS stub to user ${String(userId)}: ${body}`)
 
-  await payload.create({
+  await repos.create({
     collection: 'notifications',
     data: {
-      user: relationUser(userId),
+      user: userId,
       event: event.type,
       channel: 'sms',
       title: eventTitles[event.type],
       body,
       payload: event.payload,
       sentAt: new Date().toISOString(),
-    },
+    } as never,
   })
 }
 
-async function dispatchInApp(userId: string | number, event: DomainEvent, body: string, payload: Payload): Promise<void> {
-  await payload.create({
+async function dispatchInApp(userId: string | number, event: DomainEvent, body: string, repos: CoreRepositories): Promise<void> {
+  await repos.create({
     collection: 'notifications',
     data: {
-      user: relationUser(userId),
+      user: userId,
       event: event.type,
       channel: 'in_app',
       title: eventTitles[event.type],
       body,
       payload: event.payload,
       sentAt: new Date().toISOString(),
-    },
+    } as never,
   })
 }
 
@@ -207,8 +202,8 @@ export function startListening(bus: EventBus): void {
     if (dispatched.has(key)) return
     dispatched.add(key)
 
-    const pl = await getPayloadClient()
-    const prefs = await lookupPreferences(pl, event.userId)
+    const repos = await getRepositories()
+    const prefs = await lookupPreferences(repos, event.userId)
 
     const channels = eventChannels[event.type]
     for (const channel of channels) {
@@ -216,13 +211,13 @@ export function startListening(bus: EventBus): void {
 
       switch (channel) {
         case 'email':
-          await dispatchEmail(event.userId, event, templateBody, pl)
+          await dispatchEmail(event.userId, event, templateBody, repos)
           break
         case 'sms':
-          await dispatchSms(event.userId, event, templateBody, pl)
+          await dispatchSms(event.userId, event, templateBody, repos)
           break
         case 'inApp':
-          await dispatchInApp(event.userId, event, templateBody, pl)
+          await dispatchInApp(event.userId, event, templateBody, repos)
           break
       }
     }

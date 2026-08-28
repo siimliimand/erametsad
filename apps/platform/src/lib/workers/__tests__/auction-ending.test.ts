@@ -1,18 +1,17 @@
-import type { CollectionBeforeChangeHook } from 'payload'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { statusTransitionHook, validateTransition } from '../../auction/status-transitions'
 import type { DomainEvent } from '../../notifications/event-bus'
 import { processEndedAuctions } from '../auction-ending'
 
-const { broadcastMock, emitMock, getPayloadClientMock } = vi.hoisted(() => ({
+const { broadcastMock, emitMock, getRepositoriesMock } = vi.hoisted(() => ({
   emitMock: vi.fn<(event: DomainEvent) => void>(),
   broadcastMock: vi.fn<(event: string, data: unknown) => void>(),
-  getPayloadClientMock: vi.fn<() => Promise<unknown>>(),
+  getRepositoriesMock: vi.fn<() => Promise<unknown>>(),
 }))
 
-vi.mock('@/payload/payloadClient', () => ({
-  getPayloadClient: getPayloadClientMock,
+vi.mock('@/lib/data/runtime', () => ({
+  getRepositories: getRepositoriesMock,
 }))
 
 vi.mock('../../notifications/event-bus', () => ({
@@ -22,9 +21,6 @@ vi.mock('../../notifications/event-bus', () => ({
 vi.mock('../../realtime/auction-stream', () => ({
   broadcast: broadcastMock,
 }))
-
-type GuardHook = CollectionBeforeChangeHook<Doc>
-type GuardHookArgs = Parameters<GuardHook>[0]
 
 interface Doc extends Record<string, unknown> {
   id: string
@@ -49,7 +45,7 @@ interface CreateArgs {
 // The spec forbids mocking the collection hooks in a way that bypasses the
 // transition guard, so every auctions update below runs through the real
 // beforeChange hook. An illegal transition throws and fails the test.
-const guardHook = statusTransitionHook as unknown as GuardHook
+const guardHook = statusTransitionHook
 
 function conditionMatches(actual: unknown, condition: Record<string, unknown>): boolean {
   const value =
@@ -70,11 +66,13 @@ function matchesWhere(doc: Doc, where: unknown): boolean {
   if (Array.isArray(where)) {
     return where.every((clause) => matchesWhere(doc, clause))
   }
+  // Where clauses speak the public relation names; rows carry storage names.
+  const storageField: Record<string, string> = { auction: 'auctionId', user: 'userId' }
   return Object.entries(where as Record<string, unknown>).every(([field, condition]) => {
     if (field === 'and') {
       return matchesWhere(doc, condition)
     }
-    return conditionMatches(doc[field], condition as Record<string, unknown>)
+    return conditionMatches(doc[storageField[field] ?? field], condition as Record<string, unknown>)
   })
 }
 
@@ -110,15 +108,16 @@ function createHarness(seed: { auctions?: Doc[]; bids?: Doc[] }) {
 
   const update = vi.fn(
     async ({ collection, id, data }: UpdateArgs): Promise<Doc | null> => {
+      await Promise.resolve()
       if (collection === 'auctions') {
         const doc = auctions.find((a) => a.id === id)
         if (doc == null) throw new Error(`unknown auction: ${id}`)
         auctionUpdates.push({ id, data })
-        const next = (await guardHook({
+        const next = guardHook({
           data: { ...doc, ...data },
           originalDoc: doc,
-        } as unknown as GuardHookArgs)) as Record<string, unknown> | null
-        Object.assign(doc, next ?? data)
+        })
+        Object.assign(doc, next)
         return { ...doc }
       }
       if (collection === 'statistics-snapshots') {
@@ -139,7 +138,7 @@ function createHarness(seed: { auctions?: Doc[]; bids?: Doc[] }) {
     },
   )
 
-  getPayloadClientMock.mockResolvedValue({ find, findByID, update, create })
+  getRepositoriesMock.mockResolvedValue({ find, findByID, update, create })
 
   return { auctions, snapshots, auctionUpdates, find, update, create }
 }
@@ -154,7 +153,7 @@ function activeAuction(overrides: Record<string, unknown> = {}): Doc {
     type: 'open',
     objectType: 'forest',
     title: 'Metsakrunt',
-    seller: 'seller-1',
+    sellerId: 'seller-1',
     cadastres: [],
     ...overrides,
   }
@@ -163,10 +162,10 @@ function activeAuction(overrides: Record<string, unknown> = {}): Doc {
 function leadingBid(overrides: Record<string, unknown> = {}): Doc {
   return {
     id: 'bid-leading',
-    amount: 5000,
+    amountCents: 500000,
     status: 'leading',
-    auction: 'auction-1',
-    user: 'bidder-1',
+    auctionId: 'auction-1',
+    userId: 'bidder-1',
     ...overrides,
   }
 }
@@ -186,8 +185,8 @@ beforeEach(() => {
 describe('processEndedAuctions', () => {
   it('moves an open auction with a winning bid through active to ended to appraised via the real guard', async () => {
     const h = createHarness({
-      auctions: [activeAuction({ reservePrice: 1000 })],
-      bids: [leadingBid({ amount: 5000 })],
+      auctions: [activeAuction({ reservePriceCents: 100000 })],
+      bids: [leadingBid({ amountCents: 500000 })],
     })
 
     const result = await processEndedAuctions()
@@ -246,8 +245,8 @@ describe('processEndedAuctions', () => {
 
   it('marks the outcome unsold and notifies the bidder when the leading bid is below the reserve price', async () => {
     const h = createHarness({
-      auctions: [activeAuction({ reservePrice: 5000 })],
-      bids: [leadingBid({ amount: 1000, user: 'bidder-reserve' })],
+      auctions: [activeAuction({ reservePriceCents: 500000 })],
+      bids: [leadingBid({ amountCents: 100000, userId: 'bidder-reserve' })],
     })
 
     await processEndedAuctions()
@@ -291,7 +290,7 @@ describe('processEndedAuctions', () => {
   it('treats any leading bid as a win when the auction sets no reserve price', async () => {
     const h = createHarness({
       auctions: [activeAuction()],
-      bids: [leadingBid({ amount: 100 })],
+      bids: [leadingBid({ amountCents: 10000 })],
     })
 
     await processEndedAuctions()
@@ -303,7 +302,7 @@ describe('processEndedAuctions', () => {
   it('does not write a second outcome when the same auction fires twice', async () => {
     const h = createHarness({
       auctions: [activeAuction()],
-      bids: [leadingBid({ amount: 5000 })],
+      bids: [leadingBid({ amountCents: 500000 })],
     })
 
     const first = await processEndedAuctions()

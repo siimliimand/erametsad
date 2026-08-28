@@ -9,13 +9,13 @@ import {
 import { fakeD1, type FakeD1, type RecordedStatement } from './fake-d1'
 import { setD1ForTests } from '../../db'
 
-vi.mock('@/payload/payloadClient', () => ({
-  getPayloadClient: vi.fn(),
+vi.mock('@/lib/data/runtime', () => ({
+  getRepositories: vi.fn(),
 }))
 
-import { getPayloadClient } from '@/payload/payloadClient'
+import { getRepositories } from '@/lib/data/runtime'
 
-let mockPayload: { find: ReturnType<typeof vi.fn> }
+let mockRepos: { find: ReturnType<typeof vi.fn> }
 let statements: RecordedStatement[]
 let d1: FakeD1
 
@@ -24,8 +24,8 @@ beforeEach(() => {
   statements = []
   d1 = fakeD1(statements)
   setD1ForTests(d1)
-  mockPayload = { find: vi.fn() }
-  vi.mocked(getPayloadClient).mockImplementation(() => mockPayload as never)
+  mockRepos = { find: vi.fn() }
+  vi.mocked(getRepositories).mockImplementation(() => mockRepos as never)
 })
 
 afterEach(() => {
@@ -34,9 +34,9 @@ afterEach(() => {
 
 const pendingBid = {
   id: 'bid-1',
-  auction: 'auction-1',
-  user: 'user-9',
-  amount: 80,
+  auctionId: 'auction-1',
+  userId: 'user-9',
+  amountCents: 8000,
   status: 'pending_approval',
 }
 const activeAuction = {
@@ -57,16 +57,16 @@ describe('isAlapakkumineEnabled', () => {
 
 describe('approveAlapakkumine', () => {
   it('takes the lead and demotes the current leader in one batch', async () => {
-    mockPayload.find
+    mockRepos.find
       .mockResolvedValueOnce({ docs: [pendingBid] })
       .mockResolvedValueOnce({ docs: [activeAuction] })
       .mockResolvedValueOnce({
         docs: [
           {
             id: 'lead-1',
-            auction: 'auction-1',
-            user: 'user-2',
-            amount: 100,
+            auctionId: 'auction-1',
+            userId: 'user-2',
+            amountCents: 10000,
             status: 'leading',
           },
         ],
@@ -105,7 +105,7 @@ describe('approveAlapakkumine', () => {
   })
 
   it('approves without a leader when no leading bid exists', async () => {
-    mockPayload.find
+    mockRepos.find
       .mockResolvedValueOnce({ docs: [pendingBid] })
       .mockResolvedValueOnce({ docs: [activeAuction] })
       .mockResolvedValueOnce({ docs: [] })
@@ -123,16 +123,16 @@ describe('approveAlapakkumine', () => {
 
   it('emits bid.approved and outbid events with userId after the write', async () => {
     const emitSpy = vi.spyOn(eventBus, 'emit')
-    mockPayload.find
+    mockRepos.find
       .mockResolvedValueOnce({ docs: [pendingBid] })
       .mockResolvedValueOnce({ docs: [activeAuction] })
       .mockResolvedValueOnce({
         docs: [
           {
             id: 'lead-1',
-            auction: 'auction-1',
-            user: 'user-2',
-            amount: 100,
+            auctionId: 'auction-1',
+            userId: 'user-2',
+            amountCents: 10000,
             status: 'leading',
           },
         ],
@@ -150,7 +150,7 @@ describe('approveAlapakkumine', () => {
   })
 
   it('is a no-op conflict when the bid already left pending_approval (serialised race)', async () => {
-    mockPayload.find
+    mockRepos.find
       .mockResolvedValueOnce({ docs: [{ ...pendingBid, status: 'leading' }] })
       .mockResolvedValueOnce({ docs: [activeAuction] })
 
@@ -164,7 +164,7 @@ describe('approveAlapakkumine', () => {
 
   it('reports a conflict when the guarded update matches no rows', async () => {
     const emitSpy = vi.spyOn(eventBus, 'emit')
-    mockPayload.find
+    mockRepos.find
       .mockResolvedValueOnce({ docs: [pendingBid] })
       .mockResolvedValueOnce({ docs: [activeAuction] })
       .mockResolvedValueOnce({ docs: [] })
@@ -181,7 +181,7 @@ describe('approveAlapakkumine', () => {
   })
 
   it('refuses to approve after the auction ended', async () => {
-    mockPayload.find
+    mockRepos.find
       .mockResolvedValueOnce({ docs: [pendingBid] })
       .mockResolvedValueOnce({ docs: [{ ...activeAuction, status: 'ended' }] })
 
@@ -194,8 +194,8 @@ describe('approveAlapakkumine', () => {
   })
 
   it('returns bid_not_found when the bid belongs to another auction', async () => {
-    mockPayload.find.mockResolvedValueOnce({
-      docs: [{ ...pendingBid, auction: 'auction-2' }],
+    mockRepos.find.mockResolvedValueOnce({
+      docs: [{ ...pendingBid, auctionId: 'auction-2' }],
     })
 
     const decision = await approveAlapakkumine('auction-1', 'bid-1')
@@ -204,7 +204,7 @@ describe('approveAlapakkumine', () => {
   })
 
   it('returns bid_not_found when the bid does not exist', async () => {
-    mockPayload.find.mockResolvedValueOnce({ docs: [] })
+    mockRepos.find.mockResolvedValueOnce({ docs: [] })
 
     const decision = await approveAlapakkumine('auction-1', 'missing')
 
@@ -212,7 +212,7 @@ describe('approveAlapakkumine', () => {
   })
 
   it('returns auction_not_found when the auction read finds no row', async () => {
-    mockPayload.find
+    mockRepos.find
       .mockResolvedValueOnce({ docs: [pendingBid] })
       .mockResolvedValueOnce({ docs: [] })
 
@@ -226,7 +226,7 @@ describe('approveAlapakkumine', () => {
 describe('rejectAlapakkumine', () => {
   it('sets the pending bid to rejected and notifies the bidder', async () => {
     const emitSpy = vi.spyOn(eventBus, 'emit')
-    mockPayload.find
+    mockRepos.find
       .mockResolvedValueOnce({ docs: [pendingBid] })
       .mockResolvedValueOnce({ docs: [activeAuction] })
 
@@ -251,7 +251,7 @@ describe('rejectAlapakkumine', () => {
   })
 
   it('still rejects after the auction ended (cleanup path)', async () => {
-    mockPayload.find
+    mockRepos.find
       .mockResolvedValueOnce({ docs: [pendingBid] })
       .mockResolvedValueOnce({ docs: [{ ...activeAuction, status: 'ended' }] })
 
@@ -261,7 +261,7 @@ describe('rejectAlapakkumine', () => {
   })
 
   it('is a no-op conflict when the bid is no longer pending', async () => {
-    mockPayload.find
+    mockRepos.find
       .mockResolvedValueOnce({ docs: [{ ...pendingBid, status: 'rejected' }] })
       .mockResolvedValueOnce({ docs: [activeAuction] })
 
@@ -274,7 +274,7 @@ describe('rejectAlapakkumine', () => {
   })
 
   it('reports a conflict when the guarded update matches no rows', async () => {
-    mockPayload.find
+    mockRepos.find
       .mockResolvedValueOnce({ docs: [pendingBid] })
       .mockResolvedValueOnce({ docs: [activeAuction] })
     d1.updateChanges = 0
@@ -288,7 +288,7 @@ describe('rejectAlapakkumine', () => {
   })
 
   it('returns bid_not_found when the bid does not exist', async () => {
-    mockPayload.find.mockResolvedValueOnce({ docs: [] })
+    mockRepos.find.mockResolvedValueOnce({ docs: [] })
 
     const decision = await rejectAlapakkumine('auction-1', 'missing')
 

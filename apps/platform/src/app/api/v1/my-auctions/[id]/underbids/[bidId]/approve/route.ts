@@ -3,8 +3,8 @@ import type { NextRequest } from 'next/server'
 
 import { isAdminRole, verifyAccessToken } from '@/lib/auth/jwt'
 import { approveAlapakkumine } from '@/lib/bidding/alapakkumine'
+import { getRepositories } from '@/lib/data/runtime'
 import { pushNotification, pushOutbid } from '@/lib/realtime/my-stream'
-import { getPayloadClient } from '@/payload/payloadClient'
 
 export async function POST(
   request: NextRequest,
@@ -24,22 +24,18 @@ export async function POST(
 
   // Seller identity comes from the auction row; the role comes from the
   // JWT claims. Either the seller or an admin may decide.
-  const payload = await getPayloadClient()
-  const auctions = await payload.find({
+  const repos = await getRepositories()
+  const auctions = await repos.find({
     collection: 'auctions',
     where: { id: { equals: auctionId } },
     limit: 1,
-    depth: 0,
   })
   const auction = auctions.docs[0] as Record<string, unknown> | undefined
   if (!auction) {
     return NextResponse.json({ error: 'Auction not found' }, { status: 404 })
   }
-  const seller = auction.seller
-  const sellerId =
-    typeof seller === 'string' || typeof seller === 'number'
-      ? String(seller)
-      : String((seller as { id?: string | number } | null | undefined)?.id ?? '')
+  const rawSeller = auction.sellerId
+  const sellerId = typeof rawSeller === 'string' ? rawSeller : ''
   if (sellerId !== tokenPayload.userId && !isAdminRole(tokenPayload.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }

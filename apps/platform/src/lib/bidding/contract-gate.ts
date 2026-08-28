@@ -1,15 +1,14 @@
-import { getPayloadClient } from '@/payload/payloadClient'
+import { getRepositories } from '../data/runtime'
 
 export async function checkContractGate(
   userId: string,
   _auctionId: string,
 ): Promise<{ passed: boolean; redirectUrl?: string }> {
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const settingsResult = await payload.find({
+  const settingsResult = await repos.find({
     collection: 'settings',
     limit: 1,
-    depth: 0,
   })
 
   const settings = settingsResult.docs[0] as Record<string, unknown> | undefined
@@ -22,7 +21,7 @@ export async function checkContractGate(
     return { passed: true }
   }
 
-  const frameworkTemplates = await payload.find({
+  const frameworkTemplates = await repos.find({
     collection: 'contract-templates',
     where: {
       and: [
@@ -31,18 +30,17 @@ export async function checkContractGate(
       ],
     },
     limit: 100,
-    depth: 0,
   })
 
   const templateIds = frameworkTemplates.docs.map(
-    (t: Record<string, unknown>) => t.id,
+    (t) => t.id,
   )
 
   if (templateIds.length === 0) {
     return { passed: true }
   }
 
-  const signedContracts = await payload.find({
+  const signedContracts = await repos.find({
     collection: 'contracts',
     where: {
       and: [
@@ -52,7 +50,6 @@ export async function checkContractGate(
       ],
     },
     limit: 1,
-    depth: 0,
   })
 
   if (signedContracts.docs.length === 0) {

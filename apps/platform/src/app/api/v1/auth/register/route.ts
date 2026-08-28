@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+import { hashCredentialPassword } from '@/lib/auth/password'
 import { createSession, setSessionCookies } from '@/lib/auth/session'
+import { getRepositories } from '@/lib/data/runtime'
 import { authRateLimiter } from '@/lib/rate-limit'
-import { getPayloadClient } from '@/payload/payloadClient'
 
 export async function POST(request: NextRequest) {
   const forwarded = request.headers.get('x-forwarded-for') ?? 'global'
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Vale profiili tüüp' }, { status: 400 })
   }
 
-  const consentTimestamps: Record<string, Date> = {}
+  const consentTimestamps: Record<string, string> = {}
   for (const key of ['terms', 'privacy', 'marketing']) {
     const raw = consents[key]
     const parsed =
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       )
     }
-    consentTimestamps[key] = parsed
+    consentTimestamps[key] = parsed.toISOString()
   }
 
   if (profileType === 'company' && (!regCode || !companyName)) {
@@ -60,14 +61,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Parool peab olema vähemalt 8 tähemärki' }, { status: 400 })
   }
 
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  // Pass the raw password: users is a Payload auth collection, so Payload
-  // applies its own hashing. Pre-hashing here would make the account
-  // impossible to log into.
+  // Hash with the seed's scrypt credential scheme (password_hash +
+  // password_salt); the raw password never reaches storage.
+  const credentials = hashCredentialPassword(password)
   const userData: Record<string, unknown> = {
     email: identifier,
-    password,
+    passwordHash: credentials.hash,
+    passwordSalt: credentials.salt,
     role: profileType === 'company' ? 'company' : 'private',
     authMethod: 'password',
     status: 'active',
@@ -75,7 +77,7 @@ export async function POST(request: NextRequest) {
 
   let user: Record<string, unknown>
   try {
-    user = (await payload.create({
+    user = (await repos.create({
       collection: 'users',
       data: userData,
     }))
@@ -95,9 +97,9 @@ export async function POST(request: NextRequest) {
     user: userId,
     displayName,
     approvalStatus: profileType === 'company' ? 'pending' : 'approved',
-    termsConsentAt: consentTimestamps.terms,
-    privacyConsentAt: consentTimestamps.privacy,
-    marketingConsentAt: consentTimestamps.marketing,
+    termsConsentAt: consentTimestamps.terms ?? '',
+    privacyConsentAt: consentTimestamps.privacy ?? '',
+    marketingConsentAt: consentTimestamps.marketing ?? '',
   }
 
   if (profileType === 'company') {
@@ -105,7 +107,7 @@ export async function POST(request: NextRequest) {
     profileData.companyRegCode = regCode
   }
 
-  const profile = (await payload.create({
+  const profile = (await repos.create({
     collection: 'profile',
     data: profileData,
   })) as Record<string, unknown>
@@ -113,7 +115,7 @@ export async function POST(request: NextRequest) {
   const profileId = String(profile.id)
 
   if (profileType === 'company') {
-    await payload.create({
+    await repos.create({
       collection: 'company-access-request',
       data: {
         regCode,

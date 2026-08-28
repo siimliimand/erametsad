@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 import { verifyAccessToken } from '@/lib/auth/jwt'
-import { getPayloadClient } from '@/payload/payloadClient'
+import { centsToEuros, eurosToCents } from '@/lib/data/repositories/money'
+import { getRepositories, sessionGuardContext } from '@/lib/data/runtime'
 
 export async function POST(request: NextRequest) {
   const accessToken = request.cookies.get('access_token')?.value
@@ -38,9 +39,11 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const payload = await getPayloadClient()
+  // The caller owns autobidders rows, so the repository guard context is
+  // derived from the verified session.
+  const repos = await getRepositories(sessionGuardContext(tokenPayload))
 
-  const existing = await payload.find({
+  const existing = await repos.find({
     collection: 'autobidders',
     where: {
       and: [
@@ -49,32 +52,46 @@ export async function POST(request: NextRequest) {
       ],
     },
     limit: 1,
-    depth: 0,
   })
 
   let autobidder: Record<string, unknown>
 
   if (existing.docs.length > 0) {
     const existingDoc = existing.docs[0] as Record<string, unknown>
-    autobidder = await payload.update({
+    autobidder = (await repos.update({
       collection: 'autobidders',
       id: existingDoc.id as string,
       data: {
-        maxAmount,
+        maxAmountCents: eurosToCents(maxAmount),
         status: 'active',
       },
-    })
+    }))
   } else {
-    autobidder = await payload.create({
+    autobidder = (await repos.create({
       collection: 'autobidders',
       data: {
         user: tokenPayload.userId,
         auction: auctionId,
-        maxAmount,
+        maxAmountCents: eurosToCents(maxAmount),
         status: 'active',
       },
-    })
+    }))
   }
 
-  return NextResponse.json(autobidder, { status: 201 })
+  return NextResponse.json(toPublicAutobidder(autobidder), { status: 201 })
+}
+
+// Repository rows carry storage names (userId, auctionId,
+// maxAmountCents); the API surface keeps the Payload field names
+// (user, auction, maxAmount in EUR).
+function toPublicAutobidder(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id,
+    user: row.userId,
+    auction: row.auctionId,
+    maxAmount: centsToEuros(row.maxAmountCents as number),
+    status: row.status,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
 }

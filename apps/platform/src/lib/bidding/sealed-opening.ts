@@ -3,8 +3,10 @@ import crypto from 'node:crypto'
 import { verifyAdminAccessToken } from '../auth/jwt'
 import { createCache } from '../cache'
 import { decryptSealedBids, getSealedBidsForAuction, type DecryptedBid } from './sealed-bid'
-import { getPayloadClient } from '../../payload/payloadClient'
 import { prepareContract } from '../contracts/service'
+import type { AuctionDoc } from '../data/repositories'
+import { centsToEuros, eurosToCents } from '../data/repositories/money'
+import { getRepositories } from '../data/runtime'
 import { eventBus } from '../notifications/event-bus'
 import { upsertSnapshot } from '../stats/aggregation'
 
@@ -53,6 +55,18 @@ function rankBids(bids: DecryptedBid[]): DecryptedBid[] {
     })
 }
 
+async function findAuction(
+  auctionId: string,
+): Promise<AuctionDoc | undefined> {
+  const repos = await getRepositories()
+  const auctionResult = await repos.find({
+    collection: 'auctions',
+    where: { id: { equals: auctionId } },
+    limit: 1,
+  })
+  return auctionResult.docs[0]
+}
+
 export async function startOpeningSession(
   auctionId: string,
   openerAccessToken: string,
@@ -62,20 +76,12 @@ export async function startOpeningSession(
     throw new Error('Opener must hold a valid admin or superadmin token')
   }
 
-  const payload = await getPayloadClient()
-
-  const auctionResult = await payload.find({
-    collection: 'auctions',
-    where: { id: { equals: auctionId } },
-    limit: 1,
-    depth: 0,
-  })
-  const auction = auctionResult.docs[0] as Record<string, unknown> | undefined
+  const auction = await findAuction(auctionId)
   if (!auction) {
     throw new Error('Auction not found')
   }
   if (auction.status !== 'ended') {
-    throw new Error(`Auction must be in 'ended' status to open sealed bids, current: ${String(auction.status)}`)
+    throw new Error(`Auction must be in 'ended' status to open sealed bids, current: ${auction.status}`)
   }
 
   const approvalToken = generateToken()
@@ -151,20 +157,14 @@ export async function confirmWinner(
     throw new Error('Confirmer must hold a valid admin or superadmin token')
   }
 
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const auctionResult = await payload.find({
-    collection: 'auctions',
-    where: { id: { equals: auctionId } },
-    limit: 1,
-    depth: 0,
-  })
-  const auction = auctionResult.docs[0] as Record<string, unknown> | undefined
+  const auction = await findAuction(auctionId)
   if (!auction) {
     throw new Error('Auction not found')
   }
   if (auction.status !== 'ended') {
-    throw new Error(`Auction must be in 'ended' status to confirm a winner, current: ${String(auction.status)}`)
+    throw new Error(`Auction must be in 'ended' status to confirm a winner, current: ${auction.status}`)
   }
 
   const approved = await openingSessions.get(auctionApprovalKey(auctionId))
@@ -191,12 +191,12 @@ export async function confirmWinner(
   const winningAmount = target.amount
   const auctionTitle = auction.title as string | undefined
   const objectType = auction.objectType as string
-  const rawReserve = auction.reservePrice
-  const reserveSet = typeof rawReserve === 'number' && Number.isFinite(rawReserve)
-  const reserveMet = !reserveSet || winningAmount >= rawReserve
+  const rawReserveCents = auction.reservePriceCents
+  const reserveSet = typeof rawReserveCents === 'number'
+  const reserveMet = !reserveSet || eurosToCents(winningAmount) >= (rawReserveCents)
 
   if (!reserveMet) {
-    await payload.update({
+    await repos.update({
       collection: 'auctions',
       id: auctionId,
       data: { status: 'unsold' },
@@ -215,7 +215,7 @@ export async function confirmWinner(
       },
     })
 
-    await payload.create({
+    await repos.create({
       collection: 'audit-entry',
       data: {
         action: 'reserve_not_met',
@@ -225,7 +225,7 @@ export async function confirmWinner(
           bidId,
           auctionStatus: 'unsold',
           finalPrice: winningAmount,
-          reservePrice: rawReserve,
+          reservePrice: centsToEuros(rawReserveCents),
         },
       },
     })
@@ -233,13 +233,13 @@ export async function confirmWinner(
     return
   }
 
-  await payload.update({
+  await repos.update({
     collection: 'bids',
     id: bidId,
     data: { status: 'won' },
   })
 
-  const allBids = await payload.find({
+  const allBids = await repos.find({
     collection: 'bids',
     where: {
       and: [
@@ -249,30 +249,29 @@ export async function confirmWinner(
       ],
     },
     limit: 1000,
-    depth: 0,
   })
   for (const otherBid of allBids.docs) {
-    await payload.update({
+    await repos.update({
       collection: 'bids',
       id: otherBid.id,
       data: { status: 'lost' },
     })
   }
 
-  await payload.update({
+  await repos.update({
     collection: 'auctions',
     id: auctionId,
     data: {
       status: 'appraised',
       winningBid: bidId,
-      finalPrice: winningAmount,
+      finalPriceCents: eurosToCents(winningAmount),
     },
   })
 
   // The ending worker already recorded count and area for this auction in
   // the end-day snapshot with eur 0, so the ceremony backfill adds only the
   // eur contribution from the published finalPrice.
-  await upsertSnapshot(payload, { objectType, eur: winningAmount })
+  await upsertSnapshot(repos, { objectType, eur: winningAmount })
 
   await prepareContract(auctionId, 'auction')
 
@@ -297,7 +296,7 @@ export async function confirmWinner(
     })
   }
 
-  await payload.create({
+  await repos.create({
     collection: 'audit-entry',
     data: {
       action: 'winner_confirmed',
@@ -313,29 +312,23 @@ export async function confirmWinner(
 }
 
 export async function voidOpening(auctionId: string): Promise<void> {
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const auctionResult = await payload.find({
-    collection: 'auctions',
-    where: { id: { equals: auctionId } },
-    limit: 1,
-    depth: 0,
-  })
-  const auction = auctionResult.docs[0] as Record<string, unknown> | undefined
+  const auction = await findAuction(auctionId)
   if (!auction) {
     throw new Error('Auction not found')
   }
   if (auction.status !== 'ended') {
-    throw new Error(`Auction must be in 'ended' status to void an opening, current: ${String(auction.status)}`)
+    throw new Error(`Auction must be in 'ended' status to void an opening, current: ${auction.status}`)
   }
 
-  await payload.update({
+  await repos.update({
     collection: 'auctions',
     id: auctionId,
     data: { status: 'unsold' },
   })
 
-  await payload.create({
+  await repos.create({
     collection: 'audit-entry',
     data: {
       action: 'opening_voided',
