@@ -1,0 +1,32 @@
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "do-auction-test",
+  "main": "../auction.ts",
+  "compatibility_date": "2025-04-01",
+  // nodejs_compat: the repository layer pulls in nodeIsikukoodCodec
+  // (node:crypto). The codec is never invoked for auctions/bids reads, but
+  // the import must resolve inside workerd.
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "AUCTION",
+        "class_name": "AuctionDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["AuctionDO"]
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "do-auction-test",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../../drizzle"
+    }
+  ]
+}
