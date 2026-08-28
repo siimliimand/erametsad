@@ -1,3 +1,4 @@
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -9,8 +10,35 @@ import type { BidResult } from '@/lib/bidding/place-bid'
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { centsToEuros } from '@/lib/data/repositories/money'
 import { getRepositories } from '@/lib/data/runtime'
-import { emitBidCreated } from '@/lib/realtime/auction-stream'
+import { emitAuctionExtended, emitBidCreated } from '@/lib/realtime/auction-stream'
 import { pushOutbid } from '@/lib/realtime/my-stream'
+
+// Minimal DO namespace surface (same local-declaration approach as
+// src/lib/rate-limit.ts, so the route never imports cloudflare:workers).
+interface AuctionDONamespace {
+  idFromName(name: string): unknown
+  get(id: unknown): { fetch(input: string, init?: RequestInit): Promise<Response> }
+}
+
+declare global {
+  interface CloudflareEnv {
+    /** AuctionDO binding from wrangler.jsonc durable_objects (task 3.7). */
+    AUCTION?: AuctionDONamespace
+  }
+}
+
+interface AuctionDOAdmission {
+  allowed: boolean
+  bid?: Record<string, unknown>
+  error?: string
+  status?: number
+  code?: 'framework_contract_required'
+  redirectUrl?: string
+  replayed?: boolean
+  previousLeading?: { userId: string; amount: number } | null
+  autobid?: { userId: string; amount: number; placedAt: string } | null
+  extended?: { previousEndsAt: string; endsAt: string; windowMinutes: number } | null
+}
 
 type RouteCollection = 'auctions' | 'bids'
 
@@ -37,6 +65,110 @@ function findLeadingBid(
       { status: { equals: 'leading' } },
     ],
   })
+}
+
+/**
+ * Bid admission through the AuctionDO, the serialization authority for
+ * the auction. Returns null when the DO is unreachable (binding absent
+ * until task 3.7, or transport failure) so the caller can fall back to
+ * the legacy in-process path.
+ */
+async function admitViaAuctionDO(input: {
+  userId: string
+  auctionId: string
+  amount: number
+  type: string
+  idempotencyKey?: string
+  requestIp: string
+}): Promise<AuctionDOAdmission | null> {
+  let namespace: AuctionDONamespace | undefined
+  try {
+    const context = await getCloudflareContext({ async: true })
+    namespace = context.env.AUCTION
+  } catch {
+    return null
+  }
+  if (!namespace) return null
+
+  try {
+    const stub = namespace.get(namespace.idFromName(input.auctionId))
+    const response = await stub.fetch(`https://auction-do/${input.auctionId}/bid`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        userId: input.userId,
+        amount: input.amount,
+        type: input.type,
+        ...(input.idempotencyKey !== undefined
+          ? { idempotencyKey: input.idempotencyKey }
+          : {}),
+        requestIp: input.requestIp,
+      }),
+    })
+    const payload = (await response.json()) as Record<string, unknown>
+    if (!response.ok) {
+      let errorMessage: string | undefined
+      if (typeof payload.error === 'string') {
+        errorMessage = payload.error
+      }
+      return {
+        allowed: false,
+        error: errorMessage ?? 'AuctionDO rejected the request',
+        status: response.status,
+      }
+    }
+    return payload as unknown as AuctionDOAdmission
+  } catch (error) {
+    console.error('[bids/create] AuctionDO fetch failed', error)
+    return null
+  }
+}
+
+// Mirrors the DO's admitted bid onto the legacy in-memory SSE hubs. The
+// AuctionDO owns admission, autobidders, and the endsAt update; these
+// pushes keep the pre-3.5 streams alive until they are rebuilt on DO
+// events. Payload shapes match auction-stream.ts / my-stream.ts exactly.
+function mirrorAcceptedBidOnStreams(admission: AuctionDOAdmission): void {
+  const bid = admission.bid
+  if (!bid) return
+  if (bid.status !== 'leading') return
+
+  const auctionId = bid.auction as string
+  const amount = bid.amount as number
+  const placedAt = (bid.createdAt as string | Date | undefined) ?? new Date()
+
+  emitBidCreated({ auctionId, amount, placedAt })
+
+  if (admission.previousLeading) {
+    pushOutbid(admission.previousLeading.userId, {
+      auctionId,
+      previousAmount: admission.previousLeading.amount,
+      newAmount: amount,
+      placedAt,
+    })
+  }
+
+  if (admission.extended) {
+    emitAuctionExtended({
+      auctionId,
+      previousEndsAt: admission.extended.previousEndsAt,
+      endsAt: admission.extended.endsAt,
+    })
+  }
+
+  if (admission.autobid) {
+    emitBidCreated({
+      auctionId,
+      amount: admission.autobid.amount,
+      placedAt: admission.autobid.placedAt,
+    })
+    pushOutbid(bid.user as string | number, {
+      auctionId,
+      previousAmount: amount,
+      newAmount: admission.autobid.amount,
+      placedAt: admission.autobid.placedAt,
+    })
+  }
 }
 
 // placeBid already emitted the bid.created and outbid DomainEvents
@@ -131,6 +263,49 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'type must be open or sealed' }, { status: 400 })
   }
 
+  const requestIp = request.headers.get('x-forwarded-for') ?? 'unknown'
+
+  const admission = await admitViaAuctionDO({
+    userId: tokenPayload.userId,
+    auctionId,
+    amount,
+    type,
+    ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+    requestIp,
+  })
+
+  if (admission !== null) {
+    console.log('[bids/create] AuctionDO admission', {
+      auctionId,
+      allowed: admission.allowed,
+      status: admission.status,
+      bidStatus: admission.bid?.status,
+      replayed: admission.replayed ?? false,
+    })
+
+    if (!admission.allowed) {
+      if (admission.code === 'framework_contract_required') {
+        return NextResponse.json(
+          {
+            error: admission.error,
+            code: admission.code,
+            redirectUrl: admission.redirectUrl ?? '/contracts/framework',
+          },
+          { status: admission.status ?? 403 },
+        )
+      }
+      return NextResponse.json(
+        { error: admission.error ?? 'Bid rejected' },
+        { status: admission.status ?? 400 },
+      )
+    }
+
+    mirrorAcceptedBidOnStreams(admission)
+    return NextResponse.json(admission.bid, { status: 201 })
+  }
+
+  // Fallback while the AUCTION binding is not deployed (task 3.7): the
+  // legacy in-process admission path, unchanged.
   let previousLeading: Record<string, unknown> | null = null
   let result: BidResult
   try {
@@ -144,7 +319,7 @@ export async function POST(request: NextRequest) {
       amount,
       type,
       source: 'manual',
-      requestIp: request.headers.get('x-forwarded-for') ?? 'unknown',
+      requestIp,
       ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
     })
   } catch (error) {
