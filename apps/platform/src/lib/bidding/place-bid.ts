@@ -1,4 +1,8 @@
-import crypto from 'node:crypto'
+// Task 5.2: computeIpHashAsync is the canonical crypto.subtle path used by
+// the bid flow. The sync computeIpHash stays on node:crypto because the
+// leads route and the local vitest node pool still call it synchronously;
+// both produce the same salted SHA-256 hex digest.
+import { createHash } from 'node:crypto'
 
 import { isAlapakkumineEnabled } from './alapakkumine'
 import type { CoreRepositories } from '../data/repositories'
@@ -36,10 +40,20 @@ export type BidResult = BidSuccess | BidError
 const IP_HASH_SALT = process.env.PAYLOAD_SECRET ?? 'dev-ip-hash-salt'
 
 export function computeIpHash(ip: string): string {
-  return crypto
-    .createHash('sha256')
+  return createHash('sha256')
     .update(`${IP_HASH_SALT}:${ip}`)
     .digest('hex')
+}
+
+export async function computeIpHashAsync(ip: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`${IP_HASH_SALT}:${ip}`),
+  )
+  return Array.from(
+    new Uint8Array(digest),
+    (byte) => byte.toString(16).padStart(2, '0'),
+  ).join('')
 }
 
 function normalizeRequestIp(headerValue: string | undefined): string {
@@ -90,7 +104,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
   const events: DomainEvent[] = []
   const ipHash =
     requestIp !== undefined
-      ? computeIpHash(normalizeRequestIp(requestIp))
+      ? await computeIpHashAsync(normalizeRequestIp(requestIp))
       : undefined
   const now = new Date().toISOString()
 
