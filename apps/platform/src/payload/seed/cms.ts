@@ -148,7 +148,9 @@ export async function seedCms(payload: Payload): Promise<void> {
       collection: 'faq-categories',
       data: cat,
     })
-    categoryDocs[cat.slug] = { id: String(doc.id) }
+    // Keep the id as returned: Payload rejects numeric strings for
+    // number-typed relationship ids.
+    categoryDocs[cat.slug] = { id: doc.id }
   }
 
   // ── FAQ ITEMS ──

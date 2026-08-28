@@ -1,24 +1,18 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { hashPassword } from '@/lib/auth/password'
 import { consumeResetToken } from '@/lib/auth/reset-tokens'
 import { revokeAllUserSessions } from '@/lib/auth/session'
 import { authRateLimiter } from '@/lib/rate-limit'
 import { getPayloadClient } from '@/payload/payloadClient'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ token: string }> },
-) {
+export async function POST(request: NextRequest) {
   const forwarded = request.headers.get('x-forwarded-for') ?? 'global'
   const rateLimitResult = authRateLimiter.check(forwarded)
 
   if (!rateLimitResult.allowed) {
     return NextResponse.json({ error: 'Liiga palju katseid' }, { status: 429 })
   }
-
-  const { token } = await params
 
   let body: Record<string, unknown>
   try {
@@ -27,10 +21,19 @@ export async function POST(
     return NextResponse.json({ error: 'Vigane päringu keha' }, { status: 400 })
   }
 
+  const token = body.token as string | undefined
   const password = body.password as string | undefined
-  if (!password || password.length < 8) {
+
+  if (!token || !password) {
     return NextResponse.json(
-      { error: 'Parool peab olema vähemalt 8 tähemärki' },
+      { error: 'Lähtestamise link ja uus parool on kohustuslikud' },
+      { status: 400 },
+    )
+  }
+
+  if (typeof password !== 'string' || password.length < 10) {
+    return NextResponse.json(
+      { error: 'Parool peab olema vähemalt 10 tähemärki' },
       { status: 400 },
     )
   }
@@ -43,14 +46,13 @@ export async function POST(
     )
   }
 
-  const passwordHash = await hashPassword(password)
-
   const payload = await getPayloadClient()
 
+  // Raw password: Payload's auth field applies its own hashing on update.
   await payload.update({
     collection: 'users',
     id: userId,
-    data: { password: passwordHash },
+    data: { password },
   })
 
   await revokeAllUserSessions(userId)

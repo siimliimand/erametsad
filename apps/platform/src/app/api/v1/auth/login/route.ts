@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { verifyPassword } from '@/lib/auth/password'
 import { createSession, setSessionCookies } from '@/lib/auth/session'
 import { hash } from '@/lib/crypto'
 import { authRateLimiter } from '@/lib/rate-limit'
+import { getUserRole } from '@/payload/access/roles'
 import { getPayloadClient } from '@/payload/payloadClient'
 
 export async function POST(request: NextRequest) {
@@ -66,16 +66,24 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const passwordHash = user.password as string | undefined
-  if (!passwordHash) {
+  // users is a Payload auth collection: credentials live in Payload's own
+  // salt/hash columns, and find() never returns them, so there is no
+  // user.password to compare. payload.login runs Payload's own verification
+  // (plus its lockout counters) and throws on a wrong password.
+  try {
+    await payload.login({
+      collection: 'users',
+      data: { email: user.email as string, password },
+      depth: 0,
+    })
+  } catch {
     return NextResponse.json(
       { error: 'Vale kasutajanimi või parool' },
       { status: 401 },
     )
   }
 
-  const valid = await verifyPassword(password, passwordHash)
-  if (!valid) {
+  if (user.status === 'suspended') {
     return NextResponse.json(
       { error: 'Vale kasutajanimi või parool' },
       { status: 401 },
@@ -83,8 +91,9 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = String(user.id)
+  const role = getUserRole(user.role as string | undefined)
   const profileId = user.profileId as string | undefined
-  const { accessToken, refreshToken } = await createSession(userId, profileId)
+  const { accessToken, refreshToken } = await createSession(userId, role, profileId)
 
   const response = NextResponse.json({
     user: {

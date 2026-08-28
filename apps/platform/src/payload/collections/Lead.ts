@@ -59,6 +59,13 @@ export const Lead: CollectionConfig = {
       ],
     },
     {
+      name: 'ipHash',
+      type: 'text',
+      admin: {
+        description: 'Salted SHA-256 of IP address',
+      },
+    },
+    {
       name: 'assignedSpecialist',
       type: 'relationship',
       relationTo: 'specialist',

@@ -1,191 +1,337 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { CollectionBeforeChangeHook } from 'payload'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-type UpdateCall = [data: Record<string, unknown>, params?: Record<string, unknown>]
+import { statusTransitionHook, validateTransition } from '../../auction/status-transitions'
+import type { DomainEvent } from '../../notifications/event-bus'
+import { processEndedAuctions } from '../auction-ending'
+
+const { broadcastMock, emitMock, getPayloadClientMock } = vi.hoisted(() => ({
+  emitMock: vi.fn<(event: DomainEvent) => void>(),
+  broadcastMock: vi.fn<(event: string, data: unknown) => void>(),
+  getPayloadClientMock: vi.fn<() => Promise<unknown>>(),
+}))
 
 vi.mock('@/payload/payloadClient', () => ({
-  getPayloadClient: vi.fn(),
+  getPayloadClient: getPayloadClientMock,
 }))
 
 vi.mock('../../notifications/event-bus', () => ({
-  eventBus: { emit: vi.fn() },
+  eventBus: { emit: emitMock },
 }))
 
 vi.mock('../../realtime/auction-stream', () => ({
-  broadcast: vi.fn(),
+  broadcast: broadcastMock,
 }))
 
-import { eventBus } from '../../notifications/event-bus'
-import { broadcast } from '../../realtime/auction-stream'
-import { processEndedAuctions } from '../auction-ending'
+type GuardHook = CollectionBeforeChangeHook<Doc>
+type GuardHookArgs = Parameters<GuardHook>[0]
 
-import { getPayloadClient } from '@/payload/payloadClient'
+interface Doc extends Record<string, unknown> {
+  id: string
+}
 
-let mockPayload: { find: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; findByID: ReturnType<typeof vi.fn> }
+interface FindArgs {
+  collection: string
+  where?: unknown
+}
+
+interface UpdateArgs {
+  collection: string
+  id: string
+  data: Record<string, unknown>
+}
+
+interface CreateArgs {
+  collection: string
+  data: Record<string, unknown>
+}
+
+// The spec forbids mocking the collection hooks in a way that bypasses the
+// transition guard, so every auctions update below runs through the real
+// beforeChange hook. An illegal transition throws and fails the test.
+const guardHook = statusTransitionHook as unknown as GuardHook
+
+function conditionMatches(actual: unknown, condition: Record<string, unknown>): boolean {
+  const value =
+    typeof actual === 'object' && actual !== null && 'id' in actual
+      ? (actual).id
+      : actual
+  if ('equals' in condition) {
+    return String(value) === String(condition.equals)
+  }
+  if ('less_than_equal' in condition) {
+    return String(value) <= String(condition.less_than_equal)
+  }
+  return true
+}
+
+function matchesWhere(doc: Doc, where: unknown): boolean {
+  if (where == null || typeof where !== 'object') return true
+  if (Array.isArray(where)) {
+    return where.every((clause) => matchesWhere(doc, clause))
+  }
+  return Object.entries(where as Record<string, unknown>).every(([field, condition]) => {
+    if (field === 'and') {
+      return matchesWhere(doc, condition)
+    }
+    return conditionMatches(doc[field], condition as Record<string, unknown>)
+  })
+}
+
+function createHarness(seed: { auctions?: Doc[]; bids?: Doc[] }) {
+  const auctions = (seed.auctions ?? []).map((doc) => ({ ...doc }))
+  const bids = (seed.bids ?? []).map((doc) => ({ ...doc }))
+  const snapshots: Doc[] = []
+  const auctionUpdates: { id: string; data: Record<string, unknown> }[] = []
+
+  const find = vi.fn(
+    ({ collection, where }: FindArgs): { docs: Doc[] } => {
+      if (collection === 'auctions') {
+        return { docs: auctions.filter((doc) => matchesWhere(doc, where)) }
+      }
+      if (collection === 'bids') {
+        return { docs: bids.filter((doc) => matchesWhere(doc, where)) }
+      }
+      if (collection === 'statistics-snapshots') {
+        return { docs: snapshots.filter((doc) => matchesWhere(doc, where)).slice(0, 1) }
+      }
+      return { docs: [] }
+    },
+  )
+
+  const findByID = vi.fn(
+    ({ collection, id }: { collection: string; id: string }): Doc | null => {
+      if (collection === 'auctions') {
+        return auctions.find((doc) => doc.id === id) ?? null
+      }
+      return null
+    },
+  )
+
+  const update = vi.fn(
+    async ({ collection, id, data }: UpdateArgs): Promise<Doc | null> => {
+      if (collection === 'auctions') {
+        const doc = auctions.find((a) => a.id === id)
+        if (doc == null) throw new Error(`unknown auction: ${id}`)
+        auctionUpdates.push({ id, data })
+        const next = (await guardHook({
+          data: { ...doc, ...data },
+          originalDoc: doc,
+        } as unknown as GuardHookArgs)) as Record<string, unknown> | null
+        Object.assign(doc, next ?? data)
+        return { ...doc }
+      }
+      if (collection === 'statistics-snapshots') {
+        const doc = snapshots.find((s) => s.id === id)
+        if (doc == null) return null
+        Object.assign(doc, data)
+        return doc
+      }
+      return null
+    },
+  )
+
+  const create = vi.fn(
+    ({ collection, data }: CreateArgs): Doc => {
+      const doc: Doc = { id: `snapshot-${String(snapshots.length + 1)}`, ...data }
+      if (collection === 'statistics-snapshots') snapshots.push(doc)
+      return doc
+    },
+  )
+
+  getPayloadClientMock.mockResolvedValue({ find, findByID, update, create })
+
+  return { auctions, snapshots, auctionUpdates, find, update, create }
+}
+
+type Harness = ReturnType<typeof createHarness>
+
+function activeAuction(overrides: Record<string, unknown> = {}): Doc {
+  return {
+    id: 'auction-1',
+    status: 'active',
+    endsAt: '2024-01-01T00:00:00.000Z',
+    type: 'open',
+    objectType: 'forest',
+    title: 'Metsakrunt',
+    seller: 'seller-1',
+    cadastres: [],
+    ...overrides,
+  }
+}
+
+function leadingBid(overrides: Record<string, unknown> = {}): Doc {
+  return {
+    id: 'bid-leading',
+    amount: 5000,
+    status: 'leading',
+    auction: 'auction-1',
+    user: 'bidder-1',
+    ...overrides,
+  }
+}
+
+function auctionStatuses(h: Harness): unknown[] {
+  return h.auctionUpdates.map(({ data }) => data.status)
+}
+
+function emittedEvents(): DomainEvent[] {
+  return emitMock.mock.calls.map((call) => call[0])
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockPayload = { find: vi.fn(), create: vi.fn(), update: vi.fn(), findByID: vi.fn() }
-  vi.mocked(getPayloadClient).mockResolvedValue(mockPayload as never)
 })
 
 describe('processEndedAuctions', () => {
-  function mockAuctionsQuery(auctions: Record<string, unknown>[]) {
-    mockPayload.find.mockResolvedValueOnce({ docs: auctions })
-  }
-
-  function mockAuctionFindByID(auction: Record<string, unknown> | null) {
-    mockPayload.findByID.mockResolvedValueOnce(auction)
-  }
-
-  function mockBidsQuery(bids: Record<string, unknown>[]) {
-    mockPayload.find.mockResolvedValueOnce({ docs: bids })
-  }
-
-  it('processes active auction past endTime to ended', async () => {
-    mockAuctionsQuery([
-      { id: 'auction-1', status: 'active', endsAt: '2024-01-01T00:00:00Z', type: 'open', objectType: 'forest', cadastres: [] },
-    ])
-    mockAuctionFindByID({ id: 'auction-1', status: 'active', type: 'open', objectType: 'forest', cadastres: [] })
-    mockBidsQuery([{ id: 'lead-bid-1', amount: 1000 }])
-    mockPayload.find.mockResolvedValueOnce({ docs: [] })
+  it('moves an open auction with a winning bid through active to ended to appraised via the real guard', async () => {
+    const h = createHarness({
+      auctions: [activeAuction({ reservePrice: 1000 })],
+      bids: [leadingBid({ amount: 5000 })],
+    })
 
     const result = await processEndedAuctions()
 
-    expect(result.processed).toBe(1)
-    expect(mockPayload.update).toHaveBeenCalledWith(
+    expect(result).toEqual({ processed: 1, skipped: 0 })
+    expect(auctionStatuses(h)).toEqual(['ended', 'appraised'])
+    expect(h.auctionUpdates[0]?.data).toMatchObject({ status: 'ended' })
+    expect(typeof h.auctionUpdates[0]?.data.endedAt).toBe('string')
+    expect(h.auctionUpdates[1]?.data).toMatchObject({
+      status: 'appraised',
+      winningBid: 'bid-leading',
+    })
+
+    expect(validateTransition('active', 'ended')).toBe(true)
+    expect(validateTransition('ended', 'appraised')).toBe(true)
+
+    const stored = h.auctions[0]
+    expect(stored?.status).toBe('appraised')
+    expect(stored?.winningBid).toBe('bid-leading')
+    expect(typeof stored?.endedAt).toBe('string')
+    expect(typeof stored?.appraisedAt).toBe('string')
+
+    const events = emittedEvents()
+    const won = events.find((event) => event.type === 'auction.won')
+    expect(won?.userId).toBe('bidder-1')
+    expect(won?.payload).toMatchObject({ auctionId: 'auction-1', winningBid: 5000 })
+
+    const sellerNotice = events.find((event) => event.type === 'auction.ended')
+    expect(sellerNotice?.userId).toBe('seller-1')
+    expect(sellerNotice?.payload).toMatchObject({ hasWinner: true, finalPrice: 5000 })
+
+    expect(broadcastMock).toHaveBeenCalledWith('auction:ended', {
+      auctionId: 'auction-1',
+      type: 'open',
+      hasWinner: true,
+    })
+
+    expect(h.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        collection: 'auctions',
-        id: 'auction-1',
-        data: expect.objectContaining({ status: 'ended' }) as Record<string, unknown>,
+        collection: 'statistics-snapshots',
+        data: expect.objectContaining({ objectType: 'forest', eur: 5000, count: 1 }) as Record<string, unknown>,
       }),
     )
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(vi.mocked(eventBus).emit).toHaveBeenCalled()
-     
-    expect(vi.mocked(broadcast)).toHaveBeenCalled()
   })
 
-  it('transitions auction with leading bid to ended correctly', async () => {
-    mockAuctionsQuery([
-      { id: 'auction-1', status: 'active', endsAt: '2024-01-01T00:00:00Z', type: 'open', objectType: 'forest', cadastres: [] },
-    ])
-    mockAuctionFindByID({ id: 'auction-1', status: 'active', type: 'open', objectType: 'forest', cadastres: [] })
-    mockBidsQuery([{ id: 'winning-bid', amount: 5000 }])
-    mockPayload.find.mockResolvedValueOnce({ docs: [] })
+  it('moves an open auction with no bids through active to ended to unsold without error', async () => {
+    const h = createHarness({ auctions: [activeAuction()] })
+
+    const result = await processEndedAuctions()
+
+    expect(result).toEqual({ processed: 1, skipped: 0 })
+    expect(auctionStatuses(h)).toEqual(['ended', 'unsold'])
+    expect(h.auctions[0]?.status).toBe('unsold')
+    expect(validateTransition('ended', 'unsold')).toBe(true)
+  })
+
+  it('marks the outcome unsold and notifies the bidder when the leading bid is below the reserve price', async () => {
+    const h = createHarness({
+      auctions: [activeAuction({ reservePrice: 5000 })],
+      bids: [leadingBid({ amount: 1000, user: 'bidder-reserve' })],
+    })
 
     await processEndedAuctions()
 
-    const allUpdates = mockPayload.update.mock.calls
-    const auctionUpdates = allUpdates.filter(
-      (c) => ((c as unknown[])[0] as { collection?: string }).collection === 'auctions',
+    expect(auctionStatuses(h)).toEqual(['ended', 'unsold'])
+    expect(h.auctions[0]?.status).toBe('unsold')
+
+    const events = emittedEvents()
+    expect(events.some((event) => event.type === 'auction.won')).toBe(false)
+    const bidderNotice = events.find(
+      (event) => event.type === 'auction.ended' && event.userId === 'bidder-reserve',
     )
-    expect(auctionUpdates.length).toBe(1)
-    expect(((mockPayload.update.mock.calls[0] as unknown[])[0] as { data: Record<string, unknown> }).data.status).toBe('ended')
-    expect(((mockPayload.update.mock.calls[0] as unknown[])[0] as { data: Record<string, unknown> }).data.winningBid).toBe('winning-bid')
+    expect(bidderNotice?.payload).toMatchObject({ reserveNotMet: true, hasWinner: false })
   })
 
-  it('transitions auction with needsAppraisal to appraised', async () => {
-    mockAuctionsQuery([
-      { id: 'auction-1', status: 'active', endsAt: '2024-01-01T00:00:00Z', type: 'open', objectType: 'forest', cadastres: [], needsAppraisal: true },
-    ])
-    mockAuctionFindByID({ id: 'auction-1', status: 'active', type: 'open', objectType: 'forest', cadastres: [], needsAppraisal: true })
-    mockBidsQuery([{ id: 'winning-bid', amount: 5000 }])
-    mockPayload.find.mockResolvedValueOnce({ docs: [] })
+  it('stops a sealed auction at ended and keeps the opening ceremony available', async () => {
+    const h = createHarness({ auctions: [activeAuction({ type: 'sealed' })] })
 
-    await processEndedAuctions()
+    const result = await processEndedAuctions()
 
-    const allUpdates = mockPayload.update.mock.calls as unknown as UpdateCall[]
-    const auctionUpdates = allUpdates.filter(
-      (c) => c[0].collection === 'auctions',
-    )
-    expect(auctionUpdates.length).toBe(1)
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const updateData = auctionUpdates[0]![0] as { data: Record<string, unknown> }
-    expect(updateData.data.status).toBe('appraised')
-    expect(updateData.data.appraisedAt).toBeDefined()
-  })
+    expect(result).toEqual({ processed: 1, skipped: 0 })
+    expect(auctionStatuses(h)).toEqual(['ended'])
+    expect(h.auctions[0]?.status).toBe('ended')
+    expect(h.auctions[0]?.winningBid).toBeUndefined()
 
-  it('goes to unsold when auction has no leading bid', async () => {
-    mockAuctionsQuery([
-      { id: 'auction-1', status: 'active', endsAt: '2024-01-01T00:00:00Z', type: 'open', objectType: 'forest', cadastres: [] },
-    ])
-    mockAuctionFindByID({ id: 'auction-1', status: 'active', type: 'open', objectType: 'forest', cadastres: [] })
-    mockBidsQuery([])
-    mockPayload.find.mockResolvedValueOnce({ docs: [] })
+    expect(h.find.mock.calls.filter((call) => call[0].collection === 'bids')).toHaveLength(0)
 
-    await processEndedAuctions()
-
-    const allUpdates = mockPayload.update.mock.calls as unknown as UpdateCall[]
-    const auctionUpdates = allUpdates.filter(
-      (c) => c[0].collection === 'auctions',
-    )
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (auctionUpdates.length > 0) {
-      const call = auctionUpdates[0] as unknown[]
-      const callData = call[0] as { data: Record<string, unknown> }
-      expect(callData.data.status).toBe('unsold')
-    }
-    expect(auctionUpdates.length).toBe(1)
-  })
-
-  it('handles sealed auction type', async () => {
-    mockAuctionsQuery([
-      { id: 'auction-1', status: 'active', endsAt: '2024-01-01T00:00:00Z', type: 'sealed', objectType: 'forest', cadastres: [] },
-    ])
-    mockAuctionFindByID({ id: 'auction-1', status: 'active', type: 'sealed', objectType: 'forest', cadastres: [] })
-    mockPayload.find.mockResolvedValueOnce({ docs: [] })
-
-    await processEndedAuctions()
-
-    const allUpdates = mockPayload.update.mock.calls as unknown as UpdateCall[]
-    const auctionUpdates = allUpdates.filter(
-      (c) => c[0].collection === 'auctions',
-    )
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (auctionUpdates.length > 0) {
-      const call = auctionUpdates[0] as unknown[]
-      const callData = call[0] as { data: Record<string, unknown> }
-      expect(callData.data.status).toBe('ended')
-    }
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(vi.mocked(eventBus).emit).toHaveBeenCalledWith(
+    expect(emittedEvents()).toEqual([
       expect.objectContaining({
         type: 'auction.ended',
+        userId: 'seller-1',
         payload: expect.objectContaining({ type: 'sealed' }) as Record<string, unknown>,
       }),
-    )
+    ])
+    expect(broadcastMock).toHaveBeenCalledWith('auction:ended', {
+      auctionId: 'auction-1',
+      type: 'sealed',
+    })
   })
 
-  it('skips already-ended auction (idempotent)', async () => {
-    mockAuctionsQuery([
-      { id: 'auction-1', status: 'active', endsAt: '2024-01-01T00:00:00Z', type: 'open', objectType: 'forest' },
-    ])
-    mockAuctionFindByID({ id: 'auction-1', status: 'ended', type: 'open', objectType: 'forest' })
-
-    const result = await processEndedAuctions()
-
-    expect(result.skipped).toBe(1)
-  })
-
-  it('writes statistics snapshot on completion', async () => {
-    mockAuctionsQuery([
-      { id: 'auction-1', status: 'active', endsAt: '2024-01-01T00:00:00Z', type: 'open', objectType: 'forest', cadastres: [{ area: 100 }] },
-    ])
-    mockAuctionFindByID({ id: 'auction-1', status: 'active', type: 'open', objectType: 'forest', cadastres: [{ area: 100 }] })
-    mockBidsQuery([{ id: 'winning-bid', amount: 5000 }])
-    mockPayload.find.mockResolvedValueOnce({ docs: [] })
+  it('treats any leading bid as a win when the auction sets no reserve price', async () => {
+    const h = createHarness({
+      auctions: [activeAuction()],
+      bids: [leadingBid({ amount: 100 })],
+    })
 
     await processEndedAuctions()
 
-    expect(mockPayload.create).toHaveBeenCalledWith({
-      collection: 'statistics-snapshots',
-      data: expect.objectContaining({
-        objectType: 'forest',
-        eur: 5000,
-        area: 100,
-        count: 1,
-      }) as Record<string, unknown>,
-      depth: 0,
+    expect(auctionStatuses(h)).toEqual(['ended', 'appraised'])
+    expect(h.auctions[0]?.status).toBe('appraised')
+  })
+
+  it('does not write a second outcome when the same auction fires twice', async () => {
+    const h = createHarness({
+      auctions: [activeAuction()],
+      bids: [leadingBid({ amount: 5000 })],
     })
+
+    const first = await processEndedAuctions()
+    expect(first.processed).toBe(1)
+
+    const emitCount = emitMock.mock.calls.length
+    const broadcastCount = broadcastMock.mock.calls.length
+    const createCount = h.create.mock.calls.length
+
+    // Simulate a double fire: the query still returns the stale active row,
+    // so the status recheck must stop a second outcome write.
+    h.find.mockImplementationOnce(() => ({ docs: [activeAuction()] }))
+
+    const second = await processEndedAuctions()
+
+    expect(second).toEqual({ processed: 0, skipped: 1 })
+    expect(auctionStatuses(h)).toEqual(['ended', 'appraised'])
+    expect(emitMock.mock.calls).toHaveLength(emitCount)
+    expect(broadcastMock.mock.calls).toHaveLength(broadcastCount)
+    expect(h.create.mock.calls).toHaveLength(createCount)
+  })
+
+  it('rejects a status write the guard map does not allow', async () => {
+    const h = createHarness({ auctions: [activeAuction()] })
+
+    expect(validateTransition('active', 'unsold')).toBe(false)
+    await expect(
+      h.update({ collection: 'auctions', id: 'auction-1', data: { status: 'unsold' } }),
+    ).rejects.toThrow('Invalid status transition: active → unsold')
   })
 })

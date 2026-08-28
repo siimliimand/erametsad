@@ -1,6 +1,7 @@
 import { getPayloadClient } from '../../payload/payloadClient'
 import { eventBus } from '../notifications/event-bus'
 import { broadcast } from '../realtime/auction-stream'
+import { upsertSnapshot } from '../stats/aggregation'
 
 const inProgress = new Set<string>()
 
@@ -15,62 +16,21 @@ function getTotalArea(auction: Record<string, unknown>): number {
   return cadastres.reduce((sum, c) => sum + (Number(c.area) || 0), 0)
 }
 
-async function upsertSnapshot(
-  payload: Awaited<ReturnType<typeof getPayloadClient>>,
-  objectType: string,
-  eur: number,
-  area: number,
-): Promise<void> {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  const existing = await payload.find({
-    collection: 'statistics-snapshots',
-    where: {
-      and: [
-        { date: { equals: today.toISOString() } },
-        { objectType: { equals: objectType } },
-      ],
-    },
-    limit: 1,
-    depth: 0,
-  })
-
-  if (existing.docs.length > 0) {
-    const doc = existing.docs[0] as Record<string, unknown>
-    await payload.update({
-      collection: 'statistics-snapshots',
-      id: doc.id as string,
-      data: {
-        count: (Number(doc.count) || 0) + 1,
-        area: (Number(doc.area) || 0) + area,
-        eur: (Number(doc.eur) || 0) + eur,
-      },
-      depth: 0,
-    })
-  } else {
-    await payload.create({
-      collection: 'statistics-snapshots',
-      data: {
-        date: today.toISOString(),
-        objectType,
-        count: 1,
-        area,
-        eur,
-      },
-      depth: 0,
-    })
-  }
-}
-
 function isSealedAuction(auction: Record<string, unknown>): boolean {
-  if (auction.type === 'sealed') return true
-  if ((auction as { isQuickAuction?: boolean }).isQuickAuction) return false
-  return false
+  return auction.type === 'sealed'
 }
 
 function nowISO(): string {
   return new Date().toISOString()
+}
+
+function relationUserId(value: unknown): string | number | undefined {
+  if (typeof value === 'string' || typeof value === 'number') return value
+  if (value != null && typeof value === 'object') {
+    const id = (value as { id?: unknown }).id
+    if (typeof id === 'string' || typeof id === 'number') return id
+  }
+  return undefined
 }
 
 export async function processEndedAuctions(): Promise<ProcessResult> {
@@ -116,24 +76,31 @@ export async function processEndedAuctions(): Promise<ProcessResult> {
         continue
       }
 
+      await payload.update({
+        collection: 'auctions',
+        id: auctionId,
+        data: {
+          status: 'ended',
+          endedAt: nowISO(),
+        },
+        depth: 0,
+      })
+
+      const objectType = currentAuction.objectType as string
+      const auctionTitle = currentAuction.title as string | undefined
+      const area = getTotalArea(currentAuction)
+      const seller = relationUserId(currentAuction.seller)
+
       if (isSealedAuction(currentAuction)) {
-        await payload.update({
-          collection: 'auctions',
-          id: auctionId,
-          data: {
-            status: 'ended',
-            endedAt: nowISO(),
-          },
-          depth: 0,
-        })
+        if (seller !== undefined) {
+          eventBus.emit({
+            type: 'auction.ended',
+            userId: seller,
+            payload: { auctionId, auctionTitle, type: 'sealed' },
+          })
+        }
 
-        eventBus.emit({
-          type: 'auction.ended',
-          payload: { auctionId, type: 'sealed' },
-        })
-
-        const objectType = currentAuction.objectType as string
-        await upsertSnapshot(payload, objectType, 0, getTotalArea(currentAuction))
+        await upsertSnapshot(payload, { objectType, eur: 0, area, count: 1 })
 
         broadcast('auction:ended', { auctionId, type: 'sealed' })
 
@@ -154,35 +121,46 @@ export async function processEndedAuctions(): Promise<ProcessResult> {
       })
 
       const leadingBid = bids.docs[0] as Record<string, unknown> | undefined
+      const leadingAmount = leadingBid === undefined ? 0 : Number(leadingBid.amount) || 0
+      const rawReserve = currentAuction.reservePrice
+      const reserveSet = typeof rawReserve === 'number' && Number.isFinite(rawReserve)
+      const reserveMet =
+        leadingBid !== undefined && (!reserveSet || leadingAmount >= rawReserve)
 
-      if (leadingBid) {
-        const needsAppraisal = !!currentAuction.needsAppraisal
-
-        const updateData: Record<string, unknown> = {
-          status: needsAppraisal ? 'appraised' : 'ended',
-          endedAt: nowISO(),
-          winningBid: leadingBid.id,
-        }
-
-        if (needsAppraisal) {
-          updateData.appraisedAt = nowISO()
-        }
-
+      if (leadingBid !== undefined && reserveMet) {
         await payload.update({
           collection: 'auctions',
           id: auctionId,
-          data: updateData,
+          data: {
+            status: 'appraised',
+            winningBid: leadingBid.id,
+          },
           depth: 0,
         })
 
-        eventBus.emit({
-          type: 'auction.ended',
-          payload: { auctionId, type: 'open', winningBidId: leadingBid.id, amount: leadingBid.amount },
-        })
+        const winner = relationUserId(leadingBid.user)
+        if (winner !== undefined) {
+          eventBus.emit({
+            type: 'auction.won',
+            userId: winner,
+            payload: { auctionId, auctionTitle, winningBid: leadingAmount },
+          })
+        }
+        if (seller !== undefined) {
+          eventBus.emit({
+            type: 'auction.ended',
+            userId: seller,
+            payload: {
+              auctionId,
+              auctionTitle,
+              type: 'open',
+              hasWinner: true,
+              finalPrice: leadingAmount,
+            },
+          })
+        }
 
-        const objectType = currentAuction.objectType as string
-        const amount = Number(leadingBid.amount) || 0
-        await upsertSnapshot(payload, objectType, amount, getTotalArea(currentAuction))
+        await upsertSnapshot(payload, { objectType, eur: leadingAmount, area, count: 1 })
 
         broadcast('auction:ended', { auctionId, type: 'open', hasWinner: true })
       } else {
@@ -191,18 +169,42 @@ export async function processEndedAuctions(): Promise<ProcessResult> {
           id: auctionId,
           data: {
             status: 'unsold',
-            endedAt: nowISO(),
           },
           depth: 0,
         })
 
-        eventBus.emit({
-          type: 'auction.ended',
-          payload: { auctionId, type: 'open', hasWinner: false },
-        })
+        if (leadingBid !== undefined) {
+          const bidder = relationUserId(leadingBid.user)
+          if (bidder !== undefined) {
+            eventBus.emit({
+              type: 'auction.ended',
+              userId: bidder,
+              payload: {
+                auctionId,
+                auctionTitle,
+                type: 'open',
+                hasWinner: false,
+                reserveNotMet: true,
+                amount: leadingAmount,
+              },
+            })
+          }
+        }
+        if (seller !== undefined) {
+          eventBus.emit({
+            type: 'auction.ended',
+            userId: seller,
+            payload: {
+              auctionId,
+              auctionTitle,
+              type: 'open',
+              hasWinner: false,
+              reserveNotMet: leadingBid !== undefined,
+            },
+          })
+        }
 
-        const objectType = currentAuction.objectType as string
-        await upsertSnapshot(payload, objectType, 0, getTotalArea(currentAuction))
+        await upsertSnapshot(payload, { objectType, eur: 0, area, count: 1 })
 
         broadcast('auction:ended', { auctionId, type: 'open', hasWinner: false })
       }

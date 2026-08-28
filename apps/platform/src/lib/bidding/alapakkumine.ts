@@ -1,124 +1,207 @@
+import { sql } from '@payloadcms/db-postgres'
+import type { Payload } from 'payload'
+
+import { withAuctionLock } from './place-bid'
 import { getPayloadClient } from '../../payload/payloadClient'
+import { eventBus } from '../notifications/event-bus'
+import type { DomainEvent } from '../notifications/event-bus'
 
 export interface AlapakkumineResult {
   status: string
   requiresApproval: boolean
 }
 
-export async function handleAlapakkumine(
-  bid: { id: string; amount: number; auction: string },
-  auction: { minBid: number; id: string },
-): Promise<AlapakkumineResult> {
-  if (bid.amount >= auction.minBid) {
-    return { status: 'leading', requiresApproval: false }
-  }
-
-  const payload = await getPayloadClient()
-
-  const settingsResult = await payload.find({
-    collection: 'settings',
-    limit: 1,
-    depth: 0,
-  })
-  const settings = settingsResult.docs[0] as
-    | { alapakkumineEnabled?: boolean }
-    | undefined
-
-  if (!settings?.alapakkumineEnabled) {
-    return { status: 'rejected', requiresApproval: false }
-  }
-
-  const existingPending = await payload.find({
-    collection: 'bids',
-    where: {
-      and: [
-        { auction: { equals: auction.id } },
-        { status: { equals: 'pending_approval' } },
-      ],
-    },
-    limit: 1,
-    depth: 0,
-  })
-
-  const oldPending = existingPending.docs[0] as { id: string } | undefined
-  if (oldPending) {
-    await payload.update({
-      collection: 'bids',
-      id: oldPending.id,
-      data: { status: 'rejected' },
-    })
-  }
-
-  await payload.update({
-    collection: 'bids',
-    id: bid.id,
-    data: { status: 'pending_approval' },
-  })
-
-  return { status: 'pending_approval', requiresApproval: true }
+export function isAlapakkumineEnabled(
+  settings: { alapakkumineEnabled?: boolean } | null | undefined,
+): boolean {
+  return settings?.alapakkumineEnabled === true
 }
 
-export async function approveAlapakkumine(bidId: string): Promise<void> {
-  const payload = await getPayloadClient()
+type AlapakkumineCollection = 'users' | 'auctions' | 'bids'
 
-  const bidResult = await payload.find({
-    collection: 'bids',
-    where: { id: { equals: bidId } },
+async function findDoc(
+  payload: Payload,
+  collection: AlapakkumineCollection,
+  where: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> {
+  const result = await payload.find({
+    collection,
+    where,
     limit: 1,
-    depth: 1,
-  })
+    depth: 0,
+  } as Parameters<Payload['find']>[0])
+  return (result.docs[0] as Record<string, unknown> | undefined) ?? null
+}
 
-  const bid = bidResult.docs[0] as
-    | { id: string; auction: string | { id: string }; amount: number }
-    | undefined
-
-  if (!bid) {
-    throw new Error('Bid not found')
+function relationValue(value: unknown): string | number {
+  if (typeof value === 'string' || typeof value === 'number') return value
+  if (value !== null && typeof value === 'object') {
+    const id = (value as { id?: unknown }).id
+    if (typeof id === 'string' || typeof id === 'number') return id
   }
+  return ''
+}
 
-  const auctionId = typeof bid.auction === 'string' ? bid.auction : bid.auction.id
+export interface UnderbidBidInfo {
+  bidId: string
+  bidderId: string
+  amount: number
+  auctionTitle: string
+}
 
-  const existingValidBids = await payload.find({
-    collection: 'bids',
-    where: {
+export type UnderbidFailure =
+  | { outcome: 'not_pending'; status: string }
+  | { outcome: 'bid_not_found' }
+  | { outcome: 'auction_not_found' }
+  | { outcome: 'auction_not_active' }
+
+export type ApproveDecision =
+  | {
+      outcome: 'approved'
+      bid: UnderbidBidInfo
+      displacedLeader: { userId: string; amount: number } | null
+    }
+  | UnderbidFailure
+
+export type RejectDecision =
+  | { outcome: 'rejected'; bid: UnderbidBidInfo }
+  | UnderbidFailure
+
+// Seller decisions run under the same auction row lock as placeBid, so an
+// approval racing a bid or a second approval serialises on the row and the
+// loser sees the bid in its post-decision status. The status guard on the
+// UPDATE is redundant with the lock but keeps the write honest if the lock
+// semantics ever change.
+export async function approveAlapakkumine(
+  auctionId: string,
+  bidId: string,
+): Promise<ApproveDecision> {
+  const payload = await getPayloadClient()
+  const events: DomainEvent[] = []
+
+  const outcome = await withAuctionLock(payload, auctionId, async (tx): Promise<ApproveDecision> => {
+    const bid = await findDoc(payload, 'bids', { id: { equals: bidId } })
+    if (!bid || String(relationValue(bid.auction)) !== auctionId) {
+      return { outcome: 'bid_not_found' }
+    }
+    if (bid.status !== 'pending_approval') {
+      return { outcome: 'not_pending', status: String(bid.status) }
+    }
+
+    const auction = await findDoc(payload, 'auctions', { id: { equals: auctionId } })
+    if (!auction) {
+      return { outcome: 'auction_not_found' }
+    }
+    // An approval must never inject a new leader into an auction that the
+    // ending worker already processed.
+    if (auction.status !== 'active') {
+      return { outcome: 'auction_not_active' }
+    }
+
+    const auctionTitle = (auction.title as string | undefined) ?? `Auction ${auctionId}`
+    const amount = bid.amount as number
+    const bidderId = relationValue(bid.user)
+
+    // Per spec the approval wins the lead even over a higher legitimate
+    // bid; the displaced leader is demoted in the same transaction.
+    const leading = await findDoc(payload, 'bids', {
       and: [
         { auction: { equals: auctionId } },
         { status: { equals: 'leading' } },
       ],
-    },
-    limit: 1,
-    depth: 0,
+    })
+
+    if (leading) {
+      await tx.execute(
+        sql`update bids set status = 'outbid', updated_at = now() where id = ${leading.id as string}`,
+      )
+      events.push({
+        type: 'outbid',
+        userId: relationValue(leading.user),
+        payload: { auctionId, auctionTitle, currentBid: amount },
+      })
+    }
+
+    await tx.execute(
+      sql`update bids set status = 'leading', updated_at = now() where id = ${bidId} and status = 'pending_approval'`,
+    )
+
+    events.push({
+      type: 'bid.approved',
+      userId: bidderId,
+      payload: { auctionId, auctionTitle, bidId, amount },
+    })
+
+    return {
+      outcome: 'approved',
+      bid: { bidId, bidderId: String(bidderId), amount, auctionTitle },
+      displacedLeader: leading
+        ? { userId: String(relationValue(leading.user)), amount: leading.amount as number }
+        : null,
+    }
   })
 
-  const existingBid = existingValidBids.docs[0] as { id: string } | undefined
-
-  if (existingBid) {
-    await payload.update({
-      collection: 'bids',
-      id: existingBid.id,
-      data: { status: 'outbid' },
-    })
+  if (outcome === null) {
+    return { outcome: 'auction_not_found' }
   }
 
-  await payload.update({
-    collection: 'bids',
-    id: bidId,
-    data: { status: 'leading' },
-  })
+  // Emit only after the transaction committed; a rolled-back decision
+  // never notifies anyone.
+  for (const event of events) {
+    eventBus.emit(event)
+  }
 
-  await payload.update({
-    collection: 'auctions',
-    id: auctionId,
-    data: { winningBid: bidId },
-  })
+  return outcome
 }
 
-export async function rejectAlapakkumine(bidId: string): Promise<void> {
+export async function rejectAlapakkumine(
+  auctionId: string,
+  bidId: string,
+): Promise<RejectDecision> {
   const payload = await getPayloadClient()
+  const events: DomainEvent[] = []
 
-  await payload.update({
-    collection: 'bids',
-    id: bidId,
-    data: { status: 'rejected' },
+  const outcome = await withAuctionLock(payload, auctionId, async (tx): Promise<RejectDecision> => {
+    const bid = await findDoc(payload, 'bids', { id: { equals: bidId } })
+    if (!bid || String(relationValue(bid.auction)) !== auctionId) {
+      return { outcome: 'bid_not_found' }
+    }
+    if (bid.status !== 'pending_approval') {
+      return { outcome: 'not_pending', status: String(bid.status) }
+    }
+
+    const auction = await findDoc(payload, 'auctions', { id: { equals: auctionId } })
+    if (!auction) {
+      return { outcome: 'auction_not_found' }
+    }
+
+    const auctionTitle = (auction.title as string | undefined) ?? `Auction ${auctionId}`
+    const amount = bid.amount as number
+    const bidderId = relationValue(bid.user)
+
+    await tx.execute(
+      sql`update bids set status = 'rejected', updated_at = now() where id = ${bidId} and status = 'pending_approval'`,
+    )
+
+    events.push({
+      type: 'bid.rejected',
+      userId: bidderId,
+      payload: { auctionId, auctionTitle, bidId, amount },
+    })
+
+    return {
+      outcome: 'rejected',
+      bid: { bidId, bidderId: String(bidderId), amount, auctionTitle },
+    }
   })
+
+  if (outcome === null) {
+    return { outcome: 'auction_not_found' }
+  }
+
+  for (const event of events) {
+    eventBus.emit(event)
+  }
+
+  return outcome
 }

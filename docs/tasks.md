@@ -178,75 +178,77 @@ Source of truth: [design/README.md](design/README.md) (tokens, type, motion, com
 
 Source: plan §5 (functional spec), §8 (data model), §9 (API surface), §6 (auth); portal/admin specs for endpoint shapes.
 
+**Deferrals (accepted in writing):** ServiceRequest + Partner directory [S], NewsletterSubscriber [S], saved-search matcher + digests [S]/[L], media renditions pipeline [S], TOTP 2FA [L]. BullMQ / Cloudflare Queues stays deferred behind the queue interface; the ending worker runs on a 30-second interval from `instrumentation.ts` in the prototype.
+
 ### 2.1 Reference data & taxonomies
-- [ ] County (15) + Parish ref tables with seed import **[M]**
-- [ ] Tree-species codes (24) and logging types (AR,HL,HR,KR,LR,RD,SR,TR,VE,VR) enums **[M]**
+- [x] County (15) + Parish ref tables with seed import **[M]**
+- [x] Tree-species codes (24) and logging types (AR,HL,HR,KR,LR,RD,SR,TR,VE,VR) enums **[M]**
 
 ### 2.2 Identity & access collections
-- [ ] `User` (isikukood encrypted column + hash index, email, phone, status, auth method) **[M]**
-- [ ] `Profile` (private | company; company fields + `approval_status`), `CompanyAccessRequest` **[M]**
-- [ ] `AuctionRight` (user × objectType grant, granted_by, revoke) **[M]**
-- [ ] Session store (short JWT + rotating refresh, httpOnly cookies), session list & revoke **[M]**
+- [x] `User` (isikukood encrypted column + hash index, email, phone, status, auth method) **[M]**
+- [x] `Profile` (private | company; company fields + `approval_status`), `CompanyAccessRequest` **[M]**
+- [x] `AuctionRight` (user × objectType grant, granted_by, revoke) **[M]**
+- [x] Session store (short JWT + rotating refresh, httpOnly cookies), session list & revoke **[M]**
 
 ### 2.3 Auction & bidding collections
-- [ ] `Auction` with the **complete field model** — plan §5.4: identity/status (incl. `isQuickAuction`, `endYear`), location (+coordinates, kataster/Metsaregister links), land/forest data (cadastres[], registryNumbers[], species, logging types, compartments, notifications, deadlines), pricing (minBid, bidStep, reservePrice secret, fee override), content (rich text ×2, alias email, media, files), package fields, specialist, seller profile **[M]**
-- [ ] Status lifecycle field + transitions guard (draft → scheduled → active → ended → appraised/unsold → contract → completed → archived) **[M]**
-- [ ] `Bid` — append-only; amount, type open|sealed, source manual|autobidder, status set (leading/outbid/won/lost/pending_approval/rejected), `identity_snapshot`, `ip_hash` (salted) **[M]**
-- [ ] `AutoBidder` (max_amount, status) **[M]**
-- [ ] `AuctionSubscription` (filter_json, channel, frequency, unsubscribe token) **[M]**
+- [x] `Auction` with the **complete field model** — plan §5.4: identity/status (incl. `isQuickAuction`, `endYear`), location (+coordinates, kataster/Metsaregister links), land/forest data (cadastres[], registryNumbers[], species, logging types, compartments, notifications, deadlines), pricing (minBid, bidStep, reservePrice secret, fee override), content (rich text ×2, alias email, media, files), package fields, specialist, seller profile **[M]**
+- [x] Status lifecycle field + transitions guard (draft → scheduled → active → ended → appraised/unsold → contract → completed → archived) **[M]**
+- [x] `Bid` — append-only; amount, type open|sealed, source manual|autobidder, status set (leading/outbid/won/lost/pending_approval/rejected), `identity_snapshot`, `ip_hash` (salted) **[M]**
+- [x] `AutoBidder` (max_amount, status) **[M]**
+- [x] `AuctionSubscription` (filter_json, channel, frequency, unsubscribe token) **[M]**
 
 ### 2.4 Supporting collections
-- [ ] `Contract` + `ContractTemplate` (type, version, placeholders, DOCX file) **[M]**
-- [ ] `Lead` (form_name, page_slug, contact fields, status pipeline, assigned specialist, consent_at, source) **[M]**
+- [x] `Contract` + `ContractTemplate` (type, version, placeholders, DOCX file) **[M]**
+- [x] `Lead` (form_name, page_slug, contact fields, status pipeline, assigned specialist, consent_at, source) **[M]**
 - [ ] `ServiceRequest` (type kava|hooldusraie|istutamine, payload, attachments, routed_to[]) + `Partner` directory **[S]**
-- [ ] `Notification` (user, event, channel, payload, read_at) **[M]**
+- [x] `Notification` (user, event, channel, payload, read_at) **[M]**
 - [ ] `NewsletterSubscriber` (double opt-in token, group) **[S]**
-- [ ] `Specialist` (name, slug, role, phone, email, photo, bio, region, active, featured) **[M]**
-- [ ] CMS: `Page` (block builder blocks: hero/text/cards/accordion/steps/forms/ticker/stats/CTA/testimonials), `Article`, `FAQCategory`/`FAQItem` (teaser, show_until), `Testimonial`, `PartnerService`, `LegalDocument`, `Redirect`, per-page SEO fields **[M]**
-- [ ] `Settings` singleton (org data, fee % + VAT, anti-snipe defaults, alapakkumine default, sealed revision cap, feature flags) **[M]**
-- [ ] `AuditEntry` append-only (actor, action, entity, before/after JSON) **[M]**
-- [ ] `StatisticsSnapshot` (date × objectType: count, area, volume, eur) **[M]**
+- [x] `Specialist` (name, slug, role, phone, email, photo, bio, region, active, featured) **[M]**
+- [x] CMS: `Page` (block builder blocks: hero/text/cards/accordion/steps/forms/ticker/stats/CTA/testimonials), `Article`, `FAQCategory`/`FAQItem` (teaser, show_until), `Testimonial`, `PartnerService`, `LegalDocument`, `Redirect`, per-page SEO fields **[M]**
+- [x] `Settings` singleton (org data, fee % + VAT, anti-snipe defaults, alapakkumine default, sealed revision cap, feature flags) **[M]**
+- [x] `AuditEntry` append-only (actor, action, entity, before/after JSON) **[M]**
+- [x] `StatisticsSnapshot` (date × objectType: count, area, volume, eur) **[M]**
 
 ### 2.5 Auth flows
-- [ ] Password login (isikukood + password), rate-limit 5/min/IP, neutral errors **[M]**
-- [ ] **Demo eID simulator** behind provider interface: `POST /api/v1/auth/{smartid|mobileid|idcard}/start|status|complete`; control-code screen; 2s polling; configurable demo isikukoods; Web-eID detection stub **[M]**
-- [ ] Registration backend: profiles, consents (3 checkboxes w/ timestamps), `POST /api/v1/business/request-access` **[M]**
-- [ ] Company lookup mock `GET /api/v1/company-lookup?regCode=` (fixtures) **[M]**
-- [ ] Password reset (2h tokens, single-use, revoke other sessions) + change **[M]**
-- [ ] Profile selection (session carries active profile; everything profile-scoped) **[M]**
+- [x] Password login (isikukood + password), rate-limit 5/min/IP, neutral errors **[M]**
+- [x] **Demo eID simulator** behind provider interface: `POST /api/v1/auth/{smartid|mobileid|idcard}/start|status|complete`; control-code screen; 2s polling; configurable demo isikukoods; Web-eID detection stub **[M]**
+- [x] Registration backend: profiles, consents (3 checkboxes w/ timestamps), `POST /api/v1/business/request-access` **[M]**
+- [x] Company lookup mock `GET /api/v1/company-lookup?regCode=` (fixtures) **[M]**
+- [x] Password reset (2h tokens, single-use, revoke other sessions) + change **[M]**
+- [x] Profile selection (session carries active profile; everything profile-scoped) **[M]**
 - [ ] TOTP 2FA for company accounts **[L]**
 
 ### 2.6 Bidding engine (implementation-critical — plan §5.7)
-- [ ] `placeBid` service: serializable transaction + row lock on auction; validation chain (authed → active → not ended → objectType right → amount ≥ current+step → contract prerequisites); append-only audit trail **[M]**
-- [ ] Autobidder evaluation: proxy to minimum needed to lead; tie-break by earlier creation; autobidder-vs-autobidder resolves to (second-max + step) **[M]**
-- [ ] Anti-sniping: accepted bid within last N min (configurable from Settings; default 5, range 1–30) extends endTime by N; persisted + broadcast **[M]**
-- [ ] Alapakkumine (under-start bid): allowed when enabled → `pending_seller_approval`; seller approve (becomes leading) / reject (notify bidder); race-guard **[M]**
-- [ ] Sealed bids: one per user (+ configurable revision cap), amount + identity snapshot **encrypted at rest** until opening; double-submit guard w/ idempotency key **[M]**
-- [ ] Auction-ending worker (BullMQ / Cloudflare Queues): idempotent `active → ended`, server-authoritative; computes open-auction outcome; fires notifications; writes snapshot **[M]**
-- [ ] Sealed-opening service: two-person rule (opener + approver tokens, server-verified), one-shot simultaneous decrypt, rank by amount desc / tie earliest, winner-confirm publishes finalPrice + queues contract + notifies losers; unsold/void paths **[M]**
-- [ ] Contract gate for open bidding: signed framework contract (raamleping) required before first bid **[M]**
-- [ ] Unit tests: every rule above (step math, ties, anti-snipe boundary, alapakkumine, sealed encryption/decrypt ceremony, idempotent ending) **[M]**
+- [x] `placeBid` service: serializable transaction + row lock on auction; validation chain (authed → active → not ended → objectType right → amount ≥ current+step → contract prerequisites); append-only audit trail **[M]**
+- [x] Autobidder evaluation: proxy to minimum needed to lead; tie-break by earlier creation; autobidder-vs-autobidder resolves to (second-max + step) **[M]**
+- [x] Anti-sniping: accepted bid within last N min (configurable from Settings; default 5, range 1–30) extends endTime by N; persisted + broadcast **[M]**
+- [x] Alapakkumine (under-start bid): allowed when enabled → `pending_seller_approval`; seller approve (becomes leading) / reject (notify bidder); race-guard **[M]**
+- [x] Sealed bids: one per user (+ configurable revision cap), amount + identity snapshot **encrypted at rest** until opening; double-submit guard w/ idempotency key **[M]**
+- [x] Auction-ending worker (BullMQ / Cloudflare Queues): idempotent `active → ended`, server-authoritative; computes open-auction outcome; fires notifications; writes snapshot **[M]**
+- [x] Sealed-opening service: two-person rule (opener + approver tokens, server-verified), one-shot simultaneous decrypt, rank by amount desc / tie earliest, winner-confirm publishes finalPrice + queues contract + notifies losers; unsold/void paths **[M]**
+- [x] Contract gate for open bidding: signed framework contract (raamleping) required before first bid **[M]**
+- [x] Unit tests: every rule above (step math, ties, anti-snipe boundary, alapakkumine, sealed encryption/decrypt ceremony, idempotent ending) **[M]**
 
 ### 2.7 Realtime
-- [ ] `GET /api/auctions/stream` (SSE): `auction:published`, `auction:extended`, `auction:ended`, `bid:created` **[M]**
-- [ ] `GET /api/my/stream` (authed shell): `bid`, `outbid`, `auction_end`, `notification`, `countdown_sync`; heartbeat 30s; reconnect w/ backoff + full refetch **[M]**
+- [x] `GET /api/auctions/stream` (SSE): `auction:published`, `auction:extended`, `auction:ended`, `bid:created` **[M]**
+- [x] `GET /api/my/stream` (authed shell): `bid`, `outbid`, `auction_end`, `notification`, `countdown_sync`; heartbeat 30s; reconnect w/ backoff + full refetch **[M]**
 
 ### 2.8 Notifications, contracts, stats, forms
-- [ ] Notification service: event bus → per-user channel matrix (email via Mailpit, SMS log stub), templates in `packages/emails` **[M]**
+- [x] Notification service: event bus → per-user channel matrix (email via Mailpit, SMS log stub), templates in `packages/emails` **[M]**
 - [ ] Saved-search matcher (new lot vs subscriptions) + daily/weekly digests **[S]** / **[L]** (digests)
-- [ ] Contract service: template placeholder render (`{{...}}` catalogue), HTML preview + simple PDF, prepare/complete endpoints, mock signing session (15-min expiry), hash audit **[M]**
-- [ ] Statistics aggregation + public `GET /api/v1/statistics` from snapshots **[M]**
-- [ ] `POST /api/leads` ingestion: honeypot, rate-limit (IP 5/min), consent required, source tracking **[M]**
+- [x] Contract service: template placeholder render (`{{...}}` catalogue), HTML preview + simple PDF, prepare/complete endpoints, mock signing session (15-min expiry), hash audit **[M]**
+- [x] Statistics aggregation + public `GET /api/v1/statistics` from snapshots **[M]**
+- [x] `POST /api/leads` ingestion: honeypot, rate-limit (IP 5/min), consent required, source tracking **[M]**
 - [ ] `POST /api/service-requests` + routing engine (partners by service+county, minimized payload, 14-day signed links) **[S]**
 - [ ] `POST /api/newsletter` double opt-in **[S]**
 - [ ] Media pipeline: image renditions (1600×1000 / 350×175 / 1200×750), PDF uploads, signed URLs **[S]**
 
 ### 2.9 Seed & fixtures
-- [ ] Seed script: taxonomies, 6 specialists, demo users for every role (guest/private/company-pending/seller/specialist/admin/superadmin) with documented credentials **[M]**
-- [ ] ~30 demo auctions: all 4 object types × open/sealed × statuses (draft/scheduled/active/ending-soon/ended/sold/unsold/archived) incl. kiiroksjon + package w/ table **[M]**
-- [ ] Bid history fixtures incl. autobidder duel + pending alapakkumine; sealed bids (encrypted) ready for live opening demo **[M]**
-- [ ] CMS seed: homepage + service pages + FAQ (7 categories) + 6 articles + specialists + legal docs + contract templates (framework + auction) + leads in all pipeline stages **[M]**
-- [ ] `pnpm seed:reset` — wipe & reseed for repeatable demos **[M]**
+- [x] Seed script: taxonomies, 6 specialists, demo users for every role (guest/private/company-pending/seller/specialist/admin/superadmin) with documented credentials **[M]**
+- [x] ~30 demo auctions: all 4 object types × open/sealed × statuses (draft/scheduled/active/ending-soon/ended/sold/unsold/archived) incl. kiiroksjon + package w/ table **[M]**
+- [x] Bid history fixtures incl. autobidder duel + pending alapakkumine; sealed bids (encrypted) ready for live opening demo **[M]**
+- [x] CMS seed: homepage + service pages + FAQ (7 categories) + 6 articles + specialists + legal docs + contract templates (framework + auction) + leads in all pipeline stages **[M]**
+- [x] `pnpm seed:reset` — wipe & reseed for repeatable demos **[M]**
 
 ---
 

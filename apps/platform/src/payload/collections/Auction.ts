@@ -1,6 +1,25 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionBeforeChangeHook, CollectionConfig } from 'payload'
 
 import { statusTransitionHook } from '../../lib/auction/status-transitions'
+
+const SEALED_ONLY_OBJECT_TYPES = ['kinnistu', 'pakett']
+
+const validateAuctionType: CollectionBeforeChangeHook = ({ data }) => {
+  const objectType = data.objectType as string | undefined
+  const type = data.type as string | undefined
+
+  if (
+    objectType &&
+    SEALED_ONLY_OBJECT_TYPES.includes(objectType) &&
+    type !== 'sealed'
+  ) {
+    throw new Error(
+      "Oksjoni tüüp peab olema 'sealed', kui objektitüüp on 'kinnistu' või 'pakett'",
+    )
+  }
+
+  return data
+}
 
 export const Auction: CollectionConfig = {
   slug: 'auctions',
@@ -9,7 +28,10 @@ export const Auction: CollectionConfig = {
     group: 'Auction',
     defaultColumns: ['title', 'status', 'objectType', 'startsAt', 'endsAt'],
   },
-  versions: { drafts: true },
+  // No versions.drafts here: the drafts feature adds its own
+  // enum_auctions_status ({draft,published}) that collides with the custom
+  // status select below and breaks the generated schema. The auction
+  // lifecycle is guarded by statusTransitionHook instead.
   fields: [
     {
       type: 'tabs',
@@ -57,6 +79,20 @@ export const Auction: CollectionConfig = {
                 { label: 'Kiire', value: 'kiire' },
                 { label: 'Pakett', value: 'pakett' },
               ],
+            },
+            {
+              name: 'type',
+              type: 'select',
+              required: true,
+              defaultValue: 'open',
+              options: [
+                { label: 'Avatud', value: 'open' },
+                { label: 'Suletud', value: 'sealed' },
+              ],
+              admin: {
+                description:
+                  'Bidding format; kinnistu and pakett auctions must be sealed',
+              },
             },
             {
               name: 'isQuickAuction',
@@ -228,6 +264,14 @@ export const Auction: CollectionConfig = {
               min: 0,
               admin: {
                 description: 'Reserve price (encrypted at rest for sealed auctions)',
+              },
+            },
+            {
+              name: 'finalPrice',
+              type: 'number',
+              min: 0,
+              admin: {
+                description: 'Winning amount published when the auction is appraised',
               },
             },
             {
@@ -411,7 +455,7 @@ export const Auction: CollectionConfig = {
     },
   ],
   hooks: {
-    beforeChange: [statusTransitionHook],
+    beforeChange: [validateAuctionType, statusTransitionHook],
   },
   access: {
     read: ({ req: { user } }) => {

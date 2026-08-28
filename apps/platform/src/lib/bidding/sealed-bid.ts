@@ -18,6 +18,7 @@ export interface DecryptedBid {
   identitySnapshot?: string | undefined
   status: string
   createdAt: string
+  valid: boolean
 }
 
 async function getSealedRevisionCap(): Promise<number> {
@@ -70,6 +71,30 @@ export async function submitSealedBid(
     return { success: false, error: 'Auction has ended', status: 400 }
   }
 
+  const objectType = auction.objectType as string
+
+  // Same rights check and BidError as placeBid, so a shared route maps
+  // both to HTTP 403.
+  const rightsResult = await payload.find({
+    collection: 'auction-rights',
+    where: {
+      and: [
+        { user: { equals: userId } },
+        { objectType: { equals: objectType } },
+        { revokedAt: { exists: false } },
+      ],
+    },
+    limit: 1,
+    depth: 0,
+  })
+  if (rightsResult.docs.length === 0) {
+    return {
+      success: false,
+      error: 'No bidding right for this object type',
+      status: 403,
+    }
+  }
+
   if (amount < (auction.minBid as number)) {
     return {
       success: false,
@@ -93,12 +118,14 @@ export async function submitSealedBid(
   })
 
   const revisionCap = await getSealedRevisionCap()
+  // Cap semantics: 1 original bid plus up to N revisions (N from Settings),
+  // so a user may hold at most revisionCap + 1 sealed bids on an auction.
   const existingCount = existingBid.docs.length
 
-  if (existingCount > 0 && existingCount >= revisionCap + 1) {
+  if (existingCount >= revisionCap + 1) {
     return {
       success: false,
-      error: `Revision limit of ${String(revisionCap)} reached`,
+      error: `Lukspakkumuste limiit on ületatud: lubatud on üks esialgne pakkumine ja kuni ${String(revisionCap)} täienduspakkumist`,
       status: 400,
     }
   }
@@ -123,16 +150,20 @@ export async function submitSealedBid(
   const sealedPayload: Record<string, string> = {
     encrypted: encryptedData.encrypted,
     iv: encryptedData.iv,
+    authTag: encryptedData.authTag,
   }
   if (identitySnapshot) {
     const encryptedIdentity = encryptSealedData(identitySnapshot)
     sealedPayload.identityEncrypted = encryptedIdentity.encrypted
     sealedPayload.identityIv = encryptedIdentity.iv
+    sealedPayload.identityAuthTag = encryptedIdentity.authTag
   }
 
   const bidData: Record<string, unknown> = {
-    auction: auctionId,
-    user: userId,
+    // Payload's relationship validation rejects numeric strings for
+    // number-typed ids, so coerce before create.
+    auction: Number(auctionId),
+    user: Number(userId),
     amount: 0,
     type: 'sealed',
     source: 'manual',
@@ -179,6 +210,20 @@ export async function getSealedBidsForAuction(
   return result.docs
 }
 
+// Normalize relationship values (number id, numeric string, or populated
+// doc) to a plain string so ceremony comparisons against the string bidId
+// the admin routes receive can never silently mismatch.
+function relationId(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number') return String(value)
+  if (value !== null && typeof value === 'object') {
+    const id = (value as { id?: unknown }).id
+    if (typeof id === 'string') return id
+    if (typeof id === 'number') return String(id)
+  }
+  return ''
+}
+
 export function decryptSealedBids(
   bids: Record<string, unknown>[],
 ): DecryptedBid[] {
@@ -186,32 +231,70 @@ export function decryptSealedBids(
     const rawSnapshot = bid.identitySnapshot as string | undefined
     let amount = 0
     let identitySnapshot: string | undefined
+    let invalidReason: string | undefined
 
-    if (rawSnapshot) {
+    if (!rawSnapshot) {
+      invalidReason = 'no encrypted payload'
+    } else {
       try {
         const parsed = JSON.parse(rawSnapshot) as Record<string, string>
-        if (parsed.encrypted && parsed.iv) {
-          amount = Number(decryptSealedData(parsed.encrypted, parsed.iv))
-        }
-        if (parsed.identityEncrypted && parsed.identityIv) {
-          identitySnapshot = decryptSealedData(
-            parsed.identityEncrypted,
-            parsed.identityIv,
+        if (parsed.encrypted && parsed.iv && parsed.authTag) {
+          const decryptedAmount = Number(
+            decryptSealedData(parsed.encrypted, parsed.iv, parsed.authTag),
           )
+          if (Number.isFinite(decryptedAmount)) {
+            amount = decryptedAmount
+          } else {
+            invalidReason = 'decrypted amount is not a finite number'
+          }
+        } else {
+          invalidReason = 'incomplete encrypted amount fields'
         }
-      } catch {
-        amount = 0
+        if (
+          parsed.identityEncrypted ||
+          parsed.identityIv ||
+          parsed.identityAuthTag
+        ) {
+          if (
+            parsed.identityEncrypted &&
+            parsed.identityIv &&
+            parsed.identityAuthTag
+          ) {
+            identitySnapshot = decryptSealedData(
+              parsed.identityEncrypted,
+              parsed.identityIv,
+              parsed.identityAuthTag,
+            )
+          } else {
+            invalidReason = 'incomplete encrypted identity fields'
+          }
+        }
+      } catch (error) {
+        invalidReason = `decryption failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       }
     }
 
+    if (invalidReason !== undefined) {
+      // A failed decrypt must surface as an invalid bid, never as a valid
+      // bid with amount 0, so the ceremony can continue with the rest.
+      amount = 0
+      identitySnapshot = undefined
+      console.error(
+        `[sealed-bid] bid ${String(bid.id)} marked invalid: ${invalidReason}`,
+      )
+    }
+
     return {
-      id: bid.id as string,
-      auction: typeof bid.auction === 'object' ? (bid.auction as Record<string, unknown>).id as string : bid.auction as string,
-      user: typeof bid.user === 'object' ? (bid.user as Record<string, unknown>).id as string : bid.user as string,
+      id: relationId(bid.id),
+      auction: relationId(bid.auction),
+      user: relationId(bid.user),
       amount,
       identitySnapshot,
       status: bid.status as string,
       createdAt: bid.createdAt as string,
+      valid: invalidReason === undefined,
     }
   })
 }

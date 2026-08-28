@@ -74,10 +74,20 @@ function verify(token: string): Record<string, unknown> | null {
 export interface AccessTokenPayload {
   userId: string
   role: string
+  activeProfileId?: string | undefined
 }
 
 export interface RefreshTokenPayload {
   sessionId: string
+  // Unique per issuance: without it a same-second rotation signs a
+  // byte-identical token and reuse detection cannot distinguish them.
+  jti: string
+}
+
+const ADMIN_ROLES: ReadonlySet<string> = new Set(['admin', 'superadmin'])
+
+export function isAdminRole(role: string | null | undefined): boolean {
+  return typeof role === 'string' && ADMIN_ROLES.has(role)
 }
 
 export function signAccessToken(payload: AccessTokenPayload): string {
@@ -91,7 +101,19 @@ export function verifyAccessToken(
   if (!result || typeof result.userId !== 'string' || typeof result.role !== 'string') {
     return null
   }
-  return { userId: result.userId, role: result.role }
+  const activeProfileId =
+    typeof result.activeProfileId === 'string' ? result.activeProfileId : undefined
+  if (activeProfileId === undefined) {
+    return { userId: result.userId, role: result.role }
+  }
+  return { userId: result.userId, role: result.role, activeProfileId }
+}
+
+export function verifyAdminAccessToken(
+  token: string,
+): AccessTokenPayload | null {
+  const payload = verifyAccessToken(token)
+  return payload !== null && isAdminRole(payload.role) ? payload : null
 }
 
 export function signRefreshToken(payload: RefreshTokenPayload): string {
@@ -100,7 +122,7 @@ export function signRefreshToken(payload: RefreshTokenPayload): string {
 
 export function verifyRefreshToken(
   token: string,
-): RefreshTokenPayload | null {
+): { sessionId: string } | null {
   const result = verify(token)
   if (!result || typeof result.sessionId !== 'string') {
     return null

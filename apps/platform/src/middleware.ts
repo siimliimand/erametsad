@@ -81,6 +81,10 @@ export function middleware(request: NextRequest) {
   return response
 }
 
+// Node runtime: this middleware needs no Edge APIs, and an Edge middleware
+// entry forces Next to also compile instrumentation.ts for the Edge
+// runtime, where payload/nodemailer cannot resolve node builtins.
 export const config = {
+  runtime: 'nodejs',
   matcher: '/:path*',
 }

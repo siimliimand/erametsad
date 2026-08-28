@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { hashPassword } from '@/lib/auth/password'
 import { createSession, setSessionCookies } from '@/lib/auth/session'
 import { authRateLimiter } from '@/lib/rate-limit'
 import { getPayloadClient } from '@/payload/payloadClient'
@@ -36,14 +35,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Vale profiili tüüp' }, { status: 400 })
   }
 
-  const termsTimestamp = consents.terms as string | number | undefined
-  const privacyTimestamp = consents.privacy as string | number | undefined
-
-  if (!termsTimestamp || !privacyTimestamp) {
-    return NextResponse.json(
-      { error: 'Nõusolekud (terms, privacy) on kohustuslikud' },
-      { status: 400 },
-    )
+  const consentTimestamps: Record<string, Date> = {}
+  for (const key of ['terms', 'privacy', 'marketing']) {
+    const raw = consents[key]
+    const parsed =
+      typeof raw === 'string' || typeof raw === 'number' ? new Date(raw) : undefined
+    if (!parsed || Number.isNaN(parsed.getTime())) {
+      return NextResponse.json(
+        { error: 'Nõusolekud (terms, privacy, marketing) on kohustuslikud' },
+        { status: 400 },
+      )
+    }
+    consentTimestamps[key] = parsed
   }
 
   if (profileType === 'company' && (!regCode || !companyName)) {
@@ -58,11 +61,13 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = await getPayloadClient()
-  const passwordHash = await hashPassword(password)
 
+  // Pass the raw password: users is a Payload auth collection, so Payload
+  // applies its own hashing. Pre-hashing here would make the account
+  // impossible to log into.
   const userData: Record<string, unknown> = {
     email: identifier,
-    password: passwordHash,
+    password,
     role: profileType === 'company' ? 'company' : 'private',
     authMethod: 'password',
     status: 'active',
@@ -90,6 +95,9 @@ export async function POST(request: NextRequest) {
     user: userId,
     displayName,
     approvalStatus: profileType === 'company' ? 'pending' : 'approved',
+    termsConsentAt: consentTimestamps.terms,
+    privacyConsentAt: consentTimestamps.privacy,
+    marketingConsentAt: consentTimestamps.marketing,
   }
 
   if (profileType === 'company') {
@@ -117,7 +125,11 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const { accessToken, refreshToken } = await createSession(userId, profileId)
+  const { accessToken, refreshToken } = await createSession(
+    userId,
+    String(user.role),
+    profileId,
+  )
 
   const response = NextResponse.json({
     user: {

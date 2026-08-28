@@ -1,8 +1,32 @@
 /* eslint-disable no-console */
-import { getPayload } from 'payload'
+import { existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, resolve } from 'node:path'
 
-import { seed } from './index'
-import config from '../../payload.config'
+// payload's config import runs @next/env's loadEnvConfig, which crashes
+// under tsx unless the environment is already loaded. Process .env from the
+// package dir or the monorepo root before importing anything from payload.
+for (const dir of [process.cwd(), resolve(process.cwd(), '../..')]) {
+  const envPath = resolve(dir, '.env')
+  if (existsSync(envPath)) {
+    process.loadEnvFile(envPath)
+    break
+  }
+}
+
+// tsx compiles this entry to CJS, and its esbuild interop keeps an ESM
+// default import of @next/env undefined because that package ships
+// __esModule with no default. payload's loadEnv.js then crashes on
+// destructuring. @next/env is a transitive dep (via payload/next), so
+// resolve it from payload and attach a default before payload loads.
+const localRequire = createRequire(resolve(process.cwd(), 'index.js'))
+const payloadEntry = localRequire.resolve('payload')
+const payloadRoot = dirname(dirname(payloadEntry))
+const nextEnvPath = localRequire.resolve('@next/env', { paths: [payloadRoot] })
+const nextEnv = localRequire(nextEnvPath) as { default?: unknown }
+if (nextEnv.default === undefined) {
+  nextEnv.default = nextEnv
+}
 
 const COLLECTIONS_IN_ORDER = [
   // Level 1 — no dependents (leaf collections)
@@ -26,6 +50,7 @@ const COLLECTIONS_IN_ORDER = [
   'profile',
   'company-access-request',
   // Level 8 — CMS
+  'settings',
   'faq-items',
   'testimonials',
   'partner-services',
@@ -44,6 +69,12 @@ const COLLECTIONS_IN_ORDER = [
 ]
 
 export async function resetAndSeed(): Promise<void> {
+  // Imported lazily so the .env loop above runs before payload's config
+  // module (and @next/env with it) is loaded.
+  const { getPayload } = await import('payload')
+  const { seed } = await import('./index')
+  const config = (await import('../../payload.config')).default
+
   console.log('Resetting database…')
 
   const payload = await getPayload({ config })
@@ -75,3 +106,13 @@ export async function resetAndSeed(): Promise<void> {
   console.log('Database reset complete. Running seed…')
   await seed(payload)
 }
+
+resetAndSeed()
+  .then(() => {
+    console.log('Seed script finished')
+    process.exit(0)
+  })
+  .catch((error: unknown) => {
+    console.error('Seed script failed', error)
+    process.exit(1)
+  })

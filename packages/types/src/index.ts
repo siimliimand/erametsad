@@ -3,6 +3,7 @@ export {
   EEIsikukood,
   EERegistrikood,
   EECadastral,
+  EEEmail,
   validators,
 } from './validators'
 
