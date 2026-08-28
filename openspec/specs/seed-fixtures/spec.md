@@ -4,29 +4,33 @@
 TBD - created by archiving change phase-2-core-backend. Update Purpose after archive.
 ## Requirements
 ### Requirement: Consent checkboxes in registration
-User registration SHALL include 3 consent checkboxes presented visibly,
-always unchecked, and required. The time of consent SHALL be recorded
-in the User's `consents[]` field.
+Registration SHALL require three consents (terms, privacy, marketing) with
+timestamps and SHALL persist all three with their timestamps on the
+created profile for audit.
 
-#### Scenario: Consent timestamp recorded on registration
-- **WHEN** a user completes registration with all three consents checked
-- **THEN** the User document has 3 entries in `consents[]` each with the
-  checked timestamp
+#### Scenario: Consents stored
+- **WHEN** a user registers with all three consents accepted
+- **THEN** the stored profile records each consent with its timestamp
+
+#### Scenario: Missing consent rejected
+- **WHEN** a registration omits any required consent
+- **THEN** the response is HTTP 400
 
 ### Requirement: Sealed-bid revision cap
-The sealed-bid revision cap SHALL be a Settings field defaulting to 1
-(one submission only). The system SHALL allow resubmissions up to the cap
-when the cap is 2 or higher, applying a double-submit guard with an
-idempotency key.
+The revision cap SHALL be enforced as: one original plus up to N
+revisions (N from Settings), after which further submissions are rejected
+with a clear error. Sealed seed fixtures SHALL be created through the
+encrypted submission path so amounts are unreadable at rest and the live
+opening demo works.
 
-#### Scenario: Resubmission allowed within cap
-- **WHEN** revision cap is set to 3 and a user has submitted 2 sealed bids
-  on the same auction
-- **THEN** a third submission is accepted
+#### Scenario: Seed sealed bids are encrypted
+- **WHEN** seed data for a sealed auction is inspected in the database
+- **THEN** every sealed bid row has amount 0 and encrypted payloads with
+  auth tags
 
-#### Scenario: Resubmission blocked at cap
-- **WHEN** revision cap is 1 and a user has already submitted a sealed bid
-- **THEN** a second submission returns HTTP 409
+#### Scenario: Cap enforced
+- **WHEN** a user submits more than 1 + N sealed bids
+- **THEN** the next submission is rejected with the revision-limit error
 
 ### Requirement: Password strength and validation
 Passwords MUST be at least 10 characters and MUST NOT match the user's
@@ -42,3 +46,14 @@ SHALL be rejected server-side with a 400 error.
 - **WHEN** a user submits a 12-character mixed-class password
 - **THEN** the password is accepted and stored hashed
 
+### Requirement: Auction type in seed data
+Seed auctions SHALL set `type` (`open`/`sealed`) on every row, with at
+least one sealed auction per supported object type in `ended` status
+holding encrypted sealed bids ready for the live opening demo. The
+Settings seed SHALL enable the framework-contract gate
+(`requireFrameworkContract: true`).
+
+#### Scenario: Fresh seed supports the sealed demo
+- **WHEN** `pnpm seed:reset` completes
+- **THEN** a sealed auction exists in `ended` status whose bids decrypt
+  to the documented demo amounts during the ceremony

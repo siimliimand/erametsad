@@ -4,33 +4,34 @@
 TBD - created by archiving change phase-2-core-backend. Update Purpose after archive.
 ## Requirements
 ### Requirement: Password authentication
-`POST /api/v1/auth/login` SHALL accept `identifier` (isikukood or email)
-and `password`. Failed attempts SHALL be rate-limited to 5 per IP per
-minute. Error responses SHALL be identical regardless of whether the
-identifier or the password is wrong.
+Password login SHALL accept isikukood or email with password, apply the
+5/min/IP rate limit, return neutral Estonian errors, and reject users
+whose status is `suspended`. The issued access token SHALL carry the
+user's real role and active profile id.
 
-#### Scenario: Wrong password yields neutral error
-- **WHEN** a valid isikukood is submitted with a wrong password
-- **THEN** the response is HTTP 401 with message "Vale kasutajanimi või
-  parool" and the same JSON shape as a missing-user response
+#### Scenario: Suspended user cannot log in
+- **WHEN** a user with status `suspended` submits correct credentials
+- **THEN** the response is the neutral auth error and no session is
+  created
 
-#### Scenario: Rate limit triggers after 5 attempts
-- **WHEN** 6 login requests arrive from the same IP within 60 seconds
-- **THEN** the 6th request returns HTTP 429
+#### Scenario: Token carries role
+- **WHEN** an admin logs in
+- **THEN** the access token's role claim is `admin`
 
 ### Requirement: Demo eID simulator
-A provider adapter SHALL abstract eID operations behind three endpoints
-per method (`start`, `status`, `complete`) for SMART-ID, MOBIIL-ID, and
-ID-CARD. The demo implementation SHALL show a control-code screen and
-poll for status until the user confirms (configurable 2-second poll).
-Demo accounts SHALL be defined in seed data with known isikukoods.
+The simulator SHALL expose `start`, `status`, and `complete` for each of
+smartid, mobileid, and idcard behind the provider interface. `complete`
+SHALL verify the completed session state and create an application
+session (tokens as httpOnly cookies) for the demo user. Demo isikukoods
+SHALL be configurable via environment variables.
 
-#### Scenario: Successful Smart-ID login flow
-- **WHEN** a user selects Smart-ID and a known demo isikukood
-- **THEN** `POST /api/v1/auth/smartid/start` returns a control code and
-  a session reference
-- **WHEN** the polling detects the demo user confirmed
-- **THEN** `GET /api/v1/auth/smartid/status` returns `{ status: "completed" }`
+#### Scenario: eID login establishes a session
+- **WHEN** the demo user completes the eID flow
+- **THEN** `complete` returns success and sets the session cookies
+
+#### Scenario: Complete before status completion fails
+- **WHEN** `complete` is called for a session still `pending`
+- **THEN** the response is HTTP 400 and no session is created
 
 ### Requirement: Registration end-to-end
 The registration flow SHALL support four steps: eID identity (or email
@@ -52,27 +53,30 @@ with `name`, `regCode`, and `boardMembers` from a local fixture file.
 - **THEN** the endpoint returns HTTP 404 with `{ found: false }`
 
 ### Requirement: Password reset and change
-Password reset tokens SHALL expire after 2 hours and be single-use.
-Submitting a valid reset token SHALL revoke all active sessions for that
-user. Password change via an authenticated session SHALL require the
-current password.
+A forgot-password endpoint SHALL accept the account identifier, create a
+single-use 2-hour token, and email the reset link through Mailpit. The
+reset endpoint SHALL consume the token, set the new password, and revoke
+all other sessions. An authenticated change-password endpoint SHALL
+verify the old password before setting the new one and revoke other
+sessions. Minimum length SHALL be 10 characters.
 
-#### Scenario: Reset token revokes prior sessions
-- **WHEN** a password reset completes successfully
-- **THEN** all prior sessions for that user are invalidated and the old
-  refresh tokens are revoked
+#### Scenario: Forgot password sends the link
+- **WHEN** a user requests a reset for a known account
+- **THEN** a single-use token is stored and the link is emailed
+
+#### Scenario: Change requires the old password
+- **WHEN** an authenticated user submits a wrong old password
+- **THEN** the response is HTTP 400 and the password is unchanged
 
 ### Requirement: Profile selection scope
-The session SHALL carry the `activeProfileId`. All profile-scoped
-API routes SHALL extract the profile from the session and ignore
-cross-profile data. `POST /api/profiles/:id/select`
+The session SHALL carry the active profile id, and the access token SHALL
+include it as a claim so every scoped read is filtered by the active
+profile. Selecting a profile SHALL update the session and issue a fresh
+token.
 
-SHALL activate a new profile in the same session.
-
-#### Scenario: User switches active profile
-- **WHEN** `POST /api/profiles/:companyId/select` is called
-- **THEN** subsequent API calls scope to that company profile until
-  another switch occurs
+#### Scenario: Token reflects selected profile
+- **WHEN** a user selects a different profile
+- **THEN** subsequent access tokens carry the new profile id
 
 ### Requirement: Rate limit on protected auth endpoints
 All auth endpoints accepting credentials SHALL carry a rate limiter
@@ -83,3 +87,23 @@ Redis (local dev) or Cloudflare KV (prod).
 - **WHEN** 5 password-reset requests arrive from the same IP in under 60s
 - **THEN** the 6th request returns HTTP 429
 
+### Requirement: Session refresh and revocation
+A refresh endpoint SHALL rotate the refresh token on use, detect reuse of
+a rotated token and invalidate the session family, and issue a new access
+token. Authenticated endpoints SHALL list the user's sessions and revoke
+any of them (including the current one). The refresh cookie path SHALL
+match the refresh endpoint.
+
+#### Scenario: Refresh extends the session
+- **WHEN** a valid refresh token is posted after the access token
+  expired
+- **THEN** a new access token is issued and the old refresh token is
+  unusable
+
+#### Scenario: Reused refresh token kills the family
+- **WHEN** a rotated refresh token is presented a second time
+- **THEN** the session is invalidated and all its tokens stop working
+
+#### Scenario: User revokes a session
+- **WHEN** the user revokes another session from the session list
+- **THEN** that session's tokens no longer authenticate
