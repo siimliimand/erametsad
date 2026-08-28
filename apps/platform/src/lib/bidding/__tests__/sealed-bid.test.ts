@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vites
 
 import { encryptSealedData } from '../../encryption'
 import type { BidResult, BidError } from '../place-bid'
-import { submitSealedBid } from '../sealed-bid'
+import { submitSealedBid, decryptSealedBids } from '../sealed-bid'
 
 function assertBidError(result: BidResult): asserts result is BidError {
   expect(result.success).toBe(false)
@@ -71,6 +71,10 @@ describe('submitSealedBid', () => {
     mockPayload.find.mockResolvedValueOnce({ docs: auction ? [auction] : [] })
   }
 
+  function mockRights(hasRights: boolean) {
+    mockPayload.find.mockResolvedValueOnce({ docs: hasRights ? [{ id: 'right-1' }] : [] })
+  }
+
   function mockExistingBids(docs: Record<string, unknown>[]) {
     mockPayload.find.mockResolvedValueOnce({ docs })
   }
@@ -108,30 +112,59 @@ describe('submitSealedBid', () => {
     expect(result.status).toBe(400)
   })
 
+  it('returns 403 when the user lacks the auction objectType right', async () => {
+    mockUser({ id: 'user-1' })
+    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
+    mockRights(false)
+
+    const result = await submitSealedBid(baseParams)
+    assertBidError(result)
+    expect(result.error).toBe('No bidding right for this object type')
+    expect(result.status).toBe(403)
+  })
+
   it('returns error when amount is below minBid', async () => {
     mockUser({ id: 'user-1' })
-    mockAuction({ status: 'active', minBid: 100000, endsAt: '2099-01-01T00:00:00Z' })
+    mockAuction({ status: 'active', minBid: 100000, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
+    mockRights(true)
 
     const result = await submitSealedBid({ ...baseParams, amount: 50000 })
     assertBidError(result)
     expect(result.status).toBe(400)
   })
 
-  it('enforces revision cap', async () => {
+  it('enforces the revision cap with the Estonian limit message', async () => {
     mockUser({ id: 'user-1' })
-    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z' })
+    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
+    mockRights(true)
     mockExistingBids(Array.from({ length: 4 }, (_, i) => ({ id: `bid-${String(i)}`, status: 'leading' })))
     mockSettings(3)
 
     const result = await submitSealedBid(baseParams)
     assertBidError(result)
-    expect(result.error).toContain('Revision limit')
+    expect(result.error).toBe(
+      'Lukspakkumuste limiit on ületatud: lubatud on üks esialgne pakkumine ja kuni 3 täienduspakkumist',
+    )
     expect(result.status).toBe(400)
+  })
+
+  it('accepts up to one original bid plus N revisions when under the cap', async () => {
+    mockUser({ id: 'user-1' })
+    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
+    mockRights(true)
+    mockExistingBids(Array.from({ length: 3 }, (_, i) => ({ id: `bid-${String(i)}`, status: 'leading' })))
+    mockSettings(3)
+    mockIdempotencyCheck(false)
+    mockPayload.create.mockResolvedValueOnce({ id: 'sealed-bid-4' })
+
+    const result = await submitSealedBid(baseParams)
+    expect(result.success).toBe(true)
   })
 
   it('accepts bid when under revision cap', async () => {
     mockUser({ id: 'user-1' })
-    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z' })
+    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
+    mockRights(true)
     mockExistingBids([])
     mockSettings(3)
     mockIdempotencyCheck(false)
@@ -149,7 +182,8 @@ describe('submitSealedBid', () => {
 
   it('prevents duplicate with idempotency key', async () => {
     mockUser({ id: 'user-1' })
-    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z' })
+    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
+    mockRights(true)
     mockExistingBids([])
     mockSettings(3)
     mockIdempotencyCheck(true)
@@ -157,5 +191,64 @@ describe('submitSealedBid', () => {
     const result = await submitSealedBid({ ...baseParams, idempotencyKey: 'dup-key' })
     assertBidError(result)
     expect(result.status).toBe(409)
+  })
+})
+
+describe('decryptSealedBids', () => {
+  function sealedRow(overrides: Record<string, unknown> = {}) {
+    const encrypted = encryptSealedData('50000')
+    return {
+      id: 'bid-1',
+      auction: 'auction-1',
+      user: 'user-1',
+      amount: 0,
+      type: 'sealed',
+      status: 'leading',
+      createdAt: '2026-02-01T10:00:00Z',
+      identitySnapshot: JSON.stringify(encrypted),
+      ...overrides,
+    }
+  }
+
+  it('decrypts a valid sealed bid to its original amount', () => {
+    const result = decryptSealedBids([sealedRow()])
+
+    expect(result).toHaveLength(1)
+    expect(result[0]?.amount).toBe(50000)
+    expect(result[0]?.valid).toBe(true)
+  })
+
+  it('marks a tampered bid invalid and logs instead of reporting a valid 0', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const snapshot = encryptSealedData('50000')
+    const tampered = snapshot.encrypted.endsWith('00')
+      ? `${snapshot.encrypted.slice(0, -2)}11`
+      : `${snapshot.encrypted.slice(0, -2)}00`
+    const row = sealedRow({
+      identitySnapshot: JSON.stringify({ ...snapshot, encrypted: tampered }),
+    })
+
+    const result = decryptSealedBids([row])
+
+    expect(result[0]?.amount).toBe(0)
+    expect(result[0]?.valid).toBe(false)
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('bid-1 marked invalid'))
+    errorSpy.mockRestore()
+  })
+
+  it('marks a bid without an encrypted payload invalid', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const result = decryptSealedBids([sealedRow({ identitySnapshot: undefined })])
+
+    expect(result[0]?.valid).toBe(false)
+    expect(result[0]?.amount).toBe(0)
+    errorSpy.mockRestore()
+  })
+
+  it('unwraps populated user relations to the plain user id', () => {
+    const result = decryptSealedBids([sealedRow({ user: { id: 'user-9' }, auction: { id: 'auction-9' } })])
+
+    expect(result[0]?.user).toBe('user-9')
+    expect(result[0]?.auction).toBe('auction-9')
   })
 })
