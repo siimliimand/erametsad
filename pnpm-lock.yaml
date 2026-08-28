@@ -41,6 +41,9 @@ importers:
       '@eametsad/emails':
         specifier: workspace:*
         version: link:../../packages/emails
+      '@eametsad/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@eametsad/ui':
         specifier: workspace:*
         version: link:../../packages/ui
