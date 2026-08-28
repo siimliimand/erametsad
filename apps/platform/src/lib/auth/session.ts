@@ -41,7 +41,10 @@ export async function createSession(
   const tokenFamily = crypto.randomUUID()
 
   const accessToken = signAccessToken({ userId, role, activeProfileId: profileId })
-  const refreshToken = signRefreshToken({ sessionId })
+  const refreshToken = signRefreshToken({
+    sessionId,
+    jti: crypto.randomUUID(),
+  })
   indexAccessToken(sessionId, accessToken)
 
   sessions.set(sessionId, {
@@ -74,7 +77,10 @@ export async function refreshSession(
     return null
   }
 
-  const newRefreshToken = signRefreshToken({ sessionId: payload.sessionId })
+  const newRefreshToken = signRefreshToken({
+    sessionId: payload.sessionId,
+    jti: crypto.randomUUID(),
+  })
   const newAccessToken = signAccessToken({
     userId: record.userId,
     role: record.role,
@@ -209,7 +215,7 @@ export function setSessionCookies(
     httpOnly: true,
     secure: true,
     sameSite: 'lax',
-    path: '/api/auth',
+    path: '/api/v1/auth',
     maxAge: 7 * 24 * 60 * 60,
   })
 }
@@ -227,7 +233,7 @@ export function clearSessionCookies(response: NextResponse): void {
     httpOnly: true,
     secure: true,
     sameSite: 'lax',
-    path: '/api/auth',
+    path: '/api/v1/auth',
     maxAge: 0,
   })
 }

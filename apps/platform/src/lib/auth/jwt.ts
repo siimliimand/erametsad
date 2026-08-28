@@ -79,6 +79,9 @@ export interface AccessTokenPayload {
 
 export interface RefreshTokenPayload {
   sessionId: string
+  // Unique per issuance: without it a same-second rotation signs a
+  // byte-identical token and reuse detection cannot distinguish them.
+  jti: string
 }
 
 const ADMIN_ROLES: ReadonlySet<string> = new Set(['admin', 'superadmin'])
@@ -119,7 +122,7 @@ export function signRefreshToken(payload: RefreshTokenPayload): string {
 
 export function verifyRefreshToken(
   token: string,
-): RefreshTokenPayload | null {
+): { sessionId: string } | null {
   const result = verify(token)
   if (!result || typeof result.sessionId !== 'string') {
     return null
