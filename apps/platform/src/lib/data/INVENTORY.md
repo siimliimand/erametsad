@@ -368,8 +368,8 @@ interface Repository {
 | **Auth collection (Payload auth: true)** | Yes — `0001` §1 (full replacement) | Users collection uses Payload auth (password hashing via `bcrypt`, session management). Replaced by custom auth in Phase 4. Register route passes raw password; Payload hashes it. |
 | **Payload `depth` (relationship population)** | Not explicitly addressed | Calls use depth 0 or 1. The repository layer needs a `populate` or `include` mechanism for relationships. depth: 0 = no populate is the common case. |
 | **`pagination: false` (return all)** | Not explicitly addressed | Used only in seed/reset. The repository can support `pagination: false` as an option. |
-| **`SELECT … FOR UPDATE`** | Yes — `0001` §5 | Moves to Durable Objects (AuctionDO). The `withAuctionLock` function in place-bid.ts already wraps Drizzle directly. |
-| **Direct Drizzle usage** | Partially — `0001` §5 | `place-bid.ts` and `alapakkumine.ts` use `payload.db.drizzle` for row-level locks and bid inserts inside transactions. These paths move to DO serialization. |
+| **`SELECT … FOR UPDATE`** | Yes — `0001` §5 | Moves to Durable Objects (AuctionDO). `withAuctionLock` was removed in the D1 port; bid writes rely on status guards and atomic D1 batches until AuctionDO lands. |
+| **Direct Drizzle usage** | Partially — `0001` §5 | `place-bid.ts` and `alapakkumine.ts` now write through the D1 executor in `src/lib/db.ts` (SQLite dialect, no Drizzle). These paths move to DO serialization. |
 | **`where: { exists: false }`** | Not explicitly addressed | Used only on `auction-rights.revokedAt`. Must be supported as a where operator. |
 | **`where: { in: [...] }`** | Not explicitly addressed | Used only on `contracts.template` (template IDs). Must be supported. |
 | **`sort` with leading `-`** | Not explicitly addressed | Used on `statistics-snapshots` (`-date`) and `autobidders` (`createdAt`). Must be supported. |

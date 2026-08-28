@@ -1,9 +1,10 @@
-import { sql } from '@payloadcms/db-postgres'
 import crypto from 'node:crypto'
 import type { Payload } from 'payload'
 
-import { isAlapakkumineEnabled } from './alapakkumine'
 import { getPayloadClient } from '../../payload/payloadClient'
+import { eurosToCents } from '../data/repositories/money'
+import { db, type SqlStatement } from '../db'
+import { isAlapakkumineEnabled } from './alapakkumine'
 import { eventBus } from '../notifications/event-bus'
 import type { DomainEvent } from '../notifications/event-bus'
 
@@ -35,7 +36,10 @@ export type BidResult = BidSuccess | BidError
 const IP_HASH_SALT = process.env.PAYLOAD_SECRET ?? 'dev-ip-hash-salt'
 
 export function computeIpHash(ip: string): string {
-  return crypto.createHash('sha256').update(`${IP_HASH_SALT}:${ip}`).digest('hex')
+  return crypto
+    .createHash('sha256')
+    .update(`${IP_HASH_SALT}:${ip}`)
+    .digest('hex')
 }
 
 function normalizeRequestIp(headerValue: string | undefined): string {
@@ -43,25 +47,21 @@ function normalizeRequestIp(headerValue: string | undefined): string {
   return first && first.length > 0 ? first : 'unknown'
 }
 
-interface TxStatement { execute: (query: unknown) => Promise<{ rows: Record<string, unknown>[] }> }
-
-// The only place that touches Drizzle directly. All writes run inside one
-// transaction started with SELECT ... FOR UPDATE on the auctions row, so
-// concurrent placeBid calls serialise on that row. Reads stay on the
-// Payload Local API and run while the lock is held.
-export async function withAuctionLock<T>(
-  payload: Payload,
-  auctionId: string,
-  fn: (tx: TxStatement) => Promise<T>,
-): Promise<T | null> {
-  const db = payload.db.drizzle
-  return db.transaction(async (tx) => {
-    const locked = await tx.execute(sql`select id from auctions where id = ${auctionId} for update`)
-    if (locked.rows.length === 0) {
-      return null
-    }
-    return fn(tx as unknown as TxStatement)
-  })
+// Bid writes previously ran inside a Postgres transaction guarded by
+// SELECT ... FOR UPDATE on the auction row (withAuctionLock). That lock is
+// deleted: the AuctionDO durable object serialises bid writes per auction
+// from task 3.2. Until then every UPDATE carries a status guard and
+// multi-statement writes go through one atomic D1 batch.
+export function bidStatusUpdateStatement(
+  id: string,
+  from: string,
+  to: string,
+  now: string,
+): SqlStatement {
+  return {
+    sql: 'update bids set status = ?, updated_at = ? where id = ? and status = ?',
+    params: [to, now, id, from],
+  }
 }
 
 type PayloadCollection =
@@ -88,159 +88,157 @@ async function findDoc(
 }
 
 export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
-  const { userId, auctionId, amount, type, source, requestIp, idempotencyKey } = params
+  const { userId, auctionId, amount, type, source, requestIp, idempotencyKey } =
+    params
 
   const payload = await getPayloadClient()
   const events: DomainEvent[] = []
-  const ipHash = requestIp !== undefined ? computeIpHash(normalizeRequestIp(requestIp)) : undefined
+  const ipHash =
+    requestIp !== undefined
+      ? computeIpHash(normalizeRequestIp(requestIp))
+      : undefined
+  const now = new Date().toISOString()
 
-  const outcome = await withAuctionLock(
-    payload,
-    auctionId,
-    async (tx): Promise<BidResult | null> => {
-      // 1. Verify user exists
-      const user = await findDoc(payload, 'users', { id: { equals: userId } })
-      if (!user) {
-        return { success: false, error: 'User not found', status: 401 }
-      }
-      if (user.status === 'suspended') {
-        return { success: false, error: 'User is suspended', status: 403 }
-      }
+  const runBidFlow = async (): Promise<BidResult> => {
+    // 1. Verify user exists
+    const user = await findDoc(payload, 'users', { id: { equals: userId } })
+    if (!user) {
+      return { success: false, error: 'User not found', status: 401 }
+    }
+    if (user.status === 'suspended') {
+      return { success: false, error: 'User is suspended', status: 403 }
+    }
 
-      // 2. Auction is active (read under the row lock)
-      const auction = await findDoc(payload, 'auctions', { id: { equals: auctionId } })
-      if (!auction) {
-        return { success: false, error: 'Auction not found', status: 404 }
-      }
-      if (auction.status !== 'active') {
-        return { success: false, error: 'Auction is not active', status: 400 }
-      }
-      const endsAt = auction.endsAt as string | undefined
-      if (!endsAt || new Date(endsAt) <= new Date()) {
-        return { success: false, error: 'Auction has ended', status: 400 }
-      }
+    // 2. Auction is active
+    const auction = await findDoc(payload, 'auctions', {
+      id: { equals: auctionId },
+    })
+    if (!auction) {
+      return { success: false, error: 'Auction not found', status: 404 }
+    }
+    if (auction.status !== 'active') {
+      return { success: false, error: 'Auction is not active', status: 400 }
+    }
+    const endsAt = auction.endsAt as string | undefined
+    if (!endsAt || new Date(endsAt) <= new Date()) {
+      return { success: false, error: 'Auction has ended', status: 400 }
+    }
 
-      const objectType = auction.objectType as string
-      const minBid = auction.minBid as number
-      const auctionTitle = (auction.title as string | undefined) ?? `Auction ${auctionId}`
+    const objectType = auction.objectType as string
+    const minBid = auction.minBid as number
+    const auctionTitle =
+      (auction.title as string | undefined) ?? `Auction ${auctionId}`
 
-      // 3. ObjectType right
-      const right = await findDoc(payload, 'auction-rights', {
+    // 3. ObjectType right
+    const right = await findDoc(payload, 'auction-rights', {
+      and: [
+        { user: { equals: userId } },
+        { objectType: { equals: objectType } },
+        { revokedAt: { exists: false } },
+      ],
+    })
+    if (!right) {
+      return {
+        success: false,
+        error: 'No bidding right for this object type',
+        status: 403,
+      }
+    }
+
+    // 4. Settings: alapakkumine flag and the framework-contract gate flag
+    const settings = await findDoc(payload, 'settings', {})
+    const featureFlags: Record<string, unknown> = settings?.featureFlags
+      ? (settings.featureFlags as Record<string, unknown>)
+      : {}
+    // Gate is active by default; only an explicit false disables it (demo override).
+    const gateDisabledBySettings =
+      featureFlags.requireFrameworkContract === false
+
+    // 5. Amount validity: below minBid is only legal as an alapakkumine
+    //    request (pending_approval), and only when Settings enable it.
+    const isUnderStartBid = amount < minBid
+    if (isUnderStartBid && !isAlapakkumineEnabled(settings)) {
+      return {
+        success: false,
+        error: `Bid must be at least ${String(minBid)} EUR`,
+        status: 400,
+      }
+    }
+
+    // 6. Step validation against the current leader (normal path only)
+    let leadingBid: Record<string, unknown> | null = null
+    if (!isUnderStartBid) {
+      leadingBid = await findDoc(payload, 'bids', {
         and: [
-          { user: { equals: userId } },
-          { objectType: { equals: objectType } },
-          { revokedAt: { exists: false } },
+          { auction: { equals: auctionId } },
+          { status: { equals: 'leading' } },
         ],
       })
-      if (!right) {
-        return {
-          success: false,
-          error: 'No bidding right for this object type',
-          status: 403,
-        }
-      }
-
-      // 4. Settings: alapakkumine flag and the framework-contract gate flag
-      const settings = await findDoc(payload, 'settings', {})
-      const featureFlags: Record<string, unknown> = settings?.featureFlags
-        ? (settings.featureFlags as Record<string, unknown>)
-        : {}
-      // Gate is active by default; only an explicit false disables it (demo override).
-      const gateDisabledBySettings = featureFlags.requireFrameworkContract === false
-
-      // 5. Amount validity: below minBid is only legal as an alapakkumine
-      //    request (pending_approval), and only when Settings enable it.
-      const isUnderStartBid = amount < minBid
-      if (isUnderStartBid && !isAlapakkumineEnabled(settings)) {
-        return {
-          success: false,
-          error: `Bid must be at least ${String(minBid)} EUR`,
-          status: 400,
-        }
-      }
-
-      // 6. Step validation against the current leader (normal path only)
-      let leadingBid: Record<string, unknown> | null = null
-      if (!isUnderStartBid) {
-        leadingBid = await findDoc(payload, 'bids', {
-          and: [
-            { auction: { equals: auctionId } },
-            { status: { equals: 'leading' } },
-          ],
-        })
-        if (leadingBid) {
-          const leadingAmount = leadingBid.amount as number
-          const bidStep = auction.bidStep as number | undefined
-          const minimumAmount = leadingAmount + (bidStep ?? 0)
-          if (amount < minimumAmount) {
-            return {
-              success: false,
-              error: `Bid must be at least ${String(minimumAmount)} EUR`,
-              status: 400,
-            }
-          }
-        }
-      }
-
-      // 7. Framework contract gate (open auctions, active by default)
-      if (type === 'open' && !gateDisabledBySettings) {
-        const template = await findDoc(payload, 'contract-templates', {
-          and: [
-            { type: { equals: 'framework' } },
-            { active: { equals: true } },
-          ],
-        })
-        if (template) {
-          const signed = await findDoc(payload, 'contracts', {
-            and: [
-              { signedBy: { equals: userId } },
-              { status: { equals: 'signed' } },
-              { template: { equals: template.id } },
-            ],
-          })
-          if (!signed) {
-            return {
-              success: false,
-              error: 'Framework contract required',
-              status: 403,
-              code: 'framework_contract_required',
-              redirectUrl: '/contracts/framework',
-            }
-          }
-        }
-      }
-
-      // 8. Idempotency check
-      if (idempotencyKey) {
-        const existing = await findDoc(payload, 'bids', {
-          idempotencyKey: { equals: idempotencyKey },
-        })
-        if (existing) {
+      if (leadingBid) {
+        const leadingAmount = leadingBid.amount as number
+        const bidStep = auction.bidStep as number | undefined
+        const minimumAmount = leadingAmount + (bidStep ?? 0)
+        if (amount < minimumAmount) {
           return {
             success: false,
-            error: 'Duplicate bid (idempotency key already used)',
-            status: 409,
+            error: `Bid must be at least ${String(minimumAmount)} EUR`,
+            status: 400,
           }
         }
       }
+    }
 
-      // 9. Writes. An under-start bid lands as pending_approval and never
-      //    touches the current leader until the seller approves it.
-      if (isUnderStartBid) {
-        // One pending under-start bid at a time: reject the previous one.
-        const oldPending = await findDoc(payload, 'bids', {
+    // 7. Framework contract gate (open auctions, active by default)
+    if (type === 'open' && !gateDisabledBySettings) {
+      const template = await findDoc(payload, 'contract-templates', {
+        and: [{ type: { equals: 'framework' } }, { active: { equals: true } }],
+      })
+      if (template) {
+        const signed = await findDoc(payload, 'contracts', {
           and: [
-            { auction: { equals: auctionId } },
-            { status: { equals: 'pending_approval' } },
+            { signedBy: { equals: userId } },
+            { status: { equals: 'signed' } },
+            { template: { equals: template.id } },
           ],
         })
-        if (oldPending) {
-          await tx.execute(
-            sql`update bids set status = 'rejected', updated_at = now() where id = ${oldPending.id as string}`,
-          )
+        if (!signed) {
+          return {
+            success: false,
+            error: 'Framework contract required',
+            status: 403,
+            code: 'framework_contract_required',
+            redirectUrl: '/contracts/framework',
+          }
         }
+      }
+    }
 
-        const pendingBid = await insertBid(tx, {
+    // 8. Idempotency check
+    if (idempotencyKey) {
+      const existing = await findDoc(payload, 'bids', {
+        idempotencyKey: { equals: idempotencyKey },
+      })
+      if (existing) {
+        return {
+          success: false,
+          error: 'Duplicate bid (idempotency key already used)',
+          status: 409,
+        }
+      }
+    }
+
+    // 9. Writes. An under-start bid lands as pending_approval and never
+    //    touches the current leader until the seller approves it.
+    if (isUnderStartBid) {
+      // One pending under-start bid at a time: reject the previous one.
+      const oldPending = await findDoc(payload, 'bids', {
+        and: [
+          { auction: { equals: auctionId } },
+          { status: { equals: 'pending_approval' } },
+        ],
+      })
+      const pendingInsert = insertBidStatement(
+        {
           auctionId,
           userId,
           amount,
@@ -249,23 +247,59 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
           status: 'pending_approval',
           ipHash,
           idempotencyKey,
-        })
-        events.push({
-          type: 'bid.created',
-          userId,
-          payload: {
-            auctionId,
-            auctionTitle,
-            amount,
-            bidId: pendingBid.id,
-            status: 'pending_approval',
-          },
-        })
-        return { success: true, bid: pendingBid }
+        },
+        now,
+      )
+      const statements: SqlStatement[] = []
+      if (oldPending) {
+        statements.push(
+          bidStatusUpdateStatement(
+            String(oldPending.id),
+            'pending_approval',
+            'rejected',
+            now,
+          ),
+        )
       }
+      statements.push(pendingInsert)
 
-      // Append the new bid and demote the previous leader atomically.
-      const newBid = await insertBid(tx, {
+      const results = await db.batch<InsertedBidRow>(statements)
+      const insertResult = results[statements.length - 1]
+      if (!insertResult) {
+        throw new Error('D1 batch returned no result for the bid insert')
+      }
+      const pendingBid = mapInsertedBid(
+        {
+          auctionId,
+          userId,
+          amount,
+          type,
+          source,
+          status: 'pending_approval',
+          ipHash,
+          idempotencyKey,
+        },
+        insertResult.results[0],
+        pendingInsert,
+      )
+      events.push({
+        type: 'bid.created',
+        userId,
+        payload: {
+          auctionId,
+          auctionTitle,
+          amount,
+          bidId: pendingBid.id,
+          status: 'pending_approval',
+        },
+      })
+      return { success: true, bid: pendingBid }
+    }
+
+    // Append the new bid and demote the previous leader in one atomic
+    // D1 batch.
+    const leadingInsert = insertBidStatement(
+      {
         auctionId,
         userId,
         amount,
@@ -274,42 +308,73 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
         status: 'leading',
         ipHash,
         idempotencyKey,
-      })
+      },
+      now,
+    )
+    const statements: SqlStatement[] = [leadingInsert]
+    if (leadingBid) {
+      statements.push(
+        bidStatusUpdateStatement(
+          String(leadingBid.id),
+          'leading',
+          'outbid',
+          now,
+        ),
+      )
+    }
 
-      if (leadingBid) {
-        await tx.execute(
-          sql`update bids set status = 'outbid', updated_at = now() where id = ${leadingBid.id as string}`,
-        )
-        const displacedUserId = leadingBid.user as string | number
-        events.push({
-          type: 'outbid',
-          userId: displacedUserId,
-          payload: {
-            auctionId,
-            auctionTitle,
-            currentBid: amount,
-          },
-        })
-      }
-
-      events.push({
-        type: 'bid.created',
+    const results = await db.batch<InsertedBidRow>(statements)
+    const insertResult = results[0]
+    if (!insertResult) {
+      throw new Error('D1 batch returned no result for the bid insert')
+    }
+    const newBid = mapInsertedBid(
+      {
+        auctionId,
         userId,
+        amount,
+        type,
+        source,
+        status: 'leading',
+        ipHash,
+        idempotencyKey,
+      },
+      insertResult.results[0],
+      leadingInsert,
+    )
+
+    if (leadingBid) {
+      const displacedUserId = leadingBid.user as string | number
+      events.push({
+        type: 'outbid',
+        userId: displacedUserId,
         payload: {
           auctionId,
           auctionTitle,
-          amount,
-          bidId: newBid.id,
-          status: 'leading',
+          currentBid: amount,
         },
       })
+    }
 
-      return { success: true, bid: newBid }
-    },
-  ).catch((error: unknown): BidResult => {
+    events.push({
+      type: 'bid.created',
+      userId,
+      payload: {
+        auctionId,
+        auctionTitle,
+        amount,
+        bidId: newBid.id,
+        status: 'leading',
+      },
+    })
+
+    return { success: true, bid: newBid }
+  }
+
+  const outcome = await runBidFlow().catch((error: unknown): BidResult => {
     if (
       error instanceof Error &&
-      /duplicate key/i.test(error.message) &&
+      /(duplicate key|unique constraint failed)/i.test(error.message) &&
       /idempotency_key/i.test(error.message)
     ) {
       return {
@@ -321,12 +386,8 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
     throw error
   })
 
-  if (outcome === null) {
-    return { success: false, error: 'Auction not found', status: 404 }
-  }
-
-  // Emit only after the transaction committed, so rolled-back bids never
-  // produce notifications.
+  // Emit only after the D1 batch succeeded, so failed bids never produce
+  // notifications.
   for (const event of events) {
     eventBus.emit(event)
   }
@@ -345,13 +406,46 @@ interface InsertBidInput {
   idempotencyKey?: string | undefined
 }
 
-async function insertBid(tx: TxStatement, input: InsertBidInput): Promise<Record<string, unknown>> {
-  const inserted = await tx.execute(sql`
-    insert into bids (auction_id, user_id, amount, type, source, status, ip_hash, idempotency_key, created_at, updated_at)
-    values (${input.auctionId}, ${input.userId}, ${input.amount}, ${input.type}, ${input.source}, ${input.status}, ${input.ipHash ?? null}, ${input.idempotencyKey ?? null}, now(), now())
-    returning id, created_at, updated_at
-  `)
-  const row = (inserted.rows[0] ?? {})
+interface InsertedBidRow {
+  id: string
+  created_at: string
+  updated_at: string
+}
+
+function insertBidStatement(input: InsertBidInput, now: string): SqlStatement {
+  return {
+    sql: `insert into bids (id, auction_id, user_id, amount_cents, type, source, status, ip_hash, idempotency_key, created_at, updated_at)
+      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      returning id, created_at, updated_at`,
+    params: [
+      crypto.randomUUID(),
+      input.auctionId,
+      input.userId,
+      eurosToCents(input.amount),
+      input.type,
+      input.source,
+      input.status,
+      input.ipHash ?? null,
+      input.idempotencyKey ?? null,
+      now,
+      now,
+    ],
+  }
+}
+
+function mapInsertedBid(
+  input: InsertBidInput,
+  row: InsertedBidRow | undefined,
+  statement: SqlStatement,
+): Record<string, unknown> {
+  // D1 returns the RETURNING columns; when a stub drops them, fall back to
+  // the values we bound.
+  const params = statement.params ?? []
+  row ??= {
+    id: String(params[0]),
+    created_at: String(params[9]),
+    updated_at: String(params[10]),
+  }
   return {
     id: row.id,
     auction: input.auctionId,
@@ -361,7 +455,9 @@ async function insertBid(tx: TxStatement, input: InsertBidInput): Promise<Record
     source: input.source,
     status: input.status,
     ...(input.ipHash !== undefined ? { ipHash: input.ipHash } : {}),
-    ...(input.idempotencyKey !== undefined ? { idempotencyKey: input.idempotencyKey } : {}),
+    ...(input.idempotencyKey !== undefined
+      ? { idempotencyKey: input.idempotencyKey }
+      : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

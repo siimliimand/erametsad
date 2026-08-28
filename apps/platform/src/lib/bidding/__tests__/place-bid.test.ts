@@ -1,6 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-import { placeBid, computeIpHash, type BidResult, type BidError } from '../place-bid'
+import {
+  placeBid,
+  computeIpHash,
+  type BidResult,
+  type BidError,
+} from '../place-bid'
+import { fakeD1, type FakeD1, type RecordedStatement } from './fake-d1'
+import { setD1ForTests } from '../../db'
 
 function assertBidError(result: BidResult): asserts result is BidError {
   expect(result.success).toBe(false)
@@ -12,67 +19,29 @@ vi.mock('@/payload/payloadClient', () => ({
 
 import { getPayloadClient } from '@/payload/payloadClient'
 
-// Drizzle SQL objects expose their fragments through queryChunks: string
-// fragments as StringChunk.value, bound values as raw primitives. Joining
-// them gives a matchable approximation of the statement text and params.
-function sqlText(query: unknown): string {
-  const chunks = (query as { queryChunks?: unknown[] }).queryChunks ?? []
-  return chunks
-    .map((chunk) => {
-      if (chunk === null || chunk === undefined) return ''
-      if (typeof chunk === 'string') return chunk
-      if (typeof chunk === 'number' || typeof chunk === 'bigint' || typeof chunk === 'boolean') {
-        return String(chunk)
-      }
-      if (typeof chunk === 'object') {
-        const value = (chunk as { value?: unknown }).value
-        if (typeof value === 'string') return value
-        if (Array.isArray(value)) {
-          return value.map((part) => (typeof part === 'string' ? part : '')).join('')
-        }
-        return ''
-      }
-      return ''
-    })
-    .join(' ')
-}
-
 let mockPayload: {
   find: ReturnType<typeof vi.fn>
   create: ReturnType<typeof vi.fn>
   update: ReturnType<typeof vi.fn>
-  db: { drizzle: { transaction: (fn: (tx: unknown) => Promise<unknown>) => Promise<unknown> } }
 }
-let txStatements: string[]
-let nextInsertId: number
+let statements: RecordedStatement[]
+let d1: FakeD1
 
 beforeEach(() => {
   vi.clearAllMocks()
-  txStatements = []
-  nextInsertId = 42
-  const fakeTx = {
-    execute: (query: unknown) => {
-      const text = sqlText(query)
-      txStatements.push(text)
-      if (text.includes('for update')) return Promise.resolve({ rows: [{ id: 'auction-1' }] })
-      if (text.includes('insert into bids')) {
-        nextInsertId += 1
-        return Promise.resolve({ rows: [{ id: nextInsertId, created_at: '2026-01-01T00:00:00Z' }] })
-      }
-      return Promise.resolve({ rows: [] })
-    },
-  }
+  statements = []
+  d1 = fakeD1(statements)
+  setD1ForTests(d1)
   mockPayload = {
     find: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
-    db: {
-      drizzle: {
-        transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(fakeTx),
-      },
-    },
   }
   vi.mocked(getPayloadClient).mockImplementation(() => mockPayload as never)
+})
+
+afterEach(() => {
+  setD1ForTests(null)
 })
 
 describe('placeBid', () => {
@@ -94,16 +63,26 @@ describe('placeBid', () => {
     signedContract?: Record<string, unknown> | null
     idempotencyDuplicate?: boolean
   }) {
-    mockPayload.find.mockResolvedValueOnce({ docs: opts.user ? [opts.user] : [] })
-    mockPayload.find.mockResolvedValueOnce({ docs: opts.auction ? [opts.auction] : [] })
+    mockPayload.find.mockResolvedValueOnce({
+      docs: opts.user ? [opts.user] : [],
+    })
+    mockPayload.find.mockResolvedValueOnce({
+      docs: opts.auction ? [opts.auction] : [],
+    })
     if (opts.hasRights !== undefined) {
-      mockPayload.find.mockResolvedValueOnce({ docs: opts.hasRights ? [{ id: 'right-1' }] : [] })
+      mockPayload.find.mockResolvedValueOnce({
+        docs: opts.hasRights ? [{ id: 'right-1' }] : [],
+      })
     }
     if (opts.settings !== undefined) {
-      mockPayload.find.mockResolvedValueOnce({ docs: opts.settings ? [opts.settings] : [] })
+      mockPayload.find.mockResolvedValueOnce({
+        docs: opts.settings ? [opts.settings] : [],
+      })
     }
     if (opts.leadingBid !== undefined) {
-      mockPayload.find.mockResolvedValueOnce({ docs: opts.leadingBid ? [opts.leadingBid] : [] })
+      mockPayload.find.mockResolvedValueOnce({
+        docs: opts.leadingBid ? [opts.leadingBid] : [],
+      })
     }
     if (opts.frameworkTemplate !== undefined) {
       mockPayload.find.mockResolvedValueOnce({
@@ -116,7 +95,9 @@ describe('placeBid', () => {
       })
     }
     if (opts.idempotencyDuplicate !== undefined) {
-      mockPayload.find.mockResolvedValueOnce({ docs: opts.idempotencyDuplicate ? [{ id: 'dup' }] : [] })
+      mockPayload.find.mockResolvedValueOnce({
+        docs: opts.idempotencyDuplicate ? [{ id: 'dup' }] : [],
+      })
     }
   }
 
@@ -206,7 +187,9 @@ describe('placeBid', () => {
   describe('auction active check', () => {
     it('rejects bid when auction is not active', async () => {
       mockPayload.find.mockResolvedValueOnce({ docs: [{ id: 'user-1' }] })
-      mockPayload.find.mockResolvedValueOnce({ docs: [{ ...activeAuction, status: 'ended' }] })
+      mockPayload.find.mockResolvedValueOnce({
+        docs: [{ ...activeAuction, status: 'ended' }],
+      })
 
       const result = await placeBid(baseParams)
       assertBidError(result)
@@ -218,7 +201,9 @@ describe('placeBid', () => {
   describe('end time check', () => {
     it('rejects bid when auction has ended', async () => {
       mockPayload.find.mockResolvedValueOnce({ docs: [{ id: 'user-1' }] })
-      mockPayload.find.mockResolvedValueOnce({ docs: [{ ...activeAuction, endsAt: '2020-01-01T00:00:00Z' }] })
+      mockPayload.find.mockResolvedValueOnce({
+        docs: [{ ...activeAuction, endsAt: '2020-01-01T00:00:00Z' }],
+      })
 
       const result = await placeBid(baseParams)
       assertBidError(result)
@@ -228,22 +213,30 @@ describe('placeBid', () => {
   })
 
   describe('outbidding', () => {
-    it('updates old leading bid status to outbid in the same transaction', async () => {
+    it('demotes the old leading bid in the same atomic batch', async () => {
       setupDefaultMocks({
         user: { id: 'user-1' },
         auction: activeAuction,
         hasRights: true,
         settings: gateOffSettings,
-        leadingBid: { id: 'lead-1', amount: 100, user: 'user-2', source: 'manual' },
+        leadingBid: {
+          id: 'lead-1',
+          amount: 100,
+          user: 'user-2',
+          source: 'manual',
+        },
       })
 
       const result = await placeBid({ ...baseParams, amount: 110 })
       expect(result.success).toBe(true)
-      expect(
-        txStatements.some(
-          (text) => text.includes("update bids set status = 'outbid'") && text.includes('lead-1'),
-        ),
-      ).toBe(true)
+      const demote = statements.find(
+        (statement) =>
+          statement.sql.startsWith('update bids') &&
+          statement.params.includes('outbid') &&
+          statement.params.includes('lead-1'),
+      )
+      expect(demote).toBeDefined()
+      expect(demote?.sql).toContain('status = ?')
     })
   })
 
@@ -258,7 +251,11 @@ describe('placeBid', () => {
         idempotencyDuplicate: true,
       })
 
-      const result = await placeBid({ ...baseParams, amount: 100, idempotencyKey: 'dup-key' })
+      const result = await placeBid({
+        ...baseParams,
+        amount: 100,
+        idempotencyKey: 'dup-key',
+      })
       assertBidError(result)
       expect(result.error).toBe('Duplicate bid (idempotency key already used)')
       expect(result.status).toBe(409)
@@ -274,16 +271,45 @@ describe('placeBid', () => {
         idempotencyDuplicate: false,
       })
 
-      const result = await placeBid({ ...baseParams, amount: 100, idempotencyKey: 'fresh-key' })
+      const result = await placeBid({
+        ...baseParams,
+        amount: 100,
+        idempotencyKey: 'fresh-key',
+      })
       expect(result.success).toBe(true)
-      expect(
-        txStatements.some((text) => text.includes('insert into bids') && text.includes('fresh-key')),
-      ).toBe(true)
+      const insert = statements.find((statement) =>
+        statement.sql.includes('insert into bids'),
+      )
+      expect(insert?.params).toContain('fresh-key')
     })
   })
 
-  describe('transaction', () => {
-    it('locks the auction row before any reads', async () => {
+  describe('d1 writes', () => {
+    it('uses the SQLite dialect with bound params and no row lock', async () => {
+      setupDefaultMocks({
+        user: { id: 'user-1' },
+        auction: activeAuction,
+        hasRights: true,
+        settings: gateOffSettings,
+        leadingBid: {
+          id: 'lead-1',
+          amount: 100,
+          user: 'user-2',
+          source: 'manual',
+        },
+      })
+
+      const result = await placeBid({ ...baseParams, amount: 110 })
+      expect(result.success).toBe(true)
+      expect(statements.length).toBe(2)
+      for (const statement of statements) {
+        expect(statement.sql).not.toContain('for update')
+        expect(statement.sql).not.toContain('$1')
+        expect(statement.sql).not.toContain('now()')
+      }
+    })
+
+    it('stores the amount as integer cents in amount_cents', async () => {
       setupDefaultMocks({
         user: { id: 'user-1' },
         auction: activeAuction,
@@ -292,9 +318,13 @@ describe('placeBid', () => {
         leadingBid: null,
       })
 
-      await placeBid(baseParams)
-      expect(txStatements[0]).toContain('for update')
-      expect(txStatements[0]).toContain('auctions')
+      const result = await placeBid({ ...baseParams, amount: 110 })
+      expect(result.success).toBe(true)
+      const insert = statements.find((statement) =>
+        statement.sql.includes('insert into bids'),
+      )
+      expect(insert?.sql).toContain('amount_cents')
+      expect(insert?.params).toContain(11000)
     })
   })
 
@@ -308,11 +338,16 @@ describe('placeBid', () => {
         leadingBid: null,
       })
 
-      const result = await placeBid({ ...baseParams, requestIp: '203.0.113.7, 10.0.0.1' })
+      const result = await placeBid({
+        ...baseParams,
+        requestIp: '203.0.113.7, 10.0.0.1',
+      })
       expect(result.success).toBe(true)
-      const insert = txStatements.find((text) => text.includes('insert into bids'))
-      expect(insert).toContain(computeIpHash('203.0.113.7'))
-      expect(insert).not.toContain('203.0.113.7')
+      const insert = statements.find((statement) =>
+        statement.sql.includes('insert into bids'),
+      )
+      expect(insert?.params).toContain(computeIpHash('203.0.113.7'))
+      expect(insert?.params).not.toContain('203.0.113.7')
     })
   })
 
@@ -331,8 +366,10 @@ describe('placeBid', () => {
       if (result.success) {
         expect(result.bid.status).toBe('pending_approval')
       }
-      const insert = txStatements.find((text) => text.includes('insert into bids'))
-      expect(insert).toContain('pending_approval')
+      const insert = statements.find((statement) =>
+        statement.sql.includes('insert into bids'),
+      )
+      expect(insert?.params).toContain('pending_approval')
     })
 
     it('rejects the previous pending bid when a new one arrives', async () => {
@@ -341,14 +378,19 @@ describe('placeBid', () => {
         .mockResolvedValueOnce({ docs: [{ id: 'user-1' }] })
         .mockResolvedValueOnce({ docs: [activeAuction] })
         .mockResolvedValueOnce({ docs: [{ id: 'right-1' }] })
-        .mockResolvedValueOnce({ docs: [{ ...gateOffSettings, alapakkumineEnabled: true }] })
+        .mockResolvedValueOnce({
+          docs: [{ ...gateOffSettings, alapakkumineEnabled: true }],
+        })
         .mockResolvedValueOnce({ docs: [{ id: 'old-pending' }] })
 
       const result = await placeBid({ ...baseParams, amount: 30 })
       expect(result.success).toBe(true)
       expect(
-        txStatements.some(
-          (text) => text.includes("update bids set status = 'rejected'") && text.includes('old-pending'),
+        statements.some(
+          (statement) =>
+            statement.sql.startsWith('update bids') &&
+            statement.params.includes('rejected') &&
+            statement.params.includes('old-pending'),
         ),
       ).toBe(true)
     })
