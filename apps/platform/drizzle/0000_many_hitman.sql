@@ -21,6 +21,24 @@ CREATE TABLE `users` (
 --> statement-breakpoint
 CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);--> statement-breakpoint
 CREATE INDEX `users_isikukood_hash_idx` ON `users` (`isikukood_hash`);--> statement-breakpoint
+CREATE TABLE `sessions` (
+	`id` text PRIMARY KEY NOT NULL,
+	`user_id` text NOT NULL,
+	`role` text NOT NULL,
+	`profile_id` text,
+	`token_family` text NOT NULL,
+	`access_token_hash` text NOT NULL,
+	`refresh_token_hash` text NOT NULL,
+	`expires_at` text NOT NULL,
+	`revoked_at` text,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
+	CONSTRAINT "sessions_role_check" CHECK("sessions"."role" IN ('guest', 'private', 'company', 'seller', 'specialist', 'admin', 'superadmin'))
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `sessions_access_token_hash_unique` ON `sessions` (`access_token_hash`);--> statement-breakpoint
+CREATE INDEX `sessions_user_id_idx` ON `sessions` (`user_id`);--> statement-breakpoint
 CREATE TABLE `profiles` (
 	`id` text PRIMARY KEY NOT NULL,
 	`type` text NOT NULL,
