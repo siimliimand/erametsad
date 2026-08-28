@@ -21,8 +21,8 @@
 ## 4. Sealed-bid flow
 
 - [x] 4.1 `submitSealedBid`: add objectType rights check; decrypt failures propagate (no silent amount 0); revision cap semantics documented (1 + N) <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/bidding/sealed-bid.ts] -->
-- [x] 4.2 Persist opening sessions in the cache abstraction with 30-minute expiry; two-person verification (distinct users, server-verified tokens); rank desc with earliest tie-break; step-up role checks use the real JWT role <!-- agent: fullstack-engineer.build, depends_on: [1.1, 5.1], touches: [apps/platform/src/lib/bidding/sealed-opening.ts, apps/platform/src/lib/cache.ts, apps/platform/src/app/api/v1/admin/auctions/[id]/open-sealed/route.ts] -->
-- [x] 4.3 `confirmWinner`: verify the bid belongs to the auction and tops the ranking, compare reserve (sold/appraised vs unsold), publish `finalPrice`, notify losers with userId, queue the contract; fix the admin route role check <!-- agent: fullstack-engineer.build, depends_on: [4.2], touches: [apps/platform/src/lib/bidding/sealed-opening.ts, apps/platform/src/app/api/v1/admin/auctions/[id]/confirm-winner/route.ts] -->
+- [ ] 4.2 Persist opening sessions in the cache abstraction with 30-minute expiry; two-person verification (distinct users, server-verified tokens); rank desc with earliest tie-break; step-up role checks use the real JWT role <!-- agent: fullstack-engineer.build, depends_on: [1.1, 5.1], touches: [apps/platform/src/lib/bidding/sealed-opening.ts, apps/platform/src/lib/cache.ts, apps/platform/src/app/api/v1/admin/auctions/[id]/open-sealed/route.ts] -->
+- [ ] 4.3 `confirmWinner`: verify the bid belongs to the auction and tops the ranking, compare reserve (sold/appraised vs unsold), publish `finalPrice`, notify losers with userId, queue the contract; fix the admin route role check <!-- agent: fullstack-engineer.build, depends_on: [4.2], touches: [apps/platform/src/lib/bidding/sealed-opening.ts, apps/platform/src/app/api/v1/admin/auctions/[id]/confirm-winner/route.ts] -->
 - [x] 4.4 Ceremony tests: reserve paths, tie-break, expiry, finalPrice publication, loser notifications <!-- agent: fullstack-engineer.build, depends_on: [4.3], touches: [apps/platform/src/lib/bidding/__tests__/sealed-opening.test.ts] -->
 
 ## 5. Auth & sessions
@@ -44,7 +44,7 @@
 
 ## 8. Forms & stats
 
-- [x] 8.1 Leads endpoint: 5/min/IP limiter, required-field validation with `@eametsad/types` validators (EE phone, email), no error leakage <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/api/leads/route.ts, apps/platform/src/lib/leads/ingestion.ts] -->
+- [ ] 8.1 Leads endpoint: 5/min/IP limiter, required-field validation with `@eametsad/types` validators (EE phone, email), no error leakage <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/api/leads/route.ts, apps/platform/src/lib/leads/ingestion.ts] -->
 - [x] 8.2 Sealed completion backfills the statistics snapshot `eur` from the published finalPrice <!-- agent: fullstack-engineer.build, depends_on: [4.3], touches: [apps/platform/src/lib/bidding/sealed-opening.ts, apps/platform/src/lib/stats/aggregation.ts] -->
 
 ## 9. Seed, docs, verification
