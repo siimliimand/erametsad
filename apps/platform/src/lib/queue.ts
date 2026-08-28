@@ -7,6 +7,10 @@ export interface Job {
 
 export type JobHandler = (job: Job) => Promise<void>
 
+// Swap point for the production job transport: the prototype starts an
+// in-process interval worker from src/instrumentation.ts instead of a queue.
+// Replacing these implementations with BullMQ (Node) or Cloudflare Queues
+// keeps every call site unchanged.
 export interface Queue {
   enqueue(job: Job): Promise<void>
   process(handler: JobHandler): void
