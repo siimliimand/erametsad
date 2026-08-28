@@ -31,7 +31,7 @@
 
 ## 3. Phase 2: Durable Objects for auctions and rate limiting
 
-- [ ] 3.1 `AuctionDO` skeleton (`src/do/auction.ts`) with on-demand hydration: first touch loads auction state from D1; DO storage holds only hot state (current price, endsAt, subscriber set) <!-- agent: fullstack-engineer.build, depends_on: [1.2, 2.8], touches: [apps/platform/src/do/auction.ts] -->
+- [x] 3.1 `AuctionDO` skeleton (`src/do/auction.ts`) with on-demand hydration: first touch loads auction state from D1; DO storage holds only hot state (current price, endsAt, subscriber set) <!-- agent: fullstack-engineer.build, depends_on: [1.2, 2.8], touches: [apps/platform/src/do/auction.ts] -->
 - [ ] 3.2 Bid admission in `AuctionDO`: port the place-bid validation chain (user status, amount vs current price, step, alapakkumine rules, sealed constraints, contract gate, rights), idempotency key replay, and one `batch()` write on accept (bid row + auction update + audit entry); autobidder evaluation runs in the DO <!-- agent: fullstack-engineer.build, depends_on: [2.9, 3.1], touches: [apps/platform/src/do/auction.ts, apps/platform/src/lib/bidding/place-bid.ts] -->
 - [ ] 3.3 Event hub in `AuctionDO`: `subscribe()` endpoint (SSE or WebSocket hibernation), subscriber registry, fan-out of `bid:created`, `auction:extended`, `auction:ended`, `auction:published` <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/do/auction.ts] -->
 - [ ] 3.4 `alarm()` scheduling in `AuctionDO`: anti-snipe window check, auction end transition, winner computation including sealed-bid opening trigger, notification enqueue <!-- agent: fullstack-engineer.build, depends_on: [3.2], touches: [apps/platform/src/do/auction.ts] -->
@@ -42,14 +42,14 @@
 
 ## 4. Phase 3: Email Service
 
-- [ ] 4.1 `src/lib/notifications/email-sender.ts` transport chain (EMAIL binding, then REST API, then SMTP) with `CLOUDFLARE_EMAIL_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` env; `next dev` keeps Mailpit <!-- agent: fullstack-engineer.build, depends_on: [1.3, 1.6], touches: [apps/platform/src/lib/notifications/email-sender.ts] -->
+- [x] 4.1 `src/lib/notifications/email-sender.ts` transport chain (EMAIL binding, then REST API, then SMTP) with `CLOUDFLARE_EMAIL_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` env; `next dev` keeps Mailpit <!-- agent: fullstack-engineer.build, depends_on: [1.3, 1.6], touches: [apps/platform/src/lib/notifications/email-sender.ts] -->
 - [ ] 4.2 `send_email` binding in `wrangler.jsonc`; verify sending domain `erametsad.ee` and sender `noreply@erametsad.ee` <!-- agent: fullstack-engineer.build, depends_on: [4.1], touches: [apps/platform/wrangler.jsonc] -->
 - [ ] 4.3 Surface `error.code` (`E_RATE_LIMIT_EXCEEDED`, `E_DAILY_LIMIT_EXCEEDED`, and others) in notification logs; record per-recipient result (`delivered`/`queued`/`permanent_bounces`) on the notifications rows <!-- agent: fullstack-engineer.build, depends_on: [2.5, 4.1], touches: [apps/platform/src/lib/notifications/service.ts, apps/platform/src/lib/data/schema/**] -->
 - [ ] 4.4 GDPR: `List-Unsubscribe` headers on marketing templates; review transactional templates for the same <!-- agent: fullstack-engineer.build, depends_on: [4.1], touches: [packages/emails/src/templates/**] -->
 
 ## 5. Phase 4: auth and sessions on Workers
 
-- [ ] 5.1 Replace the in-memory `accessTokenSessions` map with a D1-backed session store; verify refresh-token families persist and rotation survives isolate restarts <!-- agent: fullstack-engineer.build, depends_on: [1.6, 2.5], touches: [apps/platform/src/lib/auth/session.ts] -->
+- [x] 5.1 Replace the in-memory `accessTokenSessions` map with a D1-backed session store; verify refresh-token families persist and rotation survives isolate restarts <!-- agent: fullstack-engineer.build, depends_on: [1.6, 2.5], touches: [apps/platform/src/lib/auth/session.ts] -->
 - [ ] 5.2 Port Node `crypto` to Web Crypto (`crypto.subtle`): `createHash`, `randomUUID`, HMAC in `jwt.ts`, `computeIpHash` in the bid path, sealed-bid encryption; keep a dual implementation only where local vitest needs it <!-- agent: fullstack-engineer.build, depends_on: [1.6], touches: [apps/platform/src/lib/auth/jwt.ts, apps/platform/src/lib/bidding/place-bid.ts, apps/platform/src/lib/encryption.ts] -->
 - [ ] 5.3 Audit `src/lib/auth/eid-provider.ts` for TCP/Node assumptions; test the flows against the real provider sandbox; document the port <!-- agent: fullstack-engineer.build, depends_on: [5.2], touches: [apps/platform/src/lib/auth/eid-provider.ts] -->
 - [ ] 5.4 Phase 4 exit verification: login, bid, logout cycle on the deployed worker; token-family rotation survives isolate restarts <!-- agent: fullstack-engineer.fast, depends_on: [3.2, 5.1, 5.2, 5.3], touches: [] -->
@@ -62,7 +62,7 @@
 
 ## 7. Phase 6: admin UI (Payload replacement)
 
-- [ ] 7.1 Admin needs inventory: per collection, who edits it and which fields matter day-to-day; feeds the screen scope <!-- agent: fullstack-engineer.fast, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/INVENTORY.md] -->
+- [x] 7.1 Admin needs inventory: per collection, who edits it and which fields matter day-to-day; feeds the screen scope <!-- agent: fullstack-engineer.fast, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/INVENTORY.md] -->
 - [ ] 7.2 Admin shell: `(admin)` route group with role guard on `users.role`, layout, navigation, Estonian labels, and table/form primitives on the repository layer with server actions <!-- agent: fullstack-engineer.build, depends_on: [2.11, 7.1], touches: [apps/platform/src/app/(admin)/**] -->
 - [ ] 7.3 Auction operations screens: create/publish auction, live bid monitor (subscribes to the same AuctionDO stream), approve/reject bids, sealed ceremony screens, contract flow trigger <!-- agent: fullstack-engineer.build, depends_on: [3.3, 7.2], touches: [apps/platform/src/app/(admin)/auctions/**] -->
 - [ ] 7.4 Users, rights, contracts, and leads CRM screens <!-- agent: fullstack-engineer.build, depends_on: [7.2], touches: [apps/platform/src/app/(admin)/users/**, apps/platform/src/app/(admin)/contracts/**, apps/platform/src/app/(admin)/leads/**] -->
