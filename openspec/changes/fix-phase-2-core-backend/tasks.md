@@ -1,11 +1,11 @@
 ## 1. Crypto fixes
 
-- [ ] 1.1 Store and verify the AES-256-GCM auth tag in both crypto modules: `encrypt`/`encryptSealedData` return `authTag`, `decrypt`/`decryptSealedData` require it and throw on tamper; fix all call sites <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/crypto.ts, apps/platform/src/lib/encryption.ts, apps/platform/src/payload/collections/Users.ts] -->
+- [x] 1.1 Store and verify the AES-256-GCM auth tag in both crypto modules: `encrypt`/`encryptSealedData` return `authTag`, `decrypt`/`decryptSealedData` require it and throw on tamper; fix all call sites <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/crypto.ts, apps/platform/src/lib/encryption.ts, apps/platform/src/payload/collections/Users.ts] -->
 - [ ] 1.2 Crypto unit tests: roundtrip, tamper rejection, wrong-key rejection, Users `afterRead` never throws on encrypted isikukood <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/__tests__/encryption.test.ts] -->
 
 ## 2. Auction schema & ending worker
 
-- [ ] 2.1 Add required `type` select (open|sealed, default open) to the Auction collection; validation forces sealed for kinnistu and pakett <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/payload/collections/Auction.ts] -->
+- [x] 2.1 Add required `type` select (open|sealed, default open) to the Auction collection; validation forces sealed for kinnistu and pakett <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/payload/collections/Auction.ts] -->
 - [ ] 2.2 Fix the ending worker: two-step updates (`active → ended`, then `ended → appraised|unsold`), reserve-price outcome on open auctions, sealed branch keyed on the schema `type`, notifications carry userId <!-- agent: fullstack-engineer.build, depends_on: [2.1], touches: [apps/platform/src/lib/workers/auction-ending.ts] -->
 - [ ] 2.3 Start the worker and the notification listener from `instrumentation.ts` (Node runtime guard, 30s interval); document the queue-interface swap point <!-- agent: fullstack-engineer.build, depends_on: [2.2, 7.2], touches: [apps/platform/src/instrumentation.ts, apps/platform/src/lib/queue.ts] -->
 - [ ] 2.4 Worker tests: transitions pass the real guard, no-bid and reserve-not-met outcomes, sealed detection via schema field, double-fire idempotency <!-- agent: fullstack-engineer.build, depends_on: [2.2], touches: [apps/platform/src/lib/workers/__tests__/auction-ending.test.ts] -->
@@ -15,7 +15,7 @@
 - [ ] 3.1 Transactional `placeBid`: wrap validation chain and writes in a Postgres transaction with `FOR UPDATE` on the auction row (Drizzle via `payload.db`); server-side salted ipHash; server-set source; alapakkumine amount path (below minBid → `pending_approval` when enabled) <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/bidding/place-bid.ts, apps/platform/src/lib/bidding/alapakkumine.ts] -->
 - [ ] 3.2 Wire the bid route to the engines: anti-snipe check + `auction:extended` broadcast + audit entry, autobidder evaluation, `bid:created` broadcast, `outbid` my-stream + eventBus events with userId <!-- agent: fullstack-engineer.build, depends_on: [3.1, 3.4, 7.1], touches: [apps/platform/src/app/api/v1/bids/create/route.ts] -->
 - [ ] 3.3 Seller alapakkumine endpoints `POST /api/v1/my-auctions/:id/underbids/:bidId/approve|reject` with race guard, role check (seller/admin), and bidder notification <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/app/api/v1/my-auctions/[id]/underbids/[bidId]/approve/route.ts, apps/platform/src/app/api/v1/my-auctions/[id]/underbids/[bidId]/reject/route.ts, apps/platform/src/lib/bidding/alapakkumine.ts] -->
-- [ ] 3.4 Rewrite autobidder evaluation as a single pass: highest max (tie earliest) bids `max(leading+step, secondMax+step)` capped at own max; no self-overbid; invoked from the bid flow <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/bidding/autobidder.ts] -->
+- [x] 3.4 Rewrite autobidder evaluation as a single pass: highest max (tie earliest) bids `max(leading+step, secondMax+step)` capped at own max; no self-overbid; invoked from the bid flow <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/bidding/autobidder.ts] -->
 - [ ] 3.5 Rewrite autobidder tests to spec values: 210 case, no-self-overbid, single-autobidder minimum, equal-max tie-break <!-- agent: fullstack-engineer.build, depends_on: [3.4], touches: [apps/platform/src/lib/bidding/__tests__/autobidder.test.ts] -->
 
 ## 4. Sealed-bid flow
@@ -27,7 +27,7 @@
 
 ## 5. Auth & sessions
 
-- [ ] 5.1 JWT carries the real role and activeProfileId: populate from the user record at login/register/select, verify claims on admin routes <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/auth/jwt.ts, apps/platform/src/lib/auth/session.ts, apps/platform/src/app/api/v1/auth/login/route.ts, apps/platform/src/app/api/v1/profiles/[id]/select/route.ts] -->
+- [x] 5.1 JWT carries the real role and activeProfileId: populate from the user record at login/register/select, verify claims on admin routes <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/auth/jwt.ts, apps/platform/src/lib/auth/session.ts, apps/platform/src/app/api/v1/auth/login/route.ts, apps/platform/src/app/api/v1/profiles/[id]/select/route.ts] -->
 - [ ] 5.2 `POST /api/v1/auth/refresh`: rotation with reuse detection (family invalidation), new access token, refresh cookie path fixed to `/api/v1/auth` <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/api/v1/auth/refresh/route.ts, apps/platform/src/lib/auth/session.ts] -->
 - [ ] 5.3 eID `complete` endpoints for smartid/mobileid/idcard: verify session state, create the session and set cookies; demo isikukoods configurable via env <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/api/v1/auth/smartid/complete/route.ts, apps/platform/src/app/api/v1/auth/mobileid/complete/route.ts, apps/platform/src/app/api/v1/auth/idcard/complete/route.ts, apps/platform/src/lib/auth/eid-provider.ts] -->
 - [ ] 5.4 Forgot-password endpoint (identifier → single-use 2h token → email link via Mailpit) and authed change-password endpoint (old password required, sessions revoked, min length 10) <!-- agent: fullstack-engineer.build, depends_on: [7.2], touches: [apps/platform/src/app/api/v1/auth/forgot-password/route.ts, apps/platform/src/app/api/v1/auth/change-password/route.ts, apps/platform/src/lib/auth/reset-tokens.ts] -->
@@ -40,7 +40,7 @@
 ## 7. Realtime & notifications
 
 - [ ] 7.1 Emit all public SSE events: `bid:created` on accepted bids (anonymised), `auction:extended` on anti-snipe, `auction:published` on activation; my-stream `outbid`/`notification` pushes to the affected user <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/realtime/auction-stream.ts, apps/platform/src/lib/realtime/my-stream.ts, apps/platform/src/lib/bidding/anti-snipe.ts] -->
-- [ ] 7.2 Notification dispatch: all emitted events carry userId; dispatcher started at bootstrap; email via Mailpit SMTP using nodemailer and `@eametsad/emails` templates; per-user+event dedupe; SMS stays a stub <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/notifications/service.ts, apps/platform/src/lib/notifications/event-bus.ts, packages/emails/src/index.ts, apps/platform/package.json] -->
+- [x] 7.2 Notification dispatch: all emitted events carry userId; dispatcher started at bootstrap; email via Mailpit SMTP using nodemailer and `@eametsad/emails` templates; per-user+event dedupe; SMS stays a stub <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/notifications/service.ts, apps/platform/src/lib/notifications/event-bus.ts, packages/emails/src/index.ts, apps/platform/package.json] -->
 
 ## 8. Forms & stats
 
