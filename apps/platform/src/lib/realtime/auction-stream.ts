@@ -5,11 +5,21 @@ interface SSEClient {
   controller: ReadableStreamDefaultController<Uint8Array>
 }
 
+export type PublicStreamEvent =
+  | 'auction:published'
+  | 'auction:extended'
+  | 'auction:ended'
+  | 'bid:created'
+
 const clients = new Map<string, SSEClient>()
 const encoder = new TextEncoder()
 
 function formatSSE(event: string, data: unknown): Uint8Array {
   return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+}
+
+function toISO(value: string | Date): string {
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString()
 }
 
 export function addClient(
@@ -34,6 +44,64 @@ export function broadcast(event: string, data: unknown): void {
       clients.delete(clientId)
     }
   }
+}
+
+export interface BidCreatedEventInput {
+  auctionId: string
+  amount: number
+  placedAt?: string | Date
+}
+
+export interface AuctionExtendedEventInput {
+  auctionId: string
+  previousEndsAt: string | Date
+  endsAt: string | Date
+}
+
+export interface AuctionEndedEventInput {
+  auctionId: string
+  type: 'open' | 'sealed'
+  hasWinner?: boolean
+}
+
+export interface AuctionPublishedEventInput {
+  auctionId: string
+  endsAt?: string | Date
+  objectType?: string
+}
+
+// The input type deliberately carries no bidder field: the public
+// bid:created payload must stay anonymised by construction.
+export function emitBidCreated(input: BidCreatedEventInput): void {
+  broadcast('bid:created', {
+    auctionId: input.auctionId,
+    amount: input.amount,
+    placedAt: toISO(input.placedAt ?? new Date()),
+  })
+}
+
+export function emitAuctionExtended(input: AuctionExtendedEventInput): void {
+  broadcast('auction:extended', {
+    auctionId: input.auctionId,
+    previousEndsAt: toISO(input.previousEndsAt),
+    endsAt: toISO(input.endsAt),
+  })
+}
+
+export function emitAuctionEnded(input: AuctionEndedEventInput): void {
+  broadcast('auction:ended', {
+    auctionId: input.auctionId,
+    type: input.type,
+    hasWinner: input.hasWinner,
+  })
+}
+
+export function emitAuctionPublished(input: AuctionPublishedEventInput): void {
+  broadcast('auction:published', {
+    auctionId: input.auctionId,
+    endsAt: input.endsAt === undefined ? undefined : toISO(input.endsAt),
+    objectType: input.objectType,
+  })
 }
 
 export function getEventStream(): ReadableStream<Uint8Array> {
