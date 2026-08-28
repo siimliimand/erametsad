@@ -16,7 +16,7 @@
 - [x] 3.2 Wire the bid route to the engines: anti-snipe check + `auction:extended` broadcast + audit entry, autobidder evaluation, `bid:created` broadcast, `outbid` my-stream + eventBus events with userId <!-- agent: fullstack-engineer.build, depends_on: [3.1, 3.4, 7.1], touches: [apps/platform/src/app/api/v1/bids/create/route.ts] -->
 - [x] 3.3 Seller alapakkumine endpoints `POST /api/v1/my-auctions/:id/underbids/:bidId/approve|reject` with race guard, role check (seller/admin), and bidder notification <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/app/api/v1/my-auctions/[id]/underbids/[bidId]/approve/route.ts, apps/platform/src/app/api/v1/my-auctions/[id]/underbids/[bidId]/reject/route.ts, apps/platform/src/lib/bidding/alapakkumine.ts] -->
 - [x] 3.4 Rewrite autobidder evaluation as a single pass: highest max (tie earliest) bids `max(leading+step, secondMax+step)` capped at own max; no self-overbid; invoked from the bid flow <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/bidding/autobidder.ts] -->
-- [ ] 3.5 Rewrite autobidder tests to spec values: 210 case, no-self-overbid, single-autobidder minimum, equal-max tie-break <!-- agent: fullstack-engineer.build, depends_on: [3.4], touches: [apps/platform/src/lib/bidding/__tests__/autobidder.test.ts] -->
+- [x] 3.5 Rewrite autobidder tests to spec values: 210 case, no-self-overbid, single-autobidder minimum, equal-max tie-break <!-- agent: fullstack-engineer.build, depends_on: [3.4], touches: [apps/platform/src/lib/bidding/__tests__/autobidder.test.ts] -->
 
 ## 4. Sealed-bid flow
 
@@ -28,8 +28,8 @@
 ## 5. Auth & sessions
 
 - [x] 5.1 JWT carries the real role and activeProfileId: populate from the user record at login/register/select, verify claims on admin routes <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/auth/jwt.ts, apps/platform/src/lib/auth/session.ts, apps/platform/src/app/api/v1/auth/login/route.ts, apps/platform/src/app/api/v1/profiles/[id]/select/route.ts] -->
-- [ ] 5.2 `POST /api/v1/auth/refresh`: rotation with reuse detection (family invalidation), new access token, refresh cookie path fixed to `/api/v1/auth` <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/api/v1/auth/refresh/route.ts, apps/platform/src/lib/auth/session.ts] -->
-- [ ] 5.3 eID `complete` endpoints for smartid/mobileid/idcard: verify session state, create the session and set cookies; demo isikukoods configurable via env <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/api/v1/auth/smartid/complete/route.ts, apps/platform/src/app/api/v1/auth/mobileid/complete/route.ts, apps/platform/src/app/api/v1/auth/idcard/complete/route.ts, apps/platform/src/lib/auth/eid-provider.ts] -->
+- [x] 5.2 `POST /api/v1/auth/refresh`: rotation with reuse detection (family invalidation), new access token, refresh cookie path fixed to `/api/v1/auth` <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/api/v1/auth/refresh/route.ts, apps/platform/src/lib/auth/session.ts] -->
+- [x] 5.3 eID `complete` endpoints for smartid/mobileid/idcard: verify session state, create the session and set cookies; demo isikukoods configurable via env <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/api/v1/auth/smartid/complete/route.ts, apps/platform/src/app/api/v1/auth/mobileid/complete/route.ts, apps/platform/src/app/api/v1/auth/idcard/complete/route.ts, apps/platform/src/lib/auth/eid-provider.ts] -->
 - [x] 5.4 Forgot-password endpoint (identifier → single-use 2h token → email link via Mailpit) and authed change-password endpoint (old password required, sessions revoked, min length 10) <!-- agent: fullstack-engineer.build, depends_on: [7.2], touches: [apps/platform/src/app/api/v1/auth/forgot-password/route.ts, apps/platform/src/app/api/v1/auth/change-password/route.ts, apps/platform/src/lib/auth/reset-tokens.ts] -->
 - [x] 5.5 Login rejects suspended users; registration requires and stores 3 consents with timestamps on the profile; session list + revoke endpoints (`GET/DELETE /api/v1/my/sessions`) <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/api/v1/auth/login/route.ts, apps/platform/src/app/api/v1/auth/register/route.ts, apps/platform/src/app/api/v1/my/sessions/route.ts] -->
 
@@ -44,8 +44,8 @@
 
 ## 8. Forms & stats
 
-- [ ] 8.1 Leads endpoint: 5/min/IP limiter, required-field validation with `@eametsad/types` validators (EE phone, email), no error leakage <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/api/leads/route.ts, apps/platform/src/lib/leads/ingestion.ts] -->
-- [ ] 8.2 Sealed completion backfills the statistics snapshot `eur` from the published finalPrice <!-- agent: fullstack-engineer.build, depends_on: [4.3], touches: [apps/platform/src/lib/bidding/sealed-opening.ts, apps/platform/src/lib/stats/aggregation.ts] -->
+- [x] 8.1 Leads endpoint: 5/min/IP limiter, required-field validation with `@eametsad/types` validators (EE phone, email), no error leakage <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/api/leads/route.ts, apps/platform/src/lib/leads/ingestion.ts] -->
+- [x] 8.2 Sealed completion backfills the statistics snapshot `eur` from the published finalPrice <!-- agent: fullstack-engineer.build, depends_on: [4.3], touches: [apps/platform/src/lib/bidding/sealed-opening.ts, apps/platform/src/lib/stats/aggregation.ts] -->
 
 ## 9. Seed, docs, verification
 
