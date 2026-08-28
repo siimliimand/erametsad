@@ -199,7 +199,7 @@ describe('auction-stream connection', () => {
       const readPromise = reader.read()
       vi.advanceTimersByTime(30_000)
       const { value } = await readPromise
-      expect(decoder.decode(value as Uint8Array)).toBe(': heartbeat\n\n')
+      expect(decoder.decode(value)).toBe(': heartbeat\n\n')
     } finally {
       await reader.cancel()
     }

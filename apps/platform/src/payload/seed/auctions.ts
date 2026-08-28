@@ -1055,7 +1055,10 @@ export async function seedAuctions(payload: Payload): Promise<void> {
   }
 
   const { docs: counties } = await payload.find({ collection: 'counties', limit: 15 })
-  const { docs: parishes } = await payload.find({ collection: 'parishes', limit: 60 })
+  // Parishes total 68 and find returns newest-first, so a limit below the
+  // collection count silently drops the oldest parishes (Anija, Kose, ...)
+  // from the lookup map and their auctions get skipped.
+  const { docs: parishes } = await payload.find({ collection: 'parishes', limit: 200 })
   const { docs: specialists } = await payload.find({ collection: 'specialist', limit: 10 })
   const { docs: users } = await payload.find({ collection: 'users', limit: 15 })
 

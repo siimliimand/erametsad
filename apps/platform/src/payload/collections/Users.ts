@@ -18,7 +18,6 @@ export const Users: CollectionConfig = {
       return `${appUrl}/api/preview?collection=users&id=${id}&draft=true&secret=${secret}`
     },
   },
-  versions: { drafts: true },
   fields: [
     {
       name: 'email',
@@ -89,46 +88,37 @@ export const Users: CollectionConfig = {
   ],
   hooks: {
     beforeChange: [
-      (data: { data?: Record<string, unknown> }) => {
-        const raw = data.data?.isikukood as string | undefined
+      ({ data }: { data: Record<string, unknown> }) => {
+        const raw = data.isikukood as string | undefined
         if (!raw) return data
 
         const result = encrypt(raw)
         return {
           ...data,
-          data: {
-            ...data.data,
-            isikukoodEncrypted: result.encrypted,
-            isikukoodIv: result.iv,
-            isikukoodAuthTag: result.authTag,
-            isikukoodHash: hash(raw),
-            isikukood: undefined,
-          },
+          isikukoodEncrypted: result.encrypted,
+          isikukoodIv: result.iv,
+          isikukoodAuthTag: result.authTag,
+          isikukoodHash: hash(raw),
+          isikukood: undefined,
         }
       },
     ],
     afterRead: [
-      (data: { doc: Record<string, unknown> }) => {
-        const encrypted = data.doc.isikukoodEncrypted as string | undefined
-        const iv = data.doc.isikukoodIv as string | undefined
-        const authTag = data.doc.isikukoodAuthTag as string | undefined
-        if (!encrypted || !iv) return data
+      ({ doc }: { doc: Record<string, unknown> }) => {
+        const encrypted = doc.isikukoodEncrypted as string | undefined
+        const iv = doc.isikukoodIv as string | undefined
+        const authTag = doc.isikukoodAuthTag as string | undefined
+        if (!encrypted || !iv) return doc
 
         try {
           return {
-            ...data,
-            doc: {
-              ...data.doc,
-              isikukood: decrypt(encrypted, iv, authTag ?? ''),
-            },
+            ...doc,
+            isikukood: decrypt(encrypted, iv, authTag ?? ''),
           }
         } catch {
           return {
-            ...data,
-            doc: {
-              ...data.doc,
-              isikukood: undefined,
-            },
+            ...doc,
+            isikukood: undefined,
           }
         }
       },

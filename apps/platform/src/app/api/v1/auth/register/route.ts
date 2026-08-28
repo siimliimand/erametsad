@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { hashPassword } from '@/lib/auth/password'
 import { createSession, setSessionCookies } from '@/lib/auth/session'
 import { authRateLimiter } from '@/lib/rate-limit'
 import { getPayloadClient } from '@/payload/payloadClient'
@@ -62,11 +61,13 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = await getPayloadClient()
-  const passwordHash = await hashPassword(password)
 
+  // Pass the raw password: users is a Payload auth collection, so Payload
+  // applies its own hashing. Pre-hashing here would make the account
+  // impossible to log into.
   const userData: Record<string, unknown> = {
     email: identifier,
-    password: passwordHash,
+    password,
     role: profileType === 'company' ? 'company' : 'private',
     authMethod: 'password',
     status: 'active',

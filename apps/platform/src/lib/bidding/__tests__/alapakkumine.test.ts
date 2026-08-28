@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+import { eventBus } from '../../notifications/event-bus'
 import {
   isAlapakkumineEnabled,
   approveAlapakkumine,
   rejectAlapakkumine,
 } from '../alapakkumine'
-import { eventBus } from '../../notifications/event-bus'
 
 vi.mock('@/payload/payloadClient', () => ({
   getPayloadClient: vi.fn(),
@@ -21,8 +21,19 @@ function sqlText(query: unknown): string {
   return chunks
     .map((chunk) => {
       if (chunk === null || chunk === undefined) return ''
-      if (typeof chunk === 'object') return String((chunk as { value?: unknown }).value ?? '')
-      return String(chunk)
+      if (typeof chunk === 'string') return chunk
+      if (typeof chunk === 'number' || typeof chunk === 'bigint' || typeof chunk === 'boolean') {
+        return String(chunk)
+      }
+      if (typeof chunk === 'object') {
+        const value = (chunk as { value?: unknown }).value
+        if (typeof value === 'string') return value
+        if (Array.isArray(value)) {
+          return value.map((part) => (typeof part === 'string' ? part : '')).join('')
+        }
+        return ''
+      }
+      return ''
     })
     .join(' ')
 }
@@ -39,11 +50,11 @@ beforeEach(() => {
   txStatements = []
   lockRows = [{ id: 'auction-1' }]
   const fakeTx = {
-    execute: async (query: unknown) => {
+    execute: (query: unknown) => {
       const text = sqlText(query)
       txStatements.push(text)
-      if (text.includes('for update')) return { rows: lockRows }
-      return { rows: [] }
+      if (text.includes('for update')) return Promise.resolve({ rows: lockRows })
+      return Promise.resolve({ rows: [] })
     },
   }
   mockPayload = {

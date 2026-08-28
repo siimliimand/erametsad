@@ -81,7 +81,7 @@ async function handleAcceptedBid(input: {
   // broadcast path. Its outbid DomainEvent was already emitted by the
   // placeBid call inside evaluateAutobidders.
   const leading = await findLeadingBid(auctionId)
-  if (leading && leading.source === 'autobidder') {
+  if (leading?.source === 'autobidder') {
     const autobidAmount = leading.amount as number
     const autobidPlacedAt = (leading.createdAt as string | Date | undefined) ?? new Date()
     emitBidCreated({ auctionId, amount: autobidAmount, placedAt: autobidPlacedAt })

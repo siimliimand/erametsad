@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 
+import { Users } from '../../payload/collections/Users'
 import { decrypt, encrypt } from '../crypto'
 import { decryptSealedData, encryptSealedData } from '../encryption'
-import { Users } from '../../payload/collections/Users'
 
 const ISIKUKOOD_TEST_KEY = 'unit-test-isikukood-key'
 const SEALED_TEST_KEY = 'unit-test-sealed-key'
@@ -13,7 +13,7 @@ const sealedKeyBackup = process.env.SEALED_BID_ENCRYPTION_KEY
 
 function restoreEnv(name: string, backup: string | undefined) {
   if (backup === undefined) {
-    delete process.env[name]
+    Reflect.deleteProperty(process.env, name)
   } else {
     process.env[name] = backup
   }
@@ -31,7 +31,7 @@ afterAll(() => {
 
 // Swap the first nibble so tampered values stay valid hex but change bytes.
 function flipFirstHexNibble(hex: string): string {
-  return (hex[0] === 'a' ? 'b' : 'a') + hex.slice(1)
+  return (hex.startsWith('a') ? 'b' : 'a') + hex.slice(1)
 }
 
 describe('crypto encrypt/decrypt (isikukood)', () => {
@@ -130,12 +130,8 @@ describe('encryption encryptSealedData/decryptSealedData (sealed bids)', () => {
   })
 })
 
-type UsersAfterReadHook = (data: { doc: Record<string, unknown> }) => {
-  doc: Record<string, unknown>
-}
-type UsersBeforeChangeHook = (data: { data?: Record<string, unknown> }) => {
-  data?: Record<string, unknown>
-}
+type UsersAfterReadHook = (data: { doc: Record<string, unknown> }) => Record<string, unknown>
+type UsersBeforeChangeHook = (data: { data: Record<string, unknown> }) => Record<string, unknown>
 
 const afterReadHook = Users.hooks?.afterRead?.[0] as unknown as UsersAfterReadHook
 const beforeChangeHook = Users.hooks?.beforeChange?.[0] as unknown as UsersBeforeChangeHook
@@ -145,7 +141,7 @@ describe('Users afterRead hook on encrypted isikukood', () => {
     const isikukood = '38001298765'
     const envelope = encrypt(isikukood)
 
-    let outcome: { doc: Record<string, unknown> } | undefined
+    let outcome: Record<string, unknown> | undefined
     expect(() => {
       outcome = afterReadHook({
         doc: {
@@ -158,14 +154,14 @@ describe('Users afterRead hook on encrypted isikukood', () => {
       })
     }).not.toThrow()
 
-    expect(outcome?.doc.isikukood).toBe(isikukood)
-    expect(outcome?.doc.email).toBe('mets@example.ee')
+    expect(outcome?.isikukood).toBe(isikukood)
+    expect(outcome?.email).toBe('mets@example.ee')
   })
 
   it('never throws and omits the isikukood when the authTag is missing', () => {
     const envelope = encrypt('38001298765')
 
-    let outcome: { doc: Record<string, unknown> } | undefined
+    let outcome: Record<string, unknown> | undefined
     expect(() => {
       outcome = afterReadHook({
         doc: {
@@ -175,14 +171,14 @@ describe('Users afterRead hook on encrypted isikukood', () => {
       })
     }).not.toThrow()
 
-    expect(outcome?.doc.isikukood).toBeUndefined()
+    expect(outcome?.isikukood).toBeUndefined()
   })
 
   it('never throws and omits the isikukood when the ciphertext is tampered', () => {
     const envelope = encrypt('38001298765')
     const tampered = flipFirstHexNibble(envelope.encrypted)
 
-    let outcome: { doc: Record<string, unknown> } | undefined
+    let outcome: Record<string, unknown> | undefined
     expect(() => {
       outcome = afterReadHook({
         doc: {
@@ -193,7 +189,7 @@ describe('Users afterRead hook on encrypted isikukood', () => {
       })
     }).not.toThrow()
 
-    expect(outcome?.doc.isikukood).toBeUndefined()
+    expect(outcome?.isikukood).toBeUndefined()
   })
 
   it('never throws and omits the isikukood when the key does not match', () => {
@@ -201,7 +197,7 @@ describe('Users afterRead hook on encrypted isikukood', () => {
 
     try {
       process.env.ISIKUKOOD_ENCRYPTION_KEY = OTHER_KEY
-      let outcome: { doc: Record<string, unknown> } | undefined
+      let outcome: Record<string, unknown> | undefined
       expect(() => {
         outcome = afterReadHook({
           doc: {
@@ -212,7 +208,7 @@ describe('Users afterRead hook on encrypted isikukood', () => {
         })
       }).not.toThrow()
 
-      expect(outcome?.doc.isikukood).toBeUndefined()
+      expect(outcome?.isikukood).toBeUndefined()
     } finally {
       process.env.ISIKUKOOD_ENCRYPTION_KEY = ISIKUKOOD_TEST_KEY
     }
@@ -222,13 +218,13 @@ describe('Users afterRead hook on encrypted isikukood', () => {
     const isikukood = '48005091121'
 
     const changed = beforeChangeHook({ data: { email: 'mets@example.ee', isikukood } })
-    expect(changed.data?.isikukood).toBeUndefined()
-    expect(changed.data?.isikukoodEncrypted).toEqual(expect.any(String))
-    expect(changed.data?.isikukoodIv).toEqual(expect.any(String))
-    expect(changed.data?.isikukoodAuthTag).toEqual(expect.any(String))
-    expect(changed.data?.isikukoodHash).toEqual(expect.any(String))
+    expect(changed.isikukood).toBeUndefined()
+    expect(changed.isikukoodEncrypted).toEqual(expect.any(String))
+    expect(changed.isikukoodIv).toEqual(expect.any(String))
+    expect(changed.isikukoodAuthTag).toEqual(expect.any(String))
+    expect(changed.isikukoodHash).toEqual(expect.any(String))
 
-    const read = afterReadHook({ doc: { ...(changed.data ?? {}) } })
-    expect(read.doc.isikukood).toBe(isikukood)
+    const read = afterReadHook({ doc: { ...changed } })
+    expect(read.isikukood).toBe(isikukood)
   })
 })

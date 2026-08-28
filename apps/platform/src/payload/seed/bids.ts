@@ -157,6 +157,9 @@ export async function seedBids(payload: Payload): Promise<void> {
   // Open auction only: the duel was previously seeded on kinnistu-elva, but
   // kinnistu auctions must be sealed and autobidders do not run on sealed
   // auctions, so the duel moved to an active open raieoigus auction.
+  // maxAmount must exceed the seeded leading amount (7000): at the cap the
+  // autobidder can never answer a manual bid (min legal bid 7400 needs
+  // required 7800 <= maxAmount), and the duel demo goes inert.
   const rapla = auctionBySlug.get('raieoigus-rapla')
   if (rapla) {
     await payload.create({
@@ -164,7 +167,7 @@ export async function seedBids(payload: Payload): Promise<void> {
       data: {
         user: companyUser.id,
         auction: rapla.id,
-        maxAmount: 7000,
+        maxAmount: 9000,
         status: 'active',
       },
     })

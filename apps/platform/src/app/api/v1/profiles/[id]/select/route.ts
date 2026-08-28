@@ -53,7 +53,7 @@ export async function POST(
     return NextResponse.json({ error: 'Profiil ei kuulu kasutajale' }, { status: 403 })
   }
 
-  if (String(userId) !== session.userId) {
+  if (userId !== session.userId) {
     return NextResponse.json({ error: 'Profiil ei kuulu kasutajale' }, { status: 403 })
   }
 

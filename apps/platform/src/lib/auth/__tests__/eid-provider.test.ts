@@ -12,8 +12,8 @@ vi.mock('@/payload/payloadClient', () => ({
   getPayloadClient: vi.fn(),
 }))
 
-import { getPayloadClient } from '@/payload/payloadClient'
 import { hash } from '@/lib/crypto'
+import { getPayloadClient } from '@/payload/payloadClient'
 
 process.env.JWT_SECRET = 'test-secret-used-only-by-vitest'
 

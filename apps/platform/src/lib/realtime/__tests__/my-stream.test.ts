@@ -52,7 +52,8 @@ describe('my-stream per-user events', () => {
   async function nextFrame(): Promise<Frame> {
     if (!reader) throw new Error('reader missing')
     const { value } = await reader.read()
-    return parseFrame(value as Uint8Array)
+    if (value === undefined) throw new Error('stream ended')
+    return parseFrame(value)
   }
 
   it('sends a connected frame on stream start', async () => {
@@ -64,10 +65,11 @@ describe('my-stream per-user events', () => {
   it('keeps the connection alive with a 30-second comment heartbeat', async () => {
     await nextFrame()
 
-    const readPromise = reader!.read()
+    if (!reader) throw new Error('reader missing')
+    const readPromise = reader.read()
     vi.advanceTimersByTime(30_000)
     const { value } = await readPromise
-    expect(decoder.decode(value as Uint8Array)).toBe(': heartbeat\n\n')
+    expect(decoder.decode(value)).toBe(': heartbeat\n\n')
   })
 
   it('pushOutbid delivers the outbid event to the affected user', async () => {
@@ -98,7 +100,7 @@ describe('my-stream per-user events', () => {
     const numericReader = stream.getReader()
     try {
       const connected = await numericReader.read()
-      expect(decoder.decode(connected.value as Uint8Array)).toContain('connected')
+      expect(decoder.decode(connected.value)).toContain('connected')
 
       pushBidEvent(42, {
         auctionId: 'auction-1',
@@ -108,7 +110,7 @@ describe('my-stream per-user events', () => {
       })
 
       const { value } = await numericReader.read()
-      const raw = decoder.decode(value as Uint8Array)
+      const raw = decoder.decode(value)
       expect(raw).toContain('event: bid')
       expect(JSON.parse(/^data: (.+)$/m.exec(raw)?.[1] ?? '{}')).toEqual({
         auctionId: 'auction-1',
@@ -184,7 +186,8 @@ describe('my-stream per-user events', () => {
   it('delivers nothing to a user without connections', async () => {
     await nextFrame()
 
-    const readPromise = reader!.read()
+    if (!reader) throw new Error('reader missing')
+    const readPromise = reader.read()
     pushOutbid('user-2', { auctionId: 'auction-1', newAmount: 300 })
 
     const winner = await Promise.race([

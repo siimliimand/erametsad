@@ -160,8 +160,10 @@ export async function submitSealedBid(
   }
 
   const bidData: Record<string, unknown> = {
-    auction: auctionId,
-    user: userId,
+    // Payload's relationship validation rejects numeric strings for
+    // number-typed ids, so coerce before create.
+    auction: Number(auctionId),
+    user: Number(userId),
     amount: 0,
     type: 'sealed',
     source: 'manual',
@@ -206,6 +208,20 @@ export async function getSealedBidsForAuction(
     depth: 1,
   })
   return result.docs
+}
+
+// Normalize relationship values (number id, numeric string, or populated
+// doc) to a plain string so ceremony comparisons against the string bidId
+// the admin routes receive can never silently mismatch.
+function relationId(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number') return String(value)
+  if (value !== null && typeof value === 'object') {
+    const id = (value as { id?: unknown }).id
+    if (typeof id === 'string') return id
+    if (typeof id === 'number') return String(id)
+  }
+  return ''
 }
 
 export function decryptSealedBids(
@@ -271,9 +287,9 @@ export function decryptSealedBids(
     }
 
     return {
-      id: bid.id as string,
-      auction: typeof bid.auction === 'object' ? (bid.auction as Record<string, unknown>).id as string : bid.auction as string,
-      user: typeof bid.user === 'object' ? (bid.user as Record<string, unknown>).id as string : bid.user as string,
+      id: relationId(bid.id),
+      auction: relationId(bid.auction),
+      user: relationId(bid.user),
       amount,
       identitySnapshot,
       status: bid.status as string,

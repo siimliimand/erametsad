@@ -1,29 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { NextResponse } from 'next/server'
 
 vi.mock('@/lib/leads/ingestion', () => ({
   ingestLead: vi.fn(),
   validateHoneypot: vi.fn(),
 }))
 
-vi.mock('@/lib/rate-limit', () => {
-  const mockCheck = vi.fn()
-  return {
-    leadsRateLimiter: { check: mockCheck },
-    __mockCheck: mockCheck,
-  }
-})
+const { mockCheck } = vi.hoisted(() => ({ mockCheck: vi.fn() }))
+
+vi.mock('@/lib/rate-limit', () => ({
+  leadsRateLimiter: { check: mockCheck },
+}))
 
 vi.mock('@/lib/bidding/place-bid', () => ({
   computeIpHash: vi.fn((ip: string) => `hash-${ip}`),
 }))
 
 import { POST } from '@/app/api/leads/route'
-import { ingestLead, validateHoneypot } from '@/lib/leads/ingestion'
-import { leadsRateLimiter } from '@/lib/rate-limit'
 import { computeIpHash } from '@/lib/bidding/place-bid'
+import { ingestLead, validateHoneypot } from '@/lib/leads/ingestion'
 
-const mockCheck = vi.mocked(leadsRateLimiter.check)
 const mockIngest = vi.mocked(ingestLead)
 const mockHoneypot = vi.mocked(validateHoneypot)
 
@@ -35,6 +30,10 @@ function makeRequest(body: Record<string, unknown>, ip?: string): Request {
     headers,
     body: JSON.stringify(body),
   })
+}
+
+async function jsonResponse(res: Response): Promise<Record<string, unknown>> {
+  return (await res.json()) as Record<string, unknown>
 }
 
 const validBody = {
@@ -67,7 +66,7 @@ describe('POST /api/leads', () => {
       mockCheck.mockReturnValue({ allowed: false, limit: 5, remaining: 0, reset: Date.now() + 60_000 })
       const res = await POST(makeRequest(validBody))
       expect(res.status).toBe(429)
-      const json = await res.json()
+      const json = await jsonResponse(res)
       expect(json.error).toBe('Liiga palju päringuid')
     })
 
@@ -82,7 +81,7 @@ describe('POST /api/leads', () => {
       mockHoneypot.mockReturnValue(false)
       const res = await POST(makeRequest({ ...validBody, company_website: 'https://spam.com' }))
       expect(res.status).toBe(200)
-      const json = await res.json()
+      const json = await jsonResponse(res)
       expect(json.status).toBe('ok')
       expect(mockIngest).not.toHaveBeenCalled()
     })
@@ -92,28 +91,28 @@ describe('POST /api/leads', () => {
     it('rejects missing contactName with Estonian error', async () => {
       const res = await POST(makeRequest({ ...validBody, contactName: '' }))
       expect(res.status).toBe(400)
-      const json = await res.json()
+      const json = await jsonResponse(res)
       expect(json.error).toBe('Nimi on kohustuslik')
     })
 
     it('rejects invalid phone with Estonian error', async () => {
       const res = await POST(makeRequest({ ...validBody, phone: '123' }))
       expect(res.status).toBe(400)
-      const json = await res.json()
+      const json = await jsonResponse(res)
       expect(json.error).toBe('Sobimatu telefoninumber')
     })
 
     it('rejects invalid email with Estonian error', async () => {
       const res = await POST(makeRequest({ ...validBody, email: 'not-an-email' }))
       expect(res.status).toBe(400)
-      const json = await res.json()
+      const json = await jsonResponse(res)
       expect(json.error).toBe('Sobimatu e-posti aadress')
     })
 
     it('rejects missing consentAt with Estonian error', async () => {
       const res = await POST(makeRequest({ ...validBody, consentAt: '' }))
       expect(res.status).toBe(400)
-      const json = await res.json()
+      const json = await jsonResponse(res)
       expect(json.error).toBe('Nõusolek on kohustuslik')
     })
   })
@@ -133,7 +132,7 @@ describe('POST /api/leads', () => {
       mockIngest.mockRejectedValue(new Error('SQL connection failed'))
       const res = await POST(makeRequest(validBody))
       expect(res.status).toBe(500)
-      const json = await res.json()
+      const json = await jsonResponse(res)
       expect(json.error).toBe('Sisemine viga')
       expect(json.error).not.toContain('SQL')
     })

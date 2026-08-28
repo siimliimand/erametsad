@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { hashPassword } from '@/lib/auth/password'
 import { consumeResetToken } from '@/lib/auth/reset-tokens'
 import { revokeAllUserSessions } from '@/lib/auth/session'
 import { authRateLimiter } from '@/lib/rate-limit'
@@ -49,10 +48,11 @@ export async function POST(request: NextRequest) {
 
   const payload = await getPayloadClient()
 
+  // Raw password: Payload's auth field applies its own hashing on update.
   await payload.update({
     collection: 'users',
     id: userId,
-    data: { password: await hashPassword(password) },
+    data: { password },
   })
 
   await revokeAllUserSessions(userId)

@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server'
 import { validators } from '@eametsad/types'
+import { NextResponse } from 'next/server'
 
+import { computeIpHash } from '@/lib/bidding/place-bid'
 import { ingestLead, validateHoneypot } from '@/lib/leads/ingestion'
 import { leadsRateLimiter } from '@/lib/rate-limit'
-import { computeIpHash } from '@/lib/bidding/place-bid'
 
 function extractIp(request: Request): string {
   const raw = request.headers.get('x-forwarded-for')

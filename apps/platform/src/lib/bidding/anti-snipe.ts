@@ -59,13 +59,18 @@ export interface AntiSnipeAuditInput {
 
 export async function recordAntiSnipeExtension(input: AntiSnipeAuditInput): Promise<void> {
   const payload = await getPayloadClient()
+  // Relationship fields reject numeric strings for number-typed ids.
+  const actorValue =
+    input.actorId !== undefined && /^\d+$/.test(input.actorId)
+      ? Number(input.actorId)
+      : input.actorId
   await payload.create({
     collection: 'audit-entry',
     data: {
       action: 'anti_snipe_extension',
       entityType: 'auction',
       entityId: input.auctionId,
-      ...(input.actorId ? { actor: input.actorId } : {}),
+      ...(actorValue !== undefined ? { actor: actorValue } : {}),
       before: { endsAt: input.previousEndTime.toISOString() },
       after: {
         endsAt: input.newEndTime.toISOString(),

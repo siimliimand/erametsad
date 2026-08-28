@@ -1,12 +1,11 @@
-import crypto from 'node:crypto'
-
 import { sql } from '@payloadcms/db-postgres'
+import crypto from 'node:crypto'
 import type { Payload } from 'payload'
 
+import { isAlapakkumineEnabled } from './alapakkumine'
 import { getPayloadClient } from '../../payload/payloadClient'
 import { eventBus } from '../notifications/event-bus'
 import type { DomainEvent } from '../notifications/event-bus'
-import { isAlapakkumineEnabled } from './alapakkumine'
 
 export interface PlaceBidParams {
   userId: string
@@ -44,7 +43,7 @@ function normalizeRequestIp(headerValue: string | undefined): string {
   return first && first.length > 0 ? first : 'unknown'
 }
 
-type TxStatement = { execute: (query: unknown) => Promise<{ rows: Record<string, unknown>[] }> }
+interface TxStatement { execute: (query: unknown) => Promise<{ rows: Record<string, unknown>[] }> }
 
 // The only place that touches Drizzle directly. All writes run inside one
 // transaction started with SELECT ... FOR UPDATE on the auctions row, so
@@ -58,7 +57,7 @@ export async function withAuctionLock<T>(
   const db = payload.db.drizzle
   return db.transaction(async (tx) => {
     const locked = await tx.execute(sql`select id from auctions where id = ${auctionId} for update`)
-    if (!locked.rows || locked.rows.length === 0) {
+    if (locked.rows.length === 0) {
       return null
     }
     return fn(tx as unknown as TxStatement)
@@ -307,7 +306,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
 
       return { success: true, bid: newBid }
     },
-  ).catch((error: unknown) => {
+  ).catch((error: unknown): BidResult => {
     if (
       error instanceof Error &&
       /duplicate key/i.test(error.message) &&
@@ -317,7 +316,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
         success: false,
         error: 'Duplicate bid (idempotency key already used)',
         status: 409,
-      } as BidResult
+      }
     }
     throw error
   })
@@ -352,7 +351,7 @@ async function insertBid(tx: TxStatement, input: InsertBidInput): Promise<Record
     values (${input.auctionId}, ${input.userId}, ${input.amount}, ${input.type}, ${input.source}, ${input.status}, ${input.ipHash ?? null}, ${input.idempotencyKey ?? null}, now(), now())
     returning id, created_at, updated_at
   `)
-  const row = (inserted.rows[0] ?? {}) as Record<string, unknown>
+  const row = (inserted.rows[0] ?? {})
   return {
     id: row.id,
     auction: input.auctionId,

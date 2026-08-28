@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-import { checkAntiSnipe } from '../anti-snipe'
-
 const mockPayload = {
   find: vi.fn(),
   create: vi.fn(),
@@ -17,6 +15,7 @@ vi.mock('../../realtime/auction-stream', () => ({
 }))
 
 import { emitAuctionExtended } from '../../realtime/auction-stream'
+import { checkAntiSnipe } from '../anti-snipe'
 
 beforeEach(() => {
   vi.clearAllMocks()

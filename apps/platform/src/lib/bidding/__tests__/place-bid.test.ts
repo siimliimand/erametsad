@@ -20,8 +20,19 @@ function sqlText(query: unknown): string {
   return chunks
     .map((chunk) => {
       if (chunk === null || chunk === undefined) return ''
-      if (typeof chunk === 'object') return String((chunk as { value?: unknown }).value ?? '')
-      return String(chunk)
+      if (typeof chunk === 'string') return chunk
+      if (typeof chunk === 'number' || typeof chunk === 'bigint' || typeof chunk === 'boolean') {
+        return String(chunk)
+      }
+      if (typeof chunk === 'object') {
+        const value = (chunk as { value?: unknown }).value
+        if (typeof value === 'string') return value
+        if (Array.isArray(value)) {
+          return value.map((part) => (typeof part === 'string' ? part : '')).join('')
+        }
+        return ''
+      }
+      return ''
     })
     .join(' ')
 }
@@ -40,15 +51,15 @@ beforeEach(() => {
   txStatements = []
   nextInsertId = 42
   const fakeTx = {
-    execute: async (query: unknown) => {
+    execute: (query: unknown) => {
       const text = sqlText(query)
       txStatements.push(text)
-      if (text.includes('for update')) return { rows: [{ id: 'auction-1' }] }
+      if (text.includes('for update')) return Promise.resolve({ rows: [{ id: 'auction-1' }] })
       if (text.includes('insert into bids')) {
         nextInsertId += 1
-        return { rows: [{ id: nextInsertId, created_at: '2026-01-01T00:00:00Z' }] }
+        return Promise.resolve({ rows: [{ id: nextInsertId, created_at: '2026-01-01T00:00:00Z' }] })
       }
-      return { rows: [] }
+      return Promise.resolve({ rows: [] })
     },
   }
   mockPayload = {
@@ -77,7 +88,7 @@ describe('placeBid', () => {
     user?: Record<string, unknown>
     auction?: Record<string, unknown>
     hasRights?: boolean
-    settings?: Record<string, unknown>
+    settings?: Record<string, unknown> | null
     leadingBid?: Record<string, unknown> | null
     frameworkTemplate?: Record<string, unknown> | null
     signedContract?: Record<string, unknown> | null

@@ -1,5 +1,5 @@
-import crypto from 'node:crypto'
 import { NextResponse } from 'next/server'
+import crypto from 'node:crypto'
 
 import { createSession, setSessionCookies } from '@/lib/auth/session'
 import { hash } from '@/lib/crypto'
@@ -29,7 +29,7 @@ export interface EidProvider {
   }>
 }
 
-const DEMO_PROFILES: Array<Record<string, unknown>> = [
+const DEMO_PROFILES: Record<string, unknown>[] = [
   {
     id: 'demo-001',
     email: 'jaan@example.com',
@@ -79,12 +79,12 @@ function buildDemoUsers(): Record<string, Record<string, unknown>> {
 export class DemoEidProvider implements EidProvider {
   private sessions = new Map<string, EidSession>()
 
-  async start(
+  start(
     isikukood: string,
   ): Promise<{ sessionRef: string; controlCode?: string }> {
     const user = buildDemoUsers()[isikukood]
     if (!user) {
-      throw new Error('Unknown isikukood')
+      return Promise.reject(new Error('Unknown isikukood'))
     }
 
     const sessionRef = crypto.randomUUID()
@@ -99,39 +99,39 @@ export class DemoEidProvider implements EidProvider {
       pollCount: 0,
     })
 
-    return { sessionRef, controlCode }
+    return Promise.resolve({ sessionRef, controlCode })
   }
 
-  async status(
+  status(
     sessionRef: string,
   ): Promise<{ status: 'pending' | 'completed' | 'failed'; user?: Record<string, unknown> }> {
     const session = this.sessions.get(sessionRef)
     if (!session) {
-      return { status: 'failed' }
+      return Promise.resolve({ status: 'failed' as const })
     }
 
     session.pollCount++
 
     if (session.pollCount >= 2) {
       session.status = 'completed'
-      return { status: 'completed', user: session.user }
+      return Promise.resolve({ status: 'completed' as const, user: session.user })
     }
 
-    return { status: 'pending' }
+    return Promise.resolve({ status: 'pending' as const })
   }
 
-  async complete(sessionRef: string): Promise<{
+  complete(sessionRef: string): Promise<{
     user: Record<string, unknown>
     isikukood: string
   }> {
     const session = this.sessions.get(sessionRef)
-    if (!session || session.status !== 'completed') {
-      throw new Error('Session not completed')
+    if (session?.status !== 'completed') {
+      return Promise.reject(new Error('Session not completed'))
     }
 
     this.sessions.delete(sessionRef)
 
-    return { user: session.user, isikukood: session.isikukood }
+    return Promise.resolve({ user: session.user, isikukood: session.isikukood })
   }
 }
 

@@ -1,5 +1,5 @@
-import { beforeAll, describe, expect, it } from 'vitest'
 import type { NextResponse } from 'next/server'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 import { signRefreshToken, verifyAccessToken } from '../jwt'
 import {
@@ -41,11 +41,11 @@ describe('session store', () => {
     )
 
     const rotated = await refreshSession(refreshToken)
+    if (rotated === null) throw new Error('refreshSession returned null')
 
-    expect(rotated).not.toBeNull()
-    expect(rotated!.refreshToken).not.toBe(refreshToken)
+    expect(rotated.refreshToken).not.toBe(refreshToken)
     expect(
-      verifyAccessToken(rotated!.accessToken),
+      verifyAccessToken(rotated.accessToken),
     ).toMatchObject({
       userId: 'user-refresh-1',
       role: 'user',
@@ -57,7 +57,7 @@ describe('session store', () => {
       state: 'active',
       sessionId,
     })
-    expect(resolveAccessTokenSession(rotated!.accessToken)).toEqual({
+    expect(resolveAccessTokenSession(rotated.accessToken)).toEqual({
       state: 'active',
       sessionId,
     })
@@ -69,16 +69,16 @@ describe('session store', () => {
       'user',
     )
     const rotated = await refreshSession(refreshToken)
-    expect(rotated).not.toBeNull()
+    if (rotated === null) throw new Error('refreshSession returned null')
 
     expect(await refreshSession(refreshToken)).toBeNull()
 
     expect(await getUserSession(sessionId)).toBeNull()
     expect(resolveAccessTokenSession(accessToken)).toEqual({ state: 'revoked' })
-    expect(resolveAccessTokenSession(rotated!.accessToken)).toEqual({
+    expect(resolveAccessTokenSession(rotated.accessToken)).toEqual({
       state: 'revoked',
     })
-    expect(await refreshSession(rotated!.refreshToken)).toBeNull()
+    expect(await refreshSession(rotated.refreshToken)).toBeNull()
   })
 
   it('returns null for an unknown refresh token', async () => {

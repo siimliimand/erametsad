@@ -1,6 +1,3 @@
-import nodemailer, { type Transporter } from 'nodemailer'
-import type { Payload } from 'payload'
-
 import {
   bidPlatedTemplate,
   outbidTemplate,
@@ -8,6 +5,9 @@ import {
   auctionEndedTemplate,
   contractReadyTemplate,
 } from '@eametsad/emails'
+import nodemailer, { type Transporter } from 'nodemailer'
+import type { Payload } from 'payload'
+
 
 import { type DomainEvent, type DomainEventType, type EventBus } from './event-bus'
 
@@ -44,14 +44,12 @@ const eventTitles: Record<DomainEventType, string> = {
 let transporter: Transporter | null = null
 
 function getTransporter(): Transporter {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: env.SMTP_HOST,
-      port: env.SMTP_PORT,
-      secure: false,
-      auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
-    })
-  }
+  transporter ??= nodemailer.createTransport({
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT,
+    secure: false,
+    auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+  })
   return transporter
 }
 
@@ -128,6 +126,13 @@ async function lookupEmail(payload: Payload, userId: string | number): Promise<s
   }
 }
 
+// Relationship fields reject numeric strings for number-typed ids, and
+// every emitter (JWT subject, decrypted bids) carries userId as a string.
+function relationUser(value: string | number): string | number {
+  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value)
+  return value
+}
+
 async function dispatchEmail(userId: string | number, event: DomainEvent, body: string, payload: Payload): Promise<void> {
   const to = await lookupEmail(payload, userId)
   if (!to) {
@@ -144,7 +149,7 @@ async function dispatchEmail(userId: string | number, event: DomainEvent, body: 
   await payload.create({
     collection: 'notifications',
     data: {
-      user: userId,
+      user: relationUser(userId),
       event: event.type,
       channel: 'email',
       title: eventTitles[event.type],
@@ -161,7 +166,7 @@ async function dispatchSms(userId: string | number, event: DomainEvent, body: st
   await payload.create({
     collection: 'notifications',
     data: {
-      user: userId,
+      user: relationUser(userId),
       event: event.type,
       channel: 'sms',
       title: eventTitles[event.type],
@@ -176,7 +181,7 @@ async function dispatchInApp(userId: string | number, event: DomainEvent, body: 
   await payload.create({
     collection: 'notifications',
     data: {
-      user: userId,
+      user: relationUser(userId),
       event: event.type,
       channel: 'in_app',
       title: eventTitles[event.type],

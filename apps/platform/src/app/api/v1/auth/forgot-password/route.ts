@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import nodemailer, { type Transporter } from 'nodemailer'
 
+import { env } from '@/env'
 import { createResetToken } from '@/lib/auth/reset-tokens'
 import { hash } from '@/lib/crypto'
 import { authRateLimiter } from '@/lib/rate-limit'
-import { env } from '@/env'
 import { getPayloadClient } from '@/payload/payloadClient'
 
 const NEUTRAL_MESSAGE =
@@ -14,14 +14,12 @@ const NEUTRAL_MESSAGE =
 let transporter: Transporter | null = null
 
 function getTransporter(): Transporter {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: env.SMTP_HOST,
-      port: env.SMTP_PORT,
-      secure: false,
-      auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
-    })
-  }
+  transporter ??= nodemailer.createTransport({
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT,
+    secure: false,
+    auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+  })
   return transporter
 }
 

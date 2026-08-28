@@ -1,10 +1,10 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { Payload } from 'payload'
 
+import { withAuctionLock } from './place-bid'
 import { getPayloadClient } from '../../payload/payloadClient'
 import { eventBus } from '../notifications/event-bus'
 import type { DomainEvent } from '../notifications/event-bus'
-import { withAuctionLock } from './place-bid'
 
 export interface AlapakkumineResult {
   status: string
@@ -35,7 +35,11 @@ async function findDoc(
 
 function relationValue(value: unknown): string | number {
   if (typeof value === 'string' || typeof value === 'number') return value
-  return String((value as { id?: string | number })?.id ?? '')
+  if (value !== null && typeof value === 'object') {
+    const id = (value as { id?: unknown }).id
+    if (typeof id === 'string' || typeof id === 'number') return id
+  }
+  return ''
 }
 
 export interface UnderbidBidInfo {

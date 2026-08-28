@@ -77,11 +77,15 @@ export async function prepareContract(
 
   const rendered = renderTemplate(template, data)
 
+  // Payload's relationship validation rejects numeric strings for
+  // number-typed ids, so coerce the auction id before create.
+  const lotValue = /^\d+$/.test(auctionId) ? Number(auctionId) : auctionId
+
   const newContract = await payload.create({
     collection: 'contracts',
     data: {
       template: templateDoc.id,
-      lot: auctionId,
+      lot: lotValue,
       status: 'prepared',
       renderedHtml: rendered.html,
     },
@@ -125,13 +129,16 @@ export async function signContract(
   const renderedHtml = contract.renderedHtml as string | undefined
   const contentHash = crypto.createHash('sha256').update(renderedHtml ?? contractId).digest('hex')
 
+  // Relationship fields reject numeric strings for number-typed ids.
+  const signerValue = /^\d+$/.test(signerId) ? Number(signerId) : signerId
+
   const updated = await payload.update({
     collection: 'contracts',
     id: contractId,
     data: {
       status: 'signed',
       signedAt: new Date().toISOString(),
-      signedBy: signerId,
+      signedBy: signerValue,
       contentHash,
     },
   })

@@ -54,7 +54,7 @@ const guardHook = statusTransitionHook as unknown as GuardHook
 function conditionMatches(actual: unknown, condition: Record<string, unknown>): boolean {
   const value =
     typeof actual === 'object' && actual !== null && 'id' in actual
-      ? (actual as { id: unknown }).id
+      ? (actual).id
       : actual
   if ('equals' in condition) {
     return String(value) === String(condition.equals)
@@ -82,10 +82,10 @@ function createHarness(seed: { auctions?: Doc[]; bids?: Doc[] }) {
   const auctions = (seed.auctions ?? []).map((doc) => ({ ...doc }))
   const bids = (seed.bids ?? []).map((doc) => ({ ...doc }))
   const snapshots: Doc[] = []
-  const auctionUpdates: Array<{ id: string; data: Record<string, unknown> }> = []
+  const auctionUpdates: { id: string; data: Record<string, unknown> }[] = []
 
   const find = vi.fn(
-    async ({ collection, where }: FindArgs): Promise<{ docs: Doc[] }> => {
+    ({ collection, where }: FindArgs): { docs: Doc[] } => {
       if (collection === 'auctions') {
         return { docs: auctions.filter((doc) => matchesWhere(doc, where)) }
       }
@@ -100,7 +100,7 @@ function createHarness(seed: { auctions?: Doc[]; bids?: Doc[] }) {
   )
 
   const findByID = vi.fn(
-    async ({ collection, id }: { collection: string; id: string }): Promise<Doc | null> => {
+    ({ collection, id }: { collection: string; id: string }): Doc | null => {
       if (collection === 'auctions') {
         return auctions.find((doc) => doc.id === id) ?? null
       }
@@ -114,10 +114,10 @@ function createHarness(seed: { auctions?: Doc[]; bids?: Doc[] }) {
         const doc = auctions.find((a) => a.id === id)
         if (doc == null) throw new Error(`unknown auction: ${id}`)
         auctionUpdates.push({ id, data })
-        const next = await guardHook({
+        const next = (await guardHook({
           data: { ...doc, ...data },
           originalDoc: doc,
-        } as unknown as GuardHookArgs)
+        } as unknown as GuardHookArgs)) as Record<string, unknown> | null
         Object.assign(doc, next ?? data)
         return { ...doc }
       }
@@ -132,8 +132,8 @@ function createHarness(seed: { auctions?: Doc[]; bids?: Doc[] }) {
   )
 
   const create = vi.fn(
-    async ({ collection, data }: CreateArgs): Promise<Doc> => {
-      const doc: Doc = { id: `snapshot-${snapshots.length + 1}`, ...data }
+    ({ collection, data }: CreateArgs): Doc => {
+      const doc: Doc = { id: `snapshot-${String(snapshots.length + 1)}`, ...data }
       if (collection === 'statistics-snapshots') snapshots.push(doc)
       return doc
     },
@@ -228,7 +228,7 @@ describe('processEndedAuctions', () => {
     expect(h.create).toHaveBeenCalledWith(
       expect.objectContaining({
         collection: 'statistics-snapshots',
-        data: expect.objectContaining({ objectType: 'forest', eur: 5000, count: 1 }),
+        data: expect.objectContaining({ objectType: 'forest', eur: 5000, count: 1 }) as Record<string, unknown>,
       }),
     )
   })
@@ -279,7 +279,7 @@ describe('processEndedAuctions', () => {
       expect.objectContaining({
         type: 'auction.ended',
         userId: 'seller-1',
-        payload: expect.objectContaining({ type: 'sealed' }),
+        payload: expect.objectContaining({ type: 'sealed' }) as Record<string, unknown>,
       }),
     ])
     expect(broadcastMock).toHaveBeenCalledWith('auction:ended', {
@@ -315,7 +315,7 @@ describe('processEndedAuctions', () => {
 
     // Simulate a double fire: the query still returns the stale active row,
     // so the status recheck must stop a second outcome write.
-    h.find.mockImplementationOnce(async () => ({ docs: [activeAuction()] }))
+    h.find.mockImplementationOnce(() => ({ docs: [activeAuction()] }))
 
     const second = await processEndedAuctions()
 

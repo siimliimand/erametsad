@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { verifyPassword } from '@/lib/auth/password'
 import { createSession, setSessionCookies } from '@/lib/auth/session'
 import { hash } from '@/lib/crypto'
 import { authRateLimiter } from '@/lib/rate-limit'
@@ -67,16 +66,17 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const passwordHash = user.password as string | undefined
-  if (!passwordHash) {
-    return NextResponse.json(
-      { error: 'Vale kasutajanimi või parool' },
-      { status: 401 },
-    )
-  }
-
-  const valid = await verifyPassword(password, passwordHash)
-  if (!valid) {
+  // users is a Payload auth collection: credentials live in Payload's own
+  // salt/hash columns, and find() never returns them, so there is no
+  // user.password to compare. payload.login runs Payload's own verification
+  // (plus its lockout counters) and throws on a wrong password.
+  try {
+    await payload.login({
+      collection: 'users',
+      data: { email: user.email as string, password },
+      depth: 0,
+    })
+  } catch {
     return NextResponse.json(
       { error: 'Vale kasutajanimi või parool' },
       { status: 401 },

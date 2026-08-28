@@ -28,7 +28,10 @@ export const Auction: CollectionConfig = {
     group: 'Auction',
     defaultColumns: ['title', 'status', 'objectType', 'startsAt', 'endsAt'],
   },
-  versions: { drafts: true },
+  // No versions.drafts here: the drafts feature adds its own
+  // enum_auctions_status ({draft,published}) that collides with the custom
+  // status select below and breaks the generated schema. The auction
+  // lifecycle is guarded by statusTransitionHook instead.
   fields: [
     {
       type: 'tabs',

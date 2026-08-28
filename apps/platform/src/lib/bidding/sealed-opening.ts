@@ -166,7 +166,7 @@ export async function confirmWinner(
     throw new Error('Bid is invalid (decryption failed) and cannot win')
   }
   const top = ranked[0]
-  if (!top || top.id !== bidId) {
+  if (top?.id !== bidId) {
     throw new Error('Bid does not top the decrypted ranking')
   }
 

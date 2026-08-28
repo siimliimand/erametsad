@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 import { verifyAccessToken } from '@/lib/auth/jwt'
-import { hashPassword, verifyPassword } from '@/lib/auth/password'
 import { clearSessionCookies, revokeAllUserSessions } from '@/lib/auth/session'
 import { authRateLimiter } from '@/lib/rate-limit'
 import { getPayloadClient } from '@/payload/payloadClient'
@@ -57,15 +56,24 @@ export async function POST(request: NextRequest) {
     depth: 0,
   })) as Record<string, unknown>
 
-  const passwordHash = user.password as string | undefined
-  if (!passwordHash || !(await verifyPassword(oldPassword, passwordHash))) {
+  // Payload auth collections never return stored credentials, so verify the
+  // old password through payload.login (Payload's own comparison) instead
+  // of a user.password field that does not exist.
+  try {
+    await payload.login({
+      collection: 'users',
+      data: { email: user.email as string, password: oldPassword },
+      depth: 0,
+    })
+  } catch {
     return NextResponse.json({ error: 'Vale vana parool' }, { status: 400 })
   }
 
+  // Raw password: Payload's auth field applies its own hashing on update.
   await payload.update({
     collection: 'users',
     id: tokenPayload.userId,
-    data: { password: await hashPassword(newPassword) },
+    data: { password: newPassword },
   })
 
   // The access token carries no session id, so the session store exposes no

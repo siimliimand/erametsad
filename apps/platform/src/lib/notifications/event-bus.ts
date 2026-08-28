@@ -32,4 +32,10 @@ export class EventBus {
   }
 }
 
-export const eventBus = new EventBus()
+// Next dev compiles instrumentation.ts and route handlers into separate
+// module graphs, so a module-level singleton would give each context its
+// own bus and route-emitted events would never reach the dispatcher.
+// globalThis is shared by every bundle in the process.
+const globalForBus = globalThis as unknown as { __erametsadEventBus?: EventBus }
+export const eventBus: EventBus = globalForBus.__erametsadEventBus ?? new EventBus()
+globalForBus.__erametsadEventBus = eventBus
