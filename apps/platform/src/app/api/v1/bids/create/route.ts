@@ -1,9 +1,98 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import type { Payload } from 'payload'
 
 import { verifyAccessToken } from '@/lib/auth/jwt'
+import { checkAntiSnipe } from '@/lib/bidding/anti-snipe'
+import { evaluateAutobidders } from '@/lib/bidding/autobidder'
 import { placeBid } from '@/lib/bidding/place-bid'
 import type { BidResult } from '@/lib/bidding/place-bid'
+import { emitBidCreated } from '@/lib/realtime/auction-stream'
+import { pushOutbid } from '@/lib/realtime/my-stream'
+import { getPayloadClient } from '@/payload/payloadClient'
+
+type RouteCollection = 'auctions' | 'bids'
+
+async function findDoc(
+  collection: RouteCollection,
+  where: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> {
+  const payload = await getPayloadClient()
+  const result = await payload.find({
+    collection,
+    where,
+    limit: 1,
+    depth: 0,
+  } as Parameters<Payload['find']>[0])
+  return (result.docs[0] as Record<string, unknown> | undefined) ?? null
+}
+
+function findLeadingBid(auctionId: string): Promise<Record<string, unknown> | null> {
+  return findDoc('bids', {
+    and: [
+      { auction: { equals: auctionId } },
+      { status: { equals: 'leading' } },
+    ],
+  })
+}
+
+// placeBid already emitted the bid.created and outbid DomainEvents
+// post-commit, so the accepted-bid path only adds the SSE broadcasts and
+// the my-stream pushes.
+async function handleAcceptedBid(input: {
+  auctionId: string
+  actorId: string
+  bid: Record<string, unknown>
+  previousLeading: Record<string, unknown> | null
+}): Promise<void> {
+  const { auctionId, actorId, bid, previousLeading } = input
+  const amount = bid.amount as number
+  const placedAt = (bid.createdAt as string | Date | undefined) ?? new Date()
+
+  emitBidCreated({ auctionId, amount, placedAt })
+
+  if (previousLeading) {
+    pushOutbid(previousLeading.user as string | number, {
+      auctionId,
+      previousAmount: previousLeading.amount as number,
+      newAmount: amount,
+      placedAt,
+    })
+  }
+
+  // checkAntiSnipe owns the endsAt update, the audit entry and the
+  // auction:extended broadcast; sealed auctions never extend.
+  const auction = await findDoc('auctions', { id: { equals: auctionId } })
+  if (auction) {
+    await checkAntiSnipe(
+      {
+        id: auctionId,
+        endsAt: auction.endsAt as string | Date,
+        ...(auction.type !== undefined ? { type: auction.type as string | null } : {}),
+      },
+      undefined,
+      { actorId, triggeredByBidId: bid.id as string },
+    )
+  }
+
+  await evaluateAutobidders(auctionId)
+
+  // An autobidder bid placed by evaluateAutobidders goes through the same
+  // broadcast path. Its outbid DomainEvent was already emitted by the
+  // placeBid call inside evaluateAutobidders.
+  const leading = await findLeadingBid(auctionId)
+  if (leading && leading.source === 'autobidder') {
+    const autobidAmount = leading.amount as number
+    const autobidPlacedAt = (leading.createdAt as string | Date | undefined) ?? new Date()
+    emitBidCreated({ auctionId, amount: autobidAmount, placedAt: autobidPlacedAt })
+    pushOutbid(bid.user as string | number, {
+      auctionId,
+      previousAmount: amount,
+      newAmount: autobidAmount,
+      placedAt: autobidPlacedAt,
+    })
+  }
+}
 
 export async function POST(request: NextRequest) {
   const accessToken = request.cookies.get('access_token')?.value
@@ -38,19 +127,56 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'type must be open or sealed' }, { status: 400 })
   }
 
-  const result: BidResult = await placeBid({
-    userId: tokenPayload.userId,
-    auctionId,
-    amount,
-    type,
-    source: 'manual',
-    requestIp: request.headers.get('x-forwarded-for') ?? 'unknown',
-    ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
-  })
+  let previousLeading: Record<string, unknown> | null = null
+  let result: BidResult
+  try {
+    // Read the leader before placeBid so the outbid push targets the user
+    // this bid displaced.
+    previousLeading = await findLeadingBid(auctionId)
+    result = await placeBid({
+      userId: tokenPayload.userId,
+      auctionId,
+      amount,
+      type,
+      source: 'manual',
+      requestIp: request.headers.get('x-forwarded-for') ?? 'unknown',
+      ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+    })
+  } catch (error) {
+    console.error('[bids/create] placeBid failed', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
 
   if (!result.success) {
+    if (result.code === 'framework_contract_required') {
+      return NextResponse.json(
+        {
+          error: result.error,
+          code: result.code,
+          redirectUrl: result.redirectUrl ?? '/contracts/framework',
+        },
+        { status: 403 },
+      )
+    }
     return NextResponse.json({ error: result.error }, { status: result.status })
   }
 
-  return NextResponse.json(result.bid, { status: 201 })
+  const bid = result.bid
+  // Under-start bids wait for seller approval and never take the lead, so
+  // the engine follow-ups only apply to accepted (leading) bids.
+  if (bid.status === 'leading') {
+    try {
+      await handleAcceptedBid({
+        auctionId,
+        actorId: tokenPayload.userId,
+        bid,
+        previousLeading,
+      })
+    } catch (error) {
+      console.error('[bids/create] post-bid processing failed', error)
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    }
+  }
+
+  return NextResponse.json(bid, { status: 201 })
 }
