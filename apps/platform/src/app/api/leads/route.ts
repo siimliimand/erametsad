@@ -14,6 +14,7 @@ function extractIp(request: Request): string {
 function fieldError(field: string): { error: string } {
   const labels: Record<string, string> = {
     contactName: 'Nimi on kohustuslik',
+    formName: 'Vormi nimi on kohustuslik',
     phone: 'Sobimatu telefoninumber',
     email: 'Sobimatu e-posti aadress',
     consentAt: 'Nõusolek on kohustuslik',
@@ -52,6 +53,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(fieldError('contactName'), { status: 400 })
   }
 
+  if (!formName) {
+    return NextResponse.json(fieldError('formName'), { status: 400 })
+  }
+
   if (!phone || !validators.EEPhone.safeParse(phone).success) {
     return NextResponse.json(fieldError('phone'), { status: 400 })
   }
@@ -80,7 +85,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     })
 
     return NextResponse.json(lead, { status: 201 })
-  } catch {
+  } catch (error) {
+    console.error('[leads] ingestion failed:', error)
     return NextResponse.json({ error: 'Sisemine viga' }, { status: 500 })
   }
 }
