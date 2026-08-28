@@ -77,6 +77,11 @@ export const Users: CollectionConfig = {
       admin: { hidden: true },
     },
     {
+      name: 'isikukoodAuthTag',
+      type: 'text',
+      admin: { hidden: true },
+    },
+    {
       name: 'isikukoodHash',
       type: 'text',
       admin: { hidden: true },
@@ -95,6 +100,7 @@ export const Users: CollectionConfig = {
             ...data.data,
             isikukoodEncrypted: result.encrypted,
             isikukoodIv: result.iv,
+            isikukoodAuthTag: result.authTag,
             isikukoodHash: hash(raw),
             isikukood: undefined,
           },
@@ -105,14 +111,25 @@ export const Users: CollectionConfig = {
       (data: { doc: Record<string, unknown> }) => {
         const encrypted = data.doc.isikukoodEncrypted as string | undefined
         const iv = data.doc.isikukoodIv as string | undefined
+        const authTag = data.doc.isikukoodAuthTag as string | undefined
         if (!encrypted || !iv) return data
 
-        return {
-          ...data,
-          doc: {
-            ...data.doc,
-            isikukood: decrypt(encrypted, iv),
-          },
+        try {
+          return {
+            ...data,
+            doc: {
+              ...data.doc,
+              isikukood: decrypt(encrypted, iv, authTag ?? ''),
+            },
+          }
+        } catch {
+          return {
+            ...data,
+            doc: {
+              ...data.doc,
+              isikukood: undefined,
+            },
+          }
         }
       },
     ],

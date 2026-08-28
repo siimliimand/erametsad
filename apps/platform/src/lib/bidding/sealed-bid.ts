@@ -123,11 +123,13 @@ export async function submitSealedBid(
   const sealedPayload: Record<string, string> = {
     encrypted: encryptedData.encrypted,
     iv: encryptedData.iv,
+    authTag: encryptedData.authTag,
   }
   if (identitySnapshot) {
     const encryptedIdentity = encryptSealedData(identitySnapshot)
     sealedPayload.identityEncrypted = encryptedIdentity.encrypted
     sealedPayload.identityIv = encryptedIdentity.iv
+    sealedPayload.identityAuthTag = encryptedIdentity.authTag
   }
 
   const bidData: Record<string, unknown> = {
@@ -190,13 +192,16 @@ export function decryptSealedBids(
     if (rawSnapshot) {
       try {
         const parsed = JSON.parse(rawSnapshot) as Record<string, string>
-        if (parsed.encrypted && parsed.iv) {
-          amount = Number(decryptSealedData(parsed.encrypted, parsed.iv))
+        if (parsed.encrypted && parsed.iv && parsed.authTag) {
+          amount = Number(
+            decryptSealedData(parsed.encrypted, parsed.iv, parsed.authTag),
+          )
         }
-        if (parsed.identityEncrypted && parsed.identityIv) {
+        if (parsed.identityEncrypted && parsed.identityIv && parsed.identityAuthTag) {
           identitySnapshot = decryptSealedData(
             parsed.identityEncrypted,
             parsed.identityIv,
+            parsed.identityAuthTag,
           )
         }
       } catch {

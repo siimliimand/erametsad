@@ -11,7 +11,11 @@ function getKey(): Buffer {
   return crypto.scryptSync(raw, SALT, 32)
 }
 
-export function encryptSealedData(data: string): { encrypted: string; iv: string } {
+export function encryptSealedData(data: string): {
+  encrypted: string
+  iv: string
+  authTag: string
+} {
   const key = getKey()
   const iv = crypto.randomBytes(16)
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv)
@@ -20,16 +24,25 @@ export function encryptSealedData(data: string): { encrypted: string; iv: string
   return {
     encrypted: encrypted.toString('hex'),
     iv: iv.toString('hex'),
+    authTag: cipher.getAuthTag().toString('hex'),
   }
 }
 
-export function decryptSealedData(encrypted: string, iv: string): string {
+export function decryptSealedData(
+  encrypted: string,
+  iv: string,
+  authTag: string,
+): string {
+  if (!authTag) {
+    throw new Error('authTag is required for AES-256-GCM decryption')
+  }
   const key = getKey()
   const decipher = crypto.createDecipheriv(
     ALGORITHM,
     key,
     Buffer.from(iv, 'hex'),
   )
+  decipher.setAuthTag(Buffer.from(authTag, 'hex'))
 
   const decrypted = Buffer.concat([
     decipher.update(Buffer.from(encrypted, 'hex')),
