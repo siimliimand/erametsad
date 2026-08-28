@@ -57,3 +57,10 @@ export class DocumentNotFoundError extends RepositoryError {
     this.name = 'DocumentNotFoundError'
   }
 }
+
+export class GuardAccessError extends RepositoryError {
+  constructor(collection: string, operation: string, reason?: string) {
+    super(`Access denied: ${operation} ${collection}${reason ? ` (${reason})` : ''}`)
+    this.name = 'GuardAccessError'
+  }
+}

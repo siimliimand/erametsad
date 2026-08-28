@@ -3,8 +3,9 @@ import type { Column, SQL } from 'drizzle-orm'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 
+import { can, type GuardContext, type GuardOperation } from '../guards'
 import type * as schema from '../schema'
-import { DocumentNotFoundError, UnknownFieldError } from './errors'
+import { DocumentNotFoundError, GuardAccessError, UnknownFieldError } from './errors'
 import { applyIsikukoodOnRead, applyIsikukoodOnWrite, shouldDeactivateOtherTemplates, type IsikukoodCodec } from './hooks'
 import { decodeJsonFields, encodeJsonFields } from './json-fields'
 import { decodeMoneyFields, encodeMoneyFields } from './money'
@@ -38,6 +39,12 @@ export interface RepositoryOptions {
    */
   batch?: BatchRunner
   now?: () => string
+  /**
+   * When present, every operation passes through the access guards before
+   * executing. Absent means a trusted system caller (seed scripts, workers,
+   * AuctionDO) and operations run unguarded.
+   */
+  guardContext?: GuardContext
 }
 
 export interface FindOptions<C extends RepositorySlug = RepositorySlug> {
@@ -103,6 +110,13 @@ function idHint(value: unknown): string {
   return '(new)'
 }
 
+function combineConditions(parts: (SQL | undefined)[]): SQL | undefined {
+  const defined = parts.filter((part): part is SQL => part !== undefined)
+  if (defined.length === 0) return undefined
+  if (defined.length === 1) return defined[0]
+  return and(...defined)
+}
+
 export function createCoreRepositories(db: CoreDatabase, options: RepositoryOptions): CoreRepositories {
   const now = options.now ?? (() => new Date().toISOString())
 
@@ -116,6 +130,54 @@ export function createCoreRepositories(db: CoreDatabase, options: RepositoryOpti
       throw new UnknownFieldError(collection, name)
     }
     return column
+  }
+
+  // Guards speak public Payload field names; storage rows speak column names.
+  function toPublicRow(
+    collection: RepositorySlug,
+    row: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const out = { ...row }
+    for (const [publicField, column] of Object.entries(getCollectionConfig(collection).aliases)) {
+      if (column in row && !(publicField in row)) {
+        out[publicField] = row[column]
+      }
+    }
+    return out
+  }
+
+  /**
+   * Runs the guard for one operation. Returns the row filter (as SQL) for
+   * reads; throws GuardAccessError on denial. No-op without a guard context.
+   */
+  function guard(
+    collection: RepositorySlug,
+    operation: GuardOperation,
+    row?: Record<string, unknown>,
+  ): SQL | undefined {
+    if (!options.guardContext) return undefined
+    const decision = can(options.guardContext, collection, operation, row)
+    if (!decision.allowed) {
+      throw new GuardAccessError(collection, operation, decision.reason)
+    }
+    if (!decision.where) return undefined
+    return translateWhere(
+      columnsOf(collection),
+      decision.where,
+      getCollectionConfig(collection).aliases,
+    )
+  }
+
+  async function readRawRow(
+    collection: RepositorySlug,
+    id: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    const rows = (await db
+      .select()
+      .from(getCollectionConfig(collection).table)
+      .where(eq(requireColumn(collection, 'id'), id))
+      .limit(1)) as Record<string, unknown>[]
+    return rows[0]
   }
 
   function decodeRow<C extends RepositorySlug>(
@@ -249,7 +311,10 @@ export function createCoreRepositories(db: CoreDatabase, options: RepositoryOpti
       const collection = findOptions.collection
       const config = getCollectionConfig(collection)
       const columns = columnsOf(collection)
-      const condition = translateWhere(columns, findOptions.where, config.aliases)
+      const condition = combineConditions([
+        translateWhere(columns, findOptions.where, config.aliases),
+        guard(collection, 'read'),
+      ])
       let query = db.select().from(config.table).where(condition).$dynamic()
       if (findOptions.sort !== undefined) {
         query = query.orderBy(sortExpression(columns, config.aliases, findOptions.sort))
@@ -276,7 +341,12 @@ export function createCoreRepositories(db: CoreDatabase, options: RepositoryOpti
       const rows = (await db
         .select()
         .from(config.table)
-        .where(eq(requireColumn(collection, 'id'), String(findOptions.id)))
+        .where(
+          combineConditions([
+            eq(requireColumn(collection, 'id'), String(findOptions.id)),
+            guard(collection, 'read'),
+          ]),
+        )
         .limit(1)) as Record<string, unknown>[]
       const row = rows[0]
       return row ? decodeRow(collection, row) : null
@@ -285,6 +355,7 @@ export function createCoreRepositories(db: CoreDatabase, options: RepositoryOpti
     async create(createOptions) {
       const collection = createOptions.collection
       const config = getCollectionConfig(collection)
+      guard(collection, 'create', createOptions.data)
       const encoded = encodeWrite(collection, createOptions.data, 'create')
       const effectiveActive = encoded.active === undefined ? true : encoded.active === true
       if (
@@ -326,6 +397,13 @@ export function createCoreRepositories(db: CoreDatabase, options: RepositoryOpti
       const collection = updateOptions.collection
       const id = String(updateOptions.id)
       const data = updateOptions.data as Record<string, unknown>
+      if (options.guardContext) {
+        const current = await readRawRow(collection, id)
+        if (!current) {
+          throw new DocumentNotFoundError(collection, id)
+        }
+        guard(collection, 'update', toPublicRow(collection, current))
+      }
       let row: Record<string, unknown>
       if (collection === 'contract-templates') {
         row = await updateContractTemplate('contract-templates', id, data)
@@ -345,9 +423,17 @@ export function createCoreRepositories(db: CoreDatabase, options: RepositoryOpti
     async delete(deleteOptions) {
       const collection = deleteOptions.collection
       const config = getCollectionConfig(collection)
+      const id = String(deleteOptions.id)
+      if (options.guardContext) {
+        const current = await readRawRow(collection, id)
+        if (!current) {
+          throw new DocumentNotFoundError(collection, id)
+        }
+        guard(collection, 'delete', toPublicRow(collection, current))
+      }
       const rows = await db
         .delete(config.table)
-        .where(eq(requireColumn(collection, 'id'), String(deleteOptions.id)))
+        .where(eq(requireColumn(collection, 'id'), id))
         .returning()
       if (!rows[0]) {
         throw new DocumentNotFoundError(collection, deleteOptions.id)
