@@ -11,9 +11,19 @@
   "bindings": [
     { "type": "queue", "binding": "QUEUE", "queue_name": "eametsad-jobs" },
     { "type": "kv_namespace", "binding": "KV", "id": "5b67cd2c595f4d31b3b1be5db76e9bef" },
-    { "type": "r2_bucket", "binding": "BUCKET", "bucket_name": "eametsad-media", "preview_bucket_name": "eametsad-media-preview" },
-    { "type": "plain_text", "binding": "NEON_DATABASE_URL", "value": "" },
-    { "type": "plain_text", "binding": "DATABASE_URL", "value": "" }
+    { "type": "r2_bucket", "binding": "BUCKET", "bucket_name": "eametsad-media", "preview_bucket_name": "eametsad-media-preview" }
+  ],
+  // TODO(task 2.8): the CI wrangler token lacks D1 write permission, so remote creation failed
+  // (Authentication error, code 10000). A user with D1 access must run once from apps/platform:
+  //   pnpm exec wrangler d1 create eametsad-db
+  // then replace the placeholder database_id below with the returned uuid. Local dev ignores the id.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "eametsad-db",
+      "database_id": "REPLACE-WITH-REAL-D1-DATABASE-ID",
+      "migrations_dir": "drizzle"
+    }
   ],
   "observability": {
     "enabled": true

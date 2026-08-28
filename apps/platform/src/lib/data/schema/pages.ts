@@ -1,7 +1,9 @@
-import { index, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { sql } from 'drizzle-orm'
+import { check, index, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 import { contentStatuses } from './content'
 import { media } from './media'
+import { inList } from './shared'
 
 export const pages = sqliteTable(
   'pages',
@@ -23,5 +25,6 @@ export const pages = sqliteTable(
   (t) => [
     uniqueIndex('pages_slug_unique').on(t.slug),
     index('pages_status_idx').on(t.status),
+    check('pages_status_check', sql`${t.status} IN ${sql.raw(inList(contentStatuses))}`),
   ],
 )
