@@ -146,7 +146,9 @@ describe('POST /api/leads', () => {
     })
 
     it('stores the server-computed ipHash on the created lead row', async () => {
-      const create = vi.fn().mockResolvedValue({ id: 'lead-1' })
+      const create = vi
+        .fn<(arg: { collection: string; data: Record<string, unknown> }) => Promise<{ id: string }>>()
+        .mockResolvedValue({ id: 'lead-1' })
       getPayloadClientMock.mockResolvedValue({ create })
 
       await ingestLeadActual({
@@ -155,12 +157,9 @@ describe('POST /api/leads', () => {
         ipHash: 'hash-192.168.1.1',
       })
 
-      expect(create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          collection: 'leads',
-          data: expect.objectContaining({ ipHash: 'hash-192.168.1.1' }),
-        }),
-      )
+      const call = create.mock.calls[0]?.[0]
+      expect(call?.collection).toBe('leads')
+      expect(call?.data.ipHash).toBe('hash-192.168.1.1')
     })
 
     it('stores no lead row when the honeypot path skips ingestion', async () => {
