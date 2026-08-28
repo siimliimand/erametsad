@@ -42,7 +42,7 @@ describe('evaluateAutobidders', () => {
     mockSinglePass(200)
     vi.mocked(placeBid).mockResolvedValue({ success: true, bid: {} } as never)
 
-    await evaluateAutobidders('auction-1', 100)
+    await evaluateAutobidders('auction-1')
 
     expect(vi.mocked(placeBid)).toHaveBeenCalledWith({
       userId: 'user-auto-1',
@@ -56,7 +56,7 @@ describe('evaluateAutobidders', () => {
   it('autobidder capped at maxAmount does not exceed it', async () => {
     mockSinglePass(105)
 
-    await evaluateAutobidders('auction-1', 195)
+    await evaluateAutobidders('auction-1')
 
     expect(vi.mocked(placeBid)).not.toHaveBeenCalled()
   })
@@ -69,7 +69,7 @@ describe('evaluateAutobidders', () => {
       return { docs: [] }
     })
 
-    await evaluateAutobidders('auction-1', 200)
+    await evaluateAutobidders('auction-1')
 
     expect(vi.mocked(placeBid)).not.toHaveBeenCalled()
   })
@@ -91,10 +91,10 @@ describe('evaluateAutobidders', () => {
       })
       vi.mocked(placeBid).mockResolvedValue({ success: false } as never)
 
-      await evaluateAutobidders('auction-1', 100)
+      await evaluateAutobidders('auction-1')
 
       expect(vi.mocked(placeBid)).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 'user-old', amount: 110 }),
+        expect.objectContaining({ userId: 'user-old', amount: 200 }),
       )
     })
 
@@ -114,10 +114,10 @@ describe('evaluateAutobidders', () => {
       })
       vi.mocked(placeBid).mockResolvedValue({ success: false } as never)
 
-      await evaluateAutobidders('auction-1', 100)
+      await evaluateAutobidders('auction-1')
 
       expect(vi.mocked(placeBid)).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 'user-high', amount: 110 }),
+        expect.objectContaining({ userId: 'user-high', amount: 210 }),
       )
     })
 
@@ -137,7 +137,7 @@ describe('evaluateAutobidders', () => {
       })
       vi.mocked(placeBid).mockResolvedValue({ success: false } as never)
 
-      await evaluateAutobidders('auction-1', 100)
+      await evaluateAutobidders('auction-1')
 
       expect(vi.mocked(placeBid)).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'user-1', amount: 200 }),
