@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { verifyAccessToken } from '@/lib/auth/jwt'
+import { isAdminRole, verifyAccessToken } from '@/lib/auth/jwt'
 import { confirmWinner } from '@/lib/bidding/sealed-opening'
 
 export async function POST(
@@ -17,7 +17,7 @@ export async function POST(
   if (!tokenPayload) {
     return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
   }
-  if (tokenPayload.role !== 'admin' && tokenPayload.role !== 'superadmin') {
+  if (!isAdminRole(tokenPayload.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -36,7 +36,7 @@ export async function POST(
   }
 
   try {
-    await confirmWinner(auctionId, bidId)
+    await confirmWinner(auctionId, bidId, accessToken)
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'

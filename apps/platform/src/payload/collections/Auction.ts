@@ -264,6 +264,14 @@ export const Auction: CollectionConfig = {
               },
             },
             {
+              name: 'finalPrice',
+              type: 'number',
+              min: 0,
+              admin: {
+                description: 'Winning amount published when the auction is appraised',
+              },
+            },
+            {
               name: 'feeOverride',
               type: 'number',
               min: 0,

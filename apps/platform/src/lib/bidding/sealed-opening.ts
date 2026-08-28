@@ -5,6 +5,7 @@ import { createCache } from '../cache'
 import { decryptSealedBids, getSealedBidsForAuction, type DecryptedBid } from './sealed-bid'
 import { getPayloadClient } from '../../payload/payloadClient'
 import { prepareContract } from '../contracts/service'
+import { eventBus } from '../notifications/event-bus'
 
 interface OpeningSession {
   sessionId: string
@@ -129,7 +130,13 @@ export async function approveOpeningSession(
 export async function confirmWinner(
   auctionId: string,
   bidId: string,
+  adminAccessToken: string,
 ): Promise<void> {
+  const admin = verifyAdminAccessToken(adminAccessToken)
+  if (!admin) {
+    throw new Error('Confirmer must hold a valid admin or superadmin token')
+  }
+
   const payload = await getPayloadClient()
 
   const auctionResult = await payload.find({
@@ -142,19 +149,68 @@ export async function confirmWinner(
   if (!auction) {
     throw new Error('Auction not found')
   }
-  if (auction.status !== 'ended' && auction.status !== 'appraised') {
-    throw new Error(`Auction must be in 'ended' or 'appraised' status to confirm a winner, current: ${String(auction.status)}`)
+  if (auction.status !== 'ended') {
+    throw new Error(`Auction must be in 'ended' status to confirm a winner, current: ${String(auction.status)}`)
   }
 
-  const bidResult = await payload.find({
-    collection: 'bids',
-    where: { id: { equals: bidId } },
-    limit: 1,
-    depth: 0,
-  })
-  const bid = bidResult.docs[0] as Record<string, unknown> | undefined
-  if (!bid) {
-    throw new Error('Bid not found')
+  const rawBids = await getSealedBidsForAuction(auctionId)
+  const decrypted = decryptSealedBids(rawBids)
+  const ranked = rankBids(decrypted)
+
+  const target = decrypted.find((bid) => bid.id === bidId)
+  if (!target) {
+    throw new Error('Bid not found among the sealed bids of this auction')
+  }
+  if (!target.valid) {
+    throw new Error('Bid is invalid (decryption failed) and cannot win')
+  }
+  const top = ranked[0]
+  if (!top || top.id !== bidId) {
+    throw new Error('Bid does not top the decrypted ranking')
+  }
+
+  const winningAmount = target.amount
+  const auctionTitle = auction.title as string | undefined
+  const rawReserve = auction.reservePrice
+  const reserveSet = typeof rawReserve === 'number' && Number.isFinite(rawReserve)
+  const reserveMet = !reserveSet || winningAmount >= rawReserve
+
+  if (!reserveMet) {
+    await payload.update({
+      collection: 'auctions',
+      id: auctionId,
+      data: { status: 'unsold' },
+    })
+
+    eventBus.emit({
+      type: 'auction.ended',
+      userId: target.user,
+      payload: {
+        auctionId,
+        auctionTitle,
+        type: 'sealed',
+        hasWinner: false,
+        reserveNotMet: true,
+        amount: winningAmount,
+      },
+    })
+
+    await payload.create({
+      collection: 'audit-entry',
+      data: {
+        action: 'reserve_not_met',
+        entityType: 'auction',
+        entityId: auctionId,
+        after: {
+          bidId,
+          auctionStatus: 'unsold',
+          finalPrice: winningAmount,
+          reservePrice: rawReserve,
+        },
+      },
+    })
+
+    return
   }
 
   await payload.update({
@@ -186,10 +242,36 @@ export async function confirmWinner(
   await payload.update({
     collection: 'auctions',
     id: auctionId,
-    data: { status: 'appraised' },
+    data: {
+      status: 'appraised',
+      winningBid: bidId,
+      finalPrice: winningAmount,
+    },
   })
 
+  // 8.2 backfills the statistics snapshot eur from finalPrice at this point.
   await prepareContract(auctionId, 'auction')
+
+  const loserUserIds = [
+    ...new Set(
+      ranked
+        .filter((bid) => bid.user !== target.user)
+        .map((bid) => bid.user),
+    ),
+  ]
+  for (const loserId of loserUserIds) {
+    eventBus.emit({
+      type: 'auction.ended',
+      userId: loserId,
+      payload: {
+        auctionId,
+        auctionTitle,
+        type: 'sealed',
+        hasWinner: true,
+        finalPrice: winningAmount,
+      },
+    })
+  }
 
   await payload.create({
     collection: 'audit-entry',
@@ -200,6 +282,7 @@ export async function confirmWinner(
       after: {
         bidId,
         auctionStatus: 'appraised',
+        finalPrice: winningAmount,
       },
     },
   })
