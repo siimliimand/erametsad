@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
 
-export const runtime = 'edge'
-
 export function GET() {
   const bindings = (globalThis as Record<string, unknown>).env as
     | Record<string, unknown>

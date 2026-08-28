@@ -1,4 +1,4 @@
-import { setupDevPlatform } from '@cloudflare/next-on-pages/next-dev'
+import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare'
 import { withPayload } from '@payloadcms/next/withPayload'
 import { NextConfig } from 'next'
 
@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
 
 export default async () => {
   if (process.env.NODE_ENV === 'development') {
-    await setupDevPlatform()
+    await initOpenNextCloudflareForDev()
   }
   return withPayload(nextConfig)
 }
