@@ -333,6 +333,27 @@ describe('confirmWinner', () => {
     expect(auditCreateActions()).toContain('winner_confirmed')
   })
 
+  it('backfills the statistics snapshot eur from the published finalPrice without recounting the auction', async () => {
+    queueFind('auctions', [endedAuction({ objectType: 'forest', reservePrice: 25_000 })])
+    queueFind('bids', [
+      sealedBid({ id: 'bid-a', user: 'user-a', amount: 27_500, createdAt: '2026-02-01T10:00:00Z' }),
+    ])
+    queueFind('bids', [])
+    queueFind('statistics-snapshots', [
+      { id: 'snap-1', date: new Date().toISOString(), objectType: 'forest', count: 1, area: 12.5, eur: 0 },
+    ])
+
+    await confirmWinner(AUCTION_ID, 'bid-a', adminToken('confirmer-admin'))
+
+    expect(mockPayload.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'statistics-snapshots',
+        id: 'snap-1',
+        data: { count: 1, area: 12.5, eur: 27_500 },
+      }),
+    )
+  })
+
   it('treats a bid equal to the reserve price as meeting the reserve', async () => {
     queueFind('auctions', [endedAuction({ reservePrice: 150_000 })])
     queueFind('bids', [sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' })])
@@ -359,6 +380,12 @@ describe('confirmWinner', () => {
     expect(auctionUpdates()[0]?.data).toEqual({ status: 'unsold' })
     expect(mockPayload.update).not.toHaveBeenCalledWith(
       expect.objectContaining({ collection: 'bids', id: 'bid-a' }),
+    )
+    expect(mockPayload.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ collection: 'statistics-snapshots' }),
+    )
+    expect(mockPayload.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({ collection: 'statistics-snapshots' }),
     )
     expect(prepareContract).not.toHaveBeenCalled()
 

@@ -1,4 +1,60 @@
+import type { Payload } from 'payload'
+
 import { getPayloadClient } from '../../payload/payloadClient'
+
+export interface SnapshotDelta {
+  objectType: string
+  count?: number
+  area?: number
+  eur?: number
+}
+
+export async function upsertSnapshot(payload: Payload, delta: SnapshotDelta): Promise<void> {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const count = delta.count ?? 0
+  const area = delta.area ?? 0
+  const eur = delta.eur ?? 0
+
+  const existing = await payload.find({
+    collection: 'statistics-snapshots',
+    where: {
+      and: [
+        { date: { equals: today.toISOString() } },
+        { objectType: { equals: delta.objectType } },
+      ],
+    },
+    limit: 1,
+    depth: 0,
+  })
+
+  if (existing.docs.length > 0) {
+    const doc = existing.docs[0] as Record<string, unknown>
+    await payload.update({
+      collection: 'statistics-snapshots',
+      id: doc.id as string,
+      data: {
+        count: (Number(doc.count) || 0) + count,
+        area: (Number(doc.area) || 0) + area,
+        eur: (Number(doc.eur) || 0) + eur,
+      },
+      depth: 0,
+    })
+  } else {
+    await payload.create({
+      collection: 'statistics-snapshots',
+      data: {
+        date: today.toISOString(),
+        objectType: delta.objectType,
+        count,
+        area,
+        eur,
+      },
+      depth: 0,
+    })
+  }
+}
 
 export interface StatisticsResult {
   objectType: string

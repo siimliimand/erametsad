@@ -6,6 +6,7 @@ import { decryptSealedBids, getSealedBidsForAuction, type DecryptedBid } from '.
 import { getPayloadClient } from '../../payload/payloadClient'
 import { prepareContract } from '../contracts/service'
 import { eventBus } from '../notifications/event-bus'
+import { upsertSnapshot } from '../stats/aggregation'
 
 interface OpeningSession {
   sessionId: string
@@ -171,6 +172,7 @@ export async function confirmWinner(
 
   const winningAmount = target.amount
   const auctionTitle = auction.title as string | undefined
+  const objectType = auction.objectType as string
   const rawReserve = auction.reservePrice
   const reserveSet = typeof rawReserve === 'number' && Number.isFinite(rawReserve)
   const reserveMet = !reserveSet || winningAmount >= rawReserve
@@ -249,7 +251,11 @@ export async function confirmWinner(
     },
   })
 
-  // 8.2 backfills the statistics snapshot eur from finalPrice at this point.
+  // The ending worker already recorded count and area for this auction in
+  // the end-day snapshot with eur 0, so the ceremony backfill adds only the
+  // eur contribution from the published finalPrice.
+  await upsertSnapshot(payload, { objectType, eur: winningAmount })
+
   await prepareContract(auctionId, 'auction')
 
   const loserUserIds = [
