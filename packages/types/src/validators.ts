@@ -41,9 +41,14 @@ export const EECadastral = z
     'Estonian cadastral code must follow the format NNNNN:NNN:NNNN',
   )
 
+export const EEEmail = z
+  .string()
+  .email('Must be a valid email address')
+
 export const validators = {
   EEPhone,
   EEIsikukood,
   EERegistrikood,
   EECadastral,
+  EEEmail,
 }

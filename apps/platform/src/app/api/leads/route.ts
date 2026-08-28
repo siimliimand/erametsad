@@ -1,45 +1,86 @@
 import { NextResponse } from 'next/server'
+import { validators } from '@eametsad/types'
 
 import { ingestLead, validateHoneypot } from '@/lib/leads/ingestion'
-import { apiRateLimiter } from '@/lib/rate-limit'
+import { leadsRateLimiter } from '@/lib/rate-limit'
+import { computeIpHash } from '@/lib/bidding/place-bid'
+
+function extractIp(request: Request): string {
+  const raw = request.headers.get('x-forwarded-for')
+  const first = raw?.split(',')[0]?.trim()
+  return first && first.length > 0 ? first : 'unknown'
+}
+
+function fieldError(field: string): { error: string } {
+  const labels: Record<string, string> = {
+    contactName: 'Nimi on kohustuslik',
+    phone: 'Sobimatu telefoninumber',
+    email: 'Sobimatu e-posti aadress',
+    consentAt: 'Nõusolek on kohustuslik',
+  }
+  return { error: labels[field] ?? 'Kohustuslik välja puudub' }
+}
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
-  const rateCheck = apiRateLimiter.check(`leads:${ip}`)
+  const ip = extractIp(request)
+  const rateCheck = leadsRateLimiter.check(`leads:${ip}`)
   if (!rateCheck.allowed) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    return NextResponse.json({ error: 'Liiga palju päringuid' }, { status: 429 })
   }
 
   let body: Record<string, unknown>
   try {
     body = await request.json() as Record<string, unknown>
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return NextResponse.json({ error: 'Vigane JSON' }, { status: 400 })
   }
 
   if (!validateHoneypot(body)) {
     return NextResponse.json({ status: 'ok' })
   }
 
-  if (!body.consentAt) {
-    return NextResponse.json({ error: 'consentAt is required' }, { status: 400 })
+  const contactName = typeof body.contactName === 'string' ? body.contactName.trim() : ''
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : ''
+  const email = typeof body.email === 'string' ? body.email.trim() : ''
+  const consentAt = typeof body.consentAt === 'string' ? body.consentAt.trim() : ''
+  const formName = typeof body.formName === 'string' ? body.formName.trim() : ''
+  const pageSlug = typeof body.pageSlug === 'string' ? body.pageSlug.trim() : ''
+  const cadastr = typeof body.cadastr === 'string' ? body.cadastr.trim() : ''
+  const source = typeof body.source === 'string' ? body.source.trim() : 'web'
+
+  if (!contactName) {
+    return NextResponse.json(fieldError('contactName'), { status: 400 })
   }
+
+  if (!phone || !validators.EEPhone.safeParse(phone).success) {
+    return NextResponse.json(fieldError('phone'), { status: 400 })
+  }
+
+  if (!email || !validators.EEEmail.safeParse(email).success) {
+    return NextResponse.json(fieldError('email'), { status: 400 })
+  }
+
+  if (!consentAt) {
+    return NextResponse.json(fieldError('consentAt'), { status: 400 })
+  }
+
+  const ipHash = computeIpHash(ip)
 
   try {
     const lead = await ingestLead({
-      formName: body.formName as string,
-      pageSlug: (body.pageSlug as string | undefined) ?? '',
-      contactName: body.contactName as string,
-      phone: (body.phone as string | undefined) ?? '',
-      email: (body.email as string | undefined) ?? '',
-      cadastr: (body.cadastr as string | undefined) ?? '',
-      consentAt: body.consentAt as string,
-      source: (body.source as string | undefined) ?? 'web',
+      formName,
+      pageSlug,
+      contactName,
+      phone,
+      email,
+      cadastr,
+      consentAt,
+      source,
+      ipHash,
     })
 
     return NextResponse.json(lead, { status: 201 })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal error'
-    return NextResponse.json({ error: message }, { status: 500 })
+  } catch {
+    return NextResponse.json({ error: 'Sisemine viga' }, { status: 500 })
   }
 }

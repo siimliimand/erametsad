@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@eametsad/emails": "workspace:*",
+    "@eametsad/types": "workspace:*",
     "@eametsad/ui": "workspace:*",
     "@neondatabase/serverless": "^1.1.0",
     "@payloadcms/db-postgres": "^3.0.0",
