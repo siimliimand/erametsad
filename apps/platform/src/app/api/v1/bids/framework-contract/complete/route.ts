@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const contract = await signContract(contractId)
+    const contract = await signContract(contractId, tokenPayload.userId)
     return NextResponse.json(contract)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to sign contract'

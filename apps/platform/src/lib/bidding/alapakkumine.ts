@@ -5,6 +5,12 @@ export interface AlapakkumineResult {
   requiresApproval: boolean
 }
 
+export function isAlapakkumineEnabled(
+  settings: { alapakkumineEnabled?: boolean } | null | undefined,
+): boolean {
+  return settings?.alapakkumineEnabled === true
+}
+
 export async function handleAlapakkumine(
   bid: { id: string; amount: number; auction: string },
   auction: { minBid: number; id: string },

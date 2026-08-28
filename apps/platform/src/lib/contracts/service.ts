@@ -90,7 +90,10 @@ export async function prepareContract(
   return newContract as unknown as Contract
 }
 
-export async function signContract(contractId: string): Promise<Contract> {
+export async function signContract(
+  contractId: string,
+  signerId: string,
+): Promise<Contract> {
   const payload = await getPayloadClient()
 
   const contractResult = await payload.find({
@@ -128,6 +131,7 @@ export async function signContract(contractId: string): Promise<Contract> {
     data: {
       status: 'signed',
       signedAt: new Date().toISOString(),
+      signedBy: signerId,
       contentHash,
     },
   })

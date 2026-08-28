@@ -26,8 +26,6 @@ export async function POST(request: NextRequest) {
   const auctionId = body.auctionId as string | undefined
   const amount = body.amount as number | undefined
   const type = body.type as string | undefined
-  const source = body.source as string | undefined
-  const ipHash = body.ipHash as string | undefined
   const idempotencyKey = body.idempotencyKey as string | undefined
 
   if (!auctionId || typeof auctionId !== 'string') {
@@ -39,17 +37,14 @@ export async function POST(request: NextRequest) {
   if (type !== 'open' && type !== 'sealed') {
     return NextResponse.json({ error: 'type must be open or sealed' }, { status: 400 })
   }
-  if (source !== 'manual' && source !== 'autobidder') {
-    return NextResponse.json({ error: 'source must be manual or autobidder' }, { status: 400 })
-  }
 
   const result: BidResult = await placeBid({
     userId: tokenPayload.userId,
     auctionId,
     amount,
     type,
-    source,
-    ...(ipHash !== undefined ? { ipHash } : {}),
+    source: 'manual',
+    requestIp: request.headers.get('x-forwarded-for') ?? 'unknown',
     ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
   })
 
