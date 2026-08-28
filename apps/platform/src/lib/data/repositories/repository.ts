@@ -7,12 +7,13 @@ import type * as schema from '../schema'
 import { DocumentNotFoundError, UnknownFieldError } from './errors'
 import { applyIsikukoodOnRead, applyIsikukoodOnWrite, shouldDeactivateOtherTemplates, type IsikukoodCodec } from './hooks'
 import { decodeJsonFields, encodeJsonFields } from './json-fields'
+import { decodeMoneyFields, encodeMoneyFields } from './money'
 import {
   coreCollections,
   getCollectionConfig,
-  type CoreCollectionSlug,
   type CreateDataFor,
   type DocFor,
+  type RepositorySlug,
   type UpdateDataFor,
 } from './registry'
 import { sortExpression } from './sort'
@@ -39,7 +40,7 @@ export interface RepositoryOptions {
   now?: () => string
 }
 
-export interface FindOptions<C extends CoreCollectionSlug = CoreCollectionSlug> {
+export interface FindOptions<C extends RepositorySlug = RepositorySlug> {
   collection: C
   where?: WhereClause
   /** Leading '-' sorts descending; a bare field sorts ascending. */
@@ -55,25 +56,25 @@ export interface FindOptions<C extends CoreCollectionSlug = CoreCollectionSlug> 
   depth?: number
 }
 
-export interface FindByIDOptions<C extends CoreCollectionSlug = CoreCollectionSlug> {
+export interface FindByIDOptions<C extends RepositorySlug = RepositorySlug> {
   collection: C
   id: string | number
   depth?: number
 }
 
-export interface CreateOptions<C extends CoreCollectionSlug = CoreCollectionSlug> {
+export interface CreateOptions<C extends RepositorySlug = RepositorySlug> {
   collection: C
   data: CreateDataFor<C>
 }
 
-export interface UpdateOptions<C extends CoreCollectionSlug = CoreCollectionSlug> {
+export interface UpdateOptions<C extends RepositorySlug = RepositorySlug> {
   collection: C
   id: string | number
   data: UpdateDataFor<C>
   depth?: number
 }
 
-export interface DeleteOptions<C extends CoreCollectionSlug = CoreCollectionSlug> {
+export interface DeleteOptions<C extends RepositorySlug = RepositorySlug> {
   collection: C
   id: string | number
 }
@@ -83,10 +84,10 @@ export interface FindResult<TDoc> {
 }
 
 export interface CoreRepositories {
-  find<C extends CoreCollectionSlug>(options: FindOptions<C>): Promise<FindResult<DocFor<C>>>
-  findByID<C extends CoreCollectionSlug>(options: FindByIDOptions<C>): Promise<DocFor<C> | null>
-  create<C extends CoreCollectionSlug>(options: CreateOptions<C>): Promise<DocFor<C>>
-  update<C extends CoreCollectionSlug>(options: UpdateOptions<C>): Promise<DocFor<C>>
+  find<C extends RepositorySlug>(options: FindOptions<C>): Promise<FindResult<DocFor<C>>>
+  findByID<C extends RepositorySlug>(options: FindByIDOptions<C>): Promise<DocFor<C> | null>
+  create<C extends RepositorySlug>(options: CreateOptions<C>): Promise<DocFor<C>>
+  update<C extends RepositorySlug>(options: UpdateOptions<C>): Promise<DocFor<C>>
   delete(options: DeleteOptions): Promise<void>
 }
 
@@ -105,11 +106,11 @@ function idHint(value: unknown): string {
 export function createCoreRepositories(db: CoreDatabase, options: RepositoryOptions): CoreRepositories {
   const now = options.now ?? (() => new Date().toISOString())
 
-  function columnsOf(collection: CoreCollectionSlug): Record<string, Column> {
-    return getTableColumns(coreCollections[collection].table) as Record<string, Column>
+  function columnsOf(collection: RepositorySlug): Record<string, Column> {
+    return getTableColumns(getCollectionConfig(collection).table) as Record<string, Column>
   }
 
-  function requireColumn(collection: CoreCollectionSlug, name: string): Column {
+  function requireColumn(collection: RepositorySlug, name: string): Column {
     const column = columnsOf(collection)[name]
     if (!column) {
       throw new UnknownFieldError(collection, name)
@@ -117,12 +118,13 @@ export function createCoreRepositories(db: CoreDatabase, options: RepositoryOpti
     return column
   }
 
-  function decodeRow<C extends CoreCollectionSlug>(
+  function decodeRow<C extends RepositorySlug>(
     collection: C,
     row: Record<string, unknown>,
   ): DocFor<C> {
-    const config = coreCollections[collection]
+    const config = getCollectionConfig(collection)
     let doc = decodeJsonFields(row, config.jsonFields)
+    doc = decodeMoneyFields(doc, config.moneyFields ?? {})
     if (config.isikukood) {
       doc = applyIsikukoodOnRead(doc, options.isikukoodCodec)
     }
@@ -130,14 +132,16 @@ export function createCoreRepositories(db: CoreDatabase, options: RepositoryOpti
   }
 
   function encodeWrite(
-    collection: CoreCollectionSlug,
+    collection: RepositorySlug,
     data: Record<string, unknown>,
     mode: 'create' | 'update',
   ): Record<string, unknown> {
-    const config = coreCollections[collection]
+    const config = getCollectionConfig(collection)
     const columns = columnsOf(collection)
+    // EUR fields become integer-cents columns before alias and column checks.
+    const moneyEncoded = encodeMoneyFields(data, config.moneyFields ?? {})
     const out: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(data)) {
+    for (const [key, value] of Object.entries(moneyEncoded)) {
       if (value === undefined) {
         continue
       }
@@ -160,21 +164,21 @@ export function createCoreRepositories(db: CoreDatabase, options: RepositoryOpti
   }
 
   function tableUpdate(
-    collection: CoreCollectionSlug,
+    collection: RepositorySlug,
     values: Record<string, unknown>,
     condition: SQL | undefined,
   ) {
-    const config = coreCollections[collection]
+    const config = getCollectionConfig(collection)
     // The runtime table lookup erases the per-collection insert type; the
     // public API already validated the data shape for the given collection.
     return db.update(config.table).set(values).where(condition)
   }
 
   async function insertReturning(
-    collection: CoreCollectionSlug,
+    collection: RepositorySlug,
     values: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
-    const config = coreCollections[collection]
+    const config = getCollectionConfig(collection)
     const rows = await db
       .insert(config.table)
       .values(values as never)

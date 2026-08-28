@@ -1,6 +1,7 @@
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 
 import type {
+  Article,
   Auction,
   AuctionRight,
   AuctionSubscription,
@@ -10,7 +11,13 @@ import type {
   CompanyAccessRequest,
   Contract,
   ContractTemplate,
+  County,
+  FaqCategory,
+  FaqItem,
   Lead,
+  LegalDocument,
+  MediaAsset,
+  NewArticle,
   NewAuction,
   NewAuctionRight,
   NewAuctionSubscription,
@@ -20,17 +27,37 @@ import type {
   NewCompanyAccessRequest,
   NewContract,
   NewContractTemplate,
+  NewCounty,
+  NewFaqCategory,
+  NewFaqItem,
   NewLead,
+  NewLegalDocument,
+  NewMediaAsset,
   NewNotification,
+  NewPage,
+  NewParish,
+  NewPartnerService,
   NewProfile,
+  NewRedirect,
   NewSettings,
+  NewSpecialist,
+  NewStatisticsSnapshot,
+  NewTestimonial,
   NewUser,
   NotificationRow,
+  Page,
+  Parish,
+  PartnerService,
   Profile,
+  Redirect,
   SettingsRow,
+  Specialist,
+  StatisticsSnapshot,
+  Testimonial,
   User,
 } from '../schema'
 import {
+  articles,
   auctionRights,
   auctionSubscriptions,
   auctions,
@@ -40,14 +67,27 @@ import {
   companyAccessRequests,
   contractTemplates,
   contracts,
+  counties,
+  faqCategories,
+  faqItems,
   leads,
+  legalDocuments,
+  media,
   notifications,
+  pages,
+  parishes,
+  partnerServices,
   profiles,
+  redirects,
   settings,
+  specialists,
+  statisticsSnapshots,
+  testimonials,
   users,
 } from '../schema'
 import { UnknownCollectionError } from './errors'
 import type { JsonFieldSpec } from './json-fields'
+import type { MoneyFieldMap } from './money'
 
 export type CoreCollectionSlug =
   | 'users'
@@ -64,6 +104,23 @@ export type CoreCollectionSlug =
   | 'audit-entry'
   | 'leads'
   | 'settings'
+
+export type ContentCollectionSlug =
+  | 'articles'
+  | 'pages'
+  | 'faq-categories'
+  | 'faq-items'
+  | 'testimonials'
+  | 'partner-services'
+  | 'legal-documents'
+  | 'redirects'
+  | 'specialists'
+  | 'statistics-snapshots'
+  | 'counties'
+  | 'parishes'
+  | 'media'
+
+export type RepositorySlug = CoreCollectionSlug | ContentCollectionSlug
 
 export const auctionsJsonFields = {
   coordinates: 'json',
@@ -85,6 +142,12 @@ export const notificationsJsonFields = { payload: 'json' } as const satisfies Js
 export const auditEntriesJsonFields = { before: 'json', after: 'json' } as const satisfies JsonFieldSpec
 export const settingsJsonFields = { featureFlags: 'json' } as const satisfies JsonFieldSpec
 export const auctionSubscriptionsJsonFields = { filterJson: 'json' } as const satisfies JsonFieldSpec
+
+// Payload text hasMany on articles; blocks on pages. RichText columns
+// (articles.content, faq-items.answer, legal-documents.content,
+// specialists.bio) stay raw TEXT: the admin UI renders them as stored.
+export const articlesJsonFields = { tags: 'array' } as const satisfies JsonFieldSpec
+export const pagesJsonFields = { layout: 'json' } as const satisfies JsonFieldSpec
 
 type JsonDoc<T, J extends JsonFieldSpec> = Omit<T, keyof J> & {
   [K in keyof J & string]: J[K] extends 'array' ? unknown[] | null : unknown
@@ -114,6 +177,14 @@ export type AuctionSubscriptionCreateData = CreateData<
   NewAuctionSubscription,
   typeof auctionSubscriptionsJsonFields
 >
+
+export type ArticleDoc = JsonDoc<Article, typeof articlesJsonFields>
+export type PageDoc = JsonDoc<Page, typeof pagesJsonFields>
+// Payload 'eur' number on the public surface; eur_cents integer in storage.
+export type StatisticsSnapshotDoc = Omit<StatisticsSnapshot, 'eurCents'> & { eur: number }
+export type StatisticsSnapshotCreateData = Omit<CreateData<NewStatisticsSnapshot>, 'eurCents'> & {
+  eur: number
+}
 
 export interface CoreCollectionDocs {
   users: UserDoc
@@ -149,21 +220,59 @@ export interface CoreCollectionCreates {
   settings: SettingsCreateData
 }
 
-export type DocFor<C extends CoreCollectionSlug> = CoreCollectionDocs[C]
-export type CreateDataFor<C extends CoreCollectionSlug> = CoreCollectionCreates[C]
-export type UpdateDataFor<C extends CoreCollectionSlug> = Partial<CreateDataFor<C>> & { id?: string }
+export interface ContentCollectionDocs {
+  articles: ArticleDoc
+  pages: PageDoc
+  'faq-categories': FaqCategory
+  'faq-items': FaqItem
+  testimonials: Testimonial
+  'partner-services': PartnerService
+  'legal-documents': LegalDocument
+  redirects: Redirect
+  specialists: Specialist
+  'statistics-snapshots': StatisticsSnapshotDoc
+  counties: County
+  parishes: Parish
+  media: MediaAsset
+}
 
-interface CoreCollectionConfig {
+export interface ContentCollectionCreates {
+  articles: CreateData<NewArticle, typeof articlesJsonFields>
+  pages: CreateData<NewPage, typeof pagesJsonFields>
+  'faq-categories': CreateData<NewFaqCategory>
+  'faq-items': CreateData<NewFaqItem>
+  testimonials: CreateData<NewTestimonial>
+  'partner-services': CreateData<NewPartnerService>
+  'legal-documents': CreateData<NewLegalDocument>
+  redirects: CreateData<NewRedirect>
+  specialists: CreateData<NewSpecialist>
+  'statistics-snapshots': StatisticsSnapshotCreateData
+  counties: CreateData<NewCounty>
+  parishes: CreateData<NewParish>
+  media: CreateData<NewMediaAsset>
+}
+
+type RepositoryDocs = CoreCollectionDocs & ContentCollectionDocs
+type RepositoryCreates = CoreCollectionCreates & ContentCollectionCreates
+
+export type DocFor<C extends RepositorySlug> = RepositoryDocs[C]
+export type CreateDataFor<C extends RepositorySlug> = RepositoryCreates[C]
+export type UpdateDataFor<C extends RepositorySlug> = Partial<CreateDataFor<C>> & { id?: string }
+
+interface RepositoryCollectionConfig {
   table: SQLiteTable
   aliases: Readonly<Record<string, string>>
   jsonFields: JsonFieldSpec
   isikukood: boolean
   templateActivation: boolean
+  /** Public EUR field name to stored integer-cents column. */
+  moneyFields?: MoneyFieldMap
 }
 
-export type { CoreCollectionConfig }
+export type { RepositoryCollectionConfig }
+export type CoreCollectionConfig = RepositoryCollectionConfig
 
-export const coreCollections: Readonly<Record<CoreCollectionSlug, CoreCollectionConfig>> = {
+export const coreCollections: Readonly<Record<CoreCollectionSlug, RepositoryCollectionConfig>> = {
   users: {
     table: users,
     aliases: {},
@@ -269,9 +378,108 @@ export const coreCollections: Readonly<Record<CoreCollectionSlug, CoreCollection
   },
 }
 
-const collectionLookup: Readonly<Partial<Record<string, CoreCollectionConfig>>> = coreCollections
+export const contentCollections: Readonly<Record<ContentCollectionSlug, RepositoryCollectionConfig>> =
+  {
+    articles: {
+      table: articles,
+      aliases: { featuredImage: 'featuredImageId' },
+      jsonFields: articlesJsonFields,
+      isikukood: false,
+      templateActivation: false,
+    },
+    pages: {
+      table: pages,
+      aliases: {},
+      jsonFields: pagesJsonFields,
+      isikukood: false,
+      templateActivation: false,
+    },
+    'faq-categories': {
+      table: faqCategories,
+      aliases: {},
+      jsonFields: {},
+      isikukood: false,
+      templateActivation: false,
+    },
+    'faq-items': {
+      table: faqItems,
+      aliases: { category: 'categoryId' },
+      jsonFields: {},
+      isikukood: false,
+      templateActivation: false,
+    },
+    testimonials: {
+      table: testimonials,
+      aliases: { avatar: 'avatarId' },
+      jsonFields: {},
+      isikukood: false,
+      templateActivation: false,
+    },
+    'partner-services': {
+      table: partnerServices,
+      aliases: {},
+      jsonFields: {},
+      isikukood: false,
+      templateActivation: false,
+    },
+    'legal-documents': {
+      table: legalDocuments,
+      aliases: {},
+      jsonFields: {},
+      isikukood: false,
+      templateActivation: false,
+    },
+    redirects: {
+      table: redirects,
+      aliases: {},
+      jsonFields: {},
+      isikukood: false,
+      templateActivation: false,
+    },
+    specialists: {
+      table: specialists,
+      aliases: { photo: 'photoId' },
+      jsonFields: {},
+      isikukood: false,
+      templateActivation: false,
+    },
+    'statistics-snapshots': {
+      table: statisticsSnapshots,
+      aliases: {},
+      jsonFields: {},
+      isikukood: false,
+      templateActivation: false,
+      moneyFields: { eur: 'eurCents' },
+    },
+    counties: {
+      table: counties,
+      aliases: {},
+      jsonFields: {},
+      isikukood: false,
+      templateActivation: false,
+    },
+    parishes: {
+      table: parishes,
+      aliases: { county: 'countyId' },
+      jsonFields: {},
+      isikukood: false,
+      templateActivation: false,
+    },
+    media: {
+      table: media,
+      aliases: {},
+      jsonFields: {},
+      isikukood: false,
+      templateActivation: false,
+    },
+  }
 
-export function getCollectionConfig(collection: string): CoreCollectionConfig {
+const collectionLookup: Readonly<Partial<Record<string, RepositoryCollectionConfig>>> = {
+  ...coreCollections,
+  ...contentCollections,
+}
+
+export function getCollectionConfig(collection: string): RepositoryCollectionConfig {
   const config = collectionLookup[collection]
   if (!config) {
     throw new UnknownCollectionError(collection)

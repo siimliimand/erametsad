@@ -23,3 +23,50 @@ export function centsToEuros(cents: number): number {
   }
   return cents / 100
 }
+
+/**
+ * Public EUR field name to stored integer-cents column, for collections whose
+ * Payload surface exposes EUR numbers (statistics_snapshots.eur -> eur_cents).
+ */
+export type MoneyFieldMap = Readonly<Record<string, string>>
+
+export function encodeMoneyFields(
+  data: Record<string, unknown>,
+  moneyFields: MoneyFieldMap,
+): Record<string, unknown> {
+  if (Object.keys(moneyFields).length === 0) {
+    return data
+  }
+  const encoded: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(data)) {
+    const column = moneyFields[key]
+    if (column === undefined) {
+      encoded[key] = value
+    } else if (value !== undefined) {
+      encoded[column] = eurosToCents(value as number)
+    }
+  }
+  return encoded
+}
+
+export function decodeMoneyFields(
+  row: Record<string, unknown>,
+  moneyFields: MoneyFieldMap,
+): Record<string, unknown> {
+  if (Object.keys(moneyFields).length === 0) {
+    return row
+  }
+  const centsColumns = new Set(Object.values(moneyFields))
+  const doc: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(row)) {
+    if (!centsColumns.has(key)) {
+      doc[key] = value
+    }
+  }
+  for (const [field, column] of Object.entries(moneyFields)) {
+    if (row[column] !== undefined) {
+      doc[field] = centsToEuros(row[column] as number)
+    }
+  }
+  return doc
+}
