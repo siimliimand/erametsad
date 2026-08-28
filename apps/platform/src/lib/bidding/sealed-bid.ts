@@ -18,6 +18,7 @@ export interface DecryptedBid {
   identitySnapshot?: string | undefined
   status: string
   createdAt: string
+  valid: boolean
 }
 
 async function getSealedRevisionCap(): Promise<number> {
@@ -70,6 +71,30 @@ export async function submitSealedBid(
     return { success: false, error: 'Auction has ended', status: 400 }
   }
 
+  const objectType = auction.objectType as string
+
+  // Same rights check and BidError as placeBid, so a shared route maps
+  // both to HTTP 403.
+  const rightsResult = await payload.find({
+    collection: 'auction-rights',
+    where: {
+      and: [
+        { user: { equals: userId } },
+        { objectType: { equals: objectType } },
+        { revokedAt: { exists: false } },
+      ],
+    },
+    limit: 1,
+    depth: 0,
+  })
+  if (rightsResult.docs.length === 0) {
+    return {
+      success: false,
+      error: 'No bidding right for this object type',
+      status: 403,
+    }
+  }
+
   if (amount < (auction.minBid as number)) {
     return {
       success: false,
@@ -93,12 +118,14 @@ export async function submitSealedBid(
   })
 
   const revisionCap = await getSealedRevisionCap()
+  // Cap semantics: 1 original bid plus up to N revisions (N from Settings),
+  // so a user may hold at most revisionCap + 1 sealed bids on an auction.
   const existingCount = existingBid.docs.length
 
-  if (existingCount > 0 && existingCount >= revisionCap + 1) {
+  if (existingCount >= revisionCap + 1) {
     return {
       success: false,
-      error: `Revision limit of ${String(revisionCap)} reached`,
+      error: `Lukspakkumuste limiit on ületatud: lubatud on üks esialgne pakkumine ja kuni ${String(revisionCap)} täienduspakkumist`,
       status: 400,
     }
   }
@@ -188,25 +215,59 @@ export function decryptSealedBids(
     const rawSnapshot = bid.identitySnapshot as string | undefined
     let amount = 0
     let identitySnapshot: string | undefined
+    let invalidReason: string | undefined
 
-    if (rawSnapshot) {
+    if (!rawSnapshot) {
+      invalidReason = 'no encrypted payload'
+    } else {
       try {
         const parsed = JSON.parse(rawSnapshot) as Record<string, string>
         if (parsed.encrypted && parsed.iv && parsed.authTag) {
-          amount = Number(
+          const decryptedAmount = Number(
             decryptSealedData(parsed.encrypted, parsed.iv, parsed.authTag),
           )
+          if (Number.isFinite(decryptedAmount)) {
+            amount = decryptedAmount
+          } else {
+            invalidReason = 'decrypted amount is not a finite number'
+          }
+        } else {
+          invalidReason = 'incomplete encrypted amount fields'
         }
-        if (parsed.identityEncrypted && parsed.identityIv && parsed.identityAuthTag) {
-          identitySnapshot = decryptSealedData(
-            parsed.identityEncrypted,
-            parsed.identityIv,
-            parsed.identityAuthTag,
-          )
+        if (
+          parsed.identityEncrypted ||
+          parsed.identityIv ||
+          parsed.identityAuthTag
+        ) {
+          if (
+            parsed.identityEncrypted &&
+            parsed.identityIv &&
+            parsed.identityAuthTag
+          ) {
+            identitySnapshot = decryptSealedData(
+              parsed.identityEncrypted,
+              parsed.identityIv,
+              parsed.identityAuthTag,
+            )
+          } else {
+            invalidReason = 'incomplete encrypted identity fields'
+          }
         }
-      } catch {
-        amount = 0
+      } catch (error) {
+        invalidReason = `decryption failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       }
+    }
+
+    if (invalidReason !== undefined) {
+      // A failed decrypt must surface as an invalid bid, never as a valid
+      // bid with amount 0, so the ceremony can continue with the rest.
+      amount = 0
+      identitySnapshot = undefined
+      console.error(
+        `[sealed-bid] bid ${String(bid.id)} marked invalid: ${invalidReason}`,
+      )
     }
 
     return {
@@ -217,6 +278,7 @@ export function decryptSealedBids(
       identitySnapshot,
       status: bid.status as string,
       createdAt: bid.createdAt as string,
+      valid: invalidReason === undefined,
     }
   })
 }
