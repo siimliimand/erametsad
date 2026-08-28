@@ -36,14 +36,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Vale profiili tüüp' }, { status: 400 })
   }
 
-  const termsTimestamp = consents.terms as string | number | undefined
-  const privacyTimestamp = consents.privacy as string | number | undefined
-
-  if (!termsTimestamp || !privacyTimestamp) {
-    return NextResponse.json(
-      { error: 'Nõusolekud (terms, privacy) on kohustuslikud' },
-      { status: 400 },
-    )
+  const consentTimestamps: Record<string, Date> = {}
+  for (const key of ['terms', 'privacy', 'marketing']) {
+    const raw = consents[key]
+    const parsed =
+      typeof raw === 'string' || typeof raw === 'number' ? new Date(raw) : undefined
+    if (!parsed || Number.isNaN(parsed.getTime())) {
+      return NextResponse.json(
+        { error: 'Nõusolekud (terms, privacy, marketing) on kohustuslikud' },
+        { status: 400 },
+      )
+    }
+    consentTimestamps[key] = parsed
   }
 
   if (profileType === 'company' && (!regCode || !companyName)) {
@@ -90,6 +94,9 @@ export async function POST(request: NextRequest) {
     user: userId,
     displayName,
     approvalStatus: profileType === 'company' ? 'pending' : 'approved',
+    termsConsentAt: consentTimestamps.terms,
+    privacyConsentAt: consentTimestamps.privacy,
+    marketingConsentAt: consentTimestamps.marketing,
   }
 
   if (profileType === 'company') {

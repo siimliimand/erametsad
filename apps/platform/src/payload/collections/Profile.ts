@@ -58,6 +58,18 @@ export const Profile: CollectionConfig = {
       name: 'phone',
       type: 'text',
     },
+    {
+      name: 'termsConsentAt',
+      type: 'date',
+    },
+    {
+      name: 'privacyConsentAt',
+      type: 'date',
+    },
+    {
+      name: 'marketingConsentAt',
+      type: 'date',
+    },
   ],
   access: {
     read: ({ req: { user } }) => {

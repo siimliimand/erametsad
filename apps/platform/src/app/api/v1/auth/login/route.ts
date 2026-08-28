@@ -83,6 +83,13 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  if (user.status === 'suspended') {
+    return NextResponse.json(
+      { error: 'Vale kasutajanimi või parool' },
+      { status: 401 },
+    )
+  }
+
   const userId = String(user.id)
   const role = getUserRole(user.role as string | undefined)
   const profileId = user.profileId as string | undefined

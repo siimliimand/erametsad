@@ -18,9 +18,17 @@ interface SessionRecord {
 }
 
 const sessions = new Map<string, SessionRecord>()
+const accessTokenSessions = new Map<string, Set<string>>()
 
 function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
+}
+
+function indexAccessToken(sessionId: string, accessToken: string): void {
+  const key = hashToken(accessToken)
+  const owners = accessTokenSessions.get(key) ?? new Set<string>()
+  owners.add(sessionId)
+  accessTokenSessions.set(key, owners)
 }
 
 export async function createSession(
@@ -34,6 +42,7 @@ export async function createSession(
 
   const accessToken = signAccessToken({ userId, role, activeProfileId: profileId })
   const refreshToken = signRefreshToken({ sessionId })
+  indexAccessToken(sessionId, accessToken)
 
   sessions.set(sessionId, {
     userId,
@@ -74,6 +83,7 @@ export async function refreshSession(
 
   record.refreshTokenHash = hashToken(newRefreshToken)
   record.createdAt = new Date()
+  indexAccessToken(payload.sessionId, newAccessToken)
 
   return { accessToken: newAccessToken, refreshToken: newRefreshToken }
 }
@@ -120,11 +130,59 @@ export async function issueSessionAccessToken(
   await Promise.resolve()
   const record = sessions.get(sessionId)
   if (!record?.active) return null
-  return signAccessToken({
+  const accessToken = signAccessToken({
     userId: record.userId,
     role: record.role,
     activeProfileId: record.profileId,
   })
+  indexAccessToken(sessionId, accessToken)
+  return accessToken
+}
+
+export interface UserSessionInfo {
+  sessionId: string
+  createdAt: Date
+  current: boolean
+}
+
+export async function listUserSessions(
+  userId: string,
+  currentSessionId?: string,
+): Promise<UserSessionInfo[]> {
+  await Promise.resolve()
+  const result: UserSessionInfo[] = []
+  for (const [id, record] of sessions) {
+    if (record.userId !== userId) continue
+    result.push({
+      sessionId: id,
+      createdAt: record.createdAt,
+      current: id === currentSessionId,
+    })
+  }
+  return result
+}
+
+export type AccessTokenSessionRef =
+  | { state: 'active'; sessionId: string }
+  | { state: 'revoked' }
+  | { state: 'unknown' }
+
+export function resolveAccessTokenSession(token: string): AccessTokenSessionRef {
+  const owners = accessTokenSessions.get(hashToken(token))
+  if (!owners) return { state: 'unknown' }
+
+  // Access tokens carry no session id, and same-second issuances for one user
+  // produce identical JWTs; the newest live owner is the current session.
+  let newest: { id: string; createdAt: Date } | null = null
+  for (const id of owners) {
+    const record = sessions.get(id)
+    if (!record?.active) continue
+    if (!newest || record.createdAt > newest.createdAt) {
+      newest = { id, createdAt: record.createdAt }
+    }
+  }
+
+  return newest ? { state: 'active', sessionId: newest.id } : { state: 'revoked' }
 }
 
 export function setAccessTokenCookie(
