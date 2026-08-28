@@ -5,9 +5,8 @@ import {
   auctionEndedTemplate,
   contractReadyTemplate,
 } from '@eametsad/emails'
-import nodemailer, { type Transporter } from 'nodemailer'
 
-
+import { sendEmail, type SendResult } from './email-sender'
 import { type DomainEvent, type DomainEventType, type EventBus } from './event-bus'
 
 import { env } from '@/env'
@@ -41,16 +40,19 @@ const eventTitles: Record<DomainEventType, string> = {
   'bid.rejected': 'Teie pakkumus on tagasi lükatud',
 }
 
-let transporter: Transporter | null = null
+type RecipientDeliveryStatus = 'delivered' | 'queued' | 'permanent_bounces' | 'failed'
 
-function getTransporter(): Transporter {
-  transporter ??= nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: env.SMTP_PORT,
-    secure: false,
-    auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
-  })
-  return transporter
+interface RecipientResult {
+  email: string
+  status: RecipientDeliveryStatus
+}
+
+// SendResult cannot yet distinguish delivered from queued on the
+// cloudflare-api transport; 'queued' is reserved for transports that report it.
+function recipientStatus(result: SendResult): RecipientDeliveryStatus {
+  if (result.success) return 'delivered'
+  if (result.error?.code === 'E_PERMANENT_BOUNCE') return 'permanent_bounces'
+  return 'failed'
 }
 
 function getTemplate(eventType: DomainEventType, payload: Record<string, unknown>): string | null {
@@ -130,15 +132,28 @@ async function lookupEmail(repos: CoreRepositories, userId: string | number): Pr
 
 async function dispatchEmail(userId: string | number, event: DomainEvent, body: string, repos: CoreRepositories): Promise<void> {
   const to = await lookupEmail(repos, userId)
+  let result: SendResult | undefined
+  let recipients: RecipientResult[] = []
+  let errorCode: string | null = null
+
   if (!to) {
     console.warn(`[NOTIFICATION] No email address for user ${String(userId)}; email skipped`)
+    errorCode = 'E_NO_RECIPIENT'
   } else {
-    await getTransporter().sendMail({
+    result = await sendEmail({
       from: env.SMTP_FROM,
       to,
       subject: eventTitles[event.type],
-      text: body,
+      html: body,
     })
+    recipients = [{ email: to, status: recipientStatus(result) }]
+    errorCode = result.error?.code ?? null
+    if (!result.success) {
+      console.error(
+        `[NOTIFICATION] Email send failed via ${result.transport} for user ${String(userId)}` +
+          ` (code ${errorCode ?? 'unknown'}): ${result.error?.message ?? 'unknown error'}`,
+      )
+    }
   }
 
   await repos.create({
@@ -150,7 +165,10 @@ async function dispatchEmail(userId: string | number, event: DomainEvent, body: 
       title: eventTitles[event.type],
       body,
       payload: event.payload,
-      sentAt: new Date().toISOString(),
+      sentAt: result?.success === true ? new Date().toISOString() : null,
+      sendResult: result,
+      errorCode,
+      recipientResults: recipients,
     } as never,
   })
 }

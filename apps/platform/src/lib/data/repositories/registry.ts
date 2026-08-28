@@ -138,7 +138,11 @@ export const auctionsJsonFields = {
 } as const satisfies JsonFieldSpec
 
 export const contractTemplatesJsonFields = { placeholders: 'array' } as const satisfies JsonFieldSpec
-export const notificationsJsonFields = { payload: 'json' } as const satisfies JsonFieldSpec
+export const notificationsJsonFields = {
+  payload: 'json',
+  sendResult: 'json',
+  recipientResults: 'json',
+} as const satisfies JsonFieldSpec
 export const auditEntriesJsonFields = { before: 'json', after: 'json' } as const satisfies JsonFieldSpec
 export const settingsJsonFields = { featureFlags: 'json' } as const satisfies JsonFieldSpec
 export const auctionSubscriptionsJsonFields = { filterJson: 'json' } as const satisfies JsonFieldSpec

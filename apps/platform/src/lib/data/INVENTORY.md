@@ -376,4 +376,4 @@ interface Repository {
 | **Multi-collection `delete` (seed reset)** | Not relevant | Seed-only operation. The repository's `delete` method covers it. |
 | **RichText fields** | Not addressed | `specialist.bio` is Payload `richText`. Stored as TEXT; the admin UI renders it. No parse needed in the repository. |
 | **Upload fields** | Not addressed | `specialist.photo` is a Payload `upload` relation to `media`. The repository treats it as a foreign key. File storage moves to R2 (Phase 5). |
-| **`jsonb` fields** | Yes — plan §5.2 | Stored as TEXT with JSON parse in repository layer. Fields: `audit-entry.before`, `audit-entry.after`, `notifications.payload`, `settings.featureFlags`, `auction.cadastres` (array of objects). |
+| **`jsonb` fields** | Yes — plan §5.2 | Stored as TEXT with JSON parse in repository layer. Fields: `audit-entry.before`, `audit-entry.after`, `notifications.payload`, `notifications.sendResult`, `notifications.recipientResults`, `settings.featureFlags`, `auction.cadastres` (array of objects). |
