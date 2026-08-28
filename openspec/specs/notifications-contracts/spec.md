@@ -4,65 +4,55 @@
 TBD - created by archiving change phase-2-core-backend. Update Purpose after archive.
 ## Requirements
 ### Requirement: Notification event bus
-An in-process event bus SHALL emit typed domain events (for example,
-`bid.created`, `auction.ended`, `contract.ready`). Each event SHALL
-trigger a per-user channel matrix lookup (email, sms) from the user's
-notification preferences. Email sending SHALL use the `packages/emails`
-templates rendered into Mailpit (local) or a real provider (production).
+Domain events SHALL carry the affected `userId` so dispatch can reach the
+user. The dispatcher SHALL be started by application bootstrap alongside
+the ending worker. Email SHALL be sent through Mailpit SMTP with the
+`@eametsad/emails` templates and stored as Notification rows; SMS stays a
+log stub. Duplicate dispatch per user and event SHALL be deduplicated.
 
-#### Scenario: Outbid notification via email
-- **WHEN** a user is outbid and has email notifications enabled for that
-  event type
-- **THEN** an email is dispatched via the notification service using the
-  `outbid` template
+#### Scenario: Auction end notifies the winner
+- **WHEN** the worker ends an open auction with a winning bid
+- **THEN** the winner receives an email (visible in Mailpit) and an
+  in-app Notification row
 
-#### Scenario: SMS log stub in prototype
-- **WHEN** a notification targets the SMS channel in prototype mode
-- **THEN** the payload is logged with no external API call
+#### Scenario: Dispatcher runs without a request
+- **WHEN** the application starts and the worker emits an event
+- **THEN** the notification is dispatched without any HTTP request
+  involved
 
 ### Requirement: Contract service
-The contract service SHALL render template placeholders (`{{key}}`) into
-a document from a ContractTemplate record. It SHALL generate both an HTML
-preview and a simple PDF. `POST /api/bids/framework-contract/prepare` SHALL
-create a prepared framework contract. The mock eID signing session SHALL
-expire after 15 minutes. On signing, a hash of the signed content SHALL
-be written to the Contract record.
+Signing SHALL record `signedBy` with the authenticated user's id so the
+framework gate can match signed contracts to users. Prepare/complete
+endpoints SHALL pass the session user through. The 15-minute signing
+expiry, content hash, and status transitions remain as specified.
 
-#### Scenario: Framework contract signed successfully
-- **WHEN** a user completes the mock PIN2 ceremony
-- **THEN** the Contract status moves from `prepared` to `signed` and
-  `signedAt` is populated with the current timestamp
-
-#### Scenario: Signing session expires
-- **WHEN** 15 minutes pass after a contract is prepared without signing
-- **THEN** the contract status is set to `voided`
+#### Scenario: Signed contract records the signer
+- **WHEN** a user completes framework-contract signing
+- **THEN** the contract row stores `signedBy` = user id
 
 ### Requirement: Statistics aggregation
-A statistics service SHALL compute totals from `StatisticsSnapshot`
-records grouped by objectType. `GET /api/v1/statistics` SHALL return
-total count, total area (hectares), total volume (cubic metres), and
-total value (EUR) across all time.
+Statistics SHALL be computed from snapshots. Sealed-auction completion
+SHALL backfill the auction's `eur` contribution from the published
+`finalPrice` so sealed results appear in statistics after the ceremony.
 
-#### Scenario: Statistics endpoint returns aggregated data
-- **WHEN** `GET /api/v1/statistics` is called
-- **THEN** the response contains sums grouped by objectType
-  (raieõigus, kinnistu, kiire, pakett)
+#### Scenario: Sealed result lands in statistics
+- **WHEN** a sealed auction's winner is confirmed with finalPrice 27 500
+- **THEN** the day's snapshot for that objectType includes the amount
 
 ### Requirement: Lead ingestion endpoint
-`POST /api/leads` SHALL accept lead submissions from the marketing site
-forms. The endpoint SHALL reject requests missing a required
-`consentAt` timestamp and shall rate-limit to 5 requests per IP per
-minute. A honeypot field `company_website` SHALL be present and must be
-empty; a non-empty honeypot returns HTTP 200 silently without persisting
-the lead.
+`POST /api/leads` SHALL rate-limit by IP at 5 requests/minute, require
+the consent timestamp, validate contact fields with `@eametsad/types`
+validators (Estonian phone, email), keep the `company_website` honeypot,
+and record the source. Honeypot hits SHALL return a fake success without
+storing anything.
 
-#### Scenario: Valid lead is persisted
-- **WHEN** `POST /api/leads` receives a valid payload with consentAt
-- **THEN** a Lead document is created and the response is HTTP 201
+#### Scenario: Rate limit at five per minute
+- **WHEN** six lead submissions arrive from one IP within a minute
+- **THEN** the sixth receives HTTP 429
 
-#### Scenario: Honeypot silently drops bot submission
-- **WHEN** `company_website` field is non-empty
-- **THEN** the endpoint returns HTTP 200 but no Lead is persisted
+#### Scenario: Invalid phone rejected
+- **WHEN** a lead arrives with phone `123`
+- **THEN** the response is HTTP 400 with an Estonian field error
 
 ### Requirement: Service-requests ingestion (deferred to Phase 5)
 `POST /api/service-requests` SHALL accept service request submissions
@@ -74,4 +64,3 @@ Phase 5 implements the routing engine.
 - **WHEN** `POST /api/service-requests` receives a valid service
   request payload
 - **THEN** the ServiceRequest document is created with status `new`
-

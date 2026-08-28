@@ -139,7 +139,7 @@ All marketing-site content is managed via Payload CMS collections. The site gene
 | **Stack** | Payload CMS 3 (TypeScript, REST API, built on Next.js) |
 | **Primary storage** | PostgreSQL 16 |
 | **Cache/sessions** | Redis |
-| **Background jobs** | BullMQ (auction ending worker, notifications, digests, PDF generation) |
+| **Background jobs** | BullMQ (auction ending worker, notifications, digests, PDF generation). Prototype: worker and dispatcher run in-process from `instrumentation.ts` on a 30s interval behind the queue interface |
 | **Realtime** | SSE for live bid/countdown updates |
 
 **API endpoints (summary, as implemented in Phase 2):**
@@ -152,7 +152,7 @@ All marketing-site content is managed via Payload CMS collections. The site gene
 | Profiles | `POST /api/v1/profiles/:id/select`, `POST /api/v1/business/request-access` |
 | Realtime | `GET /api/v1/auctions/stream` (public SSE), `GET /api/v1/my/stream` (authenticated SSE) |
 | Public data | `GET /api/v1/statistics`, `GET /api/v1/company-lookup` (registry fixtures) |
-| Admin | `POST /api/v1/admin/auctions/:id/open-sealed`, `/confirm-winner`, plus Payload CRUD |
+| Admin | `POST /api/v1/admin/auctions/:id/open-sealed`, `/approve-sealed`, `/confirm-winner`, plus Payload CRUD |
 | Forms | `POST /api/leads` (honeypot + rate-limited) |
 
 ### 3.4 Admin Backend
@@ -270,7 +270,7 @@ Not evident from the repository: hosting provider, domain registration, SSL cert
 | **Authentication** | eID (Smart-ID, Mobile-ID, ID-card) via aggregator + fallback password login with rate limiting |
 | **Authorization** | Role-based: guest, registered (private/company), seller, specialist, admin, superadmin |
 | **Bid integrity** | Bids in serializable transaction with row lock; append-only audit table |
-| **Sealed bids** | Encrypted at rest until admin opening ceremony (two-person rule recommended) |
+| **Sealed bids** | Encrypted at rest until admin opening ceremony (two-person approval enforced at the API level) |
 | **Rate limiting** | Auth endpoints, bid submission, form submissions — backed by Redis |
 | **CSP** | Content Security Policy on all responses |
 | **Honeypot fields** | Invisible form fields to block bots on all forms |

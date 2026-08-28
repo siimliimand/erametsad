@@ -4,39 +4,34 @@
 TBD - created by archiving change phase-2-core-backend. Update Purpose after archive.
 ## Requirements
 ### Requirement: Auction collection complete field model
-`Auction` SHALL be a Payload collection containing all fields specified in
-the plan §5.4 dossier: identity and status fields (`status`, `objectType`,
-`isQuickAuction`, `endYear`), location (`county`, `parish`, coordinates,
-kataster and Metsaregister links), land and forest data (cadastres[],
-registryNumbers[], species, logging types, compartments, notifications,
-deadlines), pricing (`minBid`, `bidStep`, `reservePrice` encrypted,
-`feeOverride`), content (two rich-text areas, alias email, media, files),
-package fields (table with rows/columns for pakett auctions),
-`specialist` (user relationship), and `seller` (user relationship).
+The Auction collection SHALL include a required `type` select field with
+values `open` and `sealed` (default `open`). Collection validation SHALL
+force `sealed` for `kinnistu` and `pakett` object types. All other field
+groups remain as specified (identity/status including `isQuickAuction`
+and `endYear`, location with coordinates and register links, land/forest
+data, pricing, content, package fields, specialist, seller).
 
-#### Scenario: Instructor creates complete auction via admin
-- **WHEN** an admin completes all 7 wizard steps in the auction editor
-- **THEN** an Auction document is created with all fields populated and the
-  relationship to seller and specialist resolves correctly
+#### Scenario: Property auction must be sealed
+- **WHEN** an auction with objectType `kinnistu` is saved with type
+  `open`
+- **THEN** validation fails with an Estonian error message
+
+#### Scenario: Sealed flag stored on the row
+- **WHEN** a sealed auction is created
+- **THEN** the row stores `type: 'sealed'` and the ending worker can
+  branch on it
 
 ### Requirement: Auction status lifecycle
-Auction status SHALL progress through a fixed sequence:
-draft → scheduled → active → ended → appraised/unsold → contract →
-completed → archived. An `unsold` branch is valid from `ended`. The system
-MUST NOT skip or reorder statuses except through the auction-ending worker
-(server-authoritative) or a manual admin action with audit logging.
+The transition guard SHALL remain exactly: `draft → scheduled → active →
+ended`, `ended → appraised | unsold`, `appraised → contract`,
+`unsold | contract → completed → archived`. All status writes, including
+worker updates, SHALL pass through the guard; no code path SHALL write a
+status transition the guard rejects.
 
-#### Scenario: Admin cannot skip from draft to active
-- **WHEN** a mutation sets Auction status from `draft` to `active`
-- **THEN** the mutation is rejected with a 400 error
-
-#### Scenario: Ended auction can transition to unsold or contract
-- **WHEN** an ended auction has no qualifying bids
-- **THEN** the system sets status to `unsold`
-
-#### Scenario: Ended auction with a winner transitions to contract
-- **WHEN** an ended auction has a winning bid confirmed
-- **THEN** the system queues a contract and sets status to `contract`
+#### Scenario: Worker path passes the guard
+- **WHEN** the ending worker processes an open auction with no bids
+- **THEN** the auction moves `active → ended → unsold` and neither update
+  throws
 
 ### Requirement: Bid collection
 `Bid` SHALL be a Payload collection storing every bid as an append-only
@@ -68,4 +63,3 @@ autobidder per user per auction.
 #### Scenario: Anonymous subscription via unsubscribe token
 - **WHEN** a user visits the unsubscribe link with a valid token
 - **THEN** the subscription status changes to unsubscribed
-

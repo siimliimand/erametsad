@@ -4,42 +4,38 @@
 TBD - created by archiving change phase-2-core-backend. Update Purpose after archive.
 ## Requirements
 ### Requirement: Public auction SSE stream
-`GET /api/auctions/stream` SHALL be an SSE endpoint broadcasting live events:
-`auction:published` (new lot), `auction:extended` (anti-snipe), `auction:ended`
-(status flip), and `bid:created` (anonymised — amount + type only). The stream
-SHALL work for anonymous (guest) requests.
+`GET /api/v1/auctions/stream` SHALL support the events
+`auction:published`, `auction:extended`, `auction:ended`, and
+`bid:created`, each emitted at the moment the corresponding domain action
+commits: publication/activation, anti-snipe extension, worker ending, and
+accepted bid. `bid:created` payloads SHALL be anonymised (amount and
+relative time only, never bidder identity). A 30-second comment heartbeat
+SHALL keep the connection alive.
 
-#### Scenario: New bid appears on public stream
-- **WHEN** a valid bid is placed on an active auction
-- **THEN** all connected clients of `GET /api/auctions/stream` receive an
-  SSE event `bid:created` with the auction ID, bid amount, and type
+#### Scenario: Bid event reaches subscribers
+- **WHEN** a bid is accepted on a public auction
+- **THEN** all stream subscribers receive `bid:created` with the amount
+  and no bidder identity
 
-#### Scenario: Extension broadcast
-- **WHEN** anti-sniping extends an auction endTime
-- **THEN** all connected clients receive `auction:extended` with the new
-  endTime
+#### Scenario: Extension event reaches subscribers
+- **WHEN** an anti-snipe extension extends an auction
+- **THEN** subscribers receive `auction:extended` with the new end time
 
 ### Requirement: Authenticated user SSE stream
-`GET /api/my/stream` SHALL deliver personal events to an authenticated user:
-`bid` (leading/outbid), `outbid` notification, `auction_end`, `notification`
-(new unread), and `countdown_sync` (clock skew correction). The stream SHALL
-send a heartbeat every 30 seconds and SHALL disconnect after 3 missed
-heartbeats. Reconnection SHALL use exponential backoff (1s → 2s → 4s →
-max 30s), full re-fetching state on reconnect.
+`GET /api/v1/my/stream` SHALL deliver the per-user events `bid`,
+`outbid`, `auction_end`, `notification`, and `countdown_sync` to the
+authenticated user's connections. The displaced bidder SHALL receive
+`outbid` when their bid is overtaken. Notification creation SHALL push
+the `notification` event. A 30-second heartbeat SHALL keep the connection
+alive.
 
-#### Scenario: Outbid user receives SSE alert
-- **WHEN** another user outbids a previously leading bidder
-- **THEN** the outbid user's `GET /api/my/stream` receives an `outbid`
-  event with auction ID and new leading amount
+#### Scenario: Outbid notification arrives live
+- **WHEN** a user's leading bid is overtaken
+- **THEN** their open `my/stream` connection receives `outbid`
 
-#### Scenario: Heartbeat keeps connection alive
-- **WHEN** 15 seconds pass with no domain events
-- **THEN** the stream emits a `ping` heartbeat event
-
-#### Scenario: Reconnect after disconnect
-- **WHEN** the SSE connection drops and a client reconnects
-- **THEN** the server resends the full current state for that user (leading
-  bid status, unread notifications, countdowns) before streaming new events
+#### Scenario: Notification push
+- **WHEN** a notification row is created for the user
+- **THEN** their stream receives the `notification` event
 
 ### Requirement: SSE via Cloudflare Pages Functions
 All SSE endpoints SHALL be served from Next.js route handlers compatible
@@ -51,4 +47,3 @@ the client disconnects or the server terminates it.
 - **WHEN** a new SSE connection is opened to a Pages Function
 - **THEN** the connection is established successfully and the first
   heartbeat arrives within 30 seconds
-
