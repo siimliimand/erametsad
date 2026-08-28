@@ -26,6 +26,7 @@ const COLLECTIONS_IN_ORDER = [
   'profile',
   'company-access-request',
   // Level 8 — CMS
+  'settings',
   'faq-items',
   'testimonials',
   'partner-services',
