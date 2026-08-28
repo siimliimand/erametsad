@@ -1,132 +1,257 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 import {
-  handleAlapakkumine,
+  isAlapakkumineEnabled,
   approveAlapakkumine,
   rejectAlapakkumine,
 } from '../alapakkumine'
-
-const mockPayload = {
-  find: vi.fn(),
-  create: vi.fn(),
-  update: vi.fn(),
-}
+import { eventBus } from '../../notifications/event-bus'
 
 vi.mock('@/payload/payloadClient', () => ({
-  getPayloadClient: vi.fn(() => mockPayload),
+  getPayloadClient: vi.fn(),
 }))
+
+import { getPayloadClient } from '@/payload/payloadClient'
+
+// Drizzle SQL objects expose their fragments through queryChunks: string
+// fragments as StringChunk.value, bound values as raw primitives. Joining
+// them gives a matchable approximation of the statement text and params.
+function sqlText(query: unknown): string {
+  const chunks = (query as { queryChunks?: unknown[] }).queryChunks ?? []
+  return chunks
+    .map((chunk) => {
+      if (chunk === null || chunk === undefined) return ''
+      if (typeof chunk === 'object') return String((chunk as { value?: unknown }).value ?? '')
+      return String(chunk)
+    })
+    .join(' ')
+}
+
+let mockPayload: {
+  find: ReturnType<typeof vi.fn>
+  db: { drizzle: { transaction: (fn: (tx: unknown) => Promise<unknown>) => Promise<unknown> } }
+}
+let txStatements: string[]
+let lockRows: Record<string, unknown>[]
 
 beforeEach(() => {
   vi.clearAllMocks()
+  txStatements = []
+  lockRows = [{ id: 'auction-1' }]
+  const fakeTx = {
+    execute: async (query: unknown) => {
+      const text = sqlText(query)
+      txStatements.push(text)
+      if (text.includes('for update')) return { rows: lockRows }
+      return { rows: [] }
+    },
+  }
+  mockPayload = {
+    find: vi.fn(),
+    db: {
+      drizzle: {
+        transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(fakeTx),
+      },
+    },
+  }
+  vi.mocked(getPayloadClient).mockImplementation(() => mockPayload as never)
 })
 
-describe('handleAlapakkumine', () => {
-  const auction = { minBid: 100, id: 'auction-1' }
+const pendingBid = {
+  id: 'bid-1',
+  auction: 'auction-1',
+  user: 'user-9',
+  amount: 80,
+  status: 'pending_approval',
+}
+const activeAuction = { id: 'auction-1', status: 'active', title: 'Test auction' }
 
-  it('returns leading when bid amount >= minBid', async () => {
-    const bid = { id: 'bid-1', amount: 100, auction: 'auction-1' }
-    const result = await handleAlapakkumine(bid, auction)
-    expect(result).toEqual({ status: 'leading', requiresApproval: false })
-  })
-
-  it('returns pending_approval when bid amount < minBid and alapakkumine is enabled', async () => {
-    mockPayload.find
-      .mockResolvedValueOnce({ docs: [{ alapakkumineEnabled: true }] })
-      .mockResolvedValueOnce({ docs: [] })
-
-    const bid = { id: 'bid-1', amount: 80, auction: 'auction-1' }
-    const result = await handleAlapakkumine(bid, auction)
-
-    expect(result).toEqual({ status: 'pending_approval', requiresApproval: true })
-    expect(mockPayload.update).toHaveBeenCalledWith({
-      collection: 'bids',
-      id: 'bid-1',
-      data: { status: 'pending_approval' },
-    })
-  })
-
-  it('rejects bid when alapakkumine is disabled in settings', async () => {
-    mockPayload.find.mockResolvedValueOnce({ docs: [{ alapakkumineEnabled: false }] })
-
-    const bid = { id: 'bid-1', amount: 80, auction: 'auction-1' }
-    const result = await handleAlapakkumine(bid, auction)
-
-    expect(result).toEqual({ status: 'rejected', requiresApproval: false })
-  })
-
-  it('treats missing settings as disabled (alapakkumine off)', async () => {
-    mockPayload.find.mockResolvedValueOnce({ docs: [] })
-
-    const bid = { id: 'bid-1', amount: 80, auction: 'auction-1' }
-    const result = await handleAlapakkumine(bid, auction)
-
-    expect(result).toEqual({ status: 'rejected', requiresApproval: false })
-  })
-
-  describe('race guard', () => {
-    it('auto-rejects existing pending alapakkumine when a new bid triggers approval', async () => {
-      mockPayload.find
-        .mockResolvedValueOnce({ docs: [{ alapakkumineEnabled: true }] })
-        .mockResolvedValueOnce({ docs: [{ id: 'old-pending-bid' }] })
-
-      const bid = { id: 'bid-2', amount: 80, auction: 'auction-1' }
-      const result = await handleAlapakkumine(bid, auction)
-
-      expect(result).toEqual({ status: 'pending_approval', requiresApproval: true })
-      expect(mockPayload.update).toHaveBeenCalledWith({
-        collection: 'bids',
-        id: 'old-pending-bid',
-        data: { status: 'rejected' },
-      })
-      expect(mockPayload.update).toHaveBeenCalledWith({
-        collection: 'bids',
-        id: 'bid-2',
-        data: { status: 'pending_approval' },
-      })
-    })
+describe('isAlapakkumineEnabled', () => {
+  it('is enabled only when settings explicitly set the flag', () => {
+    expect(isAlapakkumineEnabled({ alapakkumineEnabled: true })).toBe(true)
+    expect(isAlapakkumineEnabled({ alapakkumineEnabled: false })).toBe(false)
+    expect(isAlapakkumineEnabled({})).toBe(false)
+    expect(isAlapakkumineEnabled(null)).toBe(false)
+    expect(isAlapakkumineEnabled(undefined)).toBe(false)
   })
 })
 
 describe('approveAlapakkumine', () => {
-  it('marks bid as leading and outbids current leading', async () => {
+  it('locks the auction row, takes the lead and demotes the current leader', async () => {
     mockPayload.find
-      .mockResolvedValueOnce({ docs: [{ id: 'bid-1', auction: 'auction-1', amount: 80 }] })
-      .mockResolvedValueOnce({ docs: [{ id: 'existing-lead' }] })
+      .mockResolvedValueOnce({ docs: [pendingBid] })
+      .mockResolvedValueOnce({ docs: [activeAuction] })
+      .mockResolvedValueOnce({
+        docs: [{ id: 'lead-1', auction: 'auction-1', user: 'user-2', amount: 100, status: 'leading' }],
+      })
 
-    await approveAlapakkumine('bid-1')
+    const decision = await approveAlapakkumine('auction-1', 'bid-1')
 
-    expect(mockPayload.update).toHaveBeenCalledWith({
-      collection: 'bids',
-      id: 'existing-lead',
-      data: { status: 'outbid' },
-    })
-    expect(mockPayload.update).toHaveBeenCalledWith({
-      collection: 'bids',
-      id: 'bid-1',
-      data: { status: 'leading' },
-    })
-    expect(mockPayload.update).toHaveBeenCalledWith({
-      collection: 'auctions',
-      id: 'auction-1',
-      data: { winningBid: 'bid-1' },
-    })
+    expect(decision.outcome).toBe('approved')
+    if (decision.outcome === 'approved') {
+      expect(decision.bid).toEqual({
+        bidId: 'bid-1',
+        bidderId: 'user-9',
+        amount: 80,
+        auctionTitle: 'Test auction',
+      })
+      expect(decision.displacedLeader).toEqual({ userId: 'user-2', amount: 100 })
+    }
+    expect(txStatements[0]).toContain('for update')
+    expect(
+      txStatements.some(
+        (text) => text.includes("update bids set status = 'outbid'") && text.includes('lead-1'),
+      ),
+    ).toBe(true)
+    expect(
+      txStatements.some(
+        (text) =>
+          text.includes("update bids set status = 'leading'") &&
+          text.includes('bid-1') &&
+          text.includes("status = 'pending_approval'"),
+      ),
+    ).toBe(true)
   })
 
-  it('throws error when bid not found', async () => {
+  it('approves without a leader when no leading bid exists', async () => {
+    mockPayload.find
+      .mockResolvedValueOnce({ docs: [pendingBid] })
+      .mockResolvedValueOnce({ docs: [activeAuction] })
+      .mockResolvedValueOnce({ docs: [] })
+
+    const decision = await approveAlapakkumine('auction-1', 'bid-1')
+
+    expect(decision.outcome).toBe('approved')
+    if (decision.outcome === 'approved') {
+      expect(decision.displacedLeader).toBeNull()
+    }
+    expect(txStatements.some((text) => text.includes("'outbid'"))).toBe(false)
+  })
+
+  it('emits bid.approved and outbid events with userId after commit', async () => {
+    const emitSpy = vi.spyOn(eventBus, 'emit')
+    mockPayload.find
+      .mockResolvedValueOnce({ docs: [pendingBid] })
+      .mockResolvedValueOnce({ docs: [activeAuction] })
+      .mockResolvedValueOnce({
+        docs: [{ id: 'lead-1', auction: 'auction-1', user: 'user-2', amount: 100, status: 'leading' }],
+      })
+
+    await approveAlapakkumine('auction-1', 'bid-1')
+
+    expect(emitSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'bid.approved', userId: 'user-9' }),
+    )
+    expect(emitSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'outbid', userId: 'user-2' }),
+    )
+    emitSpy.mockRestore()
+  })
+
+  it('is a no-op conflict when the bid already left pending_approval (serialised race)', async () => {
+    mockPayload.find
+      .mockResolvedValueOnce({ docs: [{ ...pendingBid, status: 'leading' }] })
+      .mockResolvedValueOnce({ docs: [activeAuction] })
+
+    const decision = await approveAlapakkumine('auction-1', 'bid-1')
+
+    expect(decision).toEqual({ outcome: 'not_pending', status: 'leading' })
+    expect(txStatements.some((text) => text.includes('update bids'))).toBe(false)
+  })
+
+  it('refuses to approve after the auction ended', async () => {
+    mockPayload.find
+      .mockResolvedValueOnce({ docs: [pendingBid] })
+      .mockResolvedValueOnce({ docs: [{ ...activeAuction, status: 'ended' }] })
+
+    const decision = await approveAlapakkumine('auction-1', 'bid-1')
+
+    expect(decision).toEqual({ outcome: 'auction_not_active' })
+    expect(txStatements.some((text) => text.includes('update bids'))).toBe(false)
+  })
+
+  it('returns bid_not_found when the bid belongs to another auction', async () => {
+    mockPayload.find.mockResolvedValueOnce({
+      docs: [{ ...pendingBid, auction: 'auction-2' }],
+    })
+
+    const decision = await approveAlapakkumine('auction-1', 'bid-1')
+
+    expect(decision).toEqual({ outcome: 'bid_not_found' })
+  })
+
+  it('returns bid_not_found when the bid does not exist', async () => {
     mockPayload.find.mockResolvedValueOnce({ docs: [] })
 
-    await expect(approveAlapakkumine('nonexistent')).rejects.toThrow('Bid not found')
+    const decision = await approveAlapakkumine('auction-1', 'missing')
+
+    expect(decision).toEqual({ outcome: 'bid_not_found' })
+  })
+
+  it('returns auction_not_found when the lock finds no auction row', async () => {
+    lockRows = []
+    mockPayload.find.mockResolvedValue({ docs: [] })
+
+    const decision = await approveAlapakkumine('missing', 'bid-1')
+
+    expect(decision).toEqual({ outcome: 'auction_not_found' })
   })
 })
 
 describe('rejectAlapakkumine', () => {
-  it('updates bid status to rejected', async () => {
-    await rejectAlapakkumine('bid-1')
+  it('sets the pending bid to rejected under the lock and notifies the bidder', async () => {
+    const emitSpy = vi.spyOn(eventBus, 'emit')
+    mockPayload.find
+      .mockResolvedValueOnce({ docs: [pendingBid] })
+      .mockResolvedValueOnce({ docs: [activeAuction] })
 
-    expect(mockPayload.update).toHaveBeenCalledWith({
-      collection: 'bids',
-      id: 'bid-1',
-      data: { status: 'rejected' },
-    })
+    const decision = await rejectAlapakkumine('auction-1', 'bid-1')
+
+    expect(decision.outcome).toBe('rejected')
+    if (decision.outcome === 'rejected') {
+      expect(decision.bid.bidderId).toBe('user-9')
+    }
+    expect(txStatements[0]).toContain('for update')
+    expect(
+      txStatements.some(
+        (text) =>
+          text.includes("update bids set status = 'rejected'") &&
+          text.includes('bid-1') &&
+          text.includes("status = 'pending_approval'"),
+      ),
+    ).toBe(true)
+    expect(emitSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'bid.rejected', userId: 'user-9' }),
+    )
+    emitSpy.mockRestore()
+  })
+
+  it('still rejects after the auction ended (cleanup path)', async () => {
+    mockPayload.find
+      .mockResolvedValueOnce({ docs: [pendingBid] })
+      .mockResolvedValueOnce({ docs: [{ ...activeAuction, status: 'ended' }] })
+
+    const decision = await rejectAlapakkumine('auction-1', 'bid-1')
+
+    expect(decision.outcome).toBe('rejected')
+  })
+
+  it('is a no-op conflict when the bid is no longer pending', async () => {
+    mockPayload.find
+      .mockResolvedValueOnce({ docs: [{ ...pendingBid, status: 'rejected' }] })
+      .mockResolvedValueOnce({ docs: [activeAuction] })
+
+    const decision = await rejectAlapakkumine('auction-1', 'bid-1')
+
+    expect(decision).toEqual({ outcome: 'not_pending', status: 'rejected' })
+    expect(txStatements.some((text) => text.includes('update bids'))).toBe(false)
+  })
+
+  it('returns bid_not_found when the bid does not exist', async () => {
+    mockPayload.find.mockResolvedValueOnce({ docs: [] })
+
+    const decision = await rejectAlapakkumine('auction-1', 'missing')
+
+    expect(decision).toEqual({ outcome: 'bid_not_found' })
   })
 })

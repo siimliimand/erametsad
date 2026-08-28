@@ -26,6 +26,9 @@ const eventChannels: Record<DomainEventType, (keyof NotificationPreference)[]> =
   'contract.ready': ['email', 'sms', 'inApp'],
   outbid: ['email', 'inApp'],
   'auction.won': ['email', 'sms', 'inApp'],
+  // No email templates exist for seller decisions yet; in-app only.
+  'bid.approved': ['inApp'],
+  'bid.rejected': ['inApp'],
 }
 
 const eventTitles: Record<DomainEventType, string> = {
@@ -34,6 +37,8 @@ const eventTitles: Record<DomainEventType, string> = {
   'contract.ready': 'Leping on allkirjastamiseks valmis',
   outbid: 'Teie pakkumus on üle pakutud',
   'auction.won': 'Te võitsite oksjoni',
+  'bid.approved': 'Teie pakkumus on kinnitatud',
+  'bid.rejected': 'Teie pakkumus on tagasi lükatud',
 }
 
 let transporter: Transporter | null = null
@@ -76,6 +81,14 @@ function getTemplate(eventType: DomainEventType, payload: Record<string, unknown
       return contractReadyTemplate({
         auctionTitle: payload.auctionTitle as string,
       })
+    case 'bid.approved':
+      return `Teie pakkumus ${String(payload.amount)} EUR oksjonil "${String(
+        payload.auctionTitle,
+      )}" on müüja poolt kinnitatud ja juhtiv.`
+    case 'bid.rejected':
+      return `Müüja lükkas teie pakkumuse ${String(payload.amount)} EUR oksjonil "${String(
+        payload.auctionTitle,
+      )}" tagasi.`
     default:
       return null
   }
@@ -223,4 +236,6 @@ export function startListening(bus: EventBus): void {
   bus.on('contract.ready', (event) => { void handleSafely(event) })
   bus.on('outbid', (event) => { void handleSafely(event) })
   bus.on('auction.won', (event) => { void handleSafely(event) })
+  bus.on('bid.approved', (event) => { void handleSafely(event) })
+  bus.on('bid.rejected', (event) => { void handleSafely(event) })
 }

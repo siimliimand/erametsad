@@ -1,4 +1,11 @@
-export type DomainEventType = 'bid.created' | 'auction.ended' | 'contract.ready' | 'outbid' | 'auction.won'
+export type DomainEventType =
+  | 'bid.created'
+  | 'auction.ended'
+  | 'contract.ready'
+  | 'outbid'
+  | 'auction.won'
+  | 'bid.approved'
+  | 'bid.rejected'
 
 export interface DomainEvent {
   type: DomainEventType
