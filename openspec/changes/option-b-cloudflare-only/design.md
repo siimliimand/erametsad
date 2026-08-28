@@ -204,3 +204,23 @@ export-transform-import path applies the mapping rules above.
    inventory.
 5. Contract PDF generation in-Worker (CPU limits) versus queue consumer?
    Phase 5.
+
+## Addendum: prototype domain strategy (2026-08-28, user decision)
+
+The site is currently a prototype. The zone `erametsad.ee` stays at Zone
+Media; no registrar or MX change happens now. All prototype hostnames run
+under the Cloudflare-hosted zone `ww0.dev`:
+
+| Production host | Prototype host |
+|---|---|
+| eametsad.ee | erametsad.ww0.dev |
+| oksjonid.eametsad.ee | oksjonid.erametsad.ww0.dev |
+| api.eametsad.ee | api.erametsad.ww0.dev |
+| admin.eametsad.ee | admin.erametsad.ww0.dev |
+
+Email sending uses the subdomain `erametsad.ww0.dev` on the `ww0.dev`
+zone; the prototype sender becomes `noreply@erametsad.ww0.dev`. Placeholder
+DNS records for the web hostnames are not created in advance: Workers
+custom domains attach at deploy time and pre-existing records on those
+names block attachment. The production `.ee` cutover stays a documented
+later step.
