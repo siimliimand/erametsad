@@ -10,7 +10,7 @@
   },
   "bindings": [
     { "type": "queue", "binding": "QUEUE", "queue_name": "eametsad-jobs" },
-    { "type": "kv_namespace", "binding": "KV", "id": "KV_NAMESPACE_ID" },
+    { "type": "kv_namespace", "binding": "KV", "id": "5b67cd2c595f4d31b3b1be5db76e9bef" },
     { "type": "r2_bucket", "binding": "BUCKET", "bucket_name": "eametsad-media", "preview_bucket_name": "eametsad-media-preview" },
     { "type": "plain_text", "binding": "NEON_DATABASE_URL", "value": "" },
     { "type": "plain_text", "binding": "DATABASE_URL", "value": "" }
