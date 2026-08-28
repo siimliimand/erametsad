@@ -1,7 +1,6 @@
-import type { Payload } from 'payload'
-
-import { submitSealedBid } from '../../lib/bidding/sealed-bid'
-import { encryptSealedData } from '../../lib/encryption'
+/* eslint-disable no-console */
+import { encryptSealedData } from '../../encryption'
+import { eurosToCents, type AuctionDoc, type CoreRepositories } from '../repositories'
 
 const OBJECT_TYPES = ['raieoigus', 'kinnistu', 'kiire', 'pakett'] as const
 
@@ -15,24 +14,26 @@ const ISIKUKOOD_BY_EMAIL: Record<string, string> = {
 }
 
 async function seedAuctionRights(
-  payload: Payload,
-  bidderIds: (string | number)[],
-  granterId: string | number,
+  repos: CoreRepositories,
+  bidderIds: string[],
+  granterId: string,
 ): Promise<void> {
-  const existing = await payload.find({ collection: 'auction-rights', limit: 1 })
-  if (existing.totalDocs > 0) {
+  const existing = await repos.find({ collection: 'auction-rights', limit: 1 })
+  if (existing.docs.length > 0) {
     console.log('Auction rights already seeded, skipping')
     return
   }
 
+  const grantedAt = new Date().toISOString()
   for (const userId of bidderIds) {
     for (const objectType of OBJECT_TYPES) {
-      await payload.create({
+      await repos.create({
         collection: 'auction-rights',
         data: {
-          user: userId,
+          userId,
           objectType,
           grantedBy: granterId,
+          grantedAt,
         },
       })
     }
@@ -46,10 +47,10 @@ async function seedAuctionRights(
 // Same row shape submitSealedBid writes: amount 0 at rest, the real amount
 // and identity only inside the AES-256-GCM envelope.
 async function createEncryptedSealedBid(
-  payload: Payload,
+  repos: CoreRepositories,
   params: {
-    auctionId: string | number
-    userId: string | number
+    auctionId: string
+    userId: string
     amount: number
     identity: string
     status: 'leading' | 'outbid'
@@ -57,12 +58,12 @@ async function createEncryptedSealedBid(
 ): Promise<void> {
   const encryptedAmount = encryptSealedData(String(params.amount))
   const encryptedIdentity = encryptSealedData(params.identity)
-  await payload.create({
+  await repos.create({
     collection: 'bids',
     data: {
-      auction: params.auctionId,
-      user: params.userId,
-      amount: 0,
+      auctionId: params.auctionId,
+      userId: params.userId,
+      amountCents: 0,
       type: 'sealed',
       source: 'manual',
       status: params.status,
@@ -78,11 +79,92 @@ async function createEncryptedSealedBid(
   })
 }
 
-export async function seedBids(payload: Payload): Promise<void> {
-  const { docs: users } = await payload.find({ collection: 'users', limit: 15 })
+// Repository port of the submitSealedBid validation chain and write pattern
+// (lib/bidding/sealed-bid.ts): rights check, minBid check, revision cap,
+// amount 0 at rest, previous non-rejected bids of the same bidder go outbid.
+async function submitSealedBidViaRepositories(
+  repos: CoreRepositories,
+  params: {
+    userId: string
+    auction: AuctionDoc
+    amount: number
+    identity: string
+  },
+): Promise<void> {
+  const { userId, auction, amount, identity } = params
+
+  if (auction.status !== 'active') {
+    throw new Error(`Sealed bid seed failed on ${auction.slug}: auction is not active`)
+  }
+  const endsAt = auction.endsAt
+  if (!endsAt || new Date(endsAt) <= new Date()) {
+    throw new Error(`Sealed bid seed failed on ${auction.slug}: auction has ended`)
+  }
+
+  const rightsResult = await repos.find({
+    collection: 'auction-rights',
+    where: {
+      and: [
+        { user: { equals: userId } },
+        { objectType: { equals: auction.objectType } },
+        { revokedAt: { exists: false } },
+      ],
+    },
+    limit: 1,
+  })
+  if (rightsResult.docs.length === 0) {
+    throw new Error(`Sealed bid seed failed on ${auction.slug}: no bidding right`)
+  }
+
+  if (eurosToCents(amount) < auction.minBidCents) {
+    throw new Error(
+      `Sealed bid seed failed on ${auction.slug}: bid must be at least ${String(auction.minBidCents / 100)} EUR`,
+    )
+  }
+
+  const existingBid = await repos.find({
+    collection: 'bids',
+    where: {
+      and: [
+        { auction: { equals: auction.id } },
+        { user: { equals: userId } },
+        { type: { equals: 'sealed' } },
+        { status: { not_equals: 'rejected' } },
+      ],
+    },
+    limit: 100,
+  })
+
+  const settingsResult = await repos.find({ collection: 'settings', limit: 1 })
+  const revisionCap =
+    (settingsResult.docs[0] as { sealedRevisionCap?: number } | undefined)?.sealedRevisionCap ?? 3
+  // Cap semantics: 1 original bid plus up to N revisions (N from Settings).
+  if (existingBid.docs.length >= revisionCap + 1) {
+    throw new Error(`Sealed bid seed failed on ${auction.slug}: revision limit exceeded`)
+  }
+
+  await createEncryptedSealedBid(repos, {
+    auctionId: auction.id,
+    userId,
+    amount,
+    identity,
+    status: 'leading',
+  })
+
+  for (const doc of existingBid.docs) {
+    await repos.update({
+      collection: 'bids',
+      id: doc.id,
+      data: { status: 'outbid' },
+    })
+  }
+}
+
+export async function seedBids(repos: CoreRepositories): Promise<void> {
+  const { docs: users } = await repos.find({ collection: 'users', limit: 15 })
   if (users.length === 0) throw new Error('No users found. Run seedUsers first.')
 
-  const userByEmail = new Map(users.map((u) => [u.email as string, u]))
+  const userByEmail = new Map(users.map((u) => [u.email, u] as const))
   const privateUser = userByEmail.get('private@eametsad.ee')
   const companyUser = userByEmail.get('company@eametsad.ee')
   const guestUser = userByEmail.get('guest@eametsad.ee')
@@ -91,29 +173,29 @@ export async function seedBids(payload: Payload): Promise<void> {
     throw new Error('Required seed users not found (private, company, guest, superadmin)')
   }
 
-  const isikukoodByUser = new Map<string | number, string>()
+  const isikukoodByUser = new Map<string, string>()
   for (const u of [guestUser, privateUser, companyUser]) {
-    const isikukood = ISIKUKOOD_BY_EMAIL[u.email as string]
+    const isikukood = ISIKUKOOD_BY_EMAIL[u.email]
     if (!isikukood) {
-      throw new Error(`No isikukood mapped for seed user ${String(u.email)}`)
+      throw new Error(`No isikukood mapped for seed user ${u.email}`)
     }
     isikukoodByUser.set(u.id, isikukood)
   }
 
-  // Rights must exist before submitSealedBid runs, its rights check rejects
+  // Rights must exist before sealed bids run: the rights check rejects
   // bidders without a grant for the auction objectType.
-  await seedAuctionRights(payload, [guestUser.id, privateUser.id, companyUser.id], superadminUser.id)
+  await seedAuctionRights(repos, [guestUser.id, privateUser.id, companyUser.id], superadminUser.id)
 
-  const existing = await payload.find({ collection: 'bids', limit: 1 })
-  if (existing.totalDocs > 0) {
+  const existing = await repos.find({ collection: 'bids', limit: 1 })
+  if (existing.docs.length > 0) {
     console.log('Bids already seeded, skipping')
     return
   }
 
-  const { docs: auctions } = await payload.find({ collection: 'auctions', limit: 50 })
+  const { docs: auctions } = await repos.find({ collection: 'auctions', limit: 50 })
   if (auctions.length === 0) throw new Error('No auctions found. Run seedAuctions first.')
 
-  const auctionBySlug = new Map(auctions.map((a) => [a.slug as string, a]))
+  const auctionBySlug = new Map(auctions.map((a) => [a.slug, a] as const))
 
   // ── Scenario 1: Active auction — bidding war (raieoigus-rae, minBid 3200) ──
   const rae = auctionBySlug.get('raieoigus-rae')
@@ -127,12 +209,19 @@ export async function seedBids(payload: Payload): Promise<void> {
       { user: companyUser.id, amount: 4700, source: 'manual', status: 'leading' },
     ]
     for (const b of bids) {
-      await payload.create({
+      await repos.create({
         collection: 'bids',
-        data: { auction: rae.id, type: 'open', ...b },
+        data: {
+          auctionId: rae.id,
+          type: 'open',
+          amountCents: eurosToCents(b.amount),
+          source: b.source,
+          status: b.status,
+          userId: b.user,
+        },
       })
     }
-    console.log(`  Created ${String(bids.length)} bids for auction "${String(rae.title)}" (bidding war)`)
+    console.log(`  Created ${String(bids.length)} bids for auction "${rae.title}" (bidding war)`)
   }
 
   // ── Scenario 2: Ended open auction — clear winner (raieoigus-saku-ended, minBid 2800) ──
@@ -145,12 +234,19 @@ export async function seedBids(payload: Payload): Promise<void> {
       { user: privateUser.id, amount: 3500, source: 'manual', status: 'won' },
     ]
     for (const b of bids) {
-      await payload.create({
+      await repos.create({
         collection: 'bids',
-        data: { auction: saku.id, type: 'open', ...b },
+        data: {
+          auctionId: saku.id,
+          type: 'open',
+          amountCents: eurosToCents(b.amount),
+          source: b.source,
+          status: b.status,
+          userId: b.user,
+        },
       })
     }
-    console.log(`  Created ${String(bids.length)} bids for auction "${String(saku.title)}" (clear winner)`)
+    console.log(`  Created ${String(bids.length)} bids for auction "${saku.title}" (clear winner)`)
   }
 
   // ── Scenario 3: Autobidder duel (raieoigus-rapla, minBid 4200) ──
@@ -162,12 +258,12 @@ export async function seedBids(payload: Payload): Promise<void> {
   // required 7800 <= maxAmount), and the duel demo goes inert.
   const rapla = auctionBySlug.get('raieoigus-rapla')
   if (rapla) {
-    await payload.create({
+    await repos.create({
       collection: 'autobidders',
       data: {
-        user: companyUser.id,
-        auction: rapla.id,
-        maxAmount: 9000,
+        userId: companyUser.id,
+        auctionId: rapla.id,
+        maxAmountCents: eurosToCents(9000),
         status: 'active',
       },
     })
@@ -183,35 +279,43 @@ export async function seedBids(payload: Payload): Promise<void> {
       { user: companyUser.id, amount: 7000, source: 'autobidder', status: 'leading' },
     ]
     for (const b of bids) {
-      await payload.create({
+      await repos.create({
         collection: 'bids',
-        data: { auction: rapla.id, type: 'open', ...b },
+        data: {
+          auctionId: rapla.id,
+          type: 'open',
+          amountCents: eurosToCents(b.amount),
+          source: b.source,
+          status: b.status,
+          userId: b.user,
+        },
       })
     }
-    console.log(`  Created ${String(bids.length)} bids + 1 autobidder for auction "${String(rapla.title)}" (autobidder duel)`)
+    console.log(`  Created ${String(bids.length)} bids + 1 autobidder for auction "${rapla.title}" (autobidder duel)`)
   }
 
   // ── Scenario 4: Pending alapakkumine (kiire-parnu, minBid 800) ──
   const parnu = auctionBySlug.get('kiire-parnu')
   if (parnu) {
-    await payload.create({
+    await repos.create({
       collection: 'bids',
       data: {
-        auction: parnu.id,
-        user: guestUser.id,
-        amount: 500,
+        auctionId: parnu.id,
+        userId: guestUser.id,
+        amountCents: eurosToCents(500),
         type: 'open',
         source: 'manual',
         status: 'pending_approval',
       },
     })
-    console.log(`  Created 1 pending-approval bid for auction "${String(parnu.title)}" (alapakkumine)`)
+    console.log(`  Created 1 pending-approval bid for auction "${parnu.title}" (alapakkumine)`)
   }
 
-  // ── Scenario 5: Active sealed auction via the real submission path ──
-  // kinnistu-ida-viru is active, so submitSealedBid runs end to end:
-  // rights check, minBid check, revision cap, encryption with auth tags.
-  // Demo amounts: guest 24000, private 25000 -> 30000 (revision), company 27500.
+  // ── Scenario 5: Active sealed auction via the repository submission path ──
+  // kinnistu-ida-viru is active, so the ported submitSealedBid chain runs
+  // end to end: rights check, minBid check, revision cap, encryption with
+  // auth tags. Demo amounts: guest 24000, private 25000 -> 30000 (revision),
+  // company 27500.
   const idaViru = auctionBySlug.get('kinnistu-ida-viru')
   if (idaViru) {
     const submissions = [
@@ -223,19 +327,16 @@ export async function seedBids(payload: Payload): Promise<void> {
     for (const s of submissions) {
       const identity = isikukoodByUser.get(s.userId)
       if (!identity) {
-        throw new Error(`No isikukood mapped for user ${String(s.userId)} on kinnistu-ida-viru`)
+        throw new Error(`No isikukood mapped for user ${s.userId} on kinnistu-ida-viru`)
       }
-      const result = await submitSealedBid({
-        userId: String(s.userId),
-        auctionId: String(idaViru.id),
+      await submitSealedBidViaRepositories(repos, {
+        userId: s.userId,
+        auction: idaViru,
         amount: s.amount,
-        identitySnapshot: identity,
+        identity,
       })
-      if (!result.success) {
-        throw new Error(`Sealed bid seed failed on kinnistu-ida-viru: ${result.error}`)
-      }
     }
-    console.log(`  Created ${String(submissions.length)} sealed bids for auction "${String(idaViru.title)}" via submitSealedBid (private revised 25000 -> 30000)`)
+    console.log(`  Created ${String(submissions.length)} sealed bids for auction "${idaViru.title}" via the submission path (private revised 25000 -> 30000)`)
   }
 
   // ── Scenario 6: Ended sealed auctions ready for the opening ceremony ──
@@ -245,7 +346,7 @@ export async function seedBids(payload: Payload): Promise<void> {
   //   raieoigus-voru-ended (minBid 5500, reserve 7000): guest 5600, company 6900, private 6800 -> 7200 (1 revision) -> winner private 7200
   //   kiire-kehtna-ended (minBid 700, reserve 900): guest 750, company 900, private 950 -> winner private 950
   //   pakett-ida-viru-ended (minBid 9500, reserve 12000): private 11500, company 12500 -> winner company 12500
-  const endedSealed: { slug: string; bids: { user: string | number; amount: number; status: 'leading' | 'outbid' }[] }[] = [
+  const endedSealed: { slug: string; bids: { user: string; amount: number; status: 'leading' | 'outbid' }[] }[] = [
     {
       slug: 'kinnistu-muhu-ended',
       bids: [
@@ -289,9 +390,9 @@ export async function seedBids(payload: Payload): Promise<void> {
     for (const b of scenario.bids) {
       const identity = isikukoodByUser.get(b.user)
       if (!identity) {
-        throw new Error(`No isikukood mapped for user ${String(b.user)} on ${scenario.slug}`)
+        throw new Error(`No isikukood mapped for user ${b.user} on ${scenario.slug}`)
       }
-      await createEncryptedSealedBid(payload, {
+      await createEncryptedSealedBid(repos, {
         auctionId: auction.id,
         userId: b.user,
         amount: b.amount,
@@ -299,6 +400,6 @@ export async function seedBids(payload: Payload): Promise<void> {
         status: b.status,
       })
     }
-    console.log(`  Created ${String(scenario.bids.length)} encrypted sealed bids for auction "${String(auction.title)}" (opening demo)`)
+    console.log(`  Created ${String(scenario.bids.length)} encrypted sealed bids for auction "${auction.title}" (opening demo)`)
   }
 }

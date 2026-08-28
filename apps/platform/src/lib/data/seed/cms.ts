@@ -1,7 +1,8 @@
-import type { Payload } from 'payload'
+/* eslint-disable no-console */
+import type { CoreRepositories } from '../repositories'
 
-function rt(text: string): unknown {
-  return {
+function rt(text: string): string {
+  return JSON.stringify({
     root: {
       children: [
         {
@@ -10,18 +11,20 @@ function rt(text: string): unknown {
         },
       ],
     },
-  }
+  })
 }
 
-export async function seedCms(payload: Payload): Promise<void> {
-  const existing = await payload.find({ collection: 'pages', limit: 1 })
-  if (existing.totalDocs > 0) {
+export async function seedCms(repos: CoreRepositories): Promise<void> {
+  const existing = await repos.find({ collection: 'pages', limit: 1 })
+  if (existing.docs.length > 0) {
     console.log('CMS pages already seeded, skipping')
     return
   }
 
+  const now = new Date().toISOString()
+
   // ── HOMEPAGE ──
-  await payload.create({
+  await repos.create({
     collection: 'pages',
     data: {
       title: 'Avaleht',
@@ -55,7 +58,7 @@ export async function seedCms(payload: Payload): Promise<void> {
           buttonLink: '/register',
         },
       ],
-      publishedAt: new Date(),
+      publishedAt: now,
     },
   })
 
@@ -109,15 +112,15 @@ export async function seedCms(payload: Payload): Promise<void> {
         { blockType: 'hero', heading: 'Metsa hooldus', subheading: 'Säästlik ja professionaalne metsa hooldus' },
         {
           blockType: 'text',
-          content: rt('Pakkume metsa hooldusteenuseid alates noore metsa hooldusest kuni valikraieni. Meie spetsialistid aitavad sul hoida metsa tervena ja väärtuslikuna.'),
+          content: rt('Pakume metsa hooldusteenuseid alates noore metsa hooldusest kuni valikraieni. Meie spetsialistid aitavad sul hoida metsa tervena ja väärtuslikuna.'),
         },
         {
           blockType: 'accordion',
           heading: 'Hooldusteenused',
           items: [
-            { title: 'Noore metsa hooldus', content: rt('Noore metsa hooldus hõlmab liigasisest ja liikidevahelist valikut, et tagada kvaliteetne puistu.'), },
-            { title: 'Valikraie', content: rt('Valikraie võimaldab säilitada metsa looduslikku mitmekesisust ja tagada pidev metsakate.'), },
-            { title: 'Sanitaarraie', content: rt('Sanitaarraie eesmärk on eemaldada kahjustatud või haiged puud, et vältida kahjurite levikut.'), },
+            { title: 'Noore metsa hooldus', content: rt('Noore metsa hooldus hõlmab liigisisest ja liikidevahelist valikut, et tagada kvaliteetne puistu.') },
+            { title: 'Valikraie', content: rt('Valikraie võimaldab säilitada metsa looduslikku mitmekesisust ja tagada pidev metsakate.') },
+            { title: 'Sanitaarraie', content: rt('Sanitaarraie eesmärk on eemaldada kahjustatud või haiged puud, et vältida kahjurite levikut.') },
           ],
         },
       ],
@@ -125,9 +128,9 @@ export async function seedCms(payload: Payload): Promise<void> {
   ]
 
   for (const page of services) {
-    await payload.create({
+    await repos.create({
       collection: 'pages',
-      data: { ...page, status: 'published', publishedAt: new Date() },
+      data: { ...page, status: 'published', publishedAt: now },
     })
   }
 
@@ -142,15 +145,13 @@ export async function seedCms(payload: Payload): Promise<void> {
     { title: 'Kontakt', slug: 'kontakt', order: 7 },
   ]
 
-  const categoryDocs: Record<string, { id: string | number }> = {}
+  const categoryIdBySlug: Record<string, string> = {}
   for (const cat of FAQ_CATEGORIES) {
-    const doc = await payload.create({
+    const doc = await repos.create({
       collection: 'faq-categories',
       data: cat,
     })
-    // Keep the id as returned: Payload rejects numeric strings for
-    // number-typed relationship ids.
-    categoryDocs[cat.slug] = { id: doc.id }
+    categoryIdBySlug[cat.slug] = doc.id
   }
 
   // ── FAQ ITEMS ──
@@ -191,14 +192,14 @@ export async function seedCms(payload: Payload): Promise<void> {
   ]
 
   for (const item of FAQ_ITEMS) {
-    const cat = categoryDocs[item.categorySlug]
-    if (!cat) continue
-    await payload.create({
+    const categoryId = categoryIdBySlug[item.categorySlug]
+    if (!categoryId) continue
+    await repos.create({
       collection: 'faq-items',
       data: {
         question: item.question,
         answer: rt(item.answer),
-        category: cat.id,
+        categoryId,
         order: item.order,
         slug: item.slug,
       },
@@ -258,13 +259,13 @@ export async function seedCms(payload: Payload): Promise<void> {
   ]
 
   for (const article of ARTICLES) {
-    await payload.create({
+    await repos.create({
       collection: 'articles',
       data: {
         ...article,
         content: rt(article.content),
         status: 'published',
-        publishedAt: new Date(),
+        publishedAt: now,
       },
     })
   }
@@ -278,21 +279,21 @@ export async function seedCms(payload: Payload): Promise<void> {
   ]
 
   for (const t of TESTIMONIALS) {
-    await payload.create({
+    await repos.create({
       collection: 'testimonials',
       data: t,
     })
   }
 
   // ── LEGAL DOCUMENTS ──
-  const LEGAL_DOCS: { title: string; slug: string; type: string; content: string; version: string; effectiveDate: Date }[] = [
+  const LEGAL_DOCS: { title: string; slug: string; type: 'terms' | 'privacy' | 'cookies'; content: string; version: string; effectiveDate: string }[] = [
     {
       title: 'Kasutustingimused',
       slug: 'kasutustingimused',
       type: 'terms',
       content: 'Erametsad.ee kasutustingimused reguleerivad platvormi kasutamist. Platvormi kasutades nõustud käesolevate tingimustega. Erametsad OÜ pakub oksjonikeskkonda metsavara ostmiseks ja müümiseks.',
       version: '1.0',
-      effectiveDate: new Date('2025-01-01'),
+      effectiveDate: new Date('2025-01-01').toISOString(),
     },
     {
       title: 'Privaatsuspoliitika',
@@ -300,7 +301,7 @@ export async function seedCms(payload: Payload): Promise<void> {
       type: 'privacy',
       content: 'Privaatsuspoliitika kirjeldab, kuidas kogume, töötleme ja säilitame isikuandmeid. Isikuandmeid töödeldakse vastavalt isikuandmete kaitse seadusele ja Euroopa andmekaitsemäärusele (GDPR).',
       version: '1.0',
-      effectiveDate: new Date('2025-01-01'),
+      effectiveDate: new Date('2025-01-01').toISOString(),
     },
     {
       title: 'Küpsiste poliitika',
@@ -308,17 +309,17 @@ export async function seedCms(payload: Payload): Promise<void> {
       type: 'cookies',
       content: 'Erametsad kasutab küpsiseid veebilehe toimimiseks, kasutajakogemuse parandamiseks ja statistika kogumiseks. Vajalikud küpsised on kohustuslikud, statistilised küpsised võid keelata.',
       version: '1.0',
-      effectiveDate: new Date('2025-01-01'),
+      effectiveDate: new Date('2025-01-01').toISOString(),
     },
   ]
 
   for (const doc of LEGAL_DOCS) {
-    await payload.create({
+    await repos.create({
       collection: 'legal-documents',
       data: {
         ...doc,
         content: rt(doc.content),
-        publishedAt: new Date(),
+        publishedAt: now,
       },
     })
   }

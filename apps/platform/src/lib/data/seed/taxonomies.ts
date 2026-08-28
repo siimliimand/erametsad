@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import type { Payload } from 'payload'
+import type { CoreRepositories } from '../repositories'
 
 const COUNTIES = [
   { name: 'Harju', code: 'HH' },
@@ -18,8 +18,6 @@ const COUNTIES = [
   { name: 'Viljandi', code: 'VR' },
   { name: 'Võru', code: 'VO' },
 ]
-
-interface CountyDoc { id: string; name: string; code: string }
 
 const PARISHES: { name: string; code?: string; countyCode: string }[] = [
   { name: 'Anija', countyCode: 'HH' },
@@ -92,35 +90,32 @@ const PARISHES: { name: string; code?: string; countyCode: string }[] = [
   { name: 'Võru vald', countyCode: 'VO' },
 ]
 
-export async function seedTaxonomies(payload: Payload): Promise<void> {
-  const existing = await payload.find({ collection: 'counties', limit: 1 })
-  if (existing.totalDocs > 0) {
+export async function seedTaxonomies(repos: CoreRepositories): Promise<void> {
+  const existing = await repos.find({ collection: 'counties', limit: 1 })
+  if (existing.docs.length > 0) {
     console.log('Counties already seeded, skipping')
     return
   }
 
-  const countyMap = new Map<string, CountyDoc>()
+  const countyIdByCode = new Map<string, string>()
 
   for (const county of COUNTIES) {
-    const doc = await payload.create({
-      collection: 'counties',
-      data: county,
-    })
-    countyMap.set(county.code, doc as CountyDoc)
+    const doc = await repos.create({ collection: 'counties', data: county })
+    countyIdByCode.set(county.code, doc.id)
   }
 
   for (const parish of PARISHES) {
-    const county = countyMap.get(parish.countyCode)
-    if (!county) {
+    const countyId = countyIdByCode.get(parish.countyCode)
+    if (!countyId) {
       console.warn(`Skipping parish "${parish.name}": unknown county code "${parish.countyCode}"`)
       continue
     }
-    await payload.create({
+    await repos.create({
       collection: 'parishes',
       data: {
         name: parish.name,
-        code: parish.code ?? undefined,
-        county: county.id,
+        code: parish.code,
+        countyId,
       },
     })
   }

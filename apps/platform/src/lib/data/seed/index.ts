@@ -1,5 +1,5 @@
-import type { Payload } from 'payload'
-
+/* eslint-disable no-console */
+import type { CoreRepositories } from '../repositories'
 import { seedAuctions } from './auctions'
 import { seedBids } from './bids'
 import { seedCms } from './cms'
@@ -9,14 +9,14 @@ import { seedSpecialists } from './specialists'
 import { seedTaxonomies } from './taxonomies'
 import { seedUsers } from './users'
 
-async function seedSettings(payload: Payload): Promise<void> {
-  const existing = await payload.find({ collection: 'settings', limit: 1 })
-  if (existing.totalDocs > 0) {
+async function seedSettings(repos: CoreRepositories): Promise<void> {
+  const existing = await repos.find({ collection: 'settings', limit: 1 })
+  if (existing.docs.length > 0) {
     console.log('Settings already seeded, skipping')
     return
   }
 
-  await payload.create({
+  await repos.create({
     collection: 'settings',
     data: {
       orgName: 'Erametsad OÜ',
@@ -32,18 +32,18 @@ async function seedSettings(payload: Payload): Promise<void> {
   console.log('Seeded settings (featureFlags.requireFrameworkContract: true)')
 }
 
-export async function seed(payload: Payload): Promise<void> {
+export async function seed(repos: CoreRepositories): Promise<void> {
   console.log('Seeding database…')
 
-  await seedSettings(payload)
-  await seedUsers(payload)
-  await seedSpecialists(payload)
-  await seedTaxonomies(payload)
-  await seedAuctions(payload)
-  await seedBids(payload)
-  await seedCms(payload)
-  await seedContractTemplates(payload)
-  await seedLeads(payload)
+  await seedSettings(repos)
+  await seedUsers(repos)
+  await seedSpecialists(repos)
+  await seedTaxonomies(repos)
+  await seedAuctions(repos)
+  await seedBids(repos)
+  await seedCms(repos)
+  await seedContractTemplates(repos)
+  await seedLeads(repos)
 
   console.log('Seeding complete')
 }

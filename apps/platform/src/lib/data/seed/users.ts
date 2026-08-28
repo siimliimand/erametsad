@@ -1,5 +1,7 @@
 /* eslint-disable no-console */
-import type { Payload } from 'payload'
+import crypto from 'node:crypto'
+
+import type { CoreRepositories } from '../repositories'
 
 /**
  * Demo users — all share the same password for local dev.
@@ -97,33 +99,44 @@ const DEMO_USERS: {
   },
 ]
 
-export async function seedUsers(payload: Payload): Promise<void> {
-  const existing = await payload.find({ collection: 'users', limit: 1 })
-  if (existing.totalDocs > 0) {
+// Payload hashed the shared demo password into its auth columns; the D1
+// schema keeps password_hash/password_salt. scrypt with a per-user salt
+// fills them until the Phase 4 auth port fixes the verification format.
+function hashPassword(password: string): { hash: string; salt: string } {
+  const salt = crypto.randomBytes(16).toString('hex')
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex')
+  return { hash, salt }
+}
+
+export async function seedUsers(repos: CoreRepositories): Promise<void> {
+  const existing = await repos.find({ collection: 'users', limit: 1 })
+  if (existing.docs.length > 0) {
     console.log('Users already seeded, skipping')
     return
   }
 
   for (const u of DEMO_USERS) {
     const { profile, ...userData } = u
-    const user = await payload.create({
+    const credentials = hashPassword('demo1234')
+    const user = await repos.create({
       collection: 'users',
       data: {
         ...userData,
-        password: 'demo1234',
+        passwordHash: credentials.hash,
+        passwordSalt: credentials.salt,
       },
     })
 
     if (profile) {
-      await payload.create({
+      await repos.create({
         collection: 'profile',
         data: {
-          ...profile,
-          user: user.id,
-          approvalStatus: profile.approvalStatus ?? undefined,
-          companyName: profile.companyName ?? undefined,
-          companyRegCode: profile.companyRegCode ?? undefined,
-          phone: undefined,
+          type: profile.type,
+          approvalStatus: profile.approvalStatus ?? 'pending',
+          displayName: profile.displayName,
+          companyName: profile.companyName,
+          companyRegCode: profile.companyRegCode,
+          userId: user.id,
         },
       })
     }

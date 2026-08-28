@@ -1,8 +1,9 @@
-import type { Payload } from 'payload'
+/* eslint-disable no-console */
+import type { CoreRepositories } from '../repositories'
 
-export async function seedContractTemplates(payload: Payload): Promise<void> {
-  const existing = await payload.find({ collection: 'contract-templates', limit: 1 })
-  if (existing.totalDocs > 0) {
+export async function seedContractTemplates(repos: CoreRepositories): Promise<void> {
+  const existing = await repos.find({ collection: 'contract-templates', limit: 1 })
+  if (existing.docs.length > 0) {
     console.log('Contract templates already seeded, skipping')
     return
   }
@@ -16,7 +17,7 @@ export async function seedContractTemplates(payload: Payload): Promise<void> {
     { key: '{{date}}' },
   ]
 
-  await payload.create({
+  await repos.create({
     collection: 'contract-templates',
     data: {
       name: 'Raamlepingu mall',
@@ -27,7 +28,7 @@ export async function seedContractTemplates(payload: Payload): Promise<void> {
     },
   })
 
-  await payload.create({
+  await repos.create({
     collection: 'contract-templates',
     data: {
       name: 'Oksjoni müügilepingu mall',

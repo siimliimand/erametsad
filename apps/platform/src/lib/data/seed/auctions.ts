@@ -1,16 +1,9 @@
-import type { Payload } from 'payload'
+/* eslint-disable no-console */
+import { eurosToCents, type CoreRepositories } from '../repositories'
+import type { AuctionObjectType, AuctionStatus, AuctionType } from '../schema'
 
-const _TREE_SPECIES = ['mänd', 'kuusk', 'kask', 'haab', 'sanglepp', 'tamm', 'hall lepp', 'pihlakas']
-const _LOGGING_TYPES = [
-  { code: 'U' },
-  { code: 'L' },
-  { code: 'H' },
-  { code: 'T' },
-  { code: 'R' },
-]
-
-function makeRichText(text: string): unknown {
-  return {
+function makeRichText(text: string): string {
+  return JSON.stringify({
     root: {
       children: [
         {
@@ -19,7 +12,7 @@ function makeRichText(text: string): unknown {
         },
       ],
     },
-  }
+  })
 }
 
 function futureDate(days: number, hours = 0, minutes = 0): Date {
@@ -40,9 +33,9 @@ function pastDate(daysAgo: number, hours = 0): Date {
 interface AuctionSeed {
   title: string
   slug: string
-  status: string
-  objectType: string
-  type: 'open' | 'sealed'
+  status: AuctionStatus
+  objectType: AuctionObjectType
+  type: AuctionType
   isQuickAuction: boolean
   countyIndex: number
   parishIndex: number
@@ -66,7 +59,7 @@ interface AuctionSeed {
   packageHeader: string | undefined
   packageRows: unknown
   packageColumns: string[] | undefined
-  descriptionPublic: unknown
+  descriptionPublic: string
 }
 
 const COUNTY_CODES = ['HH', 'TA', 'PR', 'VO', 'LV', 'SR', 'RA', 'IV', 'JG', 'PL']
@@ -1047,31 +1040,28 @@ const AUCTIONS: AuctionSeed[] = [
   },
 ]
 
-export async function seedAuctions(payload: Payload): Promise<void> {
-  const existing = await payload.find({ collection: 'auctions', limit: 1 })
-  if (existing.totalDocs > 0) {
+export async function seedAuctions(repos: CoreRepositories): Promise<void> {
+  const existing = await repos.find({ collection: 'auctions', limit: 1 })
+  if (existing.docs.length > 0) {
     console.log('Auctions already seeded, skipping')
     return
   }
 
-  const { docs: counties } = await payload.find({ collection: 'counties', limit: 15 })
-  // Parishes total 68 and find returns newest-first, so a limit below the
-  // collection count silently drops the oldest parishes (Anija, Kose, ...)
-  // from the lookup map and their auctions get skipped.
-  const { docs: parishes } = await payload.find({ collection: 'parishes', limit: 200 })
-  const { docs: specialists } = await payload.find({ collection: 'specialist', limit: 10 })
-  const { docs: users } = await payload.find({ collection: 'users', limit: 15 })
+  const { docs: counties } = await repos.find({ collection: 'counties', limit: 15 })
+  // Parishes total 68, so the lookup fetches them all to build the name map.
+  const { docs: parishes } = await repos.find({ collection: 'parishes', limit: 200 })
+  const { docs: specialists } = await repos.find({ collection: 'specialists', limit: 10 })
+  const { docs: users } = await repos.find({ collection: 'users', limit: 15 })
 
   if (counties.length === 0) throw new Error('No counties found. Run seedTaxonomies first.')
   if (specialists.length === 0) throw new Error('No specialists found. Run seedSpecialists first.')
   if (users.length === 0) throw new Error('No users found. Run seedUsers first.')
 
-  const countyByCode = new Map(counties.map((c) => [c.code as string, c]))
-  const parishByNameAndCounty = new Map<string, string>()
+  const countyIdByCode = new Map(counties.map((c) => [c.code, c.id] as const))
+  const parishIdByNameAndCounty = new Map<string, string>()
   for (const p of parishes) {
-    const countyId = (p.county as { id: string }).id
-    if (countyId) {
-      parishByNameAndCounty.set(`${p.name as string}|${countyId}`, p.id as string)
+    if (p.countyId) {
+      parishIdByNameAndCounty.set(`${p.name}|${p.countyId}`, p.id)
     }
   }
 
@@ -1083,8 +1073,8 @@ export async function seedAuctions(payload: Payload): Promise<void> {
       continue
     }
 
-    const county = countyByCode.get(countyCode)
-    if (!county) {
+    const countyId = countyIdByCode.get(countyCode)
+    if (!countyId) {
       console.warn(`Skipping "${a.title}": county code ${countyCode} not found in DB`)
       continue
     }
@@ -1101,7 +1091,7 @@ export async function seedAuctions(payload: Payload): Promise<void> {
       continue
     }
 
-    const parishId = parishByNameAndCounty.get(`${parishName}|${String(county.id)}`)
+    const parishId = parishIdByNameAndCounty.get(`${parishName}|${countyId}`)
     if (!parishId) {
       console.warn(`Skipping "${a.title}": parish ${parishName} not found for county ${countyCode}`)
       continue
@@ -1119,7 +1109,7 @@ export async function seedAuctions(payload: Payload): Promise<void> {
       continue
     }
 
-    await payload.create({
+    await repos.create({
       collection: 'auctions',
       data: {
         title: a.title,
@@ -1129,25 +1119,25 @@ export async function seedAuctions(payload: Payload): Promise<void> {
         type: a.type,
         isQuickAuction: a.isQuickAuction,
         endYear: a.endYear,
-        county: county.id,
-        parish: parishId,
+        countyId,
+        parishId,
         address: a.address,
         species: a.species,
         loggingTypes: a.loggingTypes,
-        minBid: a.minBid,
-        reservePrice: a.reservePrice,
-        bidStep: a.bidStep,
+        minBidCents: eurosToCents(a.minBid),
+        reservePriceCents: a.reservePrice === undefined ? undefined : eurosToCents(a.reservePrice),
+        bidStepCents: eurosToCents(a.bidStep),
         vatIncluded: true,
-        specialist: specialist.id,
-        seller: seller.id,
-        startsAt: a.startsAt,
-        endsAt: a.endsAt,
-        scheduledAt: a.scheduledAt,
-        activatedAt: a.activatedAt,
-        endedAt: a.endedAt,
-        completedAt: a.completedAt,
-        archivedAt: a.archivedAt,
-        contractAt: a.contractAt,
+        specialistId: specialist.id,
+        sellerId: seller.id,
+        startsAt: a.startsAt?.toISOString(),
+        endsAt: a.endsAt?.toISOString(),
+        scheduledAt: a.scheduledAt?.toISOString(),
+        activatedAt: a.activatedAt?.toISOString(),
+        endedAt: a.endedAt?.toISOString(),
+        completedAt: a.completedAt?.toISOString(),
+        archivedAt: a.archivedAt?.toISOString(),
+        contractAt: a.contractAt?.toISOString(),
         packageHeader: a.packageHeader,
         packageRows: a.packageRows,
         packageColumns: a.packageColumns?.map((c) => ({ column: c })),
