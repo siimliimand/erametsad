@@ -98,3 +98,91 @@ From the Email Service docs, pages dated 2026-06-09 to 2026-07-17:
 - The token needs new permissions before any email automation can run from CI.
 - Cost fits the plan: 3,000 emails per month are included, and transactional volume for the auction portal stays well under that. The ramped daily quota on new accounts is the main launch-day risk.
 - The send API returns per-recipient delivery status and a message id. Suppression and bounce handling are built in. No extra provider is needed once the zone and plan questions are settled.
+
+## Prototype rescope (ww0.dev)
+
+Date: 2026-08-28. This is a re-run of task 1.3 under the rescope in the
+design addendum "Addendum: prototype domain strategy". The prototype does
+not use `erametsad.ee`. All prototype email moves to the `ww0.dev` zone.
+
+### Prototype hostnames
+
+| Role | Prototype host | Production host |
+| ---- | ------------------------------ | ----------------------- |
+| Marketing | `erametsad.ww0.dev` | `eametsad.ee` |
+| Portal | `oksjonid.erametsad.ww0.dev` | `oksjonid.eametsad.ee` |
+| API | `api.erametsad.ww0.dev` | `api.eametsad.ee` |
+| Admin | `admin.erametsad.ww0.dev` | `admin.eametsad.ee` |
+
+No placeholder DNS records were created for these web hostnames. Workers
+custom domains attach at deploy time. A pre-existing record on the same name
+blocks attachment. Only the email sending subdomain can hold records, and
+onboarding creates them.
+
+### Zone
+
+`GET /zones?name=ww0.dev` returned one active zone:
+
+| Field | Value |
+| ---- | -------------------------------- |
+| Zone name | `ww0.dev` |
+| Zone id | `8761a52640daef70b6cf6f14d38e6dd9` |
+| Status | `active` |
+
+Sending subdomain for onboarding: `erametsad`. The prototype sender is
+`noreply@erametsad.ww0.dev`.
+
+### Probe results
+
+The token in `CLOUDFLARE_API_TOKEN` is active (`GET /user/tokens/verify`,
+HTTP 200). Zone list read works. Email endpoints still fail:
+
+| Endpoint | Result |
+| ---- | ------ |
+| `GET /zones/{zone_id}/email/sending/subdomains` | HTTP 403, code 10000 `Authentication error` |
+| `GET /accounts/{account_id}/email/sending/domains` | HTTP 404, code 10001 `Unable to authenticate request` |
+| `GET /accounts/{account_id}/email/sending/quota` | HTTP 404, code 10001 `Unable to authenticate request` |
+| `GET /accounts/{account_id}/email/sending/status` | HTTP 404, code 10001 `Unable to authenticate request` |
+| `GET /accounts/{account_id}/email/routing/addresses` | HTTP 403, code 10000 `Authentication error` |
+| `GET /accounts/{account_id}/subscriptions` | HTTP 403, code 10000 `Authentication error` |
+| `GET /zones/{zone_id}/dns_records` | HTTP 403, code 10000 `Authentication error` |
+
+The token reads the zone list but cannot read DNS records on `ww0.dev`. So
+the token also lacks `DNS : Read` on this zone. Public DNS checks with `dig`
+need no API access. They stay available for record verification.
+
+### Actions taken
+
+Read-only GET requests only. No onboarding POST, no DNS change, no account
+change, no email sent. The token value was not printed and is not stored in
+this report. Endpoints used:
+
+1. `GET /zones?name=ww0.dev`
+2. `GET /user/tokens/verify`
+3. `GET /zones/8761a52640daef70b6cf6f14d38e6dd9/email/sending/subdomains`
+4. `GET /accounts/29f50b2c797dc5cd6ccd0cff405adb43/email/sending/domains`
+5. `GET /accounts/29f50b2c797dc5cd6ccd0cff405adb43/email/sending/quota`
+6. `GET /accounts/29f50b2c797dc5cd6ccd0cff405adb43/email/sending/status`
+7. `GET /accounts/29f50b2c797dc5cd6ccd0cff405adb43/email/routing/addresses`
+8. `GET /accounts/29f50b2c797dc5cd6ccd0cff405adb43/subscriptions`
+9. `GET /zones/8761a52640daef70b6cf6f14d38e6dd9/dns_records?per_page=5`
+
+### Enablement, send, quota
+
+Not done. The enablement step stopped at the permission check, under the
+task rules. The daily quota stays unreadable until the token reaches the
+email endpoints after onboarding.
+
+### Remaining blockers
+
+1. The token lacks email permissions. Add `Email Sending : Edit` and
+   `Email Routing : Edit` for the `ww0.dev` zone at
+   `dash.cloudflare.com/profile/api-tokens`. Add `DNS : Read` on `ww0.dev`
+   if record checks must use the API.
+2. Workers Paid state stays unknown. `GET /accounts/{account_id}/subscriptions`
+   still returns code 10000. Check the plan in the dashboard, or add
+   `Billing : Read` to the token.
+3. After the permissions are fixed, re-run this task: onboard the
+   `erametsad` subdomain on zone `8761a52640daef70b6cf6f14d38e6dd9`, check
+   SPF and DKIM with `dig`, send one test email to `siim.liimand@gmail.com`,
+   and record the daily quota.
