@@ -14,13 +14,40 @@ vi.mock('@/lib/data/runtime', () => ({
 
 import { hash } from '@/lib/crypto'
 import { getRepositories } from '@/lib/data/runtime'
+import { setD1ForTests, type DbDatabase, type DbPreparedStatement, type DbResult, type SqlParam } from '@/lib/db'
 
 process.env.JWT_SECRET = 'test-secret-used-only-by-vitest'
 
 const defaultIsikukood = '38803160272'
 
+// completeEidLogin persists the session through the D1-backed store;
+// this stub accepts those statements without asserting on them.
+function recordingD1(): DbDatabase {
+  return {
+    prepare(sql: string) {
+      let params: SqlParam[] = []
+      const statement: DbPreparedStatement = {
+        bind(...values: SqlParam[]) {
+          params = values
+          return statement
+        },
+        all<T>(): Promise<DbResult<T>> {
+          void sql
+          void params
+          return Promise.resolve({ results: [], success: true, meta: { changes: 1 } })
+        },
+      }
+      return statement
+    },
+    batch<T>(prepared: DbPreparedStatement[]): Promise<DbResult<T>[]> {
+      return Promise.all(prepared.map((statement) => statement.all<T>()))
+    },
+  }
+}
+
 afterEach(() => {
   vi.unstubAllEnvs()
+  setD1ForTests(null)
 })
 
 describe('DemoEidProvider', () => {
@@ -86,6 +113,7 @@ describe('completeEidLogin', () => {
 
   beforeEach(() => {
     find = vi.fn()
+    setD1ForTests(recordingD1())
     vi.mocked(getRepositories).mockImplementation(
       () => ({ find }) as never,
     )

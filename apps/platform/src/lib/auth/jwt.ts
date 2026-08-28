@@ -75,6 +75,10 @@ export interface AccessTokenPayload {
   userId: string
   role: string
   activeProfileId?: string | undefined
+  // Present on every session-issued token: without a per-session
+  // distinguisher, same-second issuances for one user are byte-identical
+  // JWTs and collide on the sessions.access_token_hash unique index.
+  sessionId?: string | undefined
 }
 
 export interface RefreshTokenPayload {
@@ -103,10 +107,17 @@ export function verifyAccessToken(
   }
   const activeProfileId =
     typeof result.activeProfileId === 'string' ? result.activeProfileId : undefined
-  if (activeProfileId === undefined) {
+  const sessionId =
+    typeof result.sessionId === 'string' ? result.sessionId : undefined
+  if (activeProfileId === undefined && sessionId === undefined) {
     return { userId: result.userId, role: result.role }
   }
-  return { userId: result.userId, role: result.role, activeProfileId }
+  return {
+    userId: result.userId,
+    role: result.role,
+    ...(activeProfileId !== undefined ? { activeProfileId } : {}),
+    ...(sessionId !== undefined ? { sessionId } : {}),
+  }
 }
 
 export function verifyAdminAccessToken(

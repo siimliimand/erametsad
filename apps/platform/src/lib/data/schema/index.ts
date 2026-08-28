@@ -2,6 +2,7 @@ import type { InferInsertModel, InferSelectModel } from 'drizzle-orm'
 
 export * from './shared'
 export * from './users'
+export * from './sessions'
 export * from './profiles'
 export * from './company-access-requests'
 export * from './auction-rights'
@@ -52,6 +53,7 @@ import type { parishes as parishesTable } from './parishes'
 import type { partnerServices as partnerServicesTable } from './partner-services'
 import type { profiles as profilesTable } from './profiles'
 import type { redirects as redirectsTable } from './redirects'
+import type { sessions as sessionsTable } from './sessions'
 import type { settings as settingsTable } from './settings'
 import type { specialists as specialistsTable } from './specialists'
 import type { statisticsSnapshots as statisticsSnapshotsTable } from './statistics-snapshots'
@@ -108,6 +110,8 @@ export type PartnerService = InferSelectModel<typeof partnerServicesTable>
 export type NewPartnerService = InferInsertModel<typeof partnerServicesTable>
 export type Redirect = InferSelectModel<typeof redirectsTable>
 export type NewRedirect = InferInsertModel<typeof redirectsTable>
+export type Session = InferSelectModel<typeof sessionsTable>
+export type NewSession = InferInsertModel<typeof sessionsTable>
 export type Specialist = InferSelectModel<typeof specialistsTable>
 export type NewSpecialist = InferInsertModel<typeof specialistsTable>
 export type StatisticsSnapshot = InferSelectModel<typeof statisticsSnapshotsTable>
