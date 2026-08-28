@@ -4,9 +4,10 @@ import path from 'path'
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
-    // DO tests need the workers pool with their own config (task 3.8 wires
-    // the runner); the node pool cannot resolve cloudflare:test.
-    exclude: ['src/do/**'],
+    // DO and queue-consumer tests need the workers pool with their own
+    // configs (tasks 3.8 and 6.3 wire the runners); the node pool cannot
+    // resolve cloudflare:test.
+    exclude: ['src/do/**', 'src/workers/**'],
   },
   resolve: {
     alias: {
