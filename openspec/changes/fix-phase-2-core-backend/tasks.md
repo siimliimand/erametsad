@@ -1,20 +1,20 @@
 ## 1. Crypto fixes
 
 - [x] 1.1 Store and verify the AES-256-GCM auth tag in both crypto modules: `encrypt`/`encryptSealedData` return `authTag`, `decrypt`/`decryptSealedData` require it and throw on tamper; fix all call sites <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/crypto.ts, apps/platform/src/lib/encryption.ts, apps/platform/src/payload/collections/Users.ts] -->
-- [ ] 1.2 Crypto unit tests: roundtrip, tamper rejection, wrong-key rejection, Users `afterRead` never throws on encrypted isikukood <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/__tests__/encryption.test.ts] -->
+- [x] 1.2 Crypto unit tests: roundtrip, tamper rejection, wrong-key rejection, Users `afterRead` never throws on encrypted isikukood <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/__tests__/encryption.test.ts] -->
 
 ## 2. Auction schema & ending worker
 
 - [x] 2.1 Add required `type` select (open|sealed, default open) to the Auction collection; validation forces sealed for kinnistu and pakett <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/payload/collections/Auction.ts] -->
 - [x] 2.2 Fix the ending worker: two-step updates (`active → ended`, then `ended → appraised|unsold`), reserve-price outcome on open auctions, sealed branch keyed on the schema `type`, notifications carry userId <!-- agent: fullstack-engineer.build, depends_on: [2.1], touches: [apps/platform/src/lib/workers/auction-ending.ts] -->
-- [ ] 2.3 Start the worker and the notification listener from `instrumentation.ts` (Node runtime guard, 30s interval); document the queue-interface swap point <!-- agent: fullstack-engineer.build, depends_on: [2.2, 7.2], touches: [apps/platform/src/instrumentation.ts, apps/platform/src/lib/queue.ts] -->
-- [ ] 2.4 Worker tests: transitions pass the real guard, no-bid and reserve-not-met outcomes, sealed detection via schema field, double-fire idempotency <!-- agent: fullstack-engineer.build, depends_on: [2.2], touches: [apps/platform/src/lib/workers/__tests__/auction-ending.test.ts] -->
+- [x] 2.3 Start the worker and the notification listener from `instrumentation.ts` (Node runtime guard, 30s interval); document the queue-interface swap point <!-- agent: fullstack-engineer.build, depends_on: [2.2, 7.2], touches: [apps/platform/src/instrumentation.ts, apps/platform/src/lib/queue.ts] -->
+- [x] 2.4 Worker tests: transitions pass the real guard, no-bid and reserve-not-met outcomes, sealed detection via schema field, double-fire idempotency <!-- agent: fullstack-engineer.build, depends_on: [2.2], touches: [apps/platform/src/lib/workers/__tests__/auction-ending.test.ts] -->
 
 ## 3. Bidding engine
 
 - [x] 3.1 Transactional `placeBid`: wrap validation chain and writes in a Postgres transaction with `FOR UPDATE` on the auction row (Drizzle via `payload.db`); server-side salted ipHash; server-set source; alapakkumine amount path (below minBid → `pending_approval` when enabled) <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/bidding/place-bid.ts, apps/platform/src/lib/bidding/alapakkumine.ts] -->
 - [x] 3.2 Wire the bid route to the engines: anti-snipe check + `auction:extended` broadcast + audit entry, autobidder evaluation, `bid:created` broadcast, `outbid` my-stream + eventBus events with userId <!-- agent: fullstack-engineer.build, depends_on: [3.1, 3.4, 7.1], touches: [apps/platform/src/app/api/v1/bids/create/route.ts] -->
-- [ ] 3.3 Seller alapakkumine endpoints `POST /api/v1/my-auctions/:id/underbids/:bidId/approve|reject` with race guard, role check (seller/admin), and bidder notification <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/app/api/v1/my-auctions/[id]/underbids/[bidId]/approve/route.ts, apps/platform/src/app/api/v1/my-auctions/[id]/underbids/[bidId]/reject/route.ts, apps/platform/src/lib/bidding/alapakkumine.ts] -->
+- [x] 3.3 Seller alapakkumine endpoints `POST /api/v1/my-auctions/:id/underbids/:bidId/approve|reject` with race guard, role check (seller/admin), and bidder notification <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/app/api/v1/my-auctions/[id]/underbids/[bidId]/approve/route.ts, apps/platform/src/app/api/v1/my-auctions/[id]/underbids/[bidId]/reject/route.ts, apps/platform/src/lib/bidding/alapakkumine.ts] -->
 - [x] 3.4 Rewrite autobidder evaluation as a single pass: highest max (tie earliest) bids `max(leading+step, secondMax+step)` capped at own max; no self-overbid; invoked from the bid flow <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/bidding/autobidder.ts] -->
 - [ ] 3.5 Rewrite autobidder tests to spec values: 210 case, no-self-overbid, single-autobidder minimum, equal-max tie-break <!-- agent: fullstack-engineer.build, depends_on: [3.4], touches: [apps/platform/src/lib/bidding/__tests__/autobidder.test.ts] -->
 
@@ -23,7 +23,7 @@
 - [x] 4.1 `submitSealedBid`: add objectType rights check; decrypt failures propagate (no silent amount 0); revision cap semantics documented (1 + N) <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/bidding/sealed-bid.ts] -->
 - [x] 4.2 Persist opening sessions in the cache abstraction with 30-minute expiry; two-person verification (distinct users, server-verified tokens); rank desc with earliest tie-break; step-up role checks use the real JWT role <!-- agent: fullstack-engineer.build, depends_on: [1.1, 5.1], touches: [apps/platform/src/lib/bidding/sealed-opening.ts, apps/platform/src/lib/cache.ts, apps/platform/src/app/api/v1/admin/auctions/[id]/open-sealed/route.ts] -->
 - [x] 4.3 `confirmWinner`: verify the bid belongs to the auction and tops the ranking, compare reserve (sold/appraised vs unsold), publish `finalPrice`, notify losers with userId, queue the contract; fix the admin route role check <!-- agent: fullstack-engineer.build, depends_on: [4.2], touches: [apps/platform/src/lib/bidding/sealed-opening.ts, apps/platform/src/app/api/v1/admin/auctions/[id]/confirm-winner/route.ts] -->
-- [ ] 4.4 Ceremony tests: reserve paths, tie-break, expiry, finalPrice publication, loser notifications <!-- agent: fullstack-engineer.build, depends_on: [4.3], touches: [apps/platform/src/lib/bidding/__tests__/sealed-opening.test.ts] -->
+- [x] 4.4 Ceremony tests: reserve paths, tie-break, expiry, finalPrice publication, loser notifications <!-- agent: fullstack-engineer.build, depends_on: [4.3], touches: [apps/platform/src/lib/bidding/__tests__/sealed-opening.test.ts] -->
 
 ## 5. Auth & sessions
 
