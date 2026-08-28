@@ -32,12 +32,12 @@
 ## 3. Phase 2: Durable Objects for auctions and rate limiting
 
 - [x] 3.1 `AuctionDO` skeleton (`src/do/auction.ts`) with on-demand hydration: first touch loads auction state from D1; DO storage holds only hot state (current price, endsAt, subscriber set) <!-- agent: fullstack-engineer.build, depends_on: [1.2, 2.8], touches: [apps/platform/src/do/auction.ts] -->
-- [ ] 3.2 Bid admission in `AuctionDO`: port the place-bid validation chain (user status, amount vs current price, step, alapakkumine rules, sealed constraints, contract gate, rights), idempotency key replay, and one `batch()` write on accept (bid row + auction update + audit entry); autobidder evaluation runs in the DO <!-- agent: fullstack-engineer.build, depends_on: [2.9, 3.1], touches: [apps/platform/src/do/auction.ts, apps/platform/src/lib/bidding/place-bid.ts] -->
-- [ ] 3.3 Event hub in `AuctionDO`: `subscribe()` endpoint (SSE or WebSocket hibernation), subscriber registry, fan-out of `bid:created`, `auction:extended`, `auction:ended`, `auction:published` <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/do/auction.ts] -->
+- [x] 3.2 Bid admission in `AuctionDO`: port the place-bid validation chain (user status, amount vs current price, step, alapakkumine rules, sealed constraints, contract gate, rights), idempotency key replay, and one `batch()` write on accept (bid row + auction update + audit entry); autobidder evaluation runs in the DO <!-- agent: fullstack-engineer.build, depends_on: [2.9, 3.1], touches: [apps/platform/src/do/auction.ts, apps/platform/src/lib/bidding/place-bid.ts] -->
+- [x] 3.3 Event hub in `AuctionDO`: `subscribe()` endpoint (SSE or WebSocket hibernation), subscriber registry, fan-out of `bid:created`, `auction:extended`, `auction:ended`, `auction:published` <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/do/auction.ts] -->
 - [ ] 3.4 `alarm()` scheduling in `AuctionDO`: anti-snipe window check, auction end transition, winner computation including sealed-bid opening trigger, notification enqueue <!-- agent: fullstack-engineer.build, depends_on: [3.2], touches: [apps/platform/src/do/auction.ts] -->
 - [ ] 3.5 Rebuild `src/lib/realtime/auction-stream.ts` and `my-stream.ts` on top of AuctionDO events; keep the public event names so the frontend stays untouched <!-- agent: fullstack-engineer.build, depends_on: [3.3], touches: [apps/platform/src/lib/realtime/auction-stream.ts, apps/platform/src/lib/realtime/my-stream.ts] -->
 - [x] 3.6 `RateLimiterDO` (`src/do/rate-limiter.ts`): token bucket per key; `src/lib/rate-limit.ts` keeps its API and delegates; wire the leads and auth endpoints to it <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/do/rate-limiter.ts, apps/platform/src/lib/rate-limit.ts] -->
-- [ ] 3.7 `wrangler.jsonc` DO wiring: `durable_objects.bindings` for both classes plus the `migrations` list with the new SQLite-backed classes <!-- agent: fullstack-engineer.build, depends_on: [3.1, 3.6], touches: [apps/platform/wrangler.jsonc] -->
+- [x] 3.7 `wrangler.jsonc` DO wiring: `durable_objects.bindings` for both classes plus the `migrations` list with the new SQLite-backed classes <!-- agent: fullstack-engineer.build, depends_on: [3.1, 3.6], touches: [apps/platform/wrangler.jsonc] -->
 - [ ] 3.8 Concurrency and broadcast tests via `@cloudflare/vitest-pool-workers`: N parallel bids on one auction yield one consistent winner-increment sequence and consistent D1 state; two clients in different simulacra both receive `bid:created` <!-- agent: fullstack-engineer.build, depends_on: [3.2, 3.4, 3.7], touches: [apps/platform/src/do/__tests__/auction.test.ts] -->
 
 ## 4. Phase 3: Email Service
@@ -51,14 +51,14 @@
 
 - [x] 5.1 Replace the in-memory `accessTokenSessions` map with a D1-backed session store; verify refresh-token families persist and rotation survives isolate restarts <!-- agent: fullstack-engineer.build, depends_on: [1.6, 2.5], touches: [apps/platform/src/lib/auth/session.ts] -->
 - [x] 5.2 Port Node `crypto` to Web Crypto (`crypto.subtle`): `createHash`, `randomUUID`, HMAC in `jwt.ts`, `computeIpHash` in the bid path, sealed-bid encryption; keep a dual implementation only where local vitest needs it <!-- agent: fullstack-engineer.build, depends_on: [1.6], touches: [apps/platform/src/lib/auth/jwt.ts, apps/platform/src/lib/bidding/place-bid.ts, apps/platform/src/lib/encryption.ts] -->
-- [ ] 5.3 Audit `src/lib/auth/eid-provider.ts` for TCP/Node assumptions; test the flows against the real provider sandbox; document the port <!-- agent: fullstack-engineer.build, depends_on: [5.2], touches: [apps/platform/src/lib/auth/eid-provider.ts] -->
+- [x] 5.3 Audit `src/lib/auth/eid-provider.ts` for TCP/Node assumptions; test the flows against the real provider sandbox; document the port <!-- agent: fullstack-engineer.build, depends_on: [5.2], touches: [apps/platform/src/lib/auth/eid-provider.ts] -->
 - [ ] 5.4 Phase 4 exit verification: login, bid, logout cycle on the deployed worker; token-family rotation survives isolate restarts <!-- agent: fullstack-engineer.fast, depends_on: [3.2, 5.1, 5.2, 5.3], touches: [] -->
 
 ## 6. Phase 5: background jobs and queue
 
 - [x] 6.1 Queue consumer worker: notification fan-out (one message per user and channel, idempotent via `dedupeKey`), email sending, contract PDF generation into R2 <!-- agent: fullstack-engineer.build, depends_on: [2.11, 4.1], touches: [apps/platform/src/workers/queue-consumer.ts] -->
 - [ ] 6.2 Replace the polling in `src/lib/workers/auction-ending.ts` with AuctionDO alarms plus a cron trigger sweep (`scheduled()` handler) as the safety net for evicted DOs <!-- agent: fullstack-engineer.build, depends_on: [1.6, 3.4], touches: [apps/platform/src/lib/workers/auction-ending.ts, apps/platform/wrangler.jsonc] -->
-- [ ] 6.3 Dead-letter queue with retry policy and alerting on DLQ depth <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/wrangler.jsonc, apps/platform/src/workers/**] -->
+- [x] 6.3 Dead-letter queue with retry policy and alerting on DLQ depth <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/wrangler.jsonc, apps/platform/src/workers/**] -->
 
 ## 7. Phase 6: admin UI (Payload replacement)
 
