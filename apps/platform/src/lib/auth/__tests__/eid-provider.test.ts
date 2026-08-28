@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_DEMO_ISIKUKOODS,
   DemoEidProvider,
+  EidEasyProvider,
+  EIDEASY_DEFAULT_API_URL,
   completeEidLogin,
   getDemoIsikukoods,
   getEidProvider,
@@ -12,6 +14,7 @@ vi.mock('@/lib/data/runtime', () => ({
   getRepositories: vi.fn(),
 }))
 
+import { verifyAccessTokenAsync, verifyRefreshTokenAsync } from '@/lib/auth/jwt'
 import { hash } from '@/lib/crypto'
 import { getRepositories } from '@/lib/data/runtime'
 import { setD1ForTests, type DbDatabase, type DbPreparedStatement, type DbResult, type SqlParam } from '@/lib/db'
@@ -206,6 +209,261 @@ describe('completeEidLogin', () => {
     })
 
     const response = await completeEidLogin('smartid', sessionRef)
+
+    expect(response.status).toBe(401)
+    expect(response.cookies.get('access_token')).toBeUndefined()
+  })
+})
+
+describe('EidEasyProvider (sandbox contract)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    vi.stubEnv('EIDEASY_CLIENT_ID', 'sandbox-client')
+    vi.stubEnv('EIDEASY_SECRET', 'sandbox-secret')
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function jsonReply(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+
+  const completedData = {
+    identifier: '38803160272',
+    first_name: 'Jaan',
+    last_name: 'Tamm',
+  }
+
+  it('sends credentials to the sandbox start-session endpoint', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonReply({
+        status: 'OK',
+        data: {
+          session_token: 'sbx-token-1',
+          verification_control_code: '3042',
+        },
+      }),
+    )
+
+    const provider = getEidProvider('smartid')
+    expect(provider).toBeInstanceOf(EidEasyProvider)
+    const result = await provider.start('38803160272')
+
+    expect(result).toEqual({ sessionRef: 'sbx-token-1', controlCode: '3042' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [calledUrl, init] = fetchMock.mock.calls[0] as [URL, RequestInit]
+    expect(calledUrl).toEqual(
+      new URL('api/identity/start-session', EIDEASY_DEFAULT_API_URL),
+    )
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body as string)).toEqual({
+      client_id: 'sandbox-client',
+      secret: 'sandbox-secret',
+      method: 'smartid',
+      identifier: '38803160272',
+    })
+  })
+
+  it('honors EIDEASY_API_URL for a private sandbox base URL', async () => {
+    vi.stubEnv('EIDEASY_API_URL', 'https://sandbox.aggregator.example')
+    fetchMock.mockResolvedValueOnce(
+      jsonReply({ status: 'OK', data: { session_token: 'sbx-token-2' } }),
+    )
+
+    await getEidProvider('mobileid').start('47012130215')
+
+    const [calledUrl] = fetchMock.mock.calls[0] as [URL, RequestInit]
+    expect(String(calledUrl)).toBe(
+      'https://sandbox.aggregator.example/api/identity/start-session',
+    )
+  })
+
+  it('rejects when the aggregator refuses to start the session', async () => {
+    fetchMock.mockResolvedValueOnce(jsonReply({ status: 'ERROR' }))
+
+    await expect(
+      getEidProvider('idcard').start('38803160272'),
+    ).rejects.toThrow('eID aggregator refused to start the session')
+  })
+
+  it('rejects when the aggregator answers with an HTTP error', async () => {
+    fetchMock.mockResolvedValueOnce(jsonReply({ status: 'OK' }, 500))
+
+    await expect(
+      getEidProvider('smartid').start('38803160272'),
+    ).rejects.toThrow('eID aggregator request failed: 500')
+  })
+
+  it('maps PENDING, COMPLETED, and ERROR status responses', async () => {
+    const provider = getEidProvider('smartid')
+
+    fetchMock.mockResolvedValueOnce(jsonReply({ status: 'PENDING' }))
+    expect(await provider.status('sbx-token-1')).toEqual({
+      status: 'pending',
+    })
+
+    fetchMock.mockResolvedValueOnce(
+      jsonReply({ status: 'COMPLETED', data: completedData }),
+    )
+    expect(await provider.status('sbx-token-1')).toEqual({
+      status: 'completed',
+      user: completedData,
+    })
+
+    fetchMock.mockResolvedValueOnce(jsonReply({ status: 'ERROR' }))
+    expect(await provider.status('sbx-token-1')).toEqual({ status: 'failed' })
+  })
+
+  it('reports failed instead of throwing when the status call errors', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('network down'))
+
+    await expect(
+      getEidProvider('smartid').status('sbx-token-1'),
+    ).resolves.toEqual({ status: 'failed' })
+  })
+
+  it('completes with the identifier from the sandbox response', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonReply({ status: 'COMPLETED', data: completedData }),
+    )
+
+    await expect(
+      getEidProvider('smartid').complete('sbx-token-1'),
+    ).resolves.toEqual({ user: completedData, isikukood: '38803160272' })
+  })
+
+  it('refuses to complete a session that is not COMPLETED', async () => {
+    fetchMock.mockResolvedValueOnce(jsonReply({ status: 'PENDING' }))
+
+    await expect(
+      getEidProvider('smartid').complete('sbx-token-1'),
+    ).rejects.toThrow('Session not completed')
+  })
+
+  it('selects the demo provider when aggregator credentials are absent', () => {
+    vi.unstubAllEnvs()
+
+    expect(getEidProvider('smartid')).toBeInstanceOf(DemoEidProvider)
+  })
+})
+
+describe('completeEidLogin over the aggregator', () => {
+  let find: ReturnType<typeof vi.fn>
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    find = vi.fn()
+    setD1ForTests(recordingD1())
+    vi.mocked(getRepositories).mockImplementation(() => ({ find }) as never)
+
+    vi.stubEnv('EIDEASY_CLIENT_ID', 'sandbox-client')
+    vi.stubEnv('EIDEASY_SECRET', 'sandbox-secret')
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockImplementation(
+      () =>
+        new Response(
+          JSON.stringify({
+            status: 'COMPLETED',
+            data: {
+              identifier: defaultIsikukood,
+              first_name: 'Jaan',
+              last_name: 'Tamm',
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('looks up the user by the sandbox-reported isikukood', async () => {
+    find.mockResolvedValue({
+      docs: [
+        {
+          id: 'user-1',
+          email: 'jaan@example.com',
+          name: 'Jaan Tamm',
+          role: 'private',
+          profileId: 'profile-1',
+          status: 'active',
+        },
+      ],
+    })
+
+    const response = await completeEidLogin('smartid', 'sbx-token-1')
+
+    expect(response.status).toBe(200)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [, init] = fetchMock.mock.calls[0] as [URL, RequestInit]
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      session_token: 'sbx-token-1',
+    })
+    expect(find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'users',
+        where: { isikukoodHash: { equals: hash(defaultIsikukood) } },
+      }),
+    )
+  })
+
+  it('issues tokens that verify through Web Crypto (crypto.subtle)', async () => {
+    find.mockResolvedValue({
+      docs: [
+        {
+          id: 'user-1',
+          email: 'jaan@example.com',
+          name: 'Jaan Tamm',
+          role: 'private',
+          profileId: 'profile-1',
+          status: 'active',
+        },
+      ],
+    })
+
+    const response = await completeEidLogin('smartid', 'sbx-token-1')
+
+    const accessToken = response.cookies.get('access_token')?.value
+    const refreshToken = response.cookies.get('refresh_token')?.value
+    expect(accessToken).toBeTruthy()
+    expect(refreshToken).toBeTruthy()
+    if (!accessToken || !refreshToken) {
+      throw new Error('session cookies missing after eID login')
+    }
+
+    const accessPayload = await verifyAccessTokenAsync(accessToken)
+    expect(accessPayload).toMatchObject({ userId: 'user-1', role: 'private' })
+
+    const refreshPayload = await verifyRefreshTokenAsync(refreshToken)
+    expect(typeof refreshPayload?.sessionId).toBe('string')
+  })
+
+  it('returns 401 when the sandbox reports an unknown user', async () => {
+    fetchMock.mockImplementation(
+      () =>
+        new Response(JSON.stringify({ status: 'COMPLETED', data: {
+          identifier: '50001018906',
+          first_name: 'Tundmatu',
+          last_name: 'Isik',
+        } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    )
+    find.mockResolvedValue({ docs: [] })
+
+    const response = await completeEidLogin('smartid', 'sbx-token-1')
 
     expect(response.status).toBe(401)
     expect(response.cookies.get('access_token')).toBeUndefined()
