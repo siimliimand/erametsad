@@ -1,9 +1,10 @@
-import { env, fetchMock } from 'cloudflare:test'
+import { env, fetchMock, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { expect, test } from 'vitest'
 
 import * as schema from '../../lib/data/schema'
+import type { AuctionDO } from '../auction'
 
 const db = drizzle(env.DB, { schema })
 
@@ -47,6 +48,9 @@ async function seedAuction(
     bidStepCents?: number
     bidderStatus?: 'active' | 'suspended'
     withBidderRight?: boolean
+    endsAt?: string
+    auctionType?: 'open' | 'sealed'
+    reservePriceCents?: number
   } = {},
 ): Promise<Seed> {
   const {
@@ -54,6 +58,9 @@ async function seedAuction(
     bidStepCents = null,
     bidderStatus = 'active',
     withBidderRight = true,
+    endsAt,
+    auctionType,
+    reservePriceCents,
   } = options
   const sellerId = crypto.randomUUID()
   const bidderId = crypto.randomUUID()
@@ -81,9 +88,11 @@ async function seedAuction(
     slug: `${prefix}-${crypto.randomUUID()}`,
     status: 'active',
     objectType: 'raieoigus',
+    ...(auctionType !== undefined ? { type: auctionType } : {}),
     minBidCents: 10_000,
     ...(bidStepCents !== null ? { bidStepCents } : {}),
-    endsAt: '2026-12-31T12:00:00.000Z',
+    ...(reservePriceCents !== undefined ? { reservePriceCents } : {}),
+    endsAt: endsAt ?? '2026-12-31T12:00:00.000Z',
     createdAt: timestamp,
     updatedAt: timestamp,
   })
@@ -109,18 +118,56 @@ async function insertLeadingBid(
   userId: string,
   amountCents: number,
   createdAt: string,
+  type: 'open' | 'sealed' = 'open',
 ): Promise<void> {
   await db.insert(schema.bids).values({
     id: crypto.randomUUID(),
     auctionId,
     userId,
     amountCents,
-    type: 'open',
+    type,
     source: 'manual',
     status: 'leading',
     createdAt,
     updatedAt: createdAt,
   })
+}
+
+function stubFor(auctionId: string) {
+  return env.AUCTION.get(env.AUCTION.idFromName(auctionId))
+}
+
+// The ambient DurableObjectState the pool-workers types resolve to predates
+// the alarm API, so read it through a structural cast; the runtime has it.
+interface AlarmCapableStorage {
+  getAlarm(): Promise<number | null>
+}
+
+async function storedAlarm(auctionId: string): Promise<number | null> {
+  return runInDurableObject(stubFor(auctionId), (_instance, state) =>
+    (state as unknown as { storage: AlarmCapableStorage }).storage.getAlarm(),
+  )
+}
+
+async function fireAlarm(auctionId: string): Promise<void> {
+  await runInDurableObject(stubFor(auctionId), (instance: AuctionDO) => instance.alarm())
+}
+
+async function auctionRow(auctionId: string) {
+  const rows = await db.select().from(schema.auctions).where(eq(schema.auctions.id, auctionId))
+  return rows[0]
+}
+
+async function auditActions(auctionId: string): Promise<string[]> {
+  const rows = await db
+    .select()
+    .from(schema.auditEntries)
+    .where(eq(schema.auditEntries.entityId, auctionId))
+  return rows.map((row) => row.action)
+}
+
+async function notificationsFor(userId: string) {
+  return db.select().from(schema.notifications).where(eq(schema.notifications.userId, userId))
 }
 
 function fetchRoute(auctionId: string, operation: string, init?: RequestInit): Promise<Response> {
@@ -440,4 +487,182 @@ test('accepted bid fans out bid:created to the subscriber URLs', async () => {
     type: 'open',
   })
   expect(deliveries).toHaveLength(1)
+})
+
+test('hydration arms the alarm at endsAt and an anti-snipe bid reschedules it', async () => {
+  const endsAt = new Date(Date.now() + 60_000).toISOString()
+  const { auctionId, bidderId } = await seedAuction('snipe-alarm', { endsAt })
+
+  await fetchRoute(auctionId, '/state')
+  expect(await storedAlarm(auctionId)).toBe(Date.parse(endsAt))
+
+  const { admission } = await placeBidRoute(auctionId, {
+    userId: bidderId,
+    amount: 150,
+    type: 'open',
+  })
+  expect(admission.allowed).toBe(true)
+  expect(admission.extended).not.toBeNull()
+  const expectedMs = Date.parse(endsAt) + 5 * 60 * 1000
+  expect(admission.extended?.endsAt).toBe(new Date(expectedMs).toISOString())
+  expect(await storedAlarm(auctionId)).toBe(expectedMs)
+  expect((await auctionRow(auctionId))?.endsAt).toBe(new Date(expectedMs).toISOString())
+})
+
+test('alarm before endsAt re-arms at the current end and keeps the auction active', async () => {
+  const endsAt = new Date(Date.now() + 10 * 60_000).toISOString()
+  const { auctionId } = await seedAuction('alarm-early', { endsAt })
+
+  await fetchRoute(auctionId, '/state')
+  await fireAlarm(auctionId)
+
+  expect(await storedAlarm(auctionId)).toBe(Date.parse(endsAt))
+  expect((await auctionRow(auctionId))?.status).toBe('active')
+})
+
+test('scheduled alarm ends an open auction with a winner and notifies both parties', async () => {
+  fetchMock.activate()
+  fetchMock.disableNetConnect()
+  const deliveries: string[] = []
+  // A dedicated origin: the fanout test's persist() interceptor on
+  // sub.example would otherwise consume these deliveries first.
+  fetchMock
+    .get('https://alarm-sub.example')
+    .intercept({ path: () => true, method: 'POST' })
+    .reply((options) => {
+      deliveries.push(typeof options.body === 'string' ? options.body : '')
+      return { statusCode: 200 }
+    })
+    .persist()
+
+  const { auctionId, sellerId, bidderId } = await seedAuction('alarm-win', {
+    endsAt: '2026-01-01T00:00:00.000Z',
+  })
+  await insertLeadingBid(auctionId, bidderId, 12_000, '2025-12-30T00:00:00.000Z')
+  await subscribe(auctionId, 'https://alarm-sub.example/callback')
+  await fetchRoute(auctionId, '/state')
+
+  // Hydration arms an already-overdue alarm, so the runtime may fire it
+  // before this call; either path runs the same alarm() body, so only the
+  // outcome is asserted.
+  await runDurableObjectAlarm(stubFor(auctionId))
+
+  const row = await auctionRow(auctionId)
+  expect(row?.status).toBe('appraised')
+  expect(row?.endedAt).not.toBeNull()
+  const bidRows = await db.select().from(schema.bids).where(eq(schema.bids.auctionId, auctionId))
+  expect(row?.winningBid).toBe(bidRows[0]?.id)
+
+  expect(await auditActions(auctionId)).toEqual(
+    expect.arrayContaining(['auction_ended', 'auction_outcome_computed']),
+  )
+
+  const winnerNotifications = await notificationsFor(bidderId)
+  expect(winnerNotifications).toHaveLength(1)
+  expect(winnerNotifications[0]?.event).toBe('auction.won')
+  expect(winnerNotifications[0]?.channel).toBe('email')
+  expect(winnerNotifications[0]?.title).toBe('Te võitsite oksjoni')
+
+  const sellerNotifications = await notificationsFor(sellerId)
+  expect(sellerNotifications).toHaveLength(1)
+  expect(sellerNotifications[0]?.event).toBe('auction.ended')
+
+  const endedBroadcast = deliveries.map((body) =>
+    JSON.parse(body) as {
+      type: string
+      auctionId: string
+      data: { hasWinner?: boolean; type?: string }
+    },
+  )
+  const ended = endedBroadcast.filter((event) => event.type === 'auction:ended')
+  expect(ended).toHaveLength(1)
+  expect(ended[0]?.auctionId).toBe(auctionId)
+  expect(ended[0]?.data.hasWinner).toBe(true)
+  expect(ended[0]?.data.type).toBe('open')
+})
+
+test('alarm ends an open auction without bids as unsold', async () => {
+  const { auctionId, sellerId, bidderId } = await seedAuction('alarm-unsold', {
+    endsAt: '2026-01-01T00:00:00.000Z',
+  })
+  await fetchRoute(auctionId, '/state')
+
+  await fireAlarm(auctionId)
+
+  const row = await auctionRow(auctionId)
+  expect(row?.status).toBe('unsold')
+  expect(row?.endedAt).not.toBeNull()
+  expect(row?.winningBid).toBeNull()
+  expect(await auditActions(auctionId)).toEqual(
+    expect.arrayContaining(['auction_ended', 'auction_outcome_computed']),
+  )
+  expect(await notificationsFor(sellerId)).toHaveLength(1)
+  expect(await notificationsFor(bidderId)).toHaveLength(0)
+})
+
+test('leading bid below the reserve price ends unsold and notifies the bidder', async () => {
+  const { auctionId, sellerId, bidderId } = await seedAuction('alarm-reserve', {
+    endsAt: '2026-01-01T00:00:00.000Z',
+    reservePriceCents: 20_000,
+  })
+  await insertLeadingBid(auctionId, bidderId, 12_000, '2025-12-30T00:00:00.000Z')
+  await fetchRoute(auctionId, '/state')
+
+  await fireAlarm(auctionId)
+
+  const row = await auctionRow(auctionId)
+  expect(row?.status).toBe('unsold')
+  expect(row?.winningBid).toBeNull()
+  expect((await notificationsFor(bidderId)).map((n) => n.event)).toEqual(['auction.ended'])
+  expect((await notificationsFor(sellerId)).map((n) => n.event)).toEqual(['auction.ended'])
+})
+
+test('sealed auction stops at ended with the opening ceremony flagged', async () => {
+  const { auctionId, sellerId, bidderId } = await seedAuction('alarm-sealed', {
+    endsAt: '2026-01-01T00:00:00.000Z',
+    auctionType: 'sealed',
+  })
+  await insertLeadingBid(auctionId, bidderId, 12_000, '2025-12-30T00:00:00.000Z', 'sealed')
+  await fetchRoute(auctionId, '/state')
+
+  await fireAlarm(auctionId)
+
+  const row = await auctionRow(auctionId)
+  expect(row?.status).toBe('ended')
+  expect(row?.endedAt).not.toBeNull()
+  expect(row?.winningBid).toBeNull()
+  expect(await auditActions(auctionId)).toEqual(['auction_ended'])
+
+  const auditRows = await db
+    .select()
+    .from(schema.auditEntries)
+    .where(eq(schema.auditEntries.entityId, auctionId))
+  const after = JSON.parse(auditRows[0]?.after ?? '{}') as { sealedOpeningPending?: boolean }
+  expect(after.sealedOpeningPending).toBe(true)
+
+  expect(await notificationsFor(bidderId)).toHaveLength(0)
+  const sellerNotifications = await notificationsFor(sellerId)
+  expect(sellerNotifications).toHaveLength(1)
+  const payload = JSON.parse(sellerNotifications[0]?.payload ?? '{}') as {
+    sealedOpeningPending?: boolean
+  }
+  expect(payload.sealedOpeningPending).toBe(true)
+})
+
+test('a second alarm fire after the transition is a no-op', async () => {
+  const { auctionId, sellerId } = await seedAuction('alarm-idem', {
+    endsAt: '2026-01-01T00:00:00.000Z',
+    leadingBidCents: 12_000,
+  })
+  await fetchRoute(auctionId, '/state')
+
+  await fireAlarm(auctionId)
+  expect((await auctionRow(auctionId))?.status).toBe('appraised')
+  expect(await auditActions(auctionId)).toHaveLength(2)
+  expect(await notificationsFor(sellerId)).toHaveLength(2)
+
+  await fireAlarm(auctionId)
+  expect((await auctionRow(auctionId))?.status).toBe('appraised')
+  expect(await auditActions(auctionId)).toHaveLength(2)
+  expect(await notificationsFor(sellerId)).toHaveLength(2)
 })

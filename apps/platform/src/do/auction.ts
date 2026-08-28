@@ -10,8 +10,15 @@ import { centsToEuros, eurosToCents } from '../lib/data/repositories/money'
 import * as schema from '../lib/data/schema'
 import type { DbDatabase, SqlStatement } from '../lib/db'
 
+/** Minimal producer shape of the `eametsad-jobs` Cloudflare Queue binding. */
+export interface QueueProducerBinding {
+  send(message: unknown): Promise<void>
+}
+
 export interface Env {
   DB: DbDatabase
+  /** Optional: the DO test worker config declares no queue binding. */
+  QUEUE?: QueueProducerBinding
 }
 
 /**
@@ -209,6 +216,7 @@ function auctionTouchStatement(
 function insertAuditStatement(
   entryId: string,
   action: string,
+  entityType: 'bid' | 'auction',
   entityId: string,
   actorId: string | undefined,
   before: Record<string, unknown> | null,
@@ -222,10 +230,99 @@ function insertAuditStatement(
       entryId,
       actorId ?? null,
       action,
-      'bid',
+      entityType,
       entityId,
       before === null ? null : JSON.stringify(before),
       JSON.stringify(after),
+      now,
+      now,
+    ],
+  }
+}
+
+function auctionEndStatement(auctionId: string, endedAt: string, now: string): SqlStatement {
+  return {
+    sql: 'update auctions set status = ?, ended_at = ?, updated_at = ? where id = ? and status = ?',
+    params: ['ended', endedAt, now, auctionId, 'active'],
+  }
+}
+
+function auctionAppraisedStatement(
+  auctionId: string,
+  winningBidId: string,
+  now: string,
+): SqlStatement {
+  return {
+    sql: 'update auctions set status = ?, winning_bid = ?, updated_at = ? where id = ? and status = ?',
+    params: ['appraised', winningBidId, now, auctionId, 'ended'],
+  }
+}
+
+function auctionUnsoldStatement(auctionId: string, now: string): SqlStatement {
+  return {
+    sql: 'update auctions set status = ?, updated_at = ? where id = ? and status = ?',
+    params: ['unsold', now, auctionId, 'ended'],
+  }
+}
+
+interface EndNotificationInput {
+  id: string
+  userId: string
+  event: 'auction.won' | 'auction.ended'
+  title: string
+  body: string
+  payload: Record<string, unknown>
+}
+
+// Titles mirror src/lib/notifications/service.ts so DO-written rows and
+// in-request rows render identically; the queue consumer owns delivery.
+const NOTIFICATION_TITLES = {
+  'auction.won': 'Te võitsite oksjoni',
+  'auction.ended': 'Oksjon on lõppenud',
+} as const
+
+function endedNotification(
+  id: string,
+  userId: string,
+  payload: Record<string, unknown> & { body: string },
+): EndNotificationInput {
+  const { body, ...rest } = payload
+  return {
+    id,
+    userId,
+    event: 'auction.ended',
+    title: NOTIFICATION_TITLES['auction.ended'],
+    body,
+    payload: rest,
+  }
+}
+
+function wonNotification(
+  id: string,
+  userId: string,
+  payload: { auctionId: string; auctionTitle: string; winningBid: number },
+): EndNotificationInput {
+  return {
+    id,
+    userId,
+    event: 'auction.won',
+    title: NOTIFICATION_TITLES['auction.won'],
+    body: `Teie pakkumus oksjonil "${payload.auctionTitle}" võitis.`,
+    payload: { ...payload },
+  }
+}
+
+function insertNotificationStatement(input: EndNotificationInput, now: string): SqlStatement {
+  return {
+    sql: `insert into notifications (id, user_id, event, channel, title, body, payload, created_at, updated_at)
+      values (?, ?, ?, 'email', ?, ?, ?, ?, ?)`,
+    params: [
+      input.id,
+      input.userId,
+      input.event,
+      input.title,
+      input.body,
+      JSON.stringify(input.payload),
       now,
       now,
     ],
@@ -315,16 +412,238 @@ export class AuctionDO extends DurableObject<Env> {
         return this.handlePublish(auctionId)
       }
       case 'alarm':
-        // Stub: alarm scheduling arrives in task 3.4.
+        // Alarm scheduling is storage-driven (setAlarm), not HTTP; no
+        // route handler exists by design.
         return errorResponse(501, `/${operation} is not implemented`)
       default:
         return errorResponse(404, `unknown operation /${operation}`)
     }
   }
 
-  /** End-of-auction tick; real logic arrives in task 3.4. */
-  // eslint-disable-next-line @typescript-eslint/no-empty-function -- deliberate stub, task 3.4 implements it
-  async alarm(): Promise<void> {}
+  /**
+   * End-of-auction tick. Fires at (or after) the current `endsAt`; an
+   * anti-snipe extension re-arms the alarm at admission time, so an early
+   * wake just reschedules. Evicted-before-hydrate objects recover the
+   * auction id from the object name; the cron sweep covers the rest.
+   */
+  async alarm(): Promise<void> {
+    const state =
+      this.state ?? ((await this.ctx.storage.get<AuctionState>(STATE_KEY)) ?? null)
+    if (state) {
+      await this.runAlarmTick(state)
+      return
+    }
+    const name = this.ctx.id.name
+    if (!name) return
+    const hydrated = await this.hydrateState(name)
+    if (hydrated) await this.runAlarmTick(hydrated)
+  }
+
+  private async runAlarmTick(state: AuctionState): Promise<void> {
+    if (state.status !== 'active') return
+    const endsAtMs = state.endsAt !== null ? Date.parse(state.endsAt) : Number.NaN
+    if (!Number.isFinite(endsAtMs)) return
+    if (Date.now() < endsAtMs) {
+      await this.ctx.storage.setAlarm(endsAtMs)
+      return
+    }
+    await this.endAuction(state.auctionId)
+  }
+
+  /**
+   * Two-phase ending per the status-transition guard: `active -> ended`
+   * first, then the outcome (`ended -> appraised` with the winning bid, or
+   * `ended -> unsold`). Sealed auctions stop at `ended` and flag the
+   * pending opening ceremony instead of computing a winner. An alarm
+   * retried between the phases resumes at `ended`, so the outcome is
+   * never lost; every statement is status-guarded against double-fire.
+   */
+  private async endAuction(auctionId: string): Promise<void> {
+    const now = new Date().toISOString()
+    const repos = this.repositories()
+    const auction = await findDoc(repos, 'auctions', { id: { equals: auctionId } })
+    if (!auction) return
+    if (auction.status !== 'active' && auction.status !== 'ended') return
+
+    if (auction.status === 'active') {
+      // The D1 row decides, as in admission: a non-DO writer may have
+      // moved the end time after the hot state was last written.
+      const endsAt = auction.endsAt as string | undefined
+      if (endsAt !== undefined && Date.now() < Date.parse(endsAt)) {
+        await this.ctx.storage.setAlarm(Date.parse(endsAt))
+        await this.updateHotState({ endsAt })
+        return
+      }
+
+      const auctionTitle = auction.title as string
+      const isSealed = auction.type === 'sealed'
+      const sellerId = relationValue(auction.sellerId)
+      const basePayload = { auctionId, auctionTitle, type: auction.type }
+      const sealedNotifications: EndNotificationInput[] = []
+      if (isSealed && sellerId) {
+        sealedNotifications.push(
+          endedNotification(crypto.randomUUID(), sellerId, {
+            ...basePayload,
+            sealedOpeningPending: true,
+            body: `Oksjon "${auctionTitle}" on lõppenud. Lukustatud pakkumised ootavad avamist.`,
+          }),
+        )
+      }
+      await this.runBatch([
+        auctionEndStatement(auctionId, now, now),
+        insertAuditStatement(
+          crypto.randomUUID(),
+          'auction_ended',
+          'auction',
+          auctionId,
+          undefined,
+          { status: 'active', endsAt: endsAt ?? null },
+          {
+            status: 'ended',
+            endedAt: now,
+            ...(isSealed ? { sealedOpeningPending: true } : {}),
+          },
+          now,
+        ),
+        ...sealedNotifications.map((n) => insertNotificationStatement(n, now)),
+      ])
+      await this.updateHotState({ status: 'ended' })
+      await this.enqueueNotificationFanout(sealedNotifications.map((n) => n.id))
+      if (isSealed) {
+        await this.broadcast('auction:ended', {
+          auctionId,
+          type: 'sealed',
+          sealedOpeningPending: true,
+        })
+        return
+      }
+    }
+
+    // Outcome phase: open auctions only; sealed stays at `ended` until
+    // the opening ceremony (task 6.x admin endpoint).
+    if (auction.type === 'sealed') return
+
+    const auctionTitle = auction.title as string
+    const sellerId = relationValue(auction.sellerId)
+    const basePayload = { auctionId, auctionTitle, type: 'open' as const }
+    const leadingBid = await this.findLeadingBid(repos, auctionId)
+    const reserveCents = auction.reservePriceCents as number | null | undefined
+    const reserveMet =
+      leadingBid !== null &&
+      (reserveCents == null || (leadingBid.amountCents as number) >= reserveCents)
+
+    if (leadingBid && reserveMet) {
+      const winningBidId = String(leadingBid.id)
+      const finalPrice = centsToEuros(leadingBid.amountCents as number)
+      const winnerId = relationValue(leadingBid.userId)
+      const notifications: EndNotificationInput[] = []
+      if (winnerId) {
+        notifications.push(
+          wonNotification(crypto.randomUUID(), winnerId, {
+            auctionId,
+            auctionTitle,
+            winningBid: finalPrice,
+          }),
+        )
+      }
+      if (sellerId) {
+        notifications.push(
+          endedNotification(crypto.randomUUID(), sellerId, {
+            ...basePayload,
+            hasWinner: true,
+            finalPrice,
+            body: `Oksjon "${auctionTitle}" on lõppenud. Lõpphind ${String(finalPrice)} EUR.`,
+          }),
+        )
+      }
+      await this.runBatch([
+        auctionAppraisedStatement(auctionId, winningBidId, now),
+        insertAuditStatement(
+          crypto.randomUUID(),
+          'auction_outcome_computed',
+          'auction',
+          auctionId,
+          undefined,
+          { status: 'ended' },
+          { status: 'appraised', winningBidId },
+          now,
+        ),
+        ...notifications.map((n) => insertNotificationStatement(n, now)),
+      ])
+      await this.updateHotState({ status: 'appraised' })
+      await this.enqueueNotificationFanout(notifications.map((n) => n.id))
+      await this.broadcast('auction:ended', {
+        auctionId,
+        type: 'open',
+        hasWinner: true,
+        winningBidId,
+      })
+      return
+    }
+
+    const bidderId = leadingBid === null ? null : relationValue(leadingBid.userId)
+    const notifications: EndNotificationInput[] = []
+    if (bidderId && leadingBid) {
+      notifications.push(
+        endedNotification(crypto.randomUUID(), bidderId, {
+          ...basePayload,
+          hasWinner: false,
+          reserveNotMet: true,
+          amount: centsToEuros(leadingBid.amountCents as number),
+          body: `Oksjon "${auctionTitle}" on lõppenud. Reservhind jäi täitmata.`,
+        }),
+      )
+    }
+    if (sellerId) {
+      notifications.push(
+        endedNotification(crypto.randomUUID(), sellerId, {
+          ...basePayload,
+          hasWinner: false,
+          reserveNotMet: leadingBid !== null,
+          body:
+            leadingBid !== null
+              ? `Oksjon "${auctionTitle}" lõppes reservhinda täitmata.`
+              : `Oksjon "${auctionTitle}" lõppes müümata.`,
+        }),
+      )
+    }
+    await this.runBatch([
+      auctionUnsoldStatement(auctionId, now),
+      insertAuditStatement(
+        crypto.randomUUID(),
+        'auction_outcome_computed',
+        'auction',
+        auctionId,
+        undefined,
+        { status: 'ended' },
+        { status: 'unsold', reserveMet: false },
+        now,
+      ),
+      ...notifications.map((n) => insertNotificationStatement(n, now)),
+    ])
+    await this.updateHotState({ status: 'unsold' })
+    await this.enqueueNotificationFanout(notifications.map((n) => n.id))
+    await this.broadcast('auction:ended', {
+      auctionId,
+      type: 'open',
+      hasWinner: false,
+      reserveNotMet: leadingBid !== null,
+    })
+  }
+
+  private async enqueueNotificationFanout(notificationIds: string[]): Promise<void> {
+    const queue = this.env.QUEUE
+    if (!queue || notificationIds.length === 0) return
+    // The notification rows are durable; a failed enqueue must not break
+    // the already-committed transition, so failures only log here.
+    try {
+      for (const notificationId of notificationIds) {
+        await queue.send({ type: 'notification-fanout', notificationId })
+      }
+    } catch (error) {
+      console.error('[auction-do] notification fanout enqueue failed', error)
+    }
+  }
 
   private async handleBid(auctionId: string, request: Request): Promise<Response> {
     let body: Partial<BidRequest>
@@ -549,6 +868,7 @@ export class AuctionDO extends DurableObject<Env> {
         insertAuditStatement(
           crypto.randomUUID(),
           'bid_placed',
+          'bid',
           insertInput.bidId,
           userId,
           null,
@@ -611,6 +931,7 @@ export class AuctionDO extends DurableObject<Env> {
       insertAuditStatement(
         crypto.randomUUID(),
         'bid_placed',
+        'bid',
         insertInput.bidId,
         userId,
         leadingBid
@@ -665,6 +986,11 @@ export class AuctionDO extends DurableObject<Env> {
         ? { currentPriceCents: amountCents, endsAt: extended.endsAt }
         : { currentPriceCents: amountCents },
     )
+    if (extended) {
+      // The alarm must track the extension or the auction would end at
+      // the pre-anti-snipe time.
+      await this.ctx.storage.setAlarm(Date.parse(extended.endsAt))
+    }
 
     events.push({
       type: 'bid:created',
@@ -924,6 +1250,7 @@ export class AuctionDO extends DurableObject<Env> {
   private async updateHotState(changes: {
     currentPriceCents?: number
     endsAt?: string | null
+    status?: string
   }): Promise<void> {
     const base = this.state
     if (!base) return
@@ -935,6 +1262,7 @@ export class AuctionDO extends DurableObject<Env> {
       ...(changes.endsAt !== undefined && changes.endsAt !== null
         ? { endsAt: changes.endsAt }
         : {}),
+      ...(changes.status !== undefined ? { status: changes.status } : {}),
       version: base.version + 1,
     }
     await this.ctx.storage.put(STATE_KEY, next)
@@ -1022,6 +1350,15 @@ export class AuctionDO extends DurableObject<Env> {
     }
     await this.ctx.storage.put(STATE_KEY, state)
     this.state = state
+    if (state.status === 'active' && state.endsAt !== null) {
+      const endsAtMs = Date.parse(state.endsAt)
+      const current = await this.ctx.storage.getAlarm()
+      if (Number.isFinite(endsAtMs) && (current === null || current < endsAtMs)) {
+        // First touch owns the end time; a later anti-snipe extension
+        // re-arms at admission.
+        await this.ctx.storage.setAlarm(endsAtMs)
+      }
+    }
     return state
   }
 
