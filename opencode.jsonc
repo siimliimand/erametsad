@@ -12,11 +12,11 @@
     },
     "fullstack-engineer": {
       "mode": "primary",
-      "model": "openrouter/deepseek/deepseek-v4-flash"
+      "model": "zai-coding-plan/glm-5.3"
     },
     "fullstack-engineer.build": {
       "mode": "subagent",
-      "model": "openrouter/deepseek/deepseek-v4-flash"
+      "model": "zai-coding-plan/glm-5.3"
     },
     "fullstack-engineer.fast": {
       "mode": "subagent",
@@ -39,7 +39,7 @@
     "prune": true,
     "reserved": 10000
   },
-  "model": "openrouter/deepseek/deepseek-v4-flash",
+  "model": "zai-coding-plan/glm-5.3",
   "plugin": [
     "@slkiser/opencode-quota@4.2.0"
   ],
