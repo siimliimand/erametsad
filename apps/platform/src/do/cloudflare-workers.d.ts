@@ -14,6 +14,11 @@ declare module 'cloudflare:workers' {
     put(key: string, value: unknown): Promise<void>
     delete(key: string): Promise<boolean>
     deleteAll(): Promise<void>
+    list<T = unknown>(options?: { prefix?: string }): Promise<Map<string, T>>
+    // Alarms also mirror on DurableObjectState below for the legacy API.
+    setAlarm(timestamp: number): Promise<void>
+    deleteAlarm(): Promise<boolean>
+    getAlarm(): Promise<number | null>
   }
 
   export interface DurableObjectState {
