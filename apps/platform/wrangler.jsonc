@@ -1,18 +1,60 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "eametsad-api",
-  "main": ".open-next/worker.js",
+  // Entry shim: re-exports the OpenNext fetch handler from .open-next/worker.js
+  // plus the DO classes and the queue consumer, because OpenNext's generated
+  // entry cannot export them itself.
+  "main": "src/do/index.ts",
   "compatibility_date": "2025-04-01",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  "bindings": [
-    { "type": "queue", "binding": "QUEUE", "queue_name": "eametsad-jobs" },
-    { "type": "kv_namespace", "binding": "KV", "id": "5b67cd2c595f4d31b3b1be5db76e9bef" },
-    { "type": "r2_bucket", "binding": "BUCKET", "bucket_name": "eametsad-media", "preview_bucket_name": "eametsad-media-preview" }
+  // wrangler 4 rejects the legacy top-level "bindings" array (it silently
+  // drops those bindings), so producers sit next to the consumer config and
+  // KV/R2 use their canonical sections.
+  "kv_namespaces": [
+    { "binding": "KV", "id": "5b67cd2c595f4d31b3b1be5db76e9bef" }
   ],
+  "r2_buckets": [
+    { "binding": "BUCKET", "bucket_name": "eametsad-media", "preview_bucket_name": "eametsad-media-preview" }
+  ],
+  // No script_name: both classes are exported by this same Worker (the shim).
+  "durable_objects": {
+    "bindings": [
+      { "name": "AUCTION", "class_name": "AuctionDO" },
+      { "name": "RATE_LIMITER", "class_name": "RateLimiterDO" }
+    ]
+  },
+  // SQLite-backed DO classes need one migration entry; append future classes
+  // as a new tag instead of editing v1.
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["AuctionDO", "RateLimiterDO"]
+    }
+  ],
+  // Producer binding for the jobs queue; the consumer below drains it.
+  "queues": {
+    "producers": [
+      { "binding": "QUEUE", "queue": "eametsad-jobs" }
+    ],
+    // A message whose delivery fails max_retries times is routed to the DLQ by
+    // the runtime; the consumer code only calls message.retry(). Create the
+    // queues once from apps/platform:
+    //   pnpm exec wrangler queues create eametsad-jobs
+    //   pnpm exec wrangler queues create eametsad-dlq
+    // DLQ-depth alerting lives in the Cloudflare dashboard (account-level queue
+    // alerts), not in wrangler config; this comment is the wiring record.
+    "consumers": [
+      {
+        "queue": "eametsad-jobs",
+        "max_retries": 3,
+        "dead_letter_queue": "eametsad-dlq"
+      }
+    ]
+  },
   // TODO(task 2.8): the CI wrangler token lacks D1 write permission, so remote creation failed
   // (Authentication error, code 10000). A user with D1 access must run once from apps/platform:
   //   pnpm exec wrangler d1 create eametsad-db
