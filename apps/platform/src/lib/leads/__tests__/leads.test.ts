@@ -25,6 +25,7 @@ vi.mock('@/lib/bidding/place-bid', () => ({
 import { POST } from '@/app/api/leads/route'
 import { computeIpHash } from '@/lib/bidding/place-bid'
 import { ingestLead, validateHoneypot } from '@/lib/leads/ingestion'
+import type { ingestLead as ingestLeadFn } from '@/lib/leads/ingestion'
 
 const mockIngest = vi.mocked(ingestLead)
 const mockHoneypot = vi.mocked(validateHoneypot)
@@ -136,12 +137,12 @@ describe('POST /api/leads', () => {
   })
 
   describe('ingestLead persistence', () => {
-    let ingestLeadActual: typeof import('@/lib/leads/ingestion')['ingestLead']
+    let ingestLeadActual: typeof ingestLeadFn
 
     beforeAll(async () => {
-      ;({ ingestLead: ingestLeadActual } = await vi.importActual<typeof import('@/lib/leads/ingestion')>(
-        '@/lib/leads/ingestion',
-      ))
+      ;({ ingestLead: ingestLeadActual } = await vi.importActual<{
+        ingestLead: typeof ingestLeadFn
+      }>('@/lib/leads/ingestion'))
     })
 
     it('stores the server-computed ipHash on the created lead row', async () => {
