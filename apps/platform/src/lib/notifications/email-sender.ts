@@ -15,6 +15,7 @@ export interface SendEmailOptions {
   subject: string
   html: string
   from?: string
+  headers?: Record<string, string>
 }
 
 // Prototype sender on the ww0.dev zone per the design addendum
@@ -23,6 +24,22 @@ const DEFAULT_FROM = 'noreply@erametsad.ww0.dev'
 
 const CLOUDFLARE_API_BASE = 'https://api.cloudflare.com/client/v4'
 const API_SEND_TIMEOUT_MS = 10_000
+
+const UNSUBSCRIBE_MAILBOX = 'unsubscribe@erametsad.ww0.dev'
+
+/**
+ * GDPR requires a working opt-out on direct-marketing email; purely
+ * transactional mail is exempt. Every template in @eametsad/emails
+ * (bid-placed, outbid, auction-won, auction-ended, contract-ready) is
+ * transactional, so nothing sends these headers today. Any future
+ * marketing template must pass `headers: marketingEmailHeaders()`.
+ */
+export function marketingEmailHeaders(): Record<string, string> {
+  return {
+    'List-Unsubscribe': `<mailto:${UNSUBSCRIBE_MAILBOX}?subject=unsubscribe>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  }
+}
 
 // Minimal local surface of the Workers `send_email` binding. Declared here
 // because @cloudflare/workers-types is deliberately not installed
@@ -33,6 +50,7 @@ export interface EmailSenderBinding {
     to: string | string[]
     subject: string
     html: string
+    headers?: Record<string, string>
   }): Promise<{ messageId?: string } | undefined>
 }
 
@@ -48,6 +66,7 @@ interface OutgoingEmail {
   to: string[]
   subject: string
   html: string
+  headers?: Record<string, string>
 }
 
 interface EmailTransport {
@@ -98,11 +117,25 @@ function normalizeOptions(options: SendEmailOptions): OutgoingEmail {
     throw new TypeError('sendEmail: "html" is required')
   }
   const from = options.from?.trim()
+  // Headers are only attached when non-empty so transport payloads stay
+  // byte-identical to the pre-headers shape for transactional mail.
+  let headers: Record<string, string> | undefined
+  if (options.headers !== undefined) {
+    for (const [name, value] of Object.entries(options.headers)) {
+      if (typeof value !== 'string' || value.length === 0) {
+        throw new TypeError(`sendEmail: header "${name}" must be a non-empty string`)
+      }
+    }
+    if (Object.keys(options.headers).length > 0) {
+      headers = { ...options.headers }
+    }
+  }
   return {
     from: from !== undefined && from !== '' ? from : DEFAULT_FROM,
     to,
     subject: options.subject,
     html: options.html,
+    ...(headers !== undefined ? { headers } : {}),
   }
 }
 
@@ -135,6 +168,7 @@ function emailBindingTransport(binding: EmailSenderBinding | undefined): EmailTr
           to: message.to,
           subject: message.subject,
           html: message.html,
+          ...(message.headers !== undefined ? { headers: message.headers } : {}),
         })
         return successResult('email-binding', outcome?.messageId)
       } catch (error) {
@@ -189,6 +223,7 @@ function cloudflareApiTransport(
               to: message.to,
               subject: message.subject,
               html: message.html,
+              ...(message.headers !== undefined ? { headers: message.headers } : {}),
             }),
             signal: AbortSignal.timeout(API_SEND_TIMEOUT_MS),
           },
@@ -258,6 +293,7 @@ function smtpTransport(): EmailTransport {
           to: message.to,
           subject: message.subject,
           html: message.html,
+          ...(message.headers !== undefined ? { headers: message.headers } : {}),
         })) as { messageId?: string }
         return successResult('smtp', info.messageId)
       } catch (error) {

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vite
 import {
   sendEmail,
   setEmailBindingForTests,
+  marketingEmailHeaders,
   type EmailSenderBinding,
 } from '../email-sender'
 
@@ -286,5 +287,72 @@ describe('sendEmail transport chain', () => {
   it('rejects invalid recipient input', async () => {
     await expect(sendEmail({ to: [], ...baseMessage })).rejects.toThrow(TypeError)
     await expect(sendEmail({ to: '  ', ...baseMessage })).rejects.toThrow(TypeError)
+  })
+
+  it('rejects a non-string header value', async () => {
+    await expect(
+      sendEmail({ to: 'user@example.ee', headers: { 'X-Empty': '' }, ...baseMessage }),
+    ).rejects.toThrow(TypeError)
+  })
+})
+
+describe('marketingEmailHeaders', () => {
+  it('returns the GDPR unsubscribe header pair', () => {
+    expect(marketingEmailHeaders()).toEqual({
+      'List-Unsubscribe': '<mailto:unsubscribe@erametsad.ww0.dev?subject=unsubscribe>',
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    })
+  })
+})
+
+describe('custom headers propagation', () => {
+  const headers = marketingEmailHeaders()
+
+  it('passes headers through the EMAIL binding', async () => {
+    const send = vi.fn().mockResolvedValue(undefined)
+    setEmailBindingForTests(makeBinding(send))
+
+    await sendEmail({ to: 'user@example.ee', headers, ...baseMessage })
+
+    expect(send).toHaveBeenCalledWith({
+      from: 'noreply@erametsad.ww0.dev',
+      to: ['user@example.ee'],
+      subject: baseMessage.subject,
+      html: baseMessage.html,
+      headers,
+    })
+  })
+
+  it('includes headers in the REST API body', async () => {
+    process.env.CLOUDFLARE_EMAIL_TOKEN = 'tok-1'
+    process.env.CLOUDFLARE_ACCOUNT_ID = 'acc-1'
+    fetchMock.mockResolvedValueOnce(
+      apiResponse(200, { success: true, result: { delivered: ['user@example.ee'] } }),
+    )
+
+    await sendEmail({ to: 'user@example.ee', headers, ...baseMessage })
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).toEqual({
+      from: 'noreply@erametsad.ww0.dev',
+      to: ['user@example.ee'],
+      subject: baseMessage.subject,
+      html: baseMessage.html,
+      headers,
+    })
+  })
+
+  it('passes headers through SMTP', async () => {
+    sendMailMock.mockResolvedValue({ messageId: '<smtp-1@mailpit>' })
+
+    await sendEmail({ to: 'user@example.ee', headers, ...baseMessage })
+
+    expect(sendMailMock).toHaveBeenCalledWith({
+      from: 'noreply@erametsad.ww0.dev',
+      to: ['user@example.ee'],
+      subject: baseMessage.subject,
+      html: baseMessage.html,
+      headers,
+    })
   })
 })
