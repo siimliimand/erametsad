@@ -117,7 +117,11 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const { accessToken, refreshToken } = await createSession(userId, profileId)
+  const { accessToken, refreshToken } = await createSession(
+    userId,
+    String(user.role),
+    profileId,
+  )
 
   const response = NextResponse.json({
     user: {

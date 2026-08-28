@@ -3,6 +3,11 @@ import type { NextRequest } from 'next/server'
 
 import { verifyRefreshToken } from '@/lib/auth/jwt'
 import { selectActiveProfile } from '@/lib/auth/profile-scope'
+import {
+  getUserSession,
+  issueSessionAccessToken,
+  setAccessTokenCookie,
+} from '@/lib/auth/session'
 import { getPayloadClient } from '@/payload/payloadClient'
 
 export async function POST(
@@ -21,6 +26,11 @@ export async function POST(
 
   const payload_session = verifyRefreshToken(refreshToken)
   if (!payload_session) {
+    return NextResponse.json({ error: 'Sessioon on aegunud' }, { status: 401 })
+  }
+
+  const session = await getUserSession(payload_session.sessionId)
+  if (!session) {
     return NextResponse.json({ error: 'Sessioon on aegunud' }, { status: 401 })
   }
 
@@ -43,10 +53,16 @@ export async function POST(
     return NextResponse.json({ error: 'Profiil ei kuulu kasutajale' }, { status: 403 })
   }
 
-  await selectActiveProfile(
-    typeof userId === 'string' ? userId : String(userId),
-    profileId,
-  )
+  if (String(userId) !== session.userId) {
+    return NextResponse.json({ error: 'Profiil ei kuulu kasutajale' }, { status: 403 })
+  }
+
+  await selectActiveProfile(session.userId, profileId)
+
+  const accessToken = await issueSessionAccessToken(payload_session.sessionId)
+  if (!accessToken) {
+    return NextResponse.json({ error: 'Sessioon on aegunud' }, { status: 401 })
+  }
 
   const profileResponse: Record<string, unknown> = {
     id: profile.id,
@@ -60,5 +76,7 @@ export async function POST(
     profileResponse.approvalStatus = profile.approvalStatus
   }
 
-  return NextResponse.json({ profile: profileResponse })
+  const response = NextResponse.json({ profile: profileResponse })
+  setAccessTokenCookie(response, accessToken)
+  return response
 }

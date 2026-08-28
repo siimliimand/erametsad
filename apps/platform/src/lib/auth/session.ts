@@ -9,6 +9,7 @@ import {
 
 interface SessionRecord {
   userId: string
+  role: string
   profileId: string | undefined
   tokenFamily: string
   active: boolean
@@ -24,17 +25,19 @@ function hashToken(token: string): string {
 
 export async function createSession(
   userId: string,
+  role: string,
   profileId?: string,
 ): Promise<{ accessToken: string; refreshToken: string; sessionId: string }> {
   await Promise.resolve()
   const sessionId = crypto.randomUUID()
   const tokenFamily = crypto.randomUUID()
 
-  const accessToken = signAccessToken({ userId, role: 'user' })
+  const accessToken = signAccessToken({ userId, role, activeProfileId: profileId })
   const refreshToken = signRefreshToken({ sessionId })
 
   sessions.set(sessionId, {
     userId,
+    role,
     profileId,
     tokenFamily,
     active: true,
@@ -65,7 +68,8 @@ export async function refreshSession(
   const newRefreshToken = signRefreshToken({ sessionId: payload.sessionId })
   const newAccessToken = signAccessToken({
     userId: record.userId,
-    role: 'user',
+    role: record.role,
+    activeProfileId: record.profileId,
   })
 
   record.refreshTokenHash = hashToken(newRefreshToken)
@@ -110,10 +114,22 @@ export async function getUserSession(
   return sessions.get(sessionId) ?? null
 }
 
-export function setSessionCookies(
+export async function issueSessionAccessToken(
+  sessionId: string,
+): Promise<string | null> {
+  await Promise.resolve()
+  const record = sessions.get(sessionId)
+  if (!record?.active) return null
+  return signAccessToken({
+    userId: record.userId,
+    role: record.role,
+    activeProfileId: record.profileId,
+  })
+}
+
+export function setAccessTokenCookie(
   response: NextResponse,
   accessToken: string,
-  refreshToken: string,
 ): void {
   response.cookies.set('access_token', accessToken, {
     httpOnly: true,
@@ -122,6 +138,14 @@ export function setSessionCookies(
     path: '/',
     maxAge: 5 * 60,
   })
+}
+
+export function setSessionCookies(
+  response: NextResponse,
+  accessToken: string,
+  refreshToken: string,
+): void {
+  setAccessTokenCookie(response, accessToken)
 
   response.cookies.set('refresh_token', refreshToken, {
     httpOnly: true,

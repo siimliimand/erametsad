@@ -5,6 +5,7 @@ import { verifyPassword } from '@/lib/auth/password'
 import { createSession, setSessionCookies } from '@/lib/auth/session'
 import { hash } from '@/lib/crypto'
 import { authRateLimiter } from '@/lib/rate-limit'
+import { getUserRole } from '@/payload/access/roles'
 import { getPayloadClient } from '@/payload/payloadClient'
 
 export async function POST(request: NextRequest) {
@@ -83,8 +84,9 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = String(user.id)
+  const role = getUserRole(user.role as string | undefined)
   const profileId = user.profileId as string | undefined
-  const { accessToken, refreshToken } = await createSession(userId, profileId)
+  const { accessToken, refreshToken } = await createSession(userId, role, profileId)
 
   const response = NextResponse.json({
     user: {
