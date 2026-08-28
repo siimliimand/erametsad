@@ -1,7 +1,7 @@
 ---
 description: Default engineer that accumulates skills from all created persona engineers. Direct implementation with write access.
 mode: primary
-model: openrouter/deepseek/deepseek-v4-flash
+model: zai-coding-plan/glm-5.3
 color: "#D2D831"
 permission:
   edit: allow
