@@ -1,5 +1,7 @@
 import crypto from 'node:crypto'
 
+import { verifyAdminAccessToken } from '../auth/jwt'
+import { createCache } from '../cache'
 import { decryptSealedBids, getSealedBidsForAuction, type DecryptedBid } from './sealed-bid'
 import { getPayloadClient } from '../../payload/payloadClient'
 import { prepareContract } from '../contracts/service'
@@ -10,18 +12,50 @@ interface OpeningSession {
   openerUserId: string
   approvalToken: string
   step: 'step-1' | 'step-2-complete'
+  approverUserId?: string
 }
 
-const sessions = new Map<string, OpeningSession>()
+const OPENING_SESSION_TTL_SECONDS = 30 * 60
+
+const openingSessions = createCache('SEALED_OPENING_SESSIONS')
+
+function sessionKey(sessionId: string): string {
+  return `sealed-opening:${sessionId}`
+}
 
 function generateToken(): string {
   return crypto.randomBytes(32).toString('hex')
 }
 
+function tokensMatch(expected: string, actual: string): boolean {
+  const expectedBuf = Buffer.from(expected, 'utf8')
+  const actualBuf = Buffer.from(actual, 'utf8')
+  if (expectedBuf.length !== actualBuf.length) {
+    return false
+  }
+  return crypto.timingSafeEqual(expectedBuf, actualBuf)
+}
+
+function rankBids(bids: DecryptedBid[]): DecryptedBid[] {
+  return bids
+    .filter((bid) => bid.valid)
+    .sort((a, b) => {
+      if (b.amount !== a.amount) {
+        return b.amount - a.amount
+      }
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    })
+}
+
 export async function startOpeningSession(
   auctionId: string,
-  openerUserId: string,
+  openerAccessToken: string,
 ): Promise<{ sessionId: string; approvalToken: string }> {
+  const opener = verifyAdminAccessToken(openerAccessToken)
+  if (!opener) {
+    throw new Error('Opener must hold a valid admin or superadmin token')
+  }
+
   const payload = await getPayloadClient()
 
   const auctionResult = await payload.find({
@@ -43,39 +77,51 @@ export async function startOpeningSession(
   const session: OpeningSession = {
     sessionId,
     auctionId,
-    openerUserId,
+    openerUserId: opener.userId,
     approvalToken,
     step: 'step-1',
   }
-  sessions.set(sessionId, session)
+  await openingSessions.set(sessionKey(sessionId), JSON.stringify(session), OPENING_SESSION_TTL_SECONDS)
 
   return { sessionId, approvalToken }
 }
 
 export async function approveOpeningSession(
   sessionId: string,
-  approverToken: string,
-  approverUserId: string,
+  approvalToken: string,
+  approverAccessToken: string,
 ): Promise<{ bids: DecryptedBid[] }> {
-  const session = sessions.get(sessionId)
-  if (!session) {
-    throw new Error('Opening session not found')
+  const approver = verifyAdminAccessToken(approverAccessToken)
+  if (!approver) {
+    throw new Error('Approver must hold a valid admin or superadmin token')
   }
+
+  const raw = await openingSessions.get(sessionKey(sessionId))
+  if (!raw) {
+    throw new Error('Opening session not found or expired. Start a new opening session.')
+  }
+  const session = JSON.parse(raw) as OpeningSession
   if (session.step !== 'step-1') {
     throw new Error('Opening session already completed or invalid')
   }
-  if (session.openerUserId === approverUserId) {
+  if (session.openerUserId === approver.userId) {
     throw new Error('Approver must be a different admin from the opener')
   }
-  if (session.approvalToken !== approverToken) {
+  if (!tokensMatch(session.approvalToken, approvalToken)) {
     throw new Error('Invalid approval token')
   }
 
   const rawBids = await getSealedBidsForAuction(session.auctionId)
   const decrypted = decryptSealedBids(rawBids)
-  const ranked = decrypted.sort((a, b) => b.amount - a.amount)
+  const ranked = rankBids(decrypted)
 
-  session.step = 'step-2-complete'
+  // Keep the completed marker in the cache so a replayed approval is rejected
+  // as already completed instead of looking like an expired session.
+  await openingSessions.set(
+    sessionKey(sessionId),
+    JSON.stringify({ ...session, step: 'step-2-complete', approverUserId: approver.userId } satisfies OpeningSession),
+    OPENING_SESSION_TTL_SECONDS,
+  )
 
   return { bids: ranked }
 }
