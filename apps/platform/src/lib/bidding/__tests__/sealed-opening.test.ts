@@ -20,7 +20,6 @@ vi.mock('@/lib/contracts/service', () => ({
 import { prepareContract } from '@/lib/contracts/service'
 import { getPayloadClient } from '@/payload/payloadClient'
 
-const AUCTION_ID = 'auction-1'
 const OPENING_TTL_SECONDS = 30 * 60
 
 const OLD_JWT_SECRET = process.env.JWT_SECRET
@@ -55,6 +54,10 @@ let mockPayload: {
 }
 let findQueues: Record<string, Record<string, unknown>[][]>
 let emitSpy: ReturnType<typeof vi.spyOn>
+// The approval marker confirmWinner requires is keyed by auction id in a
+// module-level cache that survives across tests, so every test gets its own
+// auction.
+let auctionId: string
 
 function queueFind(collection: string, docs: Record<string, unknown>[]) {
   findQueues[collection] = [...(findQueues[collection] ?? []), docs]
@@ -63,6 +66,7 @@ function queueFind(collection: string, docs: Record<string, unknown>[]) {
 beforeEach(() => {
   vi.clearAllMocks()
   findQueues = {}
+  auctionId = `auction-${crypto.randomUUID()}`
   mockPayload = { find: vi.fn(), create: vi.fn(), update: vi.fn() }
   mockPayload.find.mockImplementation((args: MockFindArgs) => {
     const queue = findQueues[args.collection ?? ''] ?? []
@@ -87,7 +91,7 @@ function userToken(userId: string): string {
 
 function endedAuction(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    id: AUCTION_ID,
+    id: auctionId,
     status: 'ended',
     title: 'Suletud pakkumise testoksjon',
     reservePrice: 100_000,
@@ -104,7 +108,7 @@ function sealedBid(params: {
   const encrypted = encryptSealedData(String(params.amount))
   return {
     id: params.id,
-    auction: AUCTION_ID,
+    auction: auctionId,
     user: params.user,
     amount: 0,
     type: 'sealed',
@@ -134,7 +138,17 @@ async function startSession(
   auction = endedAuction(),
 ): Promise<{ sessionId: string; approvalToken: string }> {
   queueFind('auctions', [auction])
-  return startOpeningSession(AUCTION_ID, adminToken(openerUserId))
+  return startOpeningSession(auctionId, adminToken(openerUserId))
+}
+
+async function approvedSession(
+  openerUserId = 'opener-admin',
+  approverUserId = 'approver-admin',
+): Promise<{ sessionId: string; approvalToken: string }> {
+  const session = await startSession(openerUserId)
+  queueFind('bids', [])
+  await approveOpeningSession(session.sessionId, session.approvalToken, adminToken(approverUserId))
+  return session
 }
 
 function auctionUpdates(): { collection: string; data: Record<string, unknown> }[] {
@@ -160,13 +174,13 @@ describe('startOpeningSession', () => {
   it('rejects when the auction is not in ended status', async () => {
     queueFind('auctions', [endedAuction({ status: 'active' })])
 
-    await expect(startOpeningSession(AUCTION_ID, adminToken('opener-admin'))).rejects.toThrow(
+    await expect(startOpeningSession(auctionId, adminToken('opener-admin'))).rejects.toThrow(
       "Auction must be in 'ended' status",
     )
   })
 
   it('rejects a token without an admin role', async () => {
-    await expect(startOpeningSession(AUCTION_ID, userToken('plain-user'))).rejects.toThrow(
+    await expect(startOpeningSession(auctionId, userToken('plain-user'))).rejects.toThrow(
       'Opener must hold a valid admin or superadmin token',
     )
   })
@@ -253,7 +267,7 @@ describe('opening session expiry', () => {
     ).rejects.toThrow('Opening session not found or expired. Start a new opening session.')
 
     queueFind('auctions', [endedAuction()])
-    const fresh = await startOpeningSession(AUCTION_ID, adminToken('opener-admin'))
+    const fresh = await startOpeningSession(auctionId, adminToken('opener-admin'))
     queueFind('bids', [])
     await expect(
       approveOpeningSession(fresh.sessionId, fresh.approvalToken, adminToken('approver-admin')),
@@ -263,26 +277,66 @@ describe('opening session expiry', () => {
 
 describe('confirmWinner', () => {
   it('rejects when the auction is not in ended status and writes nothing', async () => {
+    await approvedSession()
     queueFind('auctions', [endedAuction({ status: 'active' })])
     queueFind('bids', [sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' })])
 
     await expect(
-      confirmWinner(AUCTION_ID, 'bid-a', adminToken('confirmer-admin')),
+      confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin')),
     ).rejects.toThrow("Auction must be in 'ended' status")
     expect(mockPayload.update).not.toHaveBeenCalled()
     expect(prepareContract).not.toHaveBeenCalled()
   })
 
+  it('rejects confirmation when no opening session exists for the auction', async () => {
+    queueFind('auctions', [endedAuction()])
+    queueFind('bids', [sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' })])
+
+    await expect(
+      confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin')),
+    ).rejects.toThrow('Suletud pakkumiste avamise tseremoonia ei ole kahesammuliselt kinnitatud')
+    expect(mockPayload.update).not.toHaveBeenCalled()
+    expect(prepareContract).not.toHaveBeenCalled()
+  })
+
+  it('rejects confirmation when the session was opened but never approved by a second admin', async () => {
+    await startSession()
+    queueFind('auctions', [endedAuction()])
+    queueFind('bids', [sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' })])
+
+    await expect(
+      confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin')),
+    ).rejects.toThrow('Suletud pakkumiste avamise tseremoonia ei ole kahesammuliselt kinnitatud')
+    expect(mockPayload.update).not.toHaveBeenCalled()
+    expect(prepareContract).not.toHaveBeenCalled()
+  })
+
+  it('rejects confirmation after the approved session expired', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-02-01T10:00:00Z'))
+    await approvedSession()
+
+    vi.advanceTimersByTime((OPENING_TTL_SECONDS + 60) * 1000)
+    queueFind('auctions', [endedAuction()])
+    queueFind('bids', [sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' })])
+
+    await expect(
+      confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin')),
+    ).rejects.toThrow('Suletud pakkumiste avamise tseremoonia ei ole kahesammuliselt kinnitatud')
+  })
+
   it('rejects a bid that is not among the sealed bids of the auction', async () => {
+    await approvedSession()
     queueFind('auctions', [endedAuction()])
     queueFind('bids', [])
 
     await expect(
-      confirmWinner(AUCTION_ID, 'foreign-bid', adminToken('confirmer-admin')),
+      confirmWinner(auctionId, 'foreign-bid', adminToken('confirmer-admin')),
     ).rejects.toThrow('Bid not found among the sealed bids of this auction')
   })
 
   it('rejects confirming the later of two equal bids and accepts the earlier one', async () => {
+    await approvedSession()
     queueFind('auctions', [endedAuction()])
     queueFind('bids', [
       sealedBid({ id: 'bid-early', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' }),
@@ -290,7 +344,7 @@ describe('confirmWinner', () => {
     ])
 
     await expect(
-      confirmWinner(AUCTION_ID, 'bid-late', adminToken('confirmer-admin')),
+      confirmWinner(auctionId, 'bid-late', adminToken('confirmer-admin')),
     ).rejects.toThrow('Bid does not top the decrypted ranking')
 
     queueFind('auctions', [endedAuction()])
@@ -299,7 +353,7 @@ describe('confirmWinner', () => {
       sealedBid({ id: 'bid-late', user: 'user-b', amount: 150_000, createdAt: '2026-02-01T10:05:00Z' }),
     ])
     queueFind('bids', [])
-    await confirmWinner(AUCTION_ID, 'bid-early', adminToken('confirmer-admin'))
+    await confirmWinner(auctionId, 'bid-early', adminToken('confirmer-admin'))
 
     expect(auctionUpdates()[0]?.data).toEqual({
       status: 'appraised',
@@ -309,6 +363,7 @@ describe('confirmWinner', () => {
   })
 
   it('publishes finalPrice with the decrypted amount and queues the contract when the top bid meets the reserve', async () => {
+    await approvedSession('opener-admin', 'approver-admin')
     queueFind('auctions', [endedAuction({ reservePrice: 100_000 })])
     queueFind('bids', [
       sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' }),
@@ -316,7 +371,7 @@ describe('confirmWinner', () => {
     ])
     queueFind('bids', [{ id: 'bid-b', status: 'leading' }])
 
-    await confirmWinner(AUCTION_ID, 'bid-a', adminToken('confirmer-admin'))
+    await confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin'))
 
     expect(mockPayload.update).toHaveBeenCalledWith(
       expect.objectContaining({ collection: 'bids', id: 'bid-a', data: { status: 'won' } }),
@@ -329,11 +384,12 @@ describe('confirmWinner', () => {
       winningBid: 'bid-a',
       finalPrice: 150_000,
     })
-    expect(prepareContract).toHaveBeenCalledWith(AUCTION_ID, 'auction')
+    expect(prepareContract).toHaveBeenCalledWith(auctionId, 'auction')
     expect(auditCreateActions()).toContain('winner_confirmed')
   })
 
   it('backfills the statistics snapshot eur from the published finalPrice without recounting the auction', async () => {
+    await approvedSession()
     queueFind('auctions', [endedAuction({ objectType: 'forest', reservePrice: 25_000 })])
     queueFind('bids', [
       sealedBid({ id: 'bid-a', user: 'user-a', amount: 27_500, createdAt: '2026-02-01T10:00:00Z' }),
@@ -343,7 +399,7 @@ describe('confirmWinner', () => {
       { id: 'snap-1', date: new Date().toISOString(), objectType: 'forest', count: 1, area: 12.5, eur: 0 },
     ])
 
-    await confirmWinner(AUCTION_ID, 'bid-a', adminToken('confirmer-admin'))
+    await confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin'))
 
     expect(mockPayload.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -355,11 +411,12 @@ describe('confirmWinner', () => {
   })
 
   it('treats a bid equal to the reserve price as meeting the reserve', async () => {
+    await approvedSession()
     queueFind('auctions', [endedAuction({ reservePrice: 150_000 })])
     queueFind('bids', [sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' })])
     queueFind('bids', [])
 
-    await confirmWinner(AUCTION_ID, 'bid-a', adminToken('confirmer-admin'))
+    await confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin'))
 
     expect(auctionUpdates()[0]?.data).toEqual({
       status: 'appraised',
@@ -369,13 +426,14 @@ describe('confirmWinner', () => {
   })
 
   it('marks the auction unsold when the top decrypted bid is below the reserve', async () => {
+    await approvedSession()
     queueFind('auctions', [endedAuction({ reservePrice: 200_000 })])
     queueFind('bids', [
       sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' }),
       sealedBid({ id: 'bid-b', user: 'user-b', amount: 120_000, createdAt: '2026-02-01T10:05:00Z' }),
     ])
 
-    await confirmWinner(AUCTION_ID, 'bid-a', adminToken('confirmer-admin'))
+    await confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin'))
 
     expect(auctionUpdates()[0]?.data).toEqual({ status: 'unsold' })
     expect(mockPayload.update).not.toHaveBeenCalledWith(
@@ -401,6 +459,7 @@ describe('confirmWinner', () => {
   })
 
   it('notifies each distinct losing bidder with their userId and never the winner', async () => {
+    await approvedSession()
     queueFind('auctions', [endedAuction()])
     queueFind('bids', [
       sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' }),
@@ -414,7 +473,7 @@ describe('confirmWinner', () => {
       { id: 'bid-c', status: 'leading' },
     ])
 
-    await confirmWinner(AUCTION_ID, 'bid-a', adminToken('confirmer-admin'))
+    await confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin'))
 
     const events = endedEvents()
     expect(events.map((event) => event.userId)).toEqual(['user-b', 'user-c'])
@@ -428,6 +487,7 @@ describe('confirmWinner', () => {
     const tampered = tamperSealedPayload(
       sealedBid({ id: 'bid-tampered', user: 'user-t', amount: 999_999, createdAt: '2026-02-01T10:00:00Z' }),
     )
+    await approvedSession()
     queueFind('auctions', [endedAuction()])
     queueFind('bids', [
       tampered,
@@ -435,7 +495,7 @@ describe('confirmWinner', () => {
     ])
 
     await expect(
-      confirmWinner(AUCTION_ID, 'bid-tampered', adminToken('confirmer-admin')),
+      confirmWinner(auctionId, 'bid-tampered', adminToken('confirmer-admin')),
     ).rejects.toThrow('Bid is invalid (decryption failed) and cannot win')
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('bid-tampered marked invalid'))
 
@@ -445,7 +505,7 @@ describe('confirmWinner', () => {
       sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:05:00Z' }),
     ])
     queueFind('bids', [])
-    await confirmWinner(AUCTION_ID, 'bid-a', adminToken('confirmer-admin'))
+    await confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin'))
 
     expect(auctionUpdates()[0]?.data).toEqual({
       status: 'appraised',

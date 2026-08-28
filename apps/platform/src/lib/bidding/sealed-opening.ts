@@ -25,6 +25,10 @@ function sessionKey(sessionId: string): string {
   return `sealed-opening:${sessionId}`
 }
 
+function auctionApprovalKey(auctionId: string): string {
+  return `sealed-opening:approved:${auctionId}`
+}
+
 function generateToken(): string {
   return crypto.randomBytes(32).toString('hex')
 }
@@ -125,6 +129,15 @@ export async function approveOpeningSession(
     OPENING_SESSION_TTL_SECONDS,
   )
 
+  // Sessions are keyed by sessionId, so confirmWinner (which only knows the
+  // auction) reads this auction-scoped marker instead. It exists only after
+  // a completed two-person approval and expires with the session.
+  await openingSessions.set(
+    auctionApprovalKey(session.auctionId),
+    JSON.stringify({ sessionId, approverUserId: approver.userId }),
+    OPENING_SESSION_TTL_SECONDS,
+  )
+
   return { bids: ranked }
 }
 
@@ -152,6 +165,11 @@ export async function confirmWinner(
   }
   if (auction.status !== 'ended') {
     throw new Error(`Auction must be in 'ended' status to confirm a winner, current: ${String(auction.status)}`)
+  }
+
+  const approved = await openingSessions.get(auctionApprovalKey(auctionId))
+  if (!approved) {
+    throw new Error('Suletud pakkumiste avamise tseremoonia ei ole kahesammuliselt kinnitatud')
   }
 
   const rawBids = await getSealedBidsForAuction(auctionId)
