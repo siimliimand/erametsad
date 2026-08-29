@@ -38,7 +38,8 @@
 - [x] 3.5 Rebuild `src/lib/realtime/auction-stream.ts` and `my-stream.ts` on top of AuctionDO events; keep the public event names so the frontend stays untouched <!-- agent: fullstack-engineer.build, depends_on: [3.3], touches: [apps/platform/src/lib/realtime/auction-stream.ts, apps/platform/src/lib/realtime/my-stream.ts] -->
 - [x] 3.6 `RateLimiterDO` (`src/do/rate-limiter.ts`): token bucket per key; `src/lib/rate-limit.ts` keeps its API and delegates; wire the leads and auth endpoints to it <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/do/rate-limiter.ts, apps/platform/src/lib/rate-limit.ts] -->
 - [x] 3.7 `wrangler.jsonc` DO wiring: `durable_objects.bindings` for both classes plus the `migrations` list with the new SQLite-backed classes <!-- agent: fullstack-engineer.build, depends_on: [3.1, 3.6], touches: [apps/platform/wrangler.jsonc] -->
-- [ ] 3.8 Concurrency and broadcast tests via `@cloudflare/vitest-pool-workers`: N parallel bids on one auction yield one consistent winner-increment sequence and consistent D1 state; two clients in different simulacra both receive `bid:created` <!-- agent: fullstack-engineer.build, depends_on: [3.2, 3.4, 3.7], touches: [apps/platform/src/do/__tests__/auction.test.ts] -->
+- [x] 3.8 Concurrency and broadcast tests via `@cloudflare/vitest-pool-workers`: N parallel bids on one auction yield one consistent winner-increment sequence and consistent D1 state; two clients in different simulacra both receive `bid:created` <!-- agent: fullstack-engineer.build, depends_on: [3.2, 3.4, 3.7], touches: [apps/platform/src/do/__tests__/auction.test.ts] -->
+  - Note: exposed and fixed a real race — D1 binding calls do not close the DO input gate, so parallel admissions interleaved; admission now serialized behind a promise-queue mutex in `src/do/auction.ts`.
 
 ## 4. Phase 3: Email Service
 
@@ -64,9 +65,9 @@
 
 - [x] 7.1 Admin needs inventory: per collection, who edits it and which fields matter day-to-day; feeds the screen scope <!-- agent: fullstack-engineer.fast, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/INVENTORY.md] -->
 - [x] 7.2 Admin shell: `(admin)` route group with role guard on `users.role`, layout, navigation, Estonian labels, and table/form primitives on the repository layer with server actions <!-- agent: fullstack-engineer.build, depends_on: [2.11, 7.1], touches: [apps/platform/src/app/(admin)/**] -->
-- [ ] 7.3 Auction operations screens: create/publish auction, live bid monitor (subscribes to the same AuctionDO stream), approve/reject bids, sealed ceremony screens, contract flow trigger <!-- agent: fullstack-engineer.build, depends_on: [3.3, 7.2], touches: [apps/platform/src/app/(admin)/auctions/**] -->
-- [ ] 7.4 Users, rights, contracts, and leads CRM screens <!-- agent: fullstack-engineer.build, depends_on: [7.2], touches: [apps/platform/src/app/(admin)/users/**, apps/platform/src/app/(admin)/contracts/**, apps/platform/src/app/(admin)/leads/**] -->
-- [ ] 7.5 Content screens: articles, pages, FAQ categories and items, testimonials, partner services, legal documents, redirects, specialists, statistics snapshots, settings <!-- agent: fullstack-engineer.build, depends_on: [7.2], touches: [apps/platform/src/app/(admin)/content/**] -->
+- [x] 7.3 Auction operations screens: create/publish auction, live bid monitor (subscribes to the same AuctionDO stream), approve/reject bids, sealed ceremony screens, contract flow trigger <!-- agent: fullstack-engineer.build, depends_on: [3.3, 7.2], touches: [apps/platform/src/app/(admin)/auctions/**] -->
+- [x] 7.4 Users, rights, contracts, and leads CRM screens <!-- agent: fullstack-engineer.build, depends_on: [7.2], touches: [apps/platform/src/app/(admin)/users/**, apps/platform/src/app/(admin)/contracts/**, apps/platform/src/app/(admin)/leads/**] -->
+- [x] 7.5 Content screens: articles, pages, FAQ categories and items, testimonials, partner services, legal documents, redirects, specialists, statistics snapshots, settings <!-- agent: fullstack-engineer.build, depends_on: [7.2], touches: [apps/platform/src/app/(admin)/content/**] -->
 - [ ] 7.6 Media library on R2: upload, browse, alt text; replaces the Payload Media UI <!-- agent: fullstack-engineer.build, depends_on: [7.2], touches: [apps/platform/src/app/(admin)/media/**] -->
 - [ ] 7.7 Content import/export tooling (JSON) so marketing can bulk-load articles and pages <!-- agent: fullstack-engineer.build, depends_on: [7.5], touches: [apps/platform/src/app/(admin)/content/import-export/**] -->
 
