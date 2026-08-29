@@ -55,6 +55,12 @@
       }
     ]
   },
+  // Cron safety net (task 6.2): AuctionDO alarms own the end transition;
+  // the every-minute scheduled() sweep in src/do/index.ts only wakes DOs
+  // whose alarm was lost to eviction. See src/lib/workers/auction-ending.ts.
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
   // TODO(task 2.8): the CI wrangler token lacks D1 write permission, so remote creation failed
   // (Authentication error, code 10000). A user with D1 access must run once from apps/platform:
   //   pnpm exec wrangler d1 create eametsad-db

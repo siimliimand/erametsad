@@ -428,6 +428,17 @@ export class AuctionDO extends DurableObject<Env> {
         }
         return this.handlePublish(auctionId)
       }
+      case 'due': {
+        if (request.method !== 'POST') {
+          return errorResponse(405, `method ${request.method} not allowed on /${operation}`)
+        }
+        // Cron sweep wake: the same serialized tick as alarm(), so the end
+        // transition always runs inside the DO, never in the sweep worker.
+        // The URL id is passed because ctx.id.name is not carried into the
+        // object runtime (see fetch()).
+        await this.serialize(() => this.alarmTick(auctionId))
+        return jsonResponse({ auctionId, woken: true })
+      }
       case 'alarm':
         // Alarm scheduling is storage-driven (setAlarm), not HTTP; no
         // route handler exists by design.
@@ -447,14 +458,14 @@ export class AuctionDO extends DurableObject<Env> {
     await this.serialize(() => this.alarmTick())
   }
 
-  private async alarmTick(): Promise<void> {
+  private async alarmTick(auctionIdFromRoute?: string): Promise<void> {
     const state =
       this.state ?? ((await this.ctx.storage.get<AuctionState>(STATE_KEY)) ?? null)
     if (state) {
       await this.runAlarmTick(state)
       return
     }
-    const name = this.ctx.id.name
+    const name = auctionIdFromRoute ?? this.ctx.id.name
     if (!name) return
     const hydrated = await this.hydrateState(name)
     if (hydrated) await this.runAlarmTick(hydrated)

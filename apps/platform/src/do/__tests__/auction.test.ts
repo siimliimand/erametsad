@@ -693,6 +693,41 @@ test('a second alarm fire after the transition is a no-op', async () => {
   expect(await notificationsFor(sellerId)).toHaveLength(2)
 })
 
+test('cron sweep wake route ends an overdue auction on a cold, never-hydrated DO', async () => {
+  const { auctionId } = await seedAuction('due-wake', { endsAt: '2026-01-01T00:00:00.000Z' })
+  // No /state call first: the object is cold, as after eviction. The wake
+  // route must recover the auction from the object name and run the same
+  // end path as alarm().
+  const response = await fetchRoute(auctionId, '/due', { method: 'POST' })
+
+  expect(response.status).toBe(200)
+  await expect(response.json()).resolves.toMatchObject({ auctionId, woken: true })
+  const row = await auctionRow(auctionId)
+  expect(row?.status).toBe('unsold')
+  expect(row?.endedAt).not.toBeNull()
+  expect(await auditActions(auctionId)).toEqual(['auction_ended', 'auction_outcome_computed'])
+})
+
+test('cron sweep wake route re-arms a not-yet-due auction instead of ending it', async () => {
+  const endsAt = new Date(Date.now() + 10 * 60_000).toISOString()
+  const { auctionId } = await seedAuction('due-early', { endsAt })
+
+  const response = await fetchRoute(auctionId, '/due', { method: 'POST' })
+
+  expect(response.status).toBe(200)
+  expect(await storedAlarm(auctionId)).toBe(Date.parse(endsAt))
+  expect((await auctionRow(auctionId))?.status).toBe('active')
+})
+
+test('cron sweep wake route rejects non-POST methods', async () => {
+  const { auctionId } = await seedAuction('due-method', { endsAt: '2026-01-01T00:00:00.000Z' })
+
+  const response = await fetchRoute(auctionId, '/due')
+
+  expect(response.status).toBe(405)
+  expect((await auctionRow(auctionId))?.status).toBe('active')
+})
+
 test('ten parallel bids on one auction serialize into one consistent winner sequence', async () => {
   const { auctionId, sellerId } = await seedAuction('burst')
   // Step-less auctions admit any amount at or above the current leader, so
