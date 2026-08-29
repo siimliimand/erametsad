@@ -18,6 +18,7 @@ export default async function AdminContentPage() {
   const [
     articles,
     pages,
+    mediaAssets,
     faqCategories,
     faqItems,
     testimonials,
@@ -29,6 +30,7 @@ export default async function AdminContentPage() {
   ] = await Promise.all([
     repositories.find({ collection: 'articles', pagination: false }),
     repositories.find({ collection: 'pages', pagination: false }),
+    repositories.find({ collection: 'media', pagination: false }),
     repositories.find({ collection: 'faq-categories', pagination: false }),
     repositories.find({ collection: 'faq-items', pagination: false }),
     repositories.find({ collection: 'testimonials', pagination: false }),
@@ -51,6 +53,12 @@ export default async function AdminContentPage() {
       label: 'Lehed',
       description: 'Staatilised lehed ja nende paigutus.',
       count: pages.docs.length,
+    },
+    {
+      href: '/admin/media',
+      label: 'Meediakogu',
+      description: 'Pildid ja PDF-failid R2 salvestusruumis.',
+      count: mediaAssets.docs.length,
     },
     {
       href: '/admin/content/faq/categories',
