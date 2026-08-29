@@ -68,7 +68,18 @@ export default async function AdminAuctionsPage({
       />
       <DataTable
         columns={[
-          { key: 'title', label: 'Pealkiri' },
+          {
+            key: 'title',
+            label: 'Pealkiri',
+            render: (row) => (
+              <Link
+                href={`/admin/auctions/${row.id}`}
+                className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
+              >
+                {row.title}
+              </Link>
+            ),
+          },
           {
             key: 'status',
             label: 'Olek',
