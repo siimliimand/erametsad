@@ -86,7 +86,7 @@ function verify(token: string): Record<string, unknown> | null {
   const expectedSig = createHmac('sha256', getSecret())
     .update(`${headerB64}.${bodyB64}`)
     .digest()
-  const actualSig = Buffer.from(base64UrlToBytes(sigB64))
+  const actualSig = base64UrlToBytes(sigB64)
 
   if (
     expectedSig.length !== actualSig.length ||

@@ -1,9 +1,11 @@
 import crypto from 'node:crypto'
 
+import { concatBytes, fromHex, toHex, utf8Decode } from './bytes'
+
 const ALGORITHM = 'aes-256-gcm'
 const SALT = 'eametsad-isikukood-v1'
 
-function getKey(): Buffer {
+function getKey(): Uint8Array {
   const raw = process.env.ISIKUKOOD_ENCRYPTION_KEY
   if (!raw) {
     throw new Error('ISIKUKOOD_ENCRYPTION_KEY env var is required')
@@ -20,11 +22,11 @@ export function encrypt(text: string): {
   const iv = crypto.randomBytes(16)
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv)
 
-  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()])
+  const encrypted = concatBytes([cipher.update(text, 'utf8'), cipher.final()])
   return {
-    encrypted: encrypted.toString('hex'),
-    iv: iv.toString('hex'),
-    authTag: cipher.getAuthTag().toString('hex'),
+    encrypted: toHex(encrypted),
+    iv: toHex(iv),
+    authTag: toHex(cipher.getAuthTag()),
   }
 }
 
@@ -40,15 +42,15 @@ export function decrypt(
   const decipher = crypto.createDecipheriv(
     ALGORITHM,
     key,
-    Buffer.from(iv, 'hex'),
+    fromHex(iv),
   )
-  decipher.setAuthTag(Buffer.from(authTag, 'hex'))
+  decipher.setAuthTag(fromHex(authTag))
 
-  const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(encrypted, 'hex')),
+  const decrypted = concatBytes([
+    decipher.update(fromHex(encrypted)),
     decipher.final(),
   ])
-  return decrypted.toString('utf8')
+  return utf8Decode(decrypted)
 }
 
 export function hash(value: string): string {

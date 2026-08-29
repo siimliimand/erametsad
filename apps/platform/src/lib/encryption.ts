@@ -8,6 +8,8 @@
 // no scrypt; decision record 1.5 confirmed no production data exists.
 import { createCipheriv, createDecipheriv, pbkdf2Sync } from 'node:crypto'
 
+import { concatBytes } from './bytes'
+
 const ALGORITHM = 'aes-256-gcm'
 const SALT = 'eametsad-sealed-bid-v1'
 const PBKDF2_ITERATIONS = 600_000
@@ -40,14 +42,14 @@ function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
 // Caches are keyed by the secret value so env swaps (tests, rotations)
 // re-derive instead of decrypting with a stale key.
 let cachedSecret: string | null = null
-let cachedKeyBytes: Buffer | null = null
+let cachedKeyBytes: Uint8Array | null = null
 
-function getKeySync(): Buffer {
+function getKeySync(): Uint8Array {
   const raw = getSecret()
   if (cachedSecret !== raw || cachedKeyBytes === null) {
     cachedKeyBytes = pbkdf2Sync(
-      Buffer.from(raw, 'utf8'),
-      Buffer.from(SALT, 'utf8'),
+      encoder.encode(raw),
+      encoder.encode(SALT),
       PBKDF2_ITERATIONS,
       32,
       'sha256',
@@ -105,11 +107,11 @@ export function encryptSealedData(data: string): SealedEnvelope {
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES))
   const cipher = createCipheriv(ALGORITHM, key, iv)
 
-  const encrypted = Buffer.concat([cipher.update(data, 'utf8'), cipher.final()])
+  const encrypted = concatBytes([cipher.update(data, 'utf8'), cipher.final()])
   return {
-    encrypted: encrypted.toString('hex'),
+    encrypted: bytesToHex(encrypted),
     iv: bytesToHex(iv),
-    authTag: cipher.getAuthTag().toString('hex'),
+    authTag: bytesToHex(cipher.getAuthTag()),
   }
 }
 
@@ -125,15 +127,15 @@ export function decryptSealedData(
   const decipher = createDecipheriv(
     ALGORITHM,
     key,
-    Buffer.from(hexToBytes(iv)),
+    hexToBytes(iv),
   )
-  decipher.setAuthTag(Buffer.from(hexToBytes(authTag)))
+  decipher.setAuthTag(hexToBytes(authTag))
 
-  const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(hexToBytes(encrypted))),
+  const decrypted = concatBytes([
+    decipher.update(hexToBytes(encrypted)),
     decipher.final(),
   ])
-  return decrypted.toString('utf8')
+  return decoder.decode(decrypted)
 }
 
 export async function encryptSealedDataAsync(data: string): Promise<SealedEnvelope> {

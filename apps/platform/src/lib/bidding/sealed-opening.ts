@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 
 import { verifyAdminAccessToken } from '../auth/jwt'
+import { utf8Encode } from '../bytes'
 import { createCache } from '../cache'
 import { decryptSealedBids, getSealedBidsForAuction, type DecryptedBid } from './sealed-bid'
 import { prepareContract } from '../contracts/service'
@@ -36,8 +37,8 @@ function generateToken(): string {
 }
 
 function tokensMatch(expected: string, actual: string): boolean {
-  const expectedBuf = Buffer.from(expected, 'utf8')
-  const actualBuf = Buffer.from(actual, 'utf8')
+  const expectedBuf = utf8Encode(expected)
+  const actualBuf = utf8Encode(actual)
   if (expectedBuf.length !== actualBuf.length) {
     return false
   }

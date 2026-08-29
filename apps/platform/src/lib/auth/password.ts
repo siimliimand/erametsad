@@ -1,5 +1,7 @@
 import crypto from 'node:crypto'
 
+import { fromHex, utf8Encode } from '../bytes'
+
 const ITERATIONS = 310_000
 const KEY_LENGTH = 64
 const DIGEST = 'sha512'
@@ -22,7 +24,7 @@ export async function verifyPassword(
   if (!salt || !key) return false
 
   const derivedKey = await deriveKey(password, salt)
-  return crypto.timingSafeEqual(Buffer.from(key), Buffer.from(derivedKey))
+  return crypto.timingSafeEqual(utf8Encode(key), utf8Encode(derivedKey))
 }
 
 function deriveKey(password: string, salt: string): Promise<string> {
@@ -58,7 +60,7 @@ export function verifyCredentialPassword(
 ): boolean {
   if (!storedHash || !salt) return false
   const candidate = crypto.scryptSync(password, salt, CREDENTIAL_KEY_BYTES)
-  const expected = Buffer.from(storedHash, 'hex')
+  const expected = fromHex(storedHash)
   return (
     candidate.length === expected.length && crypto.timingSafeEqual(candidate, expected)
   )
