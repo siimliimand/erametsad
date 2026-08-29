@@ -1,8 +1,24 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 
 import { Users } from '../../payload/collections/Users'
+import {
+  signAccessToken,
+  signAccessTokenAsync,
+  signRefreshTokenAsync,
+  verifyAccessToken,
+  verifyAccessTokenAsync,
+  verifyRefreshTokenAsync,
+} from '../auth/jwt'
+import { computeIpHash, computeIpHashAsync } from '../bidding/place-bid'
 import { decrypt, encrypt } from '../crypto'
-import { decryptSealedData, encryptSealedData } from '../encryption'
+import {
+  decryptSealedData,
+  decryptSealedDataAsync,
+  encryptSealedData,
+  encryptSealedDataAsync,
+} from '../encryption'
+
+process.env.JWT_SECRET ??= 'test-jwt-secret'
 
 const ISIKUKOOD_TEST_KEY = 'unit-test-isikukood-key'
 const SEALED_TEST_KEY = 'unit-test-sealed-key'
@@ -130,11 +146,114 @@ describe('encryption encryptSealedData/decryptSealedData (sealed bids)', () => {
   })
 })
 
+// Task 5.2: the Workers-native crypto.subtle paths must stay byte-compatible
+// with the sync node:crypto bridges so callers can migrate piecemeal.
+describe('web-crypto port interop (task 5.2)', () => {
+  it('roundtrips through encryptSealedDataAsync/decryptSealedDataAsync', async () => {
+    const envelope = await encryptSealedDataAsync('12500')
+
+    expect(envelope.encrypted).not.toBe('12500')
+    expect(envelope.authTag).toHaveLength(32)
+    expect(await decryptSealedDataAsync(
+      envelope.encrypted,
+      envelope.iv,
+      envelope.authTag,
+    )).toBe('12500')
+  })
+
+  it('decrypts an async envelope with the sync bridge', async () => {
+    const envelope = await encryptSealedDataAsync('{"userId":"user-1"}')
+
+    expect(decryptSealedData(envelope.encrypted, envelope.iv, envelope.authTag)).toBe(
+      '{"userId":"user-1"}',
+    )
+  })
+
+  it('decrypts a sync envelope with the async path', async () => {
+    const envelope = encryptSealedData('12500')
+
+    await expect(
+      decryptSealedDataAsync(envelope.encrypted, envelope.iv, envelope.authTag),
+    ).resolves.toBe('12500')
+  })
+
+  it('async decrypt throws on tampered ciphertext and tampered authTag', async () => {
+    const envelope = await encryptSealedDataAsync('12500')
+
+    await expect(decryptSealedDataAsync(
+      flipFirstHexNibble(envelope.encrypted),
+      envelope.iv,
+      envelope.authTag,
+    )).rejects.toThrow()
+
+    await expect(decryptSealedDataAsync(
+      envelope.encrypted,
+      envelope.iv,
+      flipFirstHexNibble(envelope.authTag),
+    )).rejects.toThrow()
+  })
+
+  it('async decrypt throws with a different key and on an empty authTag', async () => {
+    const envelope = await encryptSealedDataAsync('12500')
+
+    try {
+      process.env.SEALED_BID_ENCRYPTION_KEY = OTHER_KEY
+      await expect(
+        decryptSealedDataAsync(envelope.encrypted, envelope.iv, envelope.authTag),
+      ).rejects.toThrow()
+    } finally {
+      process.env.SEALED_BID_ENCRYPTION_KEY = SEALED_TEST_KEY
+    }
+
+    await expect(
+      decryptSealedDataAsync(envelope.encrypted, envelope.iv, ''),
+    ).rejects.toThrow(/authTag is required/)
+  })
+
+  it('roundtrips an access token signed and verified with crypto.subtle', async () => {
+    const token = await signAccessTokenAsync({
+      userId: 'user-async',
+      role: 'private',
+      sessionId: 'session-1',
+    })
+
+    expect(await verifyAccessTokenAsync(token)).toMatchObject({
+      userId: 'user-async',
+      role: 'private',
+      sessionId: 'session-1',
+    })
+  })
+
+  it('verifies an async-signed token with the sync bridge and vice versa', async () => {
+    const asyncToken = await signAccessTokenAsync({ userId: 'user-x', role: 'private' })
+    expect(verifyAccessToken(asyncToken)).toMatchObject({ userId: 'user-x' })
+
+    const syncToken = signAccessToken({ userId: 'user-y', role: 'admin' })
+    expect(await verifyAccessTokenAsync(syncToken)).toMatchObject({ userId: 'user-y' })
+  })
+
+  it('async refresh roundtrip and async verify rejection of tampering', async () => {
+    const token = await signRefreshTokenAsync({ sessionId: 'session-r', jti: 'jti-1' })
+    expect(await verifyRefreshTokenAsync(token)).toEqual({ sessionId: 'session-r' })
+
+    const parts = token.split('.')
+    const sig = parts[2] ?? ''
+    parts[2] = sig.endsWith('A') ? `${sig.slice(0, -1)}B` : `${sig.slice(0, -1)}A`
+    expect(await verifyAccessTokenAsync(parts.join('.'))).toBeNull()
+    expect(await verifyAccessTokenAsync('not-a-jwt')).toBeNull()
+  })
+
+  it('computeIpHashAsync matches the sync computeIpHash digest', async () => {
+    expect(await computeIpHashAsync('203.0.113.7')).toBe(computeIpHash('203.0.113.7'))
+    expect(computeIpHash('203.0.113.7')).toMatch(/^[0-9a-f]{64}$/)
+  })
+})
+
 type UsersAfterReadHook = (data: { doc: Record<string, unknown> }) => Record<string, unknown>
 type UsersBeforeChangeHook = (data: { data: Record<string, unknown> }) => Record<string, unknown>
 
-const afterReadHook = Users.hooks?.afterRead?.[0] as unknown as UsersAfterReadHook
-const beforeChangeHook = Users.hooks?.beforeChange?.[0] as unknown as UsersBeforeChangeHook
+const afterReadHook = Users.hooks.afterRead[0] as unknown as UsersAfterReadHook
+const beforeChangeHook = Users.hooks.beforeChange[0] as unknown as UsersBeforeChangeHook
 
 describe('Users afterRead hook on encrypted isikukood', () => {
   it('returns the plaintext isikukood when the envelope is intact', () => {
