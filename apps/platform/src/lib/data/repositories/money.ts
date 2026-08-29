@@ -7,6 +7,14 @@ import { InvalidMoneyError } from './errors'
  */
 export type Cents = number & { readonly __brand: 'Cents' }
 
+/**
+ * Largest cents value both helpers accept. Kept below 2^50 cents: above
+ * ~2^52 cents the float64 product `euros * 100` drifts by whole cents
+ * before rounding, so EUR -> cents -> EUR round-trips stop being exact.
+ * Still far inside SQLite/D1 signed 64-bit INTEGER columns.
+ */
+export const MAX_CENTS = 1e15
+
 export function eurosToCents(euros: number): Cents {
   if (!Number.isFinite(euros)) {
     throw new InvalidMoneyError(`EUR amount must be a finite number, got ${String(euros)}`)
@@ -14,12 +22,20 @@ export function eurosToCents(euros: number): Cents {
   if (euros < 0) {
     throw new InvalidMoneyError(`EUR amount must not be negative, got ${String(euros)}`)
   }
-  return Math.round(euros * 100) as Cents
+  const cents = Math.round(euros * 100)
+  if (!Number.isSafeInteger(cents) || cents > MAX_CENTS) {
+    throw new InvalidMoneyError(
+      `EUR amount exceeds the exact cents range of ${String(MAX_CENTS)} cents, got ${String(euros)}`,
+    )
+  }
+  return cents as Cents
 }
 
 export function centsToEuros(cents: number): number {
-  if (!Number.isInteger(cents)) {
-    throw new InvalidMoneyError(`Cents must be an integer, got ${String(cents)}`)
+  if (!Number.isSafeInteger(cents) || Math.abs(cents) > MAX_CENTS) {
+    throw new InvalidMoneyError(
+      `Cents must be a safe integer up to ${String(MAX_CENTS)}, got ${String(cents)}`,
+    )
   }
   return cents / 100
 }
