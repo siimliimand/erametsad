@@ -58,7 +58,7 @@
 ## 6. Phase 5: background jobs and queue
 
 - [x] 6.1 Queue consumer worker: notification fan-out (one message per user and channel, idempotent via `dedupeKey`), email sending, contract PDF generation into R2 <!-- agent: fullstack-engineer.build, depends_on: [2.11, 4.1], touches: [apps/platform/src/workers/queue-consumer.ts] -->
-- [ ] 6.2 Replace the polling in `src/lib/workers/auction-ending.ts` with AuctionDO alarms plus a cron trigger sweep (`scheduled()` handler) as the safety net for evicted DOs <!-- agent: fullstack-engineer.build, depends_on: [1.6, 3.4], touches: [apps/platform/src/lib/workers/auction-ending.ts, apps/platform/wrangler.jsonc] -->
+- [x] 6.2 Replace the polling in `src/lib/workers/auction-ending.ts` with AuctionDO alarms plus a cron trigger sweep (`scheduled()` handler) as the safety net for evicted DOs <!-- agent: fullstack-engineer.build, depends_on: [1.6, 3.4], touches: [apps/platform/src/lib/workers/auction-ending.ts, apps/platform/wrangler.jsonc] -->
 - [x] 6.3 Dead-letter queue with retry policy and alerting on DLQ depth <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/wrangler.jsonc, apps/platform/src/workers/**] -->
 
 ## 7. Phase 6: admin UI (Payload replacement)
