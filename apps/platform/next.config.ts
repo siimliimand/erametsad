@@ -1,9 +1,12 @@
 import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare'
-import { NextConfig } from 'next'
+import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   experimental: {
     reactCompiler: false,
+    // Media uploads (5 MiB cap) travel through the upload server action,
+    // above the 1 MB default.
+    serverActions: { bodySizeLimit: '6mb' },
   },
 }
 
