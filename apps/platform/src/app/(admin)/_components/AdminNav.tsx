@@ -27,9 +27,9 @@ const items: readonly AdminNavItem[] = [
   { href: '/admin', label: 'Töölaud', icon: DashboardIcon },
   { href: '/admin/auctions', label: 'Oksjonid', icon: GavelIcon },
   { href: '/admin/users', label: 'Kasutajad', icon: UsersIcon },
-  { href: '/admin/contracts', label: 'Lepingud', icon: FileTextIcon, soon: true },
-  { href: '/admin/content', label: 'Sisu', icon: NewspaperIcon, soon: true },
-  { href: '/admin/leads', label: 'Tegevused', icon: WrenchIcon, soon: true },
+  { href: '/admin/contracts', label: 'Lepingud', icon: FileTextIcon },
+  { href: '/admin/content', label: 'Sisu', icon: NewspaperIcon },
+  { href: '/admin/leads', label: 'Tegevused', icon: WrenchIcon },
   { href: '/admin/settings', label: 'Seaded', icon: SettingsIcon, soon: true },
 ]
 
