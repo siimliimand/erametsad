@@ -29,6 +29,7 @@ interface AdmissionResponse {
   error?: string
   status?: number
   code?: string
+  redirectUrl?: string
   replayed?: boolean
   previousLeading?: { userId: string; amount: number } | null
   autobid?: { userId: string; amount: number; placedAt: string } | null
@@ -974,4 +975,226 @@ test('an anti-snipe bid reschedules the near-due alarm and the end transition ru
     'auction_ended',
     'auction_outcome_computed',
   ])
+})
+
+// Ports of the legacy place-bid.ts validation-chain intents (task 8.1):
+// every reject reason and accept state transition that the fake-d1 suites
+// exercised on the direct-SQL path, re-asserted against AuctionDO
+// admission. Scenarios already covered above (step reject, suspended,
+// rightless, idempotent replay, outbid demotion, burst serialization,
+// integer-cents storage) are not repeated.
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(value),
+  )
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+async function insertSettings(
+  options: { alapakkumine?: boolean; requireFrameworkContract?: boolean } = {},
+): Promise<void> {
+  // isolatedStorage is off, so each settings-aware test resets the shared
+  // table and states its own flags: rows from earlier tests must not leak.
+  await db.delete(schema.settings)
+  const timestamp = new Date().toISOString()
+  await db.insert(schema.settings).values({
+    id: crypto.randomUUID(),
+    ...(options.alapakkumine !== undefined ? { alapakkumineEnabled: options.alapakkumine } : {}),
+    featureFlags:
+      options.requireFrameworkContract !== undefined
+        ? JSON.stringify({ requireFrameworkContract: options.requireFrameworkContract })
+        : null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+}
+
+test('POST /bid accepts a bid exactly at minBid and exactly at leader plus step', async () => {
+  const atMin = await seedAuction('at-min')
+  const minResult = await placeBidRoute(atMin.auctionId, {
+    userId: atMin.bidderId,
+    amount: 100,
+    type: 'open',
+  })
+  expect(minResult.admission.allowed).toBe(true)
+  expect(minResult.admission.bid?.status).toBe('leading')
+
+  const atStep = await seedAuction('at-step', { leadingBidCents: 12_000, bidStepCents: 500 })
+  const stepResult = await placeBidRoute(atStep.auctionId, {
+    userId: atStep.bidderId,
+    amount: 125,
+    type: 'open',
+  })
+  expect(stepResult.admission.allowed).toBe(true)
+  expect(stepResult.admission.previousLeading).toEqual({ userId: atStep.sellerId, amount: 120 })
+})
+
+test('POST /bid rejects an amount below minBid when alapakkumine is not enabled', async () => {
+  const { auctionId, bidderId } = await seedAuction('under-start-off')
+  await insertSettings({ alapakkumine: false })
+
+  const { admission } = await placeBidRoute(auctionId, {
+    userId: bidderId,
+    amount: 50,
+    type: 'open',
+  })
+  expect(admission.allowed).toBe(false)
+  expect(admission.status).toBe(400)
+  expect(admission.error).toBe('Bid must be at least 100 EUR')
+
+  const rows = await db.select().from(schema.bids).where(eq(schema.bids.auctionId, auctionId))
+  expect(rows).toHaveLength(0)
+})
+
+test('POST /bid rejects bids on a non-active auction row and on a passed end time', async () => {
+  const inactive = await seedAuction('inactive-row')
+  await db
+    .update(schema.auctions)
+    .set({ status: 'ended' })
+    .where(eq(schema.auctions.id, inactive.auctionId))
+  const inactiveResult = await placeBidRoute(inactive.auctionId, {
+    userId: inactive.bidderId,
+    amount: 150,
+    type: 'open',
+  })
+  expect(inactiveResult.admission.allowed).toBe(false)
+  expect(inactiveResult.admission.status).toBe(400)
+  expect(inactiveResult.admission.error).toBe('Auction is not active')
+
+  const overdue = await seedAuction('overdue-row', { endsAt: '2026-01-01T00:00:00.000Z' })
+  const overdueResult = await placeBidRoute(overdue.auctionId, {
+    userId: overdue.bidderId,
+    amount: 150,
+    type: 'open',
+  })
+  expect(overdueResult.admission.allowed).toBe(false)
+  expect(overdueResult.admission.status).toBe(400)
+  expect(overdueResult.admission.error).toBe('Auction has ended')
+})
+
+test('POST /bid replays a bid written outside the DO that already used the key', async () => {
+  const { auctionId, sellerId, bidderId } = await seedAuction('cross-writer')
+  const legacyBidId = crypto.randomUUID()
+  const timestamp = new Date().toISOString()
+  await db.insert(schema.bids).values({
+    id: legacyBidId,
+    auctionId,
+    userId: sellerId,
+    amountCents: 12_000,
+    type: 'open',
+    source: 'manual',
+    status: 'leading',
+    idempotencyKey: 'legacy-path-key',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+
+  const { admission } = await placeBidRoute(auctionId, {
+    userId: bidderId,
+    amount: 150,
+    type: 'open',
+    idempotencyKey: 'legacy-path-key',
+  })
+  expect(admission.allowed).toBe(true)
+  expect(admission.replayed).toBe(true)
+  expect(admission.bid?.id).toBe(legacyBidId)
+
+  const rows = await db
+    .select()
+    .from(schema.bids)
+    .where(eq(schema.bids.idempotencyKey, 'legacy-path-key'))
+  expect(rows).toHaveLength(1)
+})
+
+test('POST /bid stores a salted hash of the first request IP, never the raw IP', async () => {
+  const { auctionId, bidderId } = await seedAuction('ip-hash')
+
+  const { admission } = await placeBidRoute(auctionId, {
+    userId: bidderId,
+    amount: 150,
+    type: 'open',
+    requestIp: '203.0.113.7, 10.0.0.1',
+  })
+  expect(admission.allowed).toBe(true)
+
+  const row = (
+    await db.select().from(schema.bids).where(eq(schema.bids.id, admission.bid?.id ?? ''))
+  )[0]
+  const salt = process.env.PAYLOAD_SECRET ?? 'dev-ip-hash-salt'
+  expect(row?.ipHash).toBe(await sha256Hex(`${salt}:203.0.113.7`))
+  expect(row?.ipHash).not.toContain('203.0.113.7')
+})
+
+test('under-start bids land as pending_approval and one pending replaces the previous', async () => {
+  const { auctionId, bidderId } = await seedAuction('alapakk')
+  await insertSettings({ alapakkumine: true, requireFrameworkContract: false })
+
+  const first = await placeBidRoute(auctionId, { userId: bidderId, amount: 50, type: 'open' })
+  expect(first.admission.allowed).toBe(true)
+  expect(first.admission.bid?.status).toBe('pending_approval')
+
+  const second = await placeBidRoute(auctionId, { userId: bidderId, amount: 60, type: 'open' })
+  expect(second.admission.allowed).toBe(true)
+  expect(second.admission.bid?.status).toBe('pending_approval')
+
+  const rows = await db.select().from(schema.bids).where(eq(schema.bids.auctionId, auctionId))
+  expect(rows).toHaveLength(2)
+  expect(rows.filter((row) => row.status === 'pending_approval')).toHaveLength(1)
+  expect(rows.filter((row) => row.status === 'rejected')).toHaveLength(1)
+  expect(rows.find((row) => row.status === 'pending_approval')?.id).toBe(second.admission.bid?.id)
+
+  // The pending approval never leads: the hot price stays at the start bid.
+  const state = await readState(await fetchRoute(auctionId, '/state'))
+  expect(state.currentPriceCents).toBe(10_000)
+})
+
+test('the framework contract gate blocks unsigned bidders and passes signed ones', async () => {
+  const { auctionId, bidderId } = await seedAuction('gate')
+  await insertSettings({ requireFrameworkContract: true })
+  const timestamp = new Date().toISOString()
+  await db.insert(schema.contractTemplates).values({
+    id: crypto.randomUUID(),
+    name: 'Raamleping',
+    type: 'framework',
+    version: 'v1',
+    active: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+
+  const blocked = await placeBidRoute(auctionId, {
+    userId: bidderId,
+    amount: 150,
+    type: 'open',
+  })
+  expect(blocked.admission.allowed).toBe(false)
+  expect(blocked.admission.status).toBe(403)
+  expect(blocked.admission.error).toBe('Framework contract required')
+  expect(blocked.admission.code).toBe('framework_contract_required')
+  expect(blocked.admission.redirectUrl).toBe('/contracts/framework')
+  const afterBlock = await db.select().from(schema.bids).where(eq(schema.bids.auctionId, auctionId))
+  expect(afterBlock).toHaveLength(0)
+
+  const templateRow = (
+    await db.select().from(schema.contractTemplates).where(eq(schema.contractTemplates.type, 'framework'))
+  )[0]
+  await db.insert(schema.contracts).values({
+    id: crypto.randomUUID(),
+    templateId: templateRow?.id ?? '',
+    lotId: auctionId,
+    status: 'signed',
+    signedBy: bidderId,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+
+  const allowed = await placeBidRoute(auctionId, {
+    userId: bidderId,
+    amount: 150,
+    type: 'open',
+  })
+  expect(allowed.admission.allowed).toBe(true)
+  expect(allowed.admission.bid?.status).toBe('leading')
 })

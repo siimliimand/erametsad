@@ -1,12 +1,12 @@
-import { defineConfig } from 'vitest/config'
 import path from 'path'
+import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
-    // DO and queue-consumer tests need the workers pool with their own
-    // configs (tasks 3.8 and 6.3 wire the runners); the node pool cannot
-    // resolve cloudflare:test.
+    // DO and queue-consumer tests need the workers pool; the package.json
+    // test chain runs each through its own vitest.config.ts. The node pool
+    // cannot resolve cloudflare:test, so they stay excluded here.
     exclude: ['src/do/**', 'src/workers/**'],
   },
   resolve: {
