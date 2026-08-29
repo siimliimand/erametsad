@@ -358,10 +358,27 @@ function isUniqueViolation(error: unknown): boolean {
 export class AuctionDO extends DurableObject<Env> {
   private state: AuctionState | null
 
+  // WHY: D1 binding calls do not close the DO input gate, so concurrent
+  // fetch() admissions interleave their read-leader/write-bid spans and
+  // every parallel bid can see itself as the first leader (lost demotions,
+  // multiple `leading` rows). This promise queue makes each admission
+  // atomic; only one isolate per object exists at a time, so it is
+  // object-wide mutual exclusion for the read-modify-write chain.
+  private admissionChain: Promise<unknown> = Promise.resolve()
+
   constructor(ctx: DurableObjectState, env: Env) {
     // super wires the alarm dispatch that routes to alarm() below.
     super(ctx, env)
     this.state = null
+  }
+
+  private serialize<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.admissionChain.then(task, task)
+    this.admissionChain = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -427,6 +444,10 @@ export class AuctionDO extends DurableObject<Env> {
    * auction id from the object name; the cron sweep covers the rest.
    */
   async alarm(): Promise<void> {
+    await this.serialize(() => this.alarmTick())
+  }
+
+  private async alarmTick(): Promise<void> {
     const state =
       this.state ?? ((await this.ctx.storage.get<AuctionState>(STATE_KEY)) ?? null)
     if (state) {
@@ -668,17 +689,19 @@ export class AuctionDO extends DurableObject<Env> {
     ) {
       return errorResponse(400, 'source must be manual or autobidder')
     }
-    const result = await this.admitBid({
-      auctionId,
-      userId,
-      amount,
-      type,
-      source: body.source ?? 'manual',
-      ...(body.requestIp !== undefined ? { requestIp: body.requestIp } : {}),
-      ...(body.idempotencyKey !== undefined
-        ? { idempotencyKey: body.idempotencyKey }
-        : {}),
-    })
+    const result = await this.serialize(() =>
+      this.admitBid({
+        auctionId,
+        userId,
+        amount,
+        type,
+        source: body.source ?? 'manual',
+        ...(body.requestIp !== undefined ? { requestIp: body.requestIp } : {}),
+        ...(body.idempotencyKey !== undefined
+          ? { idempotencyKey: body.idempotencyKey }
+          : {}),
+      }),
+    )
     return jsonResponse(result)
   }
 

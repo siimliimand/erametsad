@@ -1,5 +1,5 @@
 import { env, fetchMock, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { expect, test } from 'vitest'
 
@@ -131,6 +131,32 @@ async function insertLeadingBid(
     createdAt,
     updatedAt: createdAt,
   })
+}
+
+/** Extra bidders for burst tests: one user row plus one auction right each. */
+async function addBidders(count: number, sellerId: string): Promise<string[]> {
+  const ids = Array.from({ length: count }, () => crypto.randomUUID())
+  const timestamp = new Date().toISOString()
+  await db.insert(schema.users).values(
+    ids.map((id, index) => ({
+      id,
+      email: `burst-bidder-${String(index)}-${id}@example.com`,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })),
+  )
+  await db.insert(schema.auctionRights).values(
+    ids.map((id) => ({
+      id: crypto.randomUUID(),
+      userId: id,
+      objectType: 'raieoigus' as const,
+      grantedBy: sellerId,
+      grantedAt: timestamp,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })),
+  )
+  return ids
 }
 
 function stubFor(auctionId: string) {
@@ -665,4 +691,252 @@ test('a second alarm fire after the transition is a no-op', async () => {
   expect((await auctionRow(auctionId))?.status).toBe('appraised')
   expect(await auditActions(auctionId)).toHaveLength(2)
   expect(await notificationsFor(sellerId)).toHaveLength(2)
+})
+
+test('ten parallel bids on one auction serialize into one consistent winner sequence', async () => {
+  const { auctionId, sellerId } = await seedAuction('burst')
+  // Step-less auctions admit any amount at or above the current leader, so
+  // equal amounts pass validation in every possible serialization order.
+  const bidders = await addBidders(10, sellerId)
+
+  const results = await Promise.all(
+    bidders.map((userId) => placeBidRoute(auctionId, { userId, amount: 150, type: 'open' })),
+  )
+  for (const { admission } of results) {
+    expect(admission.allowed).toBe(true)
+  }
+
+  const bidRows = await db.select().from(schema.bids).where(eq(schema.bids.auctionId, auctionId))
+  expect(bidRows).toHaveLength(10)
+  expect(bidRows.filter((row) => row.status === 'leading')).toHaveLength(1)
+  expect(bidRows.filter((row) => row.status === 'outbid')).toHaveLength(9)
+  for (const row of bidRows) {
+    expect(row.amountCents).toBe(15_000)
+  }
+
+  const amountById = new Map<string, number>(
+    bidRows.map((row) => [row.id, row.amountCents] as const),
+  )
+  const audits = await db
+    .select()
+    .from(schema.auditEntries)
+    .where(
+      inArray(
+        schema.auditEntries.entityId,
+        bidRows.map((row) => row.id),
+      ),
+    )
+  expect(audits).toHaveLength(10)
+  const parsed = audits.map((row) => ({
+    bidId: row.entityId ?? '',
+    before:
+      row.before === null
+        ? null
+        : (JSON.parse(row.before) as {
+            leadingBidId?: string
+            leadingAmountCents?: number
+          }),
+    after: JSON.parse(row.after ?? '{}') as {
+      auctionId?: string
+      amountCents?: number
+      status?: string
+    },
+  }))
+  const byLeadingRef = new Map<string, (typeof parsed)[number]>()
+  for (const entry of parsed) {
+    expect(entry.after.auctionId).toBe(auctionId)
+    expect(entry.after.status).toBe('leading')
+    expect(entry.after.amountCents).toBe(15_000)
+    const before = entry.before
+    const ref = before?.leadingBidId
+    if (before !== null && ref) {
+      // Contiguous chain: each hop records the demoted leader's real amount.
+      expect(before.leadingAmountCents).toBe(amountById.get(ref))
+      // No bid is demoted twice.
+      expect(byLeadingRef.has(ref)).toBe(false)
+      byLeadingRef.set(ref, entry)
+    }
+  }
+  const heads = parsed.filter((entry) => entry.before === null)
+  expect(heads).toHaveLength(1)
+  const visited: string[] = []
+  let cursor: (typeof parsed)[number] | undefined = heads[0]
+  while (cursor) {
+    visited.push(cursor.bidId)
+    cursor = byLeadingRef.get(cursor.bidId)
+  }
+  expect(visited).toHaveLength(10)
+  expect(new Set(visited).size).toBe(10)
+  expect(visited[9]).toBe(bidRows.find((row) => row.status === 'leading')?.id)
+
+  const state = await readState(await fetchRoute(auctionId, '/state'))
+  expect(state.currentPriceCents).toBe(15_000)
+  expect(state.currentPriceCents).toBe(
+    bidRows.find((row) => row.status === 'leading')?.amountCents,
+  )
+  // Hydration counts as version 1; every accepted bid bumps exactly once.
+  expect(state.version).toBe(11)
+  // Far-future end: no anti-snipe touch, D1 keeps the seeded end time.
+  expect((await auctionRow(auctionId))?.endsAt).toBe('2026-12-31T12:00:00.000Z')
+})
+
+test('the same idempotency key sent twice in one burst admits exactly one bid', async () => {
+  const { auctionId, bidderId } = await seedAuction('idem-burst')
+
+  const [first, second] = await Promise.all([
+    placeBidRoute(auctionId, {
+      userId: bidderId,
+      amount: 150,
+      type: 'open',
+      idempotencyKey: 'burst-same-key',
+    }),
+    placeBidRoute(auctionId, {
+      userId: bidderId,
+      amount: 999,
+      type: 'open',
+      idempotencyKey: 'burst-same-key',
+    }),
+  ])
+
+  expect(first.admission.allowed).toBe(true)
+  expect(second.admission.allowed).toBe(true)
+  expect(second.admission.bid?.id).toBe(first.admission.bid?.id)
+  // Exactly one replay; the replayed answer carries the original amount,
+  // not the second call's 999.
+  expect([first, second].filter((r) => r.admission.replayed === true)).toHaveLength(1)
+  expect(first.admission.bid?.amount).toBe(150)
+  expect(second.admission.bid?.amount).toBe(150)
+
+  const rows = await db
+    .select()
+    .from(schema.bids)
+    .where(eq(schema.bids.idempotencyKey, 'burst-same-key'))
+  expect(rows).toHaveLength(1)
+  expect(rows[0]?.amountCents).toBe(15_000)
+  expect(rows[0]?.id).toBe(first.admission.bid?.id)
+  const audits = await db
+    .select()
+    .from(schema.auditEntries)
+    .where(eq(schema.auditEntries.entityId, rows[0]?.id ?? ''))
+  expect(audits).toHaveLength(1)
+})
+
+test('a bid broadcast reaches two subscribers identically, then only the remaining one', async () => {
+  fetchMock.activate()
+  fetchMock.disableNetConnect()
+  const deliveriesA: string[] = []
+  const deliveriesB: string[] = []
+  for (const [origin, sink] of [
+    ['https://two-sub-a.example', deliveriesA],
+    ['https://two-sub-b.example', deliveriesB],
+  ] as const) {
+    fetchMock
+      .get(origin)
+      .intercept({ path: () => true, method: 'POST' })
+      .reply((options) => {
+        sink.push(typeof options.body === 'string' ? options.body : '')
+        return { statusCode: 200 }
+      })
+      .persist()
+  }
+
+  const { auctionId, bidderId } = await seedAuction('two-subs')
+  await subscribe(auctionId, 'https://two-sub-a.example/callback')
+  await subscribe(auctionId, 'https://two-sub-b.example/callback')
+
+  const first = await placeBidRoute(auctionId, {
+    userId: bidderId,
+    amount: 150,
+    type: 'open',
+  })
+  expect(first.admission.allowed).toBe(true)
+  expect(deliveriesA).toHaveLength(1)
+  expect(deliveriesB).toHaveLength(1)
+  // Identical payload bytes to both subscribers.
+  expect(deliveriesB[0]).toBe(deliveriesA[0])
+  const payload = JSON.parse(deliveriesA[0] ?? '{}') as {
+    type: string
+    auctionId: string
+    data: { amount: number }
+  }
+  expect(payload.type).toBe('bid:created')
+  expect(payload.auctionId).toBe(auctionId)
+  expect(payload.data.amount).toBe(150)
+
+  await fetchRoute(auctionId, '/unsubscribe', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ url: 'https://two-sub-a.example/callback' }),
+  })
+  const second = await placeBidRoute(auctionId, {
+    userId: bidderId,
+    amount: 200,
+    type: 'open',
+  })
+  expect(second.admission.allowed).toBe(true)
+  expect(deliveriesA).toHaveLength(1)
+  expect(deliveriesB).toHaveLength(2)
+  const secondPayload = JSON.parse(deliveriesB[1] ?? '{}') as {
+    type: string
+    data: { amount: number }
+  }
+  expect(secondPayload.type).toBe('bid:created')
+  expect(secondPayload.data.amount).toBe(200)
+})
+
+test('an anti-snipe bid reschedules the near-due alarm and the end transition runs exactly once with a same-tick bid', async () => {
+  const endsAt = new Date(Date.now() + 20_000).toISOString()
+  const { auctionId, bidderId } = await seedAuction('alarm-race', {
+    endsAt,
+    leadingBidCents: 12_000,
+  })
+
+  await fetchRoute(auctionId, '/state')
+  expect(await storedAlarm(auctionId)).toBe(Date.parse(endsAt))
+
+  const { admission } = await placeBidRoute(auctionId, {
+    userId: bidderId,
+    amount: 150,
+    type: 'open',
+  })
+  expect(admission.allowed).toBe(true)
+  expect(admission.extended?.windowMinutes).toBe(5)
+  const extendedMs = Date.parse(admission.extended?.endsAt ?? '')
+  expect(extendedMs).toBe(Date.parse(endsAt) + 5 * 60_000)
+  expect(await storedAlarm(auctionId)).toBe(extendedMs)
+  expect((await auctionRow(auctionId))?.endsAt).toBe(admission.extended?.endsAt)
+
+  // Advance past the extended end the way a non-DO writer sees it: move
+  // the D1 end time into the past and force the hot state to rehydrate.
+  const past = '2026-01-01T00:00:00.000Z'
+  await db
+    .update(schema.auctions)
+    .set({ endsAt: past, updatedAt: past })
+    .where(eq(schema.auctions.id, auctionId))
+  await fetchRoute(auctionId, '/hydrate', { method: 'POST' })
+
+  const [, sameTickBid] = await Promise.all([
+    fireAlarm(auctionId),
+    placeBidRoute(auctionId, { userId: bidderId, amount: 200, type: 'open' }),
+  ])
+  // Whichever order the DO serializes them in, the late bid is denied and
+  // the auction transitions exactly once.
+  expect(sameTickBid.admission.allowed).toBe(false)
+
+  const row = await auctionRow(auctionId)
+  expect(row?.status).toBe('appraised')
+  expect(row?.winningBid).toBe(admission.bid?.id)
+  expect((await auditActions(auctionId)).sort()).toEqual([
+    'auction_ended',
+    'auction_outcome_computed',
+  ])
+  const bidRows = await db.select().from(schema.bids).where(eq(schema.bids.auctionId, auctionId))
+  expect(bidRows).toHaveLength(2)
+
+  await fireAlarm(auctionId)
+  expect((await auctionRow(auctionId))?.status).toBe('appraised')
+  expect((await auditActions(auctionId)).sort()).toEqual([
+    'auction_ended',
+    'auction_outcome_computed',
+  ])
 })
