@@ -14,6 +14,7 @@ import {
 import { LiveListing } from './_components/LiveListing'
 import {
   buildActiveSummary,
+  sumStats,
   type ActiveListingStats,
   type ListingTabId,
 } from './_lib/summary'
@@ -53,16 +54,8 @@ function rawPage(raw: string | string[] | undefined): number {
 }
 
 function statsForTab(tab: ListingTabId, stats: Awaited<ReturnType<typeof activeStatsByObjectType>>): ActiveListingStats {
-  const { objectTypes } = listingTabDef(tab)
-  const merged: ActiveListingStats = { count: 0, areaHa: 0, volumeM3: 0, minBidEur: 0 }
-  for (const objectType of objectTypes) {
-    const bucket = stats[objectType]
-    merged.count += bucket.count
-    merged.areaHa += bucket.areaHa
-    merged.volumeM3 += bucket.volumeM3
-    merged.minBidEur += bucket.minBidEur
-  }
-  return merged
+  const tabDef = listingTabDef(tab)
+  return sumStats(tabDef.allTypes ? 'all' : tabDef.objectTypes, stats)
 }
 
 /** Tab objectTypes + active filters; shared by listAuctions, the map query and LiveListing. */
@@ -184,7 +177,7 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
   const repos = await getRepositories()
   const tabDef = listingTabDef(tab)
   const listingQuery = buildTabQuery(tab, page, params)
-  const hasTypes = tabDef.objectTypes.length > 0
+  const hasTypes = tabDef.allTypes || tabDef.objectTypes.length > 0
 
   const [typeStats, result, mapPoints] = await Promise.all([
     activeStatsByObjectType(repos),
@@ -242,8 +235,9 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
         ) : result.auctions.length === 0 ? (
           <div className="rounded-card border border-border bg-white p-lg text-center">
             <p className="font-body text-body text-inkMuted">
-              Hetkel ei ole käimasolevaid {tabDef.label.toLowerCase()} oksjoneid. Telli
-              teavitus, et uutest oksjonidest teada saada.
+              {tabDef.allTypes
+                ? 'Hetkel ei ole käimasolevaid oksjoneid. Telli teavitus, et uutest oksjonidest teada saada.'
+                : `Hetkel ei ole käimasolevaid ${tabDef.label.toLowerCase()} oksjoneid. Telli teavitus, et uutest oksjonidest teada saada.`}
             </p>
           </div>
         ) : (
