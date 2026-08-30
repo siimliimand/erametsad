@@ -27,4 +27,12 @@ describe('ListingFilters subscription entry', () => {
     // The dialog mounts closed: no modal content leaks into the panel.
     expect(html).not.toContain('Salvestame teie aktiivsed filtrid')
   })
+
+  it('collapses the panel by default and keeps no inline sort select', () => {
+    const html = render('mets')
+    // Sort options moved to ListingResultsBar; the panel only toggles via Filtrid.
+    expect(html).not.toContain('Sorteeri')
+    expect(html).toContain('aria-expanded="false"')
+    expect(html).toContain('aria-controls=')
+  })
 })

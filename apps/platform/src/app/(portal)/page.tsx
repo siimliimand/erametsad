@@ -183,7 +183,7 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
 
           <p className="font-body text-body text-inkMuted">{summary}</p>
 
-          <ListingMap lots={mapPoints} className="h-96" />
+          <ListingMap lots={mapPoints} />
 
           <ListingResultsBar tab={tab} total={result.total} />
 
