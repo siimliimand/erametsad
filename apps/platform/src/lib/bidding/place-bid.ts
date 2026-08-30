@@ -5,6 +5,13 @@
 import { createHash } from 'node:crypto'
 
 import { isAlapakkumineEnabled } from './alapakkumine'
+import {
+  buildSealedIdentitySnapshot,
+  countUserSealedBids,
+  resolveSealedRevisionCap,
+  sealedRevisionCapMessage,
+  sealedStorageAmountCents,
+} from './sealed-admission'
 import type { CoreRepositories } from '../data/repositories'
 import { centsToEuros, eurosToCents } from '../data/repositories/money'
 import type { RepositorySlug } from '../data/repositories/registry'
@@ -33,7 +40,7 @@ export interface BidError {
   success: false
   error: string
   status: number
-  code?: 'framework_contract_required'
+  code?: 'framework_contract_required' | 'revision_cap_exceeded'
   redirectUrl?: string
 }
 
@@ -240,8 +247,32 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
       }
     }
 
+    // 8.5 Sealed revision budget (D2): 1 initial bid + N revisions from
+    //     Settings, counted after the idempotency replay so a retried
+    //     final bid still replays instead of tripping the cap. Open bids
+    //     are unaffected.
+    if (type === 'sealed') {
+      const revisionCap = resolveSealedRevisionCap(settings)
+      const sealedCount = await countUserSealedBids(repos, auctionId, userId)
+      if (sealedCount >= revisionCap + 1) {
+        return {
+          success: false,
+          error: sealedRevisionCapMessage(revisionCap),
+          status: 400,
+          code: 'revision_cap_exceeded',
+        }
+      }
+    }
+
     // 9. Writes. An under-start bid lands as pending_approval and never
     //    touches the current leader until the seller approves it.
+    //    Sealed rows store no readable amount: amount_cents 0 at rest,
+    //    the real amount and the snapshot inside the encrypted envelope.
+    const storageAmountCents = sealedStorageAmountCents(type, eurosToCents(amount))
+    const sealedPayload =
+      type === 'sealed'
+        ? await buildSealedIdentitySnapshot(amount, params.identitySnapshot)
+        : undefined
     if (isUnderStartBid) {
       // One pending under-start bid at a time: reject the previous one.
       const oldPending = await findDoc(repos, 'bids', {
@@ -254,13 +285,13 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
         {
           auctionId,
           userId,
-          amount,
+          amountCents: storageAmountCents,
           type,
           source,
           status: 'pending_approval',
           ipHash,
           idempotencyKey,
-          identitySnapshot: params.identitySnapshot,
+          identitySnapshot: sealedPayload,
         },
         now,
       )
@@ -286,13 +317,13 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
         {
           auctionId,
           userId,
-          amount,
+          amountCents: storageAmountCents,
           type,
           source,
           status: 'pending_approval',
           ipHash,
           idempotencyKey,
-          identitySnapshot: params.identitySnapshot,
+          identitySnapshot: sealedPayload,
         },
         insertResult.results[0],
         pendingInsert,
@@ -317,13 +348,13 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
       {
         auctionId,
         userId,
-        amount,
+        amountCents: storageAmountCents,
         type,
         source,
         status: 'leading',
         ipHash,
         idempotencyKey,
-        identitySnapshot: params.identitySnapshot,
+        identitySnapshot: sealedPayload,
       },
       now,
     )
@@ -348,13 +379,13 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
       {
         auctionId,
         userId,
-        amount,
+        amountCents: storageAmountCents,
         type,
         source,
         status: 'leading',
         ipHash,
         idempotencyKey,
-        identitySnapshot: params.identitySnapshot,
+        identitySnapshot: sealedPayload,
       },
       insertResult.results[0],
       leadingInsert,
@@ -415,7 +446,8 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
 interface InsertBidInput {
   auctionId: string
   userId: string
-  amount: number
+  /** Storage cents; sealed rows carry 0 (the amount lives in the envelope). */
+  amountCents: number
   type: 'open' | 'sealed'
   source: 'manual' | 'autobidder'
   status: 'leading' | 'pending_approval'
@@ -432,17 +464,18 @@ interface InsertedBidRow {
 
 function insertBidStatement(input: InsertBidInput, now: string): SqlStatement {
   return {
-    sql: `insert into bids (id, auction_id, user_id, amount_cents, type, source, status, ip_hash, idempotency_key, created_at, updated_at)
-      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    sql: `insert into bids (id, auction_id, user_id, amount_cents, type, source, status, identity_snapshot, ip_hash, idempotency_key, created_at, updated_at)
+      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       returning id, created_at, updated_at`,
     params: [
       crypto.randomUUID(),
       input.auctionId,
       input.userId,
-      eurosToCents(input.amount),
+      input.amountCents,
       input.type,
       input.source,
       input.status,
+      input.identitySnapshot ?? null,
       input.ipHash ?? null,
       input.idempotencyKey ?? null,
       now,
@@ -461,14 +494,15 @@ function mapInsertedBid(
   const params = statement.params ?? []
   row ??= {
     id: String(params[0]),
-    created_at: String(params[9]),
-    updated_at: String(params[10]),
+    created_at: String(params[10]),
+    updated_at: String(params[11]),
   }
   return {
     id: row.id,
     auction: input.auctionId,
     user: input.userId,
-    amount: input.amount,
+    // Mirrors the stored row: sealed bids read back as amount 0.
+    amount: centsToEuros(input.amountCents),
     type: input.type,
     source: input.source,
     status: input.status,
@@ -476,8 +510,7 @@ function mapInsertedBid(
     ...(input.idempotencyKey !== undefined
       ? { idempotencyKey: input.idempotencyKey }
       : {}),
-    // Threaded for the later persistence wave (encryption + column write);
-    // the insert statement deliberately stays untouched for now.
+    // Sealed bids carry the ciphertext envelope; open bids never persist it.
     ...(input.identitySnapshot !== undefined
       ? { identitySnapshot: input.identitySnapshot }
       : {}),
