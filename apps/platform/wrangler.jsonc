@@ -20,6 +20,11 @@
   "r2_buckets": [
     { "binding": "BUCKET", "bucket_name": "eametsad-media", "preview_bucket_name": "eametsad-media-preview" }
   ],
+  // Email Sending beta (task 4.2): sending subdomain erametsad.ww0.dev is
+  // onboarded on zone ww0.dev, which permits any local part and any
+  // recipient, so no destination_address restriction applies here.
+  // remote = true keeps `wrangler dev` on the real Email Service.
+  "send_email": [{ "name": "EMAIL", "remote": true }],
   // No script_name: both classes are exported by this same Worker (the shim).
   "durable_objects": {
     "bindings": [
@@ -69,7 +74,7 @@
     {
       "binding": "DB",
       "database_name": "eametsad-db",
-      "database_id": "REPLACE-WITH-REAL-D1-DATABASE-ID",
+      "database_id": "6ffb35ca-6a2d-4447-9559-4dbc00b9a6c8",
       "migrations_dir": "drizzle"
     }
   ],

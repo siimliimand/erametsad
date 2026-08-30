@@ -186,3 +186,97 @@ email endpoints after onboarding.
    `erametsad` subdomain on zone `8761a52640daef70b6cf6f14d38e6dd9`, check
    SPF and DKIM with `dig`, send one test email to `siim.liimand@gmail.com`,
    and record the daily quota.
+
+## Task 4.2 completion
+
+Date: 2026-08-30. Operator: fullstack-engineer (build wave). The account
+blockers are cleared: the token holds D1, Email Sending, Email Routing, DNS,
+Queues, R2, and Workers permissions, and the account runs Workers Paid.
+All calls below used `CLOUDFLARE_API_TOKEN` from the repo root `.env`. The
+token value was not printed.
+
+### Subdomain onboarding
+
+`POST /zones/8761a52640daef70b6cf6f14d38e6dd9/email/sending/subdomains`
+with body `{"name": "erametsad"}` failed, HTTP 422, code 2007: `Invalid
+Input: subdomain must be within zone ww0.dev`. The `name` field must be the
+full subdomain, as the existing `support.tabspace.ww0.dev` entry implies.
+The retry with `{"name": "erametsad.ww0.dev"}` succeeded, HTTP 200:
+
+| Field               | Value                              |
+| ------------------ | ---------------------------------- |
+| id                 | `4d1f904b55bd41ab85a699ed2b35c9ce` |
+| name               | `erametsad.ww0.dev`                |
+| enabled            | `true`                             |
+| preview_enabled    | `true`                             |
+| return_path_domain | `cf-bounce.erametsad.ww0.dev`      |
+| dkim_selector      | `cf-bounce`                        |
+
+The zone now holds two sending subdomains, so no further onboarding is
+allowed under the task rules.
+
+### DNS records
+
+Onboarding created all records by itself, read back through
+`GET /zones/8761a52640daef70b6cf6f14d38e6dd9/dns_records`. No record was
+created by hand.
+
+| Type | Name                                | Value                                    |
+| ---- | ----------------------------------- | ---------------------------------------- |
+| MX   | `cf-bounce.erametsad.ww0.dev`       | `route1.mx.cloudflare.net` (and 2, 3)    |
+| TXT  | `cf-bounce.erametsad.ww0.dev`       | `v=spf1 include:_spf.mx.cloudflare.net ~all` |
+| TXT  | `cf-bounce._domainkey.erametsad.ww0.dev` | `v=DKIM1; h=sha256; k=rsa; p=...` (selector `cf-bounce`) |
+| TXT  | `_dmarc.erametsad.ww0.dev`          | `v=DMARC1; p=reject;`                    |
+
+### Sender status
+
+Subdomain sending needs no per-sender registration. The beta docs state
+that after domain onboarding you can send to any recipient immediately, and
+the send request below accepted `noreply@erametsad.ww0.dev` without a
+sender step. Any local part on the onboarded subdomain works.
+
+### Test send
+
+One test email to `siim.liimand@gmail.com` through
+`POST /accounts/29f50b2c797dc5cd6ccd0cff405adb43/email/sending/send`,
+from `noreply@erametsad.ww0.dev`. HTTP 200, `success: true`:
+
+- message_id: `<oRN2hrkTWhQQzBrLQDO4dhdxVXzeUwwTMjpu@erametsad.ww0.dev>`
+- delivered: none
+- queued: none
+- permanent_bounces: `siim.liimand@gmail.com`
+
+The API accepted the send, so entitlement, the zone, and the sender address
+all passed. The recipient address bounced permanently during the
+synchronous delivery attempt. The suppression list
+(`GET .../email/sending/suppressions`) is empty, so suppression is not the
+cause. The API response carries no upstream SMTP reason, and
+`GET .../email/sending/messages` returns 404 code 10001 with this token, so
+the bounce reason is not readable from the API. Likely cause: Gmail
+rejected the first send from a subdomain onboarded minutes earlier. The
+one-email budget was spent, so no retry ran. Next step for the lead: read
+the bounce detail in the dashboard email log (preview keeps sent messages
+about seven days), then send one retry after the domain reputation settles.
+
+### Quota
+
+`GET /accounts/29f50b2c797dc5cd6ccd0cff405adb43/email/sending/quota`
+returns 404, code 10001 `Unable to authenticate request`. The same holds
+for `GET .../email/sending/status`. So the current daily quota is not
+exposed to this token. The limits page publishes no number either: new
+accounts start at a conservative daily quota that grows with sending
+behavior and account standing. The pricing page keeps the 3,000 emails per
+account per month baseline recorded above in "Beta terms".
+
+### Wrangler binding
+
+`apps/platform/wrangler.jsonc` gained a `send_email` section:
+
+```jsonc
+"send_email": [{ "name": "EMAIL", "remote": true }]
+```
+
+No `destination_address` is set, because the onboarded subdomain allows any
+recipient. Validation: `pnpm exec wrangler deploy --dry-run` passes and
+lists `env.EMAIL (unrestricted)` next to all existing bindings. `pnpm
+typecheck` passes.
