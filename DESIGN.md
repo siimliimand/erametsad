@@ -89,7 +89,7 @@ hero-overlay: "linear-gradient(90deg, rgba(22,56,42,.85), rgba(22,56,42,.35))"
 
 # Eametsad design system
 
-Eametsad is an Estonian forest-transaction platform: a marketing site, an auction portal, and an admin backend. The design uses the Estonian forest as its visual anchor. The look is calm, genuine, and trustworthy. Nothing is hidden. Fees are stated upfront. Consent checkboxes are visible and unchecked.
+Eametsad is an Estonian forest-transaction platform: a marketing site, an auction portal, and an admin backend. The backend runs on Cloudflare Workers (via OpenNext) with Cloudflare D1 for storage and Durable Objects for bid serialization. The design uses the Estonian forest as its visual anchor. The look is calm, genuine, and trustworthy. Nothing is hidden. Fees are stated upfront. Consent checkboxes are visible and unchecked.
 
 ## Design principles
 
@@ -157,4 +157,4 @@ Lucide React provides the icon set. Key icons map to product concepts: `TreePine
 
 The voice in Estonian follows four traits: clear (short sentences, no jargon), honest (fees upfront, no hidden conditions), matter-of-fact (friendly but not chatty), and human (real names, real phone numbers, the tone of a trusted forester).
 
-<!-- Last updated: 2026-08-27 -->
+<!-- Last updated: 2026-08-30 -->
