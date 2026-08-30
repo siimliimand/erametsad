@@ -7,6 +7,11 @@
   // (node:crypto). The codec is never invoked for auctions/bids reads, but
   // the import must resolve inside workerd.
   "compatibility_flags": ["nodejs_compat"],
+  // process.env inside workerd never sees wrangler vars, so tests that
+  // need SEALED_BID_ENCRYPTION_KEY must set it on their side instead.
+  "vars": {
+    "SEALED_BID_ENCRYPTION_KEY": "test-encryption-key-32chars!!"
+  },
   "durable_objects": {
     "bindings": [
       {

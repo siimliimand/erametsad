@@ -33,7 +33,7 @@ interface AuctionDOAdmission {
   bid?: Record<string, unknown>
   error?: string
   status?: number
-  code?: 'framework_contract_required'
+  code?: 'framework_contract_required' | 'revision_cap_exceeded'
   redirectUrl?: string
   replayed?: boolean
   previousLeading?: { userId: string; amount: number } | null
@@ -310,7 +310,12 @@ export async function POST(request: NextRequest) {
         )
       }
       return NextResponse.json(
-        { error: admission.error ?? 'Bid rejected' },
+        {
+          error: admission.error ?? 'Bid rejected',
+          // Coded rejections (revision_cap_exceeded) must reach the client
+          // so the panel can lock revisions; uncoded ones stay code-free.
+          ...(admission.code !== undefined ? { code: admission.code } : {}),
+        },
         { status: admission.status ?? 400 },
       )
     }
@@ -354,7 +359,13 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       )
     }
-    return NextResponse.json({ error: result.error }, { status: result.status })
+    return NextResponse.json(
+      {
+        error: result.error,
+        ...(result.code !== undefined ? { code: result.code } : {}),
+      },
+      { status: result.status },
+    )
   }
 
   const bid = result.bid
