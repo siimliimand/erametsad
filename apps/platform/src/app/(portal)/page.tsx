@@ -2,6 +2,7 @@ import { LotCard, type LotCardProps } from '@eametsad/ui'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
+import { ListingFilters } from './_components/ListingFilters'
 import {
   LISTING_TAB_IDS,
   ListingTabs,
@@ -71,7 +72,7 @@ async function loadTabListings(
   const search = new URLSearchParams()
   search.set('objectType', objectTypes.join(','))
   search.set('auctionStatus', 'active')
-  for (const key of ['county', 'parish', 'species', 'loggingType']) {
+  for (const key of ['county', 'parish', 'species', 'loggingType', 'sort', 'order']) {
     const value = params[key]
     if (value === undefined) continue
     for (const entry of Array.isArray(value) ? value : [value]) search.append(key, entry)
@@ -190,6 +191,8 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
       <ListingTabs activeTab={tab} counts={counts} params={params} />
 
       <p className="font-body text-body text-inkMuted">{summary}</p>
+
+      <ListingFilters tab={tab} />
 
       {result.auctions.length === 0 ? (
         <div className="rounded-card border border-border bg-white p-lg text-center">
