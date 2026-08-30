@@ -18,6 +18,7 @@ import {
   type ListingSortDirection,
   type ListingSortField,
 } from '../_lib/filter-params'
+import { SPECIES } from '../_lib/species'
 
 interface CountyParish {
   id: string
@@ -49,17 +50,12 @@ function parseCounties(value: unknown): CountyOption[] {
   return value.filter(isCountyOption)
 }
 
-// Values mirror what parseAuctionSearchParams matches: county and parish
-// tokens are compared against the reference data names, species codes
-// against the mänd/kuusk/... name table, logging codes against stored codes.
-const SPECIES_OPTIONS = [
-  { value: 'ma', label: 'Mänd (MA)' },
-  { value: 'ku', label: 'Kuusk (KU)' },
-  { value: 'ks', label: 'Kask (KS)' },
-  { value: 'ha', label: 'Haab (HA)' },
-  { value: 'sa', label: 'Sanglepp (SA)' },
-  { value: 'ta', label: 'Tamm (TA)' },
-] as const
+// Chips keep the "Name (CODE)" format; the plain names live in the
+// shared species table for reuse by the lot card.
+const SPECIES_CHIP_OPTIONS = SPECIES.map((species) => ({
+  value: species.value,
+  label: `${species.name} (${species.code})`,
+}))
 
 // No label taxonomy exists in the repo; seed data stores bare codes.
 const LOGGING_TYPE_OPTIONS = [
@@ -252,7 +248,7 @@ export function ListingFilters({ tab }: { tab: string }) {
 
           <FilterSection label="Puuliik">
             <FilterChips
-              options={SPECIES_OPTIONS}
+              options={SPECIES_CHIP_OPTIONS}
               selected={state.species}
               onToggle={(value) => { update({ species: toggleToken(state.species, value) }); }}
             />
