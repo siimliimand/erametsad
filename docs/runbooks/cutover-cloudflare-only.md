@@ -99,6 +99,16 @@ From the Cloudflare dashboard → Workers → `eametsad-api` → Settings → Do
 
 Workers custom domains provision TLS automatically. Alternatively, add routes in `wrangler.jsonc`.
 
+### Portal hostname routing
+
+The `oksjonid.erametsad.ww0.dev` custom domain serves the `(portal)` route group. The host-aware middleware in `apps/platform/src/middleware.ts` does the mapping (change `fix-phase-3-auction-portal`, design D7).
+
+Before you send traffic to the portal hostname, deploy the app with this middleware. The middleware redirects portal routes and app routes to their mapped host. Redirects use HTTP 308, which keeps path and query.
+
+Session cookies are host-only. No `domain:` attribute is set in `src/lib/auth/session.ts`, so each hostname keeps an independent session.
+
+The `api.` and `admin.` hostnames attach to this same Worker. The middleware no-ops on them today. Mapping them to their own areas is a documented follow-up, not part of this change.
+
 ### Email DNS
 
 Onboarding the `erametsad` sending subdomain on `ww0.dev` creates SPF, DKIM (`cf-bounce.erametsad.ww0.dev`), and DMARC (`_dmarc.erametsad.ww0.dev`) records automatically. Verify with `dig` after onboarding. Prototype sender: `noreply@erametsad.ww0.dev`.
