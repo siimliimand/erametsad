@@ -4,11 +4,15 @@ import { describe, expect, it } from 'vitest'
 
 import {
   SealedIdentityForm,
+  identityAddressErrorMessage,
   identityCodeErrorMessage,
   identityCodeLabel,
+  identityEmailErrorMessage,
   identityNameErrorMessage,
   identityNameLabel,
+  identityPhoneErrorMessage,
   sealedIdentitySnapshot,
+  validateEmail,
   validateIdentityCode,
   validateIsikukood,
   validateRegistrikood,
@@ -77,6 +81,22 @@ describe('validateIdentityCode dispatch', () => {
   })
 })
 
+describe('validateEmail', () => {
+  it('accepts plain addresses', () => {
+    expect(validateEmail('mari@naide.ee')).toBe(true)
+    expect(validateEmail('info@mets-ou.ee')).toBe(true)
+  })
+
+  it('rejects shapes without local part, @, or domain', () => {
+    expect(validateEmail('')).toBe(false)
+    expect(validateEmail('mari')).toBe(false)
+    expect(validateEmail('mari@')).toBe(false)
+    expect(validateEmail('@naide.ee')).toBe(false)
+    expect(validateEmail('mari@naide')).toBe(false)
+    expect(validateEmail('mari naide@naide.ee')).toBe(false) // space
+  })
+})
+
 describe('Estonian labels and messages', () => {
   it('labels the code field per profile type', () => {
     expect(identityCodeLabel('private')).toBe('Isikukood')
@@ -104,43 +124,87 @@ describe('Estonian labels and messages', () => {
     expect(identityNameErrorMessage('private')).toBe('Sisesta oma nimi.')
     expect(identityNameErrorMessage('company')).toBe('Sisesta ettevõtte nimi.')
   })
+
+  it('gives contact-field messages', () => {
+    expect(identityAddressErrorMessage()).toBe('Sisesta oma aadress.')
+    expect(identityEmailErrorMessage()).toBe('Sisesta korrektne e-posti aadress.')
+    expect(identityPhoneErrorMessage()).toBe('Sisesta oma telefoni number.')
+  })
 })
 
 describe('sealedIdentitySnapshot', () => {
-  it('stores the isikukood key for private bidders', () => {
+  it('stores all five fields with the isikukood key for private bidders', () => {
     const snapshot = JSON.parse(
       sealedIdentitySnapshot('private', {
         name: 'Mari Maasikas',
         code: VALID_ISIKUKOOD,
+        address: 'Metsa tee 1, Tartu',
+        email: 'mari@naide.ee',
+        phone: '+372 5555 0100',
       }),
     ) as Record<string, unknown>
-    expect(snapshot).toEqual({ name: 'Mari Maasikas', isikukood: VALID_ISIKUKOOD })
+    expect(snapshot).toEqual({
+      name: 'Mari Maasikas',
+      isikukood: VALID_ISIKUKOOD,
+      aadress: 'Metsa tee 1, Tartu',
+      email: 'mari@naide.ee',
+      telefon: '+372 5555 0100',
+    })
   })
 
-  it('stores the registrikood key for companies', () => {
+  it('stores all five fields with the registrikood key for companies', () => {
     const snapshot = JSON.parse(
-      sealedIdentitySnapshot('company', { name: 'Mets OÜ', code: '12345678' }),
+      sealedIdentitySnapshot('company', {
+        name: 'Mets OÜ',
+        code: '12345678',
+        address: 'Metsa tee 2, Tartu',
+        email: 'info@metsou.ee',
+        phone: '+372 5555 0200',
+      }),
     ) as Record<string, unknown>
-    expect(snapshot).toEqual({ name: 'Mets OÜ', registrikood: '12345678' })
+    expect(snapshot).toEqual({
+      name: 'Mets OÜ',
+      registrikood: '12345678',
+      aadress: 'Metsa tee 2, Tartu',
+      email: 'info@metsou.ee',
+      telefon: '+372 5555 0200',
+    })
   })
 })
 
 describe('SealedIdentityForm markup', () => {
-  const noErrors: SealedIdentityErrors = { name: null, code: null }
+  const noErrors: SealedIdentityErrors = {
+    name: null,
+    code: null,
+    address: null,
+    email: null,
+    phone: null,
+  }
 
   it('renders private labels and no alerts when there are no errors', () => {
     const html = renderToString(
       createElement(SealedIdentityForm, {
         profileType: 'private',
-        values: { name: 'Mari Maasikas', code: VALID_ISIKUKOOD },
+        values: {
+          name: 'Mari Maasikas',
+          code: VALID_ISIKUKOOD,
+          address: 'Metsa tee 1, Tartu',
+          email: 'mari@naide.ee',
+          phone: '+372 5555 0100',
+        },
         onChange: () => undefined,
         errors: noErrors,
       }),
     )
     expect(html).toContain('Nimi')
     expect(html).toContain('Isikukood')
+    expect(html).toContain('Aadress')
+    expect(html).toContain('E-post')
+    expect(html).toContain('Telefon')
     expect(html).toContain('Mari Maasikas')
     expect(html).toContain(VALID_ISIKUKOOD)
+    expect(html).toContain('mari@naide.ee')
+    expect(html).toContain('+372 5555 0100')
     expect(html).toContain('aria-invalid="false"')
     expect(html).not.toContain('role="alert"')
     expect(html).not.toContain('disabled=""')
@@ -150,9 +214,15 @@ describe('SealedIdentityForm markup', () => {
     const html = renderToString(
       createElement(SealedIdentityForm, {
         profileType: 'private',
-        values: { name: 'Mari Maasikas', code: BAD_CHECKSUM },
+        values: {
+          name: 'Mari Maasikas',
+          code: BAD_CHECKSUM,
+          address: 'Metsa tee 1, Tartu',
+          email: 'mari@naide.ee',
+          phone: '+372 5555 0100',
+        },
         onChange: () => undefined,
-        errors: { name: null, code: identityCodeErrorMessage('private') },
+        errors: { ...noErrors, code: identityCodeErrorMessage('private') },
       }),
     )
     expect(html).toContain('role="alert"')
@@ -164,19 +234,56 @@ describe('SealedIdentityForm markup', () => {
     const html = renderToString(
       createElement(SealedIdentityForm, {
         profileType: 'private',
-        values: { name: '', code: VALID_ISIKUKOOD },
+        values: {
+          name: '',
+          code: VALID_ISIKUKOOD,
+          address: 'Metsa tee 1, Tartu',
+          email: 'mari@naide.ee',
+          phone: '+372 5555 0100',
+        },
         onChange: () => undefined,
-        errors: { name: identityNameErrorMessage('private'), code: null },
+        errors: { ...noErrors, name: identityNameErrorMessage('private') },
       }),
     )
     expect(html).toContain('Sisesta oma nimi.')
+  })
+
+  it('shows the contact-field errors for missing or invalid values', () => {
+    const html = renderToString(
+      createElement(SealedIdentityForm, {
+        profileType: 'private',
+        values: {
+          name: 'Mari Maasikas',
+          code: VALID_ISIKUKOOD,
+          address: '',
+          email: 'pole-email',
+          phone: '',
+        },
+        onChange: () => undefined,
+        errors: {
+          ...noErrors,
+          address: identityAddressErrorMessage(),
+          email: identityEmailErrorMessage(),
+          phone: identityPhoneErrorMessage(),
+        },
+      }),
+    )
+    expect(html).toContain('Sisesta oma aadress.')
+    expect(html).toContain('Sisesta korrektne e-posti aadress.')
+    expect(html).toContain('Sisesta oma telefoni number.')
   })
 
   it('renders company labels for the company profile', () => {
     const html = renderToString(
       createElement(SealedIdentityForm, {
         profileType: 'company',
-        values: { name: 'Mets OÜ', code: '12345678' },
+        values: {
+          name: 'Mets OÜ',
+          code: '12345678',
+          address: 'Metsa tee 2, Tartu',
+          email: 'info@metsou.ee',
+          phone: '+372 5555 0200',
+        },
         onChange: () => undefined,
         errors: noErrors,
       }),
@@ -190,24 +297,37 @@ describe('SealedIdentityForm markup', () => {
     const html = renderToString(
       createElement(SealedIdentityForm, {
         profileType: 'company',
-        values: { name: 'Mets OÜ', code: '123' },
+        values: {
+          name: 'Mets OÜ',
+          code: '123',
+          address: 'Metsa tee 2, Tartu',
+          email: 'info@metsou.ee',
+          phone: '+372 5555 0200',
+        },
         onChange: () => undefined,
-        errors: { name: null, code: identityCodeErrorMessage('company') },
+        errors: { ...noErrors, code: identityCodeErrorMessage('company') },
       }),
     )
     expect(html).toContain('Registrikood peab koosnema 8 numbrist.')
   })
 
-  it('disables both inputs when disabled', () => {
+  it('disables all inputs when disabled', () => {
     const html = renderToString(
       createElement(SealedIdentityForm, {
         profileType: 'private',
-        values: { name: 'Mari Maasikas', code: VALID_ISIKUKOOD },
+        values: {
+          name: 'Mari Maasikas',
+          code: VALID_ISIKUKOOD,
+          address: 'Metsa tee 1, Tartu',
+          email: 'mari@naide.ee',
+          phone: '+372 5555 0100',
+        },
         onChange: () => undefined,
         errors: noErrors,
         disabled: true,
       }),
     )
     expect(html).toContain('disabled=""')
+    expect(html.match(/disabled=""/g)).toHaveLength(5)
   })
 })

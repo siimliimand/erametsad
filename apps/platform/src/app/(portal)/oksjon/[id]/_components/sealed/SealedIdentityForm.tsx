@@ -2,8 +2,8 @@
 
 // Identity snapshot form for the sealed-bid panel. The fields mirror the
 // identity snapshot the sealed admission stores next to the encrypted
-// amount: the bidder's name plus isikukood (private) or registrikood
-// (company). Validation runs client-side so an invalid code blocks
+// amount: name, isikukood (private) or registrikood (company), address,
+// email, and phone. Validation runs client-side so an invalid code blocks
 // submission before any API call; the API stays the final arbiter.
 
 export type SealedProfileType = 'private' | 'company'
@@ -11,11 +11,17 @@ export type SealedProfileType = 'private' | 'company'
 export interface SealedIdentityValues {
   name: string
   code: string
+  address: string
+  email: string
+  phone: string
 }
 
 export interface SealedIdentityErrors {
   name: string | null
   code: string | null
+  address: string | null
+  email: string | null
+  phone: string | null
 }
 
 // Estonian personal code: 11 digits, first digit 1-8 (sex/century), and a
@@ -44,6 +50,10 @@ export function validateIsikukood(value: string): boolean {
 
 export function validateRegistrikood(value: string): boolean {
   return /^\d{8}$/.test(value)
+}
+
+export function validateEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
 export function validateIdentityCode(
@@ -75,15 +85,32 @@ export function identityNameErrorMessage(profileType: SealedProfileType): string
     : 'Sisesta oma nimi.'
 }
 
+export function identityAddressErrorMessage(): string {
+  return 'Sisesta oma aadress.'
+}
+
+export function identityEmailErrorMessage(): string {
+  return 'Sisesta korrektne e-posti aadress.'
+}
+
+export function identityPhoneErrorMessage(): string {
+  return 'Sisesta oma telefoni number.'
+}
+
 /** JSON payload stored as the bid's identity snapshot string. */
 export function sealedIdentitySnapshot(
   profileType: SealedProfileType,
   values: SealedIdentityValues,
 ): string {
+  const shared = {
+    aadress: values.address,
+    email: values.email,
+    telefon: values.phone,
+  }
   return JSON.stringify(
     profileType === 'company'
-      ? { name: values.name, registrikood: values.code }
-      : { name: values.name, isikukood: values.code },
+      ? { name: values.name, registrikood: values.code, ...shared }
+      : { name: values.name, isikukood: values.code, ...shared },
   )
 }
 
@@ -151,6 +178,75 @@ export function SealedIdentityForm({
         {errors.code !== null && (
           <p role="alert" className="mt-2xs text-bodySm text-danger">
             {errors.code}
+          </p>
+        )}
+      </div>
+      <div>
+        <label htmlFor="sealed-identity-address" className="text-label font-semibold text-ink">
+          Aadress
+        </label>
+        <input
+          id="sealed-identity-address"
+          name="identityAddress"
+          type="text"
+          autoComplete="street-address"
+          value={values.address}
+          disabled={disabled}
+          onChange={(event) => {
+            onChange({ ...values, address: event.target.value })
+          }}
+          aria-invalid={errors.address !== null}
+          className={inputClasses}
+        />
+        {errors.address !== null && (
+          <p role="alert" className="mt-2xs text-bodySm text-danger">
+            {errors.address}
+          </p>
+        )}
+      </div>
+      <div>
+        <label htmlFor="sealed-identity-email" className="text-label font-semibold text-ink">
+          E-post
+        </label>
+        <input
+          id="sealed-identity-email"
+          name="identityEmail"
+          type="email"
+          autoComplete="email"
+          value={values.email}
+          disabled={disabled}
+          onChange={(event) => {
+            onChange({ ...values, email: event.target.value })
+          }}
+          aria-invalid={errors.email !== null}
+          className={inputClasses}
+        />
+        {errors.email !== null && (
+          <p role="alert" className="mt-2xs text-bodySm text-danger">
+            {errors.email}
+          </p>
+        )}
+      </div>
+      <div>
+        <label htmlFor="sealed-identity-phone" className="text-label font-semibold text-ink">
+          Telefon
+        </label>
+        <input
+          id="sealed-identity-phone"
+          name="identityPhone"
+          type="tel"
+          autoComplete="tel"
+          value={values.phone}
+          disabled={disabled}
+          onChange={(event) => {
+            onChange({ ...values, phone: event.target.value })
+          }}
+          aria-invalid={errors.phone !== null}
+          className={inputClasses}
+        />
+        {errors.phone !== null && (
+          <p role="alert" className="mt-2xs text-bodySm text-danger">
+            {errors.phone}
           </p>
         )}
       </div>
