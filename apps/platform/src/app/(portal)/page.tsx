@@ -3,6 +3,7 @@ import Link from 'next/link'
 
 import { ListingFilters } from './_components/ListingFilters'
 import { ListingMap } from './_components/ListingMap'
+import { ListingResultsBar } from './_components/ListingResultsBar'
 import {
   LISTING_TAB_IDS,
   ListingTabs,
@@ -183,6 +184,8 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
           <p className="font-body text-body text-inkMuted">{summary}</p>
 
           <ListingMap lots={mapPoints} className="h-96" />
+
+          <ListingResultsBar tab={tab} total={result.total} />
 
           {result.auctions.length === 0 ? (
             <div className="rounded-card border border-border bg-white p-lg text-center">
