@@ -70,7 +70,7 @@
   --motion-anti-snipe-extend-easing: cubic-bezier(0.22, 0.61, 0.36, 1);
 
   /* ── Typography ── */
-  --font-heading: "Manrope", sans-serif;
+  --font-heading: "Public Sans", sans-serif;
   --font-body: "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 

@@ -1,9 +1,11 @@
 import { createElement } from 'react'
+import type * as JsxDevRuntime from 'react/jsx-dev-runtime'
+import type * as JsxRuntime from 'react/jsx-runtime'
 import { renderToString } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let currentParams = new URLSearchParams('')
-const replace = vi.fn()
+const replace = vi.fn((_url: string, _options?: { scroll: boolean }) => undefined)
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => undefined, replace, refresh: () => undefined }),
@@ -15,7 +17,7 @@ vi.mock('next/navigation', () => ({
 // through the JSX runtime (dev and prod variants) and invoked directly,
 // still asserting the real wiring: handler -> serializeListingFilters ->
 // router.replace.
-type ChangeEvent = { target: { value: string } }
+interface ChangeEvent { target: { value: string } }
 let selectChanges: ((event: ChangeEvent) => void)[] = []
 
 function captureSelect(
@@ -32,14 +34,14 @@ function captureSelect(
 }
 
 vi.mock('react/jsx-runtime', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('react/jsx-runtime')>()
+  const actual = await importOriginal<typeof JsxRuntime>()
   const wrap = (jsx: typeof actual.jsx): typeof actual.jsx =>
     (type, props, key) => jsx(type, captureSelect(type, props as Record<string, unknown>), key)
   return { ...actual, jsx: wrap(actual.jsx), jsxs: wrap(actual.jsxs) }
 })
 
 vi.mock('react/jsx-dev-runtime', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('react/jsx-dev-runtime')>()
+  const actual = await importOriginal<typeof JsxDevRuntime>()
   const wrap = (jsxDEV: typeof actual.jsxDEV): typeof actual.jsxDEV =>
     (type, props, key, isStatic, source, self) =>
       jsxDEV(
@@ -66,7 +68,7 @@ function text(html: string): string {
 }
 
 function selectedOption(html: string): string {
-  const value = html.match(/<option value="([^"]+)" selected/)?.[1]
+  const value = /<option value="([^"]+)" selected/.exec(html)?.[1]
   if (value === undefined) throw new Error('no selected option rendered')
   return value
 }

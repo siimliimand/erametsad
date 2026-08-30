@@ -15,6 +15,7 @@ vi.mock('next/link', () => ({
     ),
 }))
 
+import type { ListingTabId } from '../../_lib/summary'
 import {
   DEFAULT_LISTING_TAB,
   LISTING_TABS,
@@ -24,7 +25,6 @@ import {
   listingTabDef,
   resolveListingTab,
 } from '../ListingTabs'
-import type { ListingTabId } from '../../_lib/summary'
 
 const koikDef = listingTabDef('koik')
 

@@ -40,10 +40,10 @@ describe('ListingFilters subscription entry', () => {
 describe('ListingFilters mobile disclosure', () => {
   it('points the toggle at the collapsible panel id', () => {
     const html = render('mets')
-    const controls = html.match(/aria-controls="([^"]+)"/)
+    const controls = /aria-controls="([^"]+)"/.exec(html)
     expect(controls).not.toBeNull()
     const panelId = controls?.[1] ?? ''
-    const panel = html.match(new RegExp(`<div id="${panelId}" class="([^"]+)"`))
+    const panel = new RegExp(`<div id="${panelId}" class="([^"]+)"`).exec(html)
     expect(panel).not.toBeNull()
     // Hidden below lg until toggled open; always open from lg up.
     expect(panel?.[1]).toContain('hidden')

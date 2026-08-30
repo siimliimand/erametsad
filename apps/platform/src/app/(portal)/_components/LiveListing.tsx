@@ -10,11 +10,11 @@ import {
   type ReactNode,
 } from 'react'
 
+import { speciesNames } from '../_lib/species'
 import {
   useAuctionStream,
   type AuctionStreamPublishedPayload,
 } from '../_lib/use-auction-stream'
-import { speciesNames } from '../_lib/species'
 
 import type { AuctionListResult, AuctionSummary } from '@/lib/auction/queries'
 import type { AuctionObjectType } from '@/lib/data/schema'
