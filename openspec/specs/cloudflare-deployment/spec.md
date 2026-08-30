@@ -1,5 +1,8 @@
-## ADDED Requirements
+# cloudflare-deployment Specification
 
+## Purpose
+TBD - created by archiving change option-b-cloudflare-only. Update Purpose after archive.
+## Requirements
 ### Requirement: next-on-pages build
 The app SHALL build and run via `@cloudflare/next-on-pages`. Pages Functions
 SHALL handle API routes and SSE streams.
@@ -8,20 +11,11 @@ SHALL handle API routes and SSE streams.
 - **WHEN** a request hits an API route in the Cloudflare deployment
 - **THEN** the route runs on Workers and an SSE stream stays open
 
-### Requirement: Serverless Postgres
-Production SHALL connect to Neon serverless Postgres via
-`@neondatabase/serverless` over HTTP. The `.env` config SHALL toggle between
-local Postgres and Neon.
-
-#### Scenario: Prod database connection
-- **WHEN** the Cloudflare deployment starts with the Neon DSN set
-- **THEN** the app queries run against Neon, and local docker-compose
-  remains the dev path
-
 ### Requirement: Queue and cache
-The app SHALL dispatch background jobs through Cloudflare Queues and SHALL
-use KV for ephemeral cache and SSE broadcast. The interface SHALL be common
-with local BullMQ/Redis.
+The app SHALL dispatch background jobs through Cloudflare Queues and
+SHALL use KV for ephemeral cache and feature flags. SSE broadcast SHALL
+run through Durable Objects, not KV. The interface SHALL be common with
+local BullMQ/Redis.
 
 #### Scenario: Job dispatch
 - **WHEN** a domain event enqueues a job
@@ -37,8 +31,10 @@ production.
 - **THEN** the file is stored in R2 and served via a signed URL
 
 ### Requirement: Wrangler bindings
-The app SHALL declare environment bindings (Queues, KV, R2, Neon DSN) in
-`wrangler.jsonc`. A `/health` route SHALL exist for smoke checks.
+The app SHALL declare environment bindings (D1 `DB`, Durable Objects,
+Queues, KV, R2, `send_email`) in `wrangler.jsonc`. The KV binding SHALL
+use the provisioned namespace id. A `/health` route SHALL exist for smoke
+checks.
 
 #### Scenario: Health check
 - **WHEN** a deploy completes

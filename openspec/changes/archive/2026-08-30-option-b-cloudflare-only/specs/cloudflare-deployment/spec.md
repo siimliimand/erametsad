@@ -24,10 +24,11 @@ checks.
 ## REMOVED Requirements
 
 ### Requirement: Serverless Postgres
-**Reason**: Option B consolidates all state inside Cloudflare. D1
-replaces Neon Postgres as the relational store; the Neon HTTP driver and
-DSN bindings are removed.
-**Migration**: Data moves through the Postgres-to-SQLite mapping rules
-from the change design (integer cents, TEXT enums with CHECK, TEXT
-jsonb). No production data exists today; the Phase 0 decision record
-confirms whether an export-transform-import path is needed.
+Production SHALL connect to Neon serverless Postgres via
+`@neondatabase/serverless` over HTTP. The `.env` config SHALL toggle between
+local Postgres and Neon.
+
+#### Scenario: Prod database connection
+- **WHEN** the Cloudflare deployment starts with the Neon DSN set
+- **THEN** the app queries run against Neon, and local docker-compose
+  remains the dev path
