@@ -27,6 +27,7 @@ import {
   type AuctionDossier,
 } from '@/lib/auction/queries'
 import type { CoreRepositories } from '@/lib/data/repositories'
+import { centsToEuros } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 
 type PillStatus = React.ComponentProps<typeof StatusPill>['status']
@@ -439,6 +440,39 @@ async function buildSealedViewer(
   }
 }
 
+/**
+ * The caller's own active autobidder row for the auction: the id enables
+ * "Uuenda"/"Eemalda" in AutobidderControl and `maxAmount` prefills it.
+ * Cancelled (paused) rows count as absent, matching the dossier's
+ * `participation.hasAutobidder`.
+ */
+async function findOwnAutobidder(
+  repositories: CoreRepositories,
+  userId: string,
+  auctionId: string,
+): Promise<{ id: string; maxAmount: number } | null> {
+  const result = await repositories.find({
+    collection: 'autobidders',
+    where: {
+      and: [
+        { user: { equals: userId } },
+        { auction: { equals: auctionId } },
+        { status: { equals: 'active' } },
+      ],
+    },
+    limit: 1,
+  })
+  const doc = result.docs[0] as Record<string, unknown> | undefined
+  if (
+    doc === undefined ||
+    typeof doc.id !== 'string' ||
+    typeof doc.maxAmountCents !== 'number'
+  ) {
+    return null
+  }
+  return { id: doc.id, maxAmount: centsToEuros(doc.maxAmountCents) }
+}
+
 // ── Page ────────────────────────────────────────────────────────────────
 
 export default async function AuctionPage({
@@ -504,7 +538,9 @@ export default async function AuctionPage({
   // ended) statuses. Sealed auctions always mount SealedBidPanel: it renders
   // its own scheduled/active/locked/opening-result states.
   const mountBidPanel = !isEndedLike && auction.type === 'open'
+  const isBiddingOpen = auction.status === 'active'
   let antiSnipeMinutes: number | null = null
+  let allowUnderStart = false
   let hasRaamleping: boolean | null = null
   if (mountBidPanel) {
     const settings = await findGateDoc(repositories, 'settings', {})
@@ -517,10 +553,20 @@ export default async function AuctionPage({
       typeof settings?.antiSnipeDurationMinutes === 'number'
         ? settings.antiSnipeDurationMinutes
         : null
+    // The under-start toggle renders only on active open auctions whose
+    // Settings enable alapakkumine; the API re-checks the flag on submit.
+    allowUnderStart = isBiddingOpen && settings?.alapakkumineEnabled === true
     if (auth !== null && !gateDisabled) {
       hasRaamleping = await hasSignedRaamleping(repositories, auth.userId)
     }
   }
+
+  // Own autobidder row feeds AutobidderControl's prefill and Eemalda; only
+  // the active form state renders the control.
+  const ownAutobidder =
+    mountBidPanel && isBiddingOpen && auth !== null
+      ? await findOwnAutobidder(repositories, auth.userId, auction.id)
+      : null
 
   const rows: DossierRow[] = []
   if (auction.cadastres.length > 0) {
@@ -764,6 +810,7 @@ export default async function AuctionPage({
                 leadingBidAmount={auction.leadingBidAmount}
                 finalPrice={auction.finalPrice}
                 antiSnipeMinutes={antiSnipeMinutes}
+                allowUnderStart={allowUnderStart}
                 viewer={
                   auth === null
                     ? null
@@ -772,9 +819,9 @@ export default async function AuctionPage({
                         isLeading: auction.participation?.isLeading ?? false,
                         hasRights: null,
                         hasRaamleping,
-                        // Dossier participation carries the flag only; the
-                        // autobidder row (id/max) stays a documented gap.
                         hasAutobidder: auction.participation?.hasAutobidder ?? false,
+                        autobidderId: ownAutobidder?.id ?? null,
+                        autobidderMaxAmount: ownAutobidder?.maxAmount ?? null,
                       }
                 }
               />
