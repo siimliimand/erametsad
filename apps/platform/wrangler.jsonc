@@ -45,9 +45,10 @@
     "producers": [
       { "binding": "QUEUE", "queue": "eametsad-jobs" }
     ],
-    // A message whose delivery fails max_retries times is routed to the DLQ by
-    // the runtime; the consumer code only calls message.retry(). Create the
-    // queues once from apps/platform:
+    // The consumer lives in its own Worker (src/workers/wrangler.jsonc) because
+    // wrangler cannot statically detect the `queue` export through the OpenNext
+    // shim's re-export chain (deploy fails with code 11001). Create the queues
+    // once from apps/platform:
     //   pnpm exec wrangler queues create eametsad-jobs
     //   pnpm exec wrangler queues create eametsad-dlq
     // DLQ-depth alerting lives in the Cloudflare dashboard (account-level queue
