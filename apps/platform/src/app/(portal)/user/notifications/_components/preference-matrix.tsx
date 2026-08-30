@@ -1,16 +1,69 @@
 'use client'
 
-import { NOTIFICATION_EVENTS } from './notifications-data'
+import { useEffect, useState } from 'react'
 
-function Toggle({ checked, label }: { checked: boolean; label: string }) {
+import {
+  apiJson,
+  apiJsonBody,
+  NOTIFICATION_EVENTS,
+} from './notifications-data'
+
+type ChannelPrefs = { email: boolean; sms: boolean }
+type PreferenceMap = Record<string, ChannelPrefs>
+
+function defaultPreferences(): PreferenceMap {
+  const out: PreferenceMap = {}
+  for (const event of NOTIFICATION_EVENTS) {
+    out[event.value] = { email: event.effectiveEmail, sms: event.effectiveSms }
+  }
+  return out
+}
+
+// Stored shape: { [event]: { email?: boolean, sms?: boolean } }. Entries that
+// fail validation fall back to the defaults for that event.
+function storedChannel(value: unknown): ChannelPrefs | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+  const record = value as Record<string, unknown>
+  const email = typeof record.email === 'boolean' ? record.email : undefined
+  const sms = typeof record.sms === 'boolean' ? record.sms : undefined
+  if (email === undefined && sms === undefined) return null
+  return { email: email ?? true, sms: sms ?? false }
+}
+
+function mergeStoredPreferences(stored: unknown): PreferenceMap {
+  const prefs = defaultPreferences()
+  if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return prefs
+  for (const [event, channels] of Object.entries(stored as Record<string, unknown>)) {
+    const parsed = storedChannel(channels)
+    if (parsed !== null && event in prefs) {
+      prefs[event] = parsed
+    }
+  }
+  return prefs
+}
+
+function Toggle({
+  checked,
+  label,
+  disabled,
+  onToggle,
+}: {
+  checked: boolean
+  label: string
+  disabled: boolean
+  onToggle?: (next: boolean) => void
+}) {
   return (
     <label className="inline-flex items-center gap-2">
       <input
         type="checkbox"
         checked={checked}
-        disabled
+        disabled={disabled}
         className="h-4 w-4 accent-primary"
         aria-label={label}
+        onChange={(changeEvent) => {
+          onToggle?.(changeEvent.target.checked)
+        }}
       />
       <span className="font-body text-bodySm text-inkMuted">
         {checked ? 'Saadetakse' : 'Ei saadeta'}
@@ -19,19 +72,66 @@ function Toggle({ checked, label }: { checked: boolean; label: string }) {
   )
 }
 
-// Preference storage does not exist yet: the service falls back to hardcoded
-// defaults and the profiles API allowlist has no notification fields, so the
-// matrix shows the current effective behavior with all toggles disabled.
 export function PreferenceMatrix() {
+  const [prefs, setPrefs] = useState<PreferenceMap>(defaultPreferences)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const data = await apiJson<{
+          profiles: { notificationPreferences?: unknown }[]
+        }>('/api/v1/profiles')
+        if (cancelled) return
+        setPrefs(mergeStoredPreferences(data.profiles[0]?.notificationPreferences))
+      } catch {
+        if (!cancelled) setLoadFailed(true)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function saveEmail(eventValue: string, fallback: ChannelPrefs, next: boolean) {
+    if (busy) return
+    const previous = prefs
+    const current = prefs[eventValue] ?? fallback
+    const updated: PreferenceMap = {
+      ...prefs,
+      [eventValue]: { ...current, email: next },
+    }
+    setPrefs(updated)
+    setBusy(true)
+    setSaved(false)
+    setError(null)
+    try {
+      await apiJsonBody('/api/v1/profiles', 'PATCH', {
+        notificationPreferences: updated,
+      })
+      setSaved(true)
+    } catch (saveError) {
+      setPrefs(previous)
+      setError(saveError instanceof Error ? saveError.message : 'Salvestamine ebaõnnestus.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-md">
-      <div className="rounded-card border border-border bg-bgMist px-md py-sm">
-        <p className="font-body text-bodySm text-ink">
-          Sündmuspõhiste teavitussätete salvestamine pole veel saadaval: profiili liides ja
-          andmeskeem ei sisalda veel teavitussätete välju. Tabel näitab süsteemi hetkel kehtivaid
-          sätteid; lülitid lubatakse, kui salvestus valmib.
-        </p>
-      </div>
+      {loadFailed && (
+        <div className="rounded-card border border-border bg-bgMist px-md py-sm">
+          <p className="font-body text-bodySm text-ink">
+            Teavitussätete laadimine ebaõnnestus; tabelis on vaikeväärtused.
+          </p>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-card border border-border">
         <table className="w-full min-w-[480px] border-collapse text-left">
@@ -55,8 +155,16 @@ export function PreferenceMatrix() {
                 <td className="px-md py-sm">
                   {event.emailAvailable ? (
                     <Toggle
-                      checked={event.effectiveEmail}
+                      checked={prefs[event.value]?.email ?? event.effectiveEmail}
                       label={`E-post: ${event.settingsLabel}`}
+                      disabled={busy}
+                      onToggle={(next) => {
+                        void saveEmail(
+                          event.value,
+                          { email: event.effectiveEmail, sms: event.effectiveSms },
+                          next,
+                        )
+                      }}
                     />
                   ) : (
                     <span className="font-body text-bodySm text-inkMuted">Ainult rakenduses</span>
@@ -64,7 +172,12 @@ export function PreferenceMatrix() {
                 </td>
                 <td className="px-md py-sm">
                   {event.smsAvailable ? (
-                    <Toggle checked={event.effectiveSms} label={`SMS: ${event.settingsLabel}`} />
+                    // SMS stays display-only until verified phone numbers exist.
+                    <Toggle
+                      checked={prefs[event.value]?.sms ?? event.effectiveSms}
+                      label={`SMS: ${event.settingsLabel}`}
+                      disabled
+                    />
                   ) : (
                     <span className="font-body text-bodySm text-inkMuted">–</span>
                   )}
@@ -73,6 +186,20 @@ export function PreferenceMatrix() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center gap-sm">
+        {busy && <span className="font-body text-bodySm text-inkMuted">Salvestamine…</span>}
+        {saved && !busy && (
+          <span role="status" className="font-body text-bodySm text-primary">
+            Salvestatud
+          </span>
+        )}
+        {error && (
+          <span role="alert" className="font-body text-bodySm text-danger">
+            {error}
+          </span>
+        )}
       </div>
 
       <p className="font-body text-bodySm text-inkMuted">

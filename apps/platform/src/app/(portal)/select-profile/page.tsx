@@ -5,7 +5,8 @@ import { ProfileSelector, type ProfileOption } from './_components/ProfileCard'
 
 import { requirePortalSession } from '@/app/(portal)/_lib/session'
 import { auctionObjectTypes } from '@/lib/data/schema'
-import type { AuctionRight, Profile } from '@/lib/data/schema'
+import type { AuctionRight } from '@/lib/data/schema'
+import type { ProfileDoc } from '@/lib/data/repositories/registry'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +41,7 @@ function grantedObjectTypes(rights: AuctionRight[]): (typeof auctionObjectTypes)
   })
 }
 
-function toOption(profile: Profile, activeProfileId: string | null): ProfileOption {
+function toOption(profile: ProfileDoc, activeProfileId: string | null): ProfileOption {
   const isCompany = profile.type === 'company'
   const name =
     (isCompany ? (profile.companyName ?? profile.displayName) : profile.displayName) ??

@@ -13,13 +13,16 @@ import { env } from '@/env'
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 
-interface NotificationPreference {
-  email: boolean
-  sms: boolean
-  inApp: boolean
+interface ChannelOverride {
+  email?: boolean
+  sms?: boolean
 }
 
-const eventChannels: Record<DomainEventType, (keyof NotificationPreference)[]> = {
+// notificationPreferences profile column shape: { [event]: { email, sms } }.
+type StoredPreferences = Record<string, ChannelOverride>
+
+const eventChannels: Record<DomainEventType, (keyof ChannelOverride | 'inApp')[]> = {
+  'auction.published': ['email', 'inApp'],
   'bid.created': ['email', 'inApp'],
   'auction.ended': ['email', 'inApp'],
   'contract.ready': ['email', 'sms', 'inApp'],
@@ -31,6 +34,7 @@ const eventChannels: Record<DomainEventType, (keyof NotificationPreference)[]> =
 }
 
 const eventTitles: Record<DomainEventType, string> = {
+  'auction.published': 'Uus oksjon on avaldatud',
   'bid.created': 'Pakkumus registreeritud',
   'auction.ended': 'Oksjon on lõppenud',
   'contract.ready': 'Leping on allkirjastamiseks valmis',
@@ -39,6 +43,9 @@ const eventTitles: Record<DomainEventType, string> = {
   'bid.approved': 'Teie pakkumus on kinnitatud',
   'bid.rejected': 'Teie pakkumus on tagasi lükatud',
 }
+
+// Missing stored keys keep the historical behavior: email on, SMS off.
+const DEFAULT_CHANNEL_ENABLED: Record<'email' | 'sms', boolean> = { email: true, sms: false }
 
 type RecipientDeliveryStatus = 'delivered' | 'queued' | 'permanent_bounces' | 'failed'
 
@@ -57,6 +64,8 @@ function recipientStatus(result: SendResult): RecipientDeliveryStatus {
 
 function getTemplate(eventType: DomainEventType, payload: Record<string, unknown>): string | null {
   switch (eventType) {
+    case 'auction.published':
+      return `Uus oksjon "${String(payload.auctionTitle)}" on avaldatud ja ootab pakkumisi.`
     case 'bid.created':
       return bidPlatedTemplate({
         amount: payload.amount as number,
@@ -94,28 +103,34 @@ function getTemplate(eventType: DomainEventType, payload: Record<string, unknown
   }
 }
 
-async function lookupPreferences(repos: CoreRepositories, userId: string | number): Promise<NotificationPreference> {
+async function lookupStoredPreferences(
+  repos: CoreRepositories,
+  userId: string | number,
+): Promise<StoredPreferences | null> {
   try {
-    // 'notification-preferences' is not a real collection (kept from the
-    // Payload call); the UnknownCollectionError lands in the catch below
-    // and the caller falls back to the defaults.
-    const prefs = (await repos.find({
-      collection: 'notification-preferences' as never,
+    const { docs } = await repos.find({
+      collection: 'profile',
       where: { user: { equals: String(userId) } },
       limit: 1,
-    })) as { docs: Record<string, unknown>[] }
-    if (prefs.docs.length > 0) {
-      const doc = prefs.docs[0] ?? {}
-      return {
-        email: (doc.email as boolean | undefined) ?? true,
-        sms: (doc.sms as boolean | undefined) ?? false,
-        inApp: (doc.inApp as boolean | undefined) ?? true,
-      }
-    }
+    })
+    const stored = docs[0]?.notificationPreferences
+    if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return null
+    return stored as StoredPreferences
   } catch {
-    // no preferences found
+    return null
   }
-  return { email: true, sms: false, inApp: true }
+}
+
+function channelEnabled(
+  stored: StoredPreferences | null,
+  eventType: DomainEventType,
+  channel: 'email' | 'sms',
+): boolean {
+  const override = stored?.[eventType]
+  if (override && typeof override[channel] === 'boolean') {
+    return override[channel] as boolean
+  }
+  return DEFAULT_CHANNEL_ENABLED[channel]
 }
 
 async function lookupEmail(repos: CoreRepositories, userId: string | number): Promise<string | undefined> {
@@ -221,11 +236,12 @@ export function startListening(bus: EventBus): void {
     dispatched.add(key)
 
     const repos = await getRepositories()
-    const prefs = await lookupPreferences(repos, event.userId)
+    const stored = await lookupStoredPreferences(repos, event.userId)
 
     const channels = eventChannels[event.type]
     for (const channel of channels) {
-      if (!prefs[channel]) continue
+      // in-app delivery stays always-on; it is not user-configurable.
+      if (channel !== 'inApp' && !channelEnabled(stored, event.type, channel)) continue
 
       switch (channel) {
         case 'email':
@@ -249,6 +265,7 @@ export function startListening(bus: EventBus): void {
     }
   }
 
+  bus.on('auction.published', (event) => { void handleSafely(event) })
   bus.on('bid.created', (event) => { void handleSafely(event) })
   bus.on('auction.ended', (event) => { void handleSafely(event) })
   bus.on('contract.ready', (event) => { void handleSafely(event) })

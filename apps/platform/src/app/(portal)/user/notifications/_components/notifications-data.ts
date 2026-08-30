@@ -56,10 +56,19 @@ export interface NotificationEventDef {
 }
 
 // Mirrors DomainEventType and eventChannels in src/lib/notifications:
-// 7 events; bid.approved/bid.rejected are in-app only; SMS only for
-// auction.won and contract.ready. effective* are the service's hardcoded
-// defaults — per-event preference storage does not exist yet.
+// 8 events; bid.approved/bid.rejected are in-app only; SMS only for
+// auction.won and contract.ready. effective* are the defaults applied when
+// the user has no stored preference for that event.
 export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
+  {
+    value: 'auction.published',
+    chipLabel: 'Oksjon avaldatud',
+    settingsLabel: 'Uus oksjon on avaldatud',
+    emailAvailable: true,
+    smsAvailable: false,
+    effectiveEmail: true,
+    effectiveSms: false,
+  },
   {
     value: 'bid.created',
     chipLabel: 'Pakkumus registreeritud',

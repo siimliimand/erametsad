@@ -28,7 +28,7 @@ interface CreateCall {
 
 function makeRepos(overrides: Record<string, ReturnType<typeof vi.fn>> = {}) {
   return {
-    find: vi.fn().mockRejectedValue(new Error('UnknownCollection: notification-preferences')),
+    find: vi.fn().mockRejectedValue(new Error('UnknownCollection: profile')),
     findByID: vi.fn().mockResolvedValue({ email: 'user@example.ee' }),
     create: vi.fn().mockResolvedValue({}),
     ...overrides,
@@ -170,7 +170,9 @@ describe('notification email dispatch', () => {
 
   it('honors notification preferences from the repository when present', async () => {
     const repos = makeRepos({
-      find: vi.fn().mockResolvedValue({ docs: [{ email: false, sms: false, inApp: true }] }),
+      find: vi.fn().mockResolvedValue({
+        docs: [{ notificationPreferences: { outbid: { email: false, sms: false } } }],
+      }),
     })
     const localCreate = repos.create
     vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
