@@ -129,7 +129,7 @@ All marketing-site content is managed via D1-backed CMS content tables. The site
 |---|---|
 | **URL** | `oksjonid.eametsad.ee` |
 | **Audience** | Bidders & sellers (public browse + authenticated customer area) |
-| **Stack** | React SPA or Next.js client-heavy routes |
+| **Stack** | Next.js 15 App Router `(portal)` route group in the shared platform app (owns `/`; marketing joins in phase 4) |
 | **Key public pages** | Listing (`/`), lot detail open/sealed (`/oksjon/:id`), archive (`/ajalugu`), login, register, select-profile |
 | **Key authenticated pages** | My bids, my sales, notifications, profile, contract signing |
 | **Realtime** | Server-Sent Events (SSE) for bid/countdown updates |
