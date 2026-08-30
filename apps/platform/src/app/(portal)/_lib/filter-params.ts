@@ -74,9 +74,9 @@ export function parseListingFilters(bag: SearchParamBag): ListingFilterState {
   const rawSortField = sortDescending ? rawSort.slice(1) : rawSort
   const rawOrder = (bag.get('order') ?? '').trim().toLowerCase()
 
-  const sortField = (LISTING_SORT_FIELDS as readonly string[]).includes(rawSortField)
-    ? (rawSortField as ListingSortField)
-    : DEFAULT_SORT_FIELD
+  const sortField =
+    LISTING_SORT_FIELDS.find((field) => field.toLowerCase() === rawSortField) ??
+    DEFAULT_SORT_FIELD
   const sortDirection: ListingSortDirection =
     rawOrder === 'desc'
       ? 'desc'
