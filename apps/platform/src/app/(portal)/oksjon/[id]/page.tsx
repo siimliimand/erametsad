@@ -2,12 +2,14 @@ import { Countdown, DocumentLink, MapEstonia, StatusPill } from '@eametsad/ui'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { BidPanel } from './_components/BidPanel'
 import { DossierTable, PackageSection, type DossierRow } from './_components/DossierTable'
 import { Gallery, type GalleryImage } from './_components/Gallery'
 import { SellerContact } from './_components/SellerContact'
 
 import { getPortalAuthState } from '@/app/(portal)/_lib/session'
 import { getAuctionDossier, type AuctionDossier } from '@/lib/auction/queries'
+import type { CoreRepositories } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 
 type PillStatus = React.ComponentProps<typeof StatusPill>['status']
@@ -205,6 +207,46 @@ function notificationNumbers(entries: unknown[]): string[] {
     .filter((value): value is string => value !== null)
 }
 
+// ── Framework contract gate (pre-submit mirror of place-bid.ts step 7) ──
+
+type GateCollection = 'settings' | 'contract-templates' | 'contracts'
+
+async function findGateDoc(
+  repositories: CoreRepositories,
+  collection: GateCollection,
+  where: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> {
+  const result = await repositories.find({
+    collection,
+    where: where as never,
+    limit: 1,
+  })
+  return (result.docs[0] as Record<string, unknown> | undefined) ?? null
+}
+
+/**
+ * `null` = the gate is off (settings demo override or no active framework
+ * template) and the panel shows no warning; the API stays the final arbiter
+ * on submit.
+ */
+async function hasSignedRaamleping(
+  repositories: CoreRepositories,
+  userId: string,
+): Promise<boolean | null> {
+  const template = await findGateDoc(repositories, 'contract-templates', {
+    and: [{ type: { equals: 'framework' } }, { active: { equals: true } }],
+  })
+  if (!template) return null
+  const signed = await findGateDoc(repositories, 'contracts', {
+    and: [
+      { signedBy: { equals: userId } },
+      { status: { equals: 'signed' } },
+      { template: { equals: template.id } },
+    ],
+  })
+  return signed !== null
+}
+
 // ── Header pieces ───────────────────────────────────────────────────────
 
 const STATUS_PILL_MAP: Record<AuctionDossier['status'], PillStatus> = {
@@ -259,9 +301,8 @@ function EndedPanel({ auction, unsold }: { auction: AuctionDossier; unsold: bool
   )
 }
 
-function BidSlot({ auction }: { auction: AuctionDossier }) {
-  // Tasks 4.2-4.4 mount the open-auction BidPanel here; the sealed variant
-  // replaces it in its own task. Nothing interactive until then.
+function SealedBidSlot({ auction }: { auction: AuctionDossier }) {
+  // Task 4.6 replaces this placeholder with the sealed-bid form.
   return (
     <section
       id="bid-panel"
@@ -270,11 +311,9 @@ function BidSlot({ auction }: { auction: AuctionDossier }) {
     >
       <h2 className="font-heading text-h4 text-ink">Pakkumine</h2>
       <p className="text-bodySm text-inkMuted">
-        {auction.type === 'sealed'
-          ? auction.bidCount !== null
-            ? `Pakkumisi: ${String(auction.bidCount)}`
-            : 'Suletud pakkumine.'
-          : 'Pakkumisvorm lisatakse varsti.'}
+        {auction.bidCount !== null
+          ? `Pakkumisi: ${String(auction.bidCount)}`
+          : 'Suletud pakkumine.'}
       </p>
     </section>
   )
@@ -321,6 +360,27 @@ export default async function AuctionPage({
     auction.status === 'completed' ||
     auction.status === 'archived' ||
     auction.status === 'unsold'
+
+  // Open auctions mount the BidPanel; it renders the scheduled/active (and,
+  // defensively, ended) variants itself. Sealed keeps its placeholder (task 4.6).
+  const mountBidPanel = !isEndedLike && auction.type === 'open'
+  let antiSnipeMinutes: number | null = null
+  let hasRaamleping: boolean | null = null
+  if (mountBidPanel) {
+    const settings = await findGateDoc(repositories, 'settings', {})
+    const flags: unknown = settings?.featureFlags
+    const gateDisabled =
+      typeof flags === 'object' &&
+      flags !== null &&
+      (flags as Record<string, unknown>).requireFrameworkContract === false
+    antiSnipeMinutes =
+      typeof settings?.antiSnipeDurationMinutes === 'number'
+        ? settings.antiSnipeDurationMinutes
+        : null
+    if (auth !== null && !gateDisabled) {
+      hasRaamleping = await hasSignedRaamleping(repositories, auth.userId)
+    }
+  }
 
   const rows: DossierRow[] = []
   if (auction.cadastres.length > 0) {
@@ -491,8 +551,31 @@ export default async function AuctionPage({
         <div className="flex flex-col gap-lg">
           {isEndedLike ? (
             <EndedPanel auction={auction} unsold={auction.status === 'unsold'} />
+          ) : auction.type === 'sealed' ? (
+            <SealedBidSlot auction={auction} />
           ) : (
-            <BidSlot auction={auction} />
+            <BidPanel
+              auctionId={auction.id}
+              objectType={auction.objectType}
+              status={auction.status}
+              startsAt={auction.startsAt}
+              endsAt={auction.endsAt}
+              minBid={auction.minBid}
+              bidStep={auction.bidStep}
+              leadingBidAmount={auction.leadingBidAmount}
+              finalPrice={auction.finalPrice}
+              antiSnipeMinutes={antiSnipeMinutes}
+              viewer={
+                auth === null
+                  ? null
+                  : {
+                      hasBid: auction.participation?.hasBid ?? false,
+                      isLeading: auction.participation?.isLeading ?? false,
+                      hasRights: null,
+                      hasRaamleping,
+                    }
+              }
+            />
           )}
           <SellerContact
             specialist={auction.contact.specialist}

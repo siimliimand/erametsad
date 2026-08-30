@@ -105,6 +105,17 @@ function fmtDateTime(iso: string): string | null {
   return new Date(time).toLocaleString('et-EE', { dateStyle: 'long', timeStyle: 'short' })
 }
 
+// The raamleping flow page (task 6.6) renders ?message= above its form.
+const RAAMLEPING_GATE_MESSAGE =
+  'Enampakkumise tegemiseks tuleb esmalt allkirjastada raamleping.'
+
+function raamlepingUrl(auctionId: string): string {
+  return (
+    `/lepingud/raamleping?next=${encodeURIComponent(`/oksjon/${auctionId}`)}` +
+    `&message=${encodeURIComponent(RAAMLEPING_GATE_MESSAGE)}`
+  )
+}
+
 // ── Default API submission ──────────────────────────────────────────────
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -387,9 +398,7 @@ export function BidPanel({
         break
       case 'framework_contract_required':
         setGateNotice(true)
-        router.push(
-          `/lepingud/raamleping?next=${encodeURIComponent(`/oksjon/${auctionId}`)}`,
-        )
+        router.push(raamlepingUrl(auctionId))
         break
       case 'no_rights':
         setFetchedRights(false)
@@ -515,9 +524,9 @@ export function BidPanel({
         )}
         {gateNotice && (
           <p role="alert" className="text-bodySm text-danger">
-            Enampakkumise tegemiseks tuleb esmalt allkirjastada raamleping.{' '}
+            {RAAMLEPING_GATE_MESSAGE}{' '}
             <Link
-              href={`/lepingud/raamleping?next=${encodeURIComponent(`/oksjon/${auctionId}`)}`}
+              href={raamlepingUrl(auctionId)}
               className="font-semibold text-primary hover:text-primaryHover"
             >
               Ava raamleping
@@ -541,9 +550,7 @@ export function BidPanel({
           </p>
         )}
         {viewer.hasRaamleping === false && (
-          <p className="text-bodySm text-statusEndingSoon">
-            Enampakkumise tegemiseks tuleb esmalt allkirjastada raamleping.
-          </p>
+          <p className="text-bodySm text-statusEndingSoon">{RAAMLEPING_GATE_MESSAGE}</p>
         )}
       </div>
 
