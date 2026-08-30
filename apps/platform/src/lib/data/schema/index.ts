@@ -6,6 +6,7 @@ export * from './sessions'
 export * from './profiles'
 export * from './company-access-requests'
 export * from './auction-rights'
+export * from './rights-requests'
 export * from './auctions'
 export * from './auction-subscriptions'
 export * from './bids'
@@ -53,6 +54,7 @@ import type { parishes as parishesTable } from './parishes'
 import type { partnerServices as partnerServicesTable } from './partner-services'
 import type { profiles as profilesTable } from './profiles'
 import type { redirects as redirectsTable } from './redirects'
+import type { rightsRequests as rightsRequestsTable } from './rights-requests'
 import type { sessions as sessionsTable } from './sessions'
 import type { settings as settingsTable } from './settings'
 import type { specialists as specialistsTable } from './specialists'
@@ -110,6 +112,8 @@ export type PartnerService = InferSelectModel<typeof partnerServicesTable>
 export type NewPartnerService = InferInsertModel<typeof partnerServicesTable>
 export type Redirect = InferSelectModel<typeof redirectsTable>
 export type NewRedirect = InferInsertModel<typeof redirectsTable>
+export type RightsRequest = InferSelectModel<typeof rightsRequestsTable>
+export type NewRightsRequest = InferInsertModel<typeof rightsRequestsTable>
 export type Session = InferSelectModel<typeof sessionsTable>
 export type NewSession = InferInsertModel<typeof sessionsTable>
 export type Specialist = InferSelectModel<typeof specialistsTable>
