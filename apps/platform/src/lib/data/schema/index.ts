@@ -27,6 +27,7 @@ export * from './media'
 export * from './pages'
 export * from './parishes'
 export * from './partner-services'
+export * from './password-reset-tokens'
 export * from './redirects'
 export * from './specialists'
 export * from './statistics-snapshots'
@@ -52,6 +53,7 @@ import type { notifications as notificationsTable } from './notifications'
 import type { pages as pagesTable } from './pages'
 import type { parishes as parishesTable } from './parishes'
 import type { partnerServices as partnerServicesTable } from './partner-services'
+import type { passwordResetTokens as passwordResetTokensTable } from './password-reset-tokens'
 import type { profiles as profilesTable } from './profiles'
 import type { redirects as redirectsTable } from './redirects'
 import type { rightsRequests as rightsRequestsTable } from './rights-requests'
@@ -110,6 +112,8 @@ export type Parish = InferSelectModel<typeof parishesTable>
 export type NewParish = InferInsertModel<typeof parishesTable>
 export type PartnerService = InferSelectModel<typeof partnerServicesTable>
 export type NewPartnerService = InferInsertModel<typeof partnerServicesTable>
+export type PasswordResetToken = InferSelectModel<typeof passwordResetTokensTable>
+export type NewPasswordResetToken = InferInsertModel<typeof passwordResetTokensTable>
 export type Redirect = InferSelectModel<typeof redirectsTable>
 export type NewRedirect = InferInsertModel<typeof redirectsTable>
 export type RightsRequest = InferSelectModel<typeof rightsRequestsTable>

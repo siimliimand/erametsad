@@ -123,7 +123,9 @@ describe('POST /api/v1/auth/forgot-password reset link', () => {
     expect(url.search).toBe('')
     expect(existsSync(RESET_TOKEN_PAGE)).toBe(true)
     // The token in the link must resolve to the requested account.
-    expect(await consumeResetToken(url.pathname.split('/')[2] ?? '')).toBe(userId)
+    expect(
+      await consumeResetToken(url.pathname.split('/')[2] ?? '', testDb.database),
+    ).toBe(userId)
   })
 
   it('matches users by isikukood hash and emails the same link shape', async () => {

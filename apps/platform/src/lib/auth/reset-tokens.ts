@@ -1,39 +1,75 @@
+import { and, eq, gt, isNull } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
 import crypto from 'node:crypto'
 
-interface ResetRecord {
-  userId: string
-  expiresAt: number
-}
+import { getD1Database } from '../db'
+import type { CoreDatabase } from '../data/repositories'
+import * as schema from '../data/schema'
+import { passwordResetTokens } from '../data/schema'
 
-const tokens = new Map<string, ResetRecord>()
+export const RESET_TOKEN_TTL_MS = 2 * 60 * 60 * 1000
 
 function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
 }
 
-export const RESET_TOKEN_TTL_MS = 2 * 60 * 60 * 1000
+function nowIso(): string {
+  return new Date().toISOString()
+}
 
-export async function createResetToken(userId: string): Promise<string> {
-  await Promise.resolve()
+/**
+ * Drizzle instance over the D1 binding, built per call like the repository
+ * runtime does (runtime.ts). Callers that already hold a database (tests)
+ * pass it explicitly to skip the Cloudflare context.
+ */
+async function defaultDatabase(): Promise<CoreDatabase> {
+  const d1 = await getD1Database()
+  return drizzle(d1 as unknown as Parameters<typeof drizzle>[0], { schema })
+}
+
+export async function createResetToken(
+  userId: string,
+  database?: CoreDatabase,
+): Promise<string> {
+  const db = database ?? (await defaultDatabase())
   const token = crypto.randomBytes(48).toString('hex')
-  const expiresAt = Date.now() + RESET_TOKEN_TTL_MS
+  const now = nowIso()
 
-  tokens.set(hashToken(token), { userId, expiresAt })
+  await db
+    .insert(passwordResetTokens)
+    .values({
+      userId,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS).toISOString(),
+      usedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning({ id: passwordResetTokens.id })
 
   return token
 }
 
 export async function consumeResetToken(
   token: string,
+  database?: CoreDatabase,
 ): Promise<string | null> {
-  await Promise.resolve()
-  const key = hashToken(token)
-  const record = tokens.get(key)
-  if (!record) return null
+  const db = database ?? (await defaultDatabase())
+  const now = nowIso()
 
-  // Delete first so a concurrent consume in the same tick cannot reuse it.
-  tokens.delete(key)
-  if (Date.now() > record.expiresAt) return null
+  // Single statement: marks used only while unused and unexpired, so a
+  // replayed or stale link cannot return the user id.
+  const rows = await db
+    .update(passwordResetTokens)
+    .set({ usedAt: now, updatedAt: now })
+    .where(
+      and(
+        eq(passwordResetTokens.tokenHash, hashToken(token)),
+        isNull(passwordResetTokens.usedAt),
+        gt(passwordResetTokens.expiresAt, now),
+      ),
+    )
+    .returning({ userId: passwordResetTokens.userId })
 
-  return record.userId
+  return rows[0]?.userId ?? null
 }
