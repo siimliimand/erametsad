@@ -1,6 +1,6 @@
 ---
 name: pc-plan-archive
-description: Archive a completed OpenSpec change and update documentation. Interactive mode finds the oldest merged unarchived change and opens an archive PR; autonomous mode archives a named change in place on the current branch. Invoked by the /plan-archive command (interactive) and the plan-goal pipeline (autonomous).
+description: Archive a completed OpenSpec change and update documentation. Interactive mode finds the oldest unarchived change with an open PR, archives it on that PR branch, and merges the PR when CI checks pass; autonomous mode archives a named change in place on the current branch. Invoked by the /plan-archive command (interactive) and the plan-goal pipeline (autonomous).
 license: MIT
 ---
 
@@ -14,8 +14,8 @@ The caller provides (all optional):
 
 ## Modes
 
-- interactive (default): full flow below. Find the oldest unarchived change with a completed PR, confirm with the user, archive it, update docs with approval, and open an archive PR. No input required.
-- autonomous: the caller names the change to archive. Skip the working-tree prep, the PR lookup, the confirmation prompt, and the archive-PR step. Instead, archive in place on the current branch:
+- interactive (default): full flow below. Find the oldest unarchived change with an open PR, confirm with the user, archive it on that PR branch, update docs with approval, push to the same PR, and merge it when CI checks pass. No input required.
+- autonomous: the caller names the change to archive. Skip the working-tree prep, the PR lookup, the confirmation prompt, and the PR push-and-merge step. Instead, archive in place on the current branch:
   1. Archive the change by its id. Prefer the `@openspec-archive-change` skill if it is available. If it is not available, run the CLI directly, and it must be non-interactive, because there is no user to answer prompts:
 
      ```bash
@@ -52,7 +52,7 @@ Steps
    [ -z "$DEFAULT_BRANCH" ] && DEFAULT_BRANCH="main"
    ```
 
-   1. If the tree has uncommitted changes: `git stash push -u -m "WIP before archive"` and tell the user their work is stashed (it is restored in step 6).
+   1. If the tree has uncommitted changes: `git stash push -u -m "WIP before archive"` and tell the user their work is stashed (it is restored in step 7).
    2. Sync the default branch (skip the pull if there is no `origin` remote):
 
    ```bash
@@ -60,7 +60,7 @@ Steps
    ```
 
 <!-- PC-PLATFORM-ARCHIVE-START -->
-2. **Find the oldest change with a completed PR**
+2. **Find the oldest change with an open PR**
 
    List unarchived changes (top-level only, excludes `archive/`):
 
@@ -70,40 +70,46 @@ Steps
 
    If empty, report a blocker and stop.
 
-   List completed PRs:
+   List open PRs:
 
    ```bash
-   gh pr list --repo {owner}/{repo} --state merged --json title,headRefName,mergedAt,number --jq 'sort_by(.mergedAt) | .[] | {name: .title, sourceRefName: .headRefName, mergedAt: .mergedAt, pullRequestId: .number}'
+   gh pr list --repo {owner}/{repo} --state open --json title,headRefName,createdAt,number --jq 'sort_by(.createdAt) | .[] | {name: .title, sourceRefName: .headRefName, createdAt: .createdAt, pullRequestId: .number}'
    ```
 
-   Match each change to a completed PR using its ID and slug as search hints:
-   - No match → skip (record as blocked: `no merged PR found`).
+   Match each change to an open PR using its ID and slug as search hints:
+   - No match → skip (record as blocked: `no open PR found (run /ops-ship first)`).
    - One match → eligible.
    - Multiple matches → ask the user which PR belongs to that change.
 
-   If nothing is eligible, report a blocker and stop. Otherwise select the eligible change with the **oldest** PR `mergedAt` as the candidate.
+   If a change has no open PR match, run the same `gh pr list` with `--state merged`. If a merged PR matches, record the block reason as `PR already merged; the archive cannot join a merged PR`.
+
+   If nothing is eligible, report a blocker and stop. Otherwise select the eligible change with the **oldest** open PR `createdAt` as the candidate.
 
 3. **Confirm the candidate**
 
-   Show the candidate (ID, title, PR ID, merged date) and any blocked changes, then ask:
+   Show the candidate (ID, title, PR ID, branch) and any blocked changes, then ask:
 
    ```text
-   Oldest unarchived merged change found:
+   Oldest unarchived change with an open PR found:
      ID: {change-id}
      Title: {title from resolved PR}
      PR ID: {pullRequestId}
-     Merged: {mergedAt}
+     Branch: {headRefName}
 
-   Proceed with archiving? [yes/no]
+   Archive on this PR, then merge when CI checks pass? [yes/no]
    ```
 
    Stop if the user does not confirm.
 
-4. **Archive the change**
+4. **Archive in place on the PR branch**
 
    ```bash
-   git checkout -b archive/{change-id}
+   git fetch origin "{headRefName}"
+   git switch "{headRefName}" 2>/dev/null || git switch --track "origin/{headRefName}"
+   git pull --ff-only origin "{headRefName}"
    ```
+
+   If the `--ff-only` pull fails, the local branch and the PR branch diverged. Report this to the user and stop. Do not force or discard anything.
 
    Load `@openspec-archive-change` skill and follow it to archive the change.
 
@@ -111,24 +117,39 @@ Steps
 
    Compare the archived change's specs against `ARCHITECTURE.md` and `DESIGN.md`. If updates are needed, show them and get user approval before applying.
 
-6. **Create the archive PR**
+6. **Push the archive to the open PR**
+
+   The archive rides the existing feature PR. Never create a separate archive PR: one merge must produce one deploy.
 
    ```bash
    git add -A
    git commit -m "archive: {title} ({change-id})"
-   git push origin archive/{change-id}
-
-   gh pr create \
-      --repo {owner}/{repo} \
-      --base "$DEFAULT_BRANCH" \
-      --head archive/{change-id} \
-      --title "archive: {title} ({change-id})" \
-      --body "Archive SDD artifacts for {change-id} after merge."
+   git push origin HEAD:"{headRefName}"
    ```
 
-   If work was stashed in step 1, restore it after the PR is created unless the user opts out.
+7. **Merge when CI checks pass**
 
-7. **Report**
+   Watch the checks until they finish:
+
+   ```bash
+   gh pr checks {pullRequestId} --repo {owner}/{repo} --watch --interval 30
+   ```
+
+   `gh pr checks` exits non-zero when a check fails.
+
+   - Any check fails → do not merge. Show the PR link and the failed checks to the user.
+   - No checks are reported → ask the user whether to merge without checks. Checks can be missing right after the push. When in doubt, wait and run the command again.
+   - All checks pass → merge and delete the branch:
+
+   ```bash
+   gh pr merge {pullRequestId} --repo {owner}/{repo} --merge --delete-branch
+   ```
+
+   If the merge command fails, show the PR link and stop. Do not resolve merge conflicts on your own.
+
+   If work was stashed in step 1, restore it after this step ends, unless the user opts out.
+
+8. **Report**
 
    Display:
 
@@ -137,8 +158,8 @@ Steps
 
      Change ID: {change-id}
      Title: {title}
-     Original PR: {original-pr-link}
-     Archive PR: {archive-pr-link}
+     PR: {pr-link}
+     Merged: yes | no (reason: {failed checks | user declined | no checks})
 
      Documentation updates:
      - ARCHITECTURE.md: {count} changes applied
@@ -150,8 +171,10 @@ Steps
 - All OpenSpec paths resolve from `git rev-parse --show-toplevel`. Never use `/openspec/...`.
 - Only process top-level directories in `$REPO_ROOT/openspec/changes/`; exclude `archive/`.
 - Use change ID and slug only as search hints; do not assume the source branch name.
-- The oldest eligible merged change is the only candidate: never ask the user which change to archive (but do ask which PR if multiple match one change).
-- Never proceed if the selected PR is not completed.
+- The eligible change with the oldest open PR is the only candidate: never ask the user which change to archive (but do ask which PR if multiple match one change).
+- Never archive a change whose PR is already merged. Report it as blocked.
+- Never create a separate archive PR. The archive must ship inside the feature PR, so one merge produces one deploy.
+- Never merge a PR with failing or pending checks.
 - Never use browser tools or direct web requests for GitHub. Use `gh` CLI only.
 - Never invent or guess PR, branch, or merge metadata.
 <!-- PC-PLATFORM-ARCHIVE-END -->

@@ -6,7 +6,7 @@ license: MIT
 
 ## Transitive loads (optimization skills)
 
-The marker sections below may contain instructions for selected optimization skills. These are mandatory. If a section says "call `skill("xxx")`", you must call the skill tool with that exact name before doing any work.
+The marker sections below may contain instructions for selected optimization skills. These are mandatory. When a marker section names a skill to call, you must call the skill tool with that exact name before doing any work. Do not write the call syntax as a literal example in prose: the reminder plugin scans this file for that pattern and would treat the example name as a real skill.
 
 ## Secrets
 

@@ -12,15 +12,15 @@
     },
     "fullstack-engineer": {
       "mode": "primary",
-      "model": "zai-coding-plan/glm-5.3"
+      "model": "zai-coding-plan/glm-5.3-flash"
     },
     "fullstack-engineer.build": {
       "mode": "subagent",
-      "model": "zai-coding-plan/glm-5.3"
+      "model": "zai-coding-plan/glm-5.3-flash"
     },
     "fullstack-engineer.fast": {
       "mode": "subagent",
-      "model": "openrouter/xiaomi/mimo-v2.5"
+      "model": "zai-coding-plan/glm-5.3-flash"
     }
   },
   "default_agent": "plan",

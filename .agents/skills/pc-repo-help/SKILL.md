@@ -46,7 +46,7 @@ Display the following reference to the user exactly as written. Do not summarize
 
 **`/ops-evidence`**: Produce evidence a completed change works and publish it to the originating issue/PR. Uses `playwright-cli` (headless) and `pnpm run dev` to capture screenshots at desktop and mobile viewports, writes `evidence/evidence.json` (passed/skipped/failed/blocked), and upserts an idempotent verified comment. Best-effort; `/plan-goal` runs it automatically. Works inside CI containers.
 
-**`/plan-archive`**: Mark a completed change as archived in OpenSpec. Run this after the PR is merged.
+**`/plan-archive`**: Archive a completed change on its open PR branch, then merge the PR when CI checks pass. Run this after `/ops-ship` creates the PR. Implementation and archive ship in one merge, so only one deploy runs.
 
 ---
 

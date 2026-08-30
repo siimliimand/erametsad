@@ -1,7 +1,7 @@
 ---
 description: Default engineer that accumulates skills from all created persona engineers. Direct implementation with write access.
 mode: primary
-model: zai-coding-plan/glm-5.3
+model: zai-coding-plan/glm-5.3-flash
 color: "#D2D831"
 permission:
   edit: allow
