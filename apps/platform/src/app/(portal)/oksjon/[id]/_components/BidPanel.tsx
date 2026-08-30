@@ -3,7 +3,7 @@
 import { Btn } from '@eametsad/ui'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, type SyntheticEvent } from 'react'
+import { useEffect, useState, type KeyboardEvent, type SyntheticEvent } from 'react'
 
 import { AlapakkumineToggle } from './AlapakkumineToggle'
 import { AutobidderControl } from './AutobidderControl'
@@ -489,6 +489,13 @@ export function BidPanel({
     setAmountStr(inputAmount(next))
   }
 
+  function handleAmountKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
+    if (step <= 0 || isSubmitting) return
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+    event.preventDefault()
+    applyStep(event.key === 'ArrowUp' ? 1 : -1)
+  }
+
   return (
     <section className={PANEL_CLASSES}>
       <h2 className="font-heading text-h4 text-ink">Pakkumine</h2>
@@ -551,6 +558,7 @@ export function BidPanel({
               setAmountStr(event.target.value)
               setError(null)
             }}
+            onKeyDown={handleAmountKeyDown}
             aria-invalid={error !== null}
             className="h-12 w-full min-w-0 rounded-input border border-border bg-bgPage px-4 text-body text-ink outline-none transition-colors aria-[invalid=true]:border-danger focus:border-primary focus:ring-2 focus:ring-primary/20"
           />

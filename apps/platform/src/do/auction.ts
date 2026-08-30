@@ -1,6 +1,7 @@
 import { DurableObject, type DurableObjectState } from 'cloudflare:workers'
 import { drizzle } from 'drizzle-orm/d1'
 
+import { parseIdentitySnapshot } from '../lib/bidding/identity-snapshot'
 import {
   createCoreRepositories,
   nodeIsikukoodCodec,
@@ -55,6 +56,8 @@ export interface BidRequest {
   source?: BidSource
   requestIp?: string
   idempotencyKey?: string
+  /** Validated identity snapshot (JSON string) for sealed admissions. */
+  identitySnapshot?: string
 }
 
 export interface AutobidInfo {
@@ -168,6 +171,7 @@ interface InsertBidInput {
   status: 'leading' | 'pending_approval'
   ipHash?: string
   idempotencyKey?: string
+  identitySnapshot?: string
 }
 
 function insertBidStatement(input: InsertBidInput, now: string): SqlStatement {
@@ -341,6 +345,9 @@ function mapBid(input: InsertBidInput, now: string): Record<string, unknown> {
     ...(input.ipHash !== undefined ? { ipHash: input.ipHash } : {}),
     ...(input.idempotencyKey !== undefined
       ? { idempotencyKey: input.idempotencyKey }
+      : {}),
+    ...(input.identitySnapshot !== undefined
+      ? { identitySnapshot: input.identitySnapshot }
       : {}),
     createdAt: now,
     updatedAt: now,
@@ -700,6 +707,12 @@ export class AuctionDO extends DurableObject<Env> {
     ) {
       return errorResponse(400, 'source must be manual or autobidder')
     }
+    let identitySnapshot: string | undefined
+    if (body.identitySnapshot !== undefined) {
+      const snapshot = parseIdentitySnapshot(body.identitySnapshot)
+      if (!snapshot.ok) return errorResponse(400, snapshot.error)
+      identitySnapshot = snapshot.snapshot
+    }
     const result = await this.serialize(() =>
       this.admitBid({
         auctionId,
@@ -711,6 +724,7 @@ export class AuctionDO extends DurableObject<Env> {
         ...(body.idempotencyKey !== undefined
           ? { idempotencyKey: body.idempotencyKey }
           : {}),
+        ...(identitySnapshot !== undefined ? { identitySnapshot } : {}),
       }),
     )
     return jsonResponse(result)
@@ -836,7 +850,7 @@ export class AuctionDO extends DurableObject<Env> {
         if (!signed) {
           return deny(403, 'Framework contract required', {
             code: 'framework_contract_required',
-            redirectUrl: '/contracts/framework',
+            redirectUrl: '/lepingud/raamleping',
           })
         }
       }
@@ -874,6 +888,9 @@ export class AuctionDO extends DurableObject<Env> {
       status: isUnderStartBid ? 'pending_approval' : 'leading',
       ...(ipHash !== undefined ? { ipHash } : {}),
       ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+      ...(input.identitySnapshot !== undefined
+        ? { identitySnapshot: input.identitySnapshot }
+        : {}),
     }
 
     // 9. Writes. An under-start bid lands as pending_approval and never

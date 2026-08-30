@@ -53,7 +53,7 @@ export async function checkContractGate(
   })
 
   if (signedContracts.docs.length === 0) {
-    return { passed: false, redirectUrl: '/contracts/framework' }
+    return { passed: false, redirectUrl: '/lepingud/raamleping' }
   }
 
   return { passed: true }

@@ -49,6 +49,40 @@ function normalizeKey(key: string): string {
   return key.toLowerCase().replace(/[^a-z0-9äöüõ]/g, '')
 }
 
+// Same code set as SPECIES_CODE_NAMES in lib/auction/queries.ts (kept
+// module-private there and server-only, so this client-safe copy maps the
+// short codes to the full Estonian species names shown in the tooltip).
+const SPECIES_FULL_NAMES: Readonly<Record<string, string>> = {
+  ma: 'Mänd',
+  ku: 'Kuusk',
+  ks: 'Kask',
+  ha: 'Haab',
+  sa: 'Sanglepp',
+  ta: 'Tamm',
+}
+
+function isSpeciesColumn(keys: readonly string[]): boolean {
+  return keys.some((key) => {
+    const normalized = normalizeKey(key)
+    return normalized === 'species' || normalized === 'puuliik'
+  })
+}
+
+/** Species cell content: short label as-is, full name as the native tooltip. */
+function SpeciesCell({ value, species }: { value: string; species: boolean }) {
+  if (!species) return <span className="whitespace-normal">{value}</span>
+  const trimmed = value.trim()
+  const fullName = SPECIES_FULL_NAMES[trimmed.toLowerCase()]
+  if (fullName === undefined || fullName.toLowerCase() === trimmed.toLowerCase()) {
+    return <span className="whitespace-normal">{value}</span>
+  }
+  return (
+    <span className="whitespace-normal" title={fullName}>
+      {value}
+    </span>
+  )
+}
+
 function cellOf(row: Record<string, unknown>, keys: readonly string[]): string | null {
   for (const key of keys) {
     const value: unknown = row[key]
@@ -103,7 +137,11 @@ function PackageTable({
     key: column.label,
     label: column.label,
     sortable: false,
-    render: (row) => <span className="whitespace-normal">{cellOf(row, column.keys)}</span>,
+    render: (row) => {
+      const value = cellOf(row, column.keys)
+      if (value === null) return null
+      return <SpeciesCell value={value} species={isSpeciesColumn(column.keys)} />
+    },
   }))
 
   return (

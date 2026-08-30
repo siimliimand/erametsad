@@ -1173,7 +1173,7 @@ test('the framework contract gate blocks unsigned bidders and passes signed ones
   expect(blocked.admission.status).toBe(403)
   expect(blocked.admission.error).toBe('Framework contract required')
   expect(blocked.admission.code).toBe('framework_contract_required')
-  expect(blocked.admission.redirectUrl).toBe('/contracts/framework')
+  expect(blocked.admission.redirectUrl).toBe('/lepingud/raamleping')
   const afterBlock = await db.select().from(schema.bids).where(eq(schema.bids.auctionId, auctionId))
   expect(afterBlock).toHaveLength(0)
 

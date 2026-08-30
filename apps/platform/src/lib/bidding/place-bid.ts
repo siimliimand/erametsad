@@ -20,6 +20,8 @@ export interface PlaceBidParams {
   source: 'manual' | 'autobidder'
   requestIp?: string
   idempotencyKey?: string
+  /** Validated identity snapshot (JSON string) forwarded by the bids/create route. */
+  identitySnapshot?: string
 }
 
 export interface BidSuccess {
@@ -218,7 +220,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
             error: 'Framework contract required',
             status: 403,
             code: 'framework_contract_required',
-            redirectUrl: '/contracts/framework',
+            redirectUrl: '/lepingud/raamleping',
           }
         }
       }
@@ -258,6 +260,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
           status: 'pending_approval',
           ipHash,
           idempotencyKey,
+          identitySnapshot: params.identitySnapshot,
         },
         now,
       )
@@ -289,6 +292,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
           status: 'pending_approval',
           ipHash,
           idempotencyKey,
+          identitySnapshot: params.identitySnapshot,
         },
         insertResult.results[0],
         pendingInsert,
@@ -319,6 +323,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
         status: 'leading',
         ipHash,
         idempotencyKey,
+        identitySnapshot: params.identitySnapshot,
       },
       now,
     )
@@ -349,6 +354,7 @@ export async function placeBid(params: PlaceBidParams): Promise<BidResult> {
         status: 'leading',
         ipHash,
         idempotencyKey,
+        identitySnapshot: params.identitySnapshot,
       },
       insertResult.results[0],
       leadingInsert,
@@ -415,6 +421,7 @@ interface InsertBidInput {
   status: 'leading' | 'pending_approval'
   ipHash?: string | undefined
   idempotencyKey?: string | undefined
+  identitySnapshot?: string | undefined
 }
 
 interface InsertedBidRow {
@@ -468,6 +475,11 @@ function mapInsertedBid(
     ...(input.ipHash !== undefined ? { ipHash: input.ipHash } : {}),
     ...(input.idempotencyKey !== undefined
       ? { idempotencyKey: input.idempotencyKey }
+      : {}),
+    // Threaded for the later persistence wave (encryption + column write);
+    // the insert statement deliberately stays untouched for now.
+    ...(input.identitySnapshot !== undefined
+      ? { identitySnapshot: input.identitySnapshot }
       : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
