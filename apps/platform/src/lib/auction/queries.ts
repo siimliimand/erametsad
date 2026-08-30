@@ -8,7 +8,7 @@ import type {
   Bid,
   BidSource,
 } from '@/lib/data/schema'
-import { auctionStatuses } from '@/lib/data/schema'
+import { auctionObjectTypes, auctionStatuses } from '@/lib/data/schema'
 
 // Shared read-side shaping for the public auction APIs. Server components
 // (tasks 3.1, 4.1, 5.1) and the REST routes import the same helpers so role
@@ -533,6 +533,46 @@ export async function listAuctionMapPoints(
   const docs = sortDocs(await collectAuctionDocs(repos, filters), filters.sortField, filters.sortDirection)
   const lookups = await locationLookups(repos)
   return docs.map((doc) => auctionSummary(doc, lookups))
+}
+
+// ── Active statistics for the portal listing tabs ───────────────────────
+
+export interface ActiveAuctionTypeStats {
+  count: number
+  areaHa: number
+  volumeM3: number
+  minBidEur: number
+}
+
+/**
+ * Per-objectType aggregates over status='active' auctions only. Powers the
+ * portal tab counters and the Estonian summary sentence; the euro value is
+ * the sum of start prices because finalPrice is null while active.
+ */
+export async function activeStatsByObjectType(
+  repos: CoreRepositories,
+): Promise<Record<AuctionObjectType, ActiveAuctionTypeStats>> {
+  const { docs } = await repos.find({
+    collection: 'auctions',
+    where: { status: { equals: 'active' } },
+    pagination: false,
+    sort: 'id',
+  })
+  const stats = Object.fromEntries(
+    auctionObjectTypes.map((objectType) => [
+      objectType,
+      { count: 0, areaHa: 0, volumeM3: 0, minBidEur: 0 },
+    ]),
+  ) as Record<AuctionObjectType, ActiveAuctionTypeStats>
+  for (const doc of docs) {
+    const totals = packageTotals(doc.packageRows)
+    const bucket = stats[doc.objectType]
+    bucket.count += 1
+    bucket.areaHa += totals.area ?? 0
+    bucket.volumeM3 += totals.volume ?? 0
+    bucket.minBidEur += centsToEuros(doc.minBidCents)
+  }
+  return stats
 }
 
 // ── Bid loading and shaping ─────────────────────────────────────────────
