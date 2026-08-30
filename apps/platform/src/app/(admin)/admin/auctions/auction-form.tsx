@@ -167,6 +167,11 @@ export function AuctionForm({
         name="descriptionPublic"
         defaultValue={auction?.descriptionPublic ?? ''}
       />
+      <FormTextareaField
+        label="Lisainfo"
+        name="descriptionSecondary"
+        defaultValue={auction?.descriptionSecondary ?? ''}
+      />
       <div className="flex items-center gap-sm pt-xs">
         <button type="submit" className={primaryButtonClass}>
           {submitLabel}

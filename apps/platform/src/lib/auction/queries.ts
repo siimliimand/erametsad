@@ -869,6 +869,7 @@ export interface AuctionDossier extends AuctionSummary {
   packageRows: unknown[]
   packageColumns: string[]
   descriptionPublic: string | null
+  descriptionSecondary: string | null
   files: unknown[]
   media: unknown[]
   contact: AuctionContact
@@ -966,6 +967,7 @@ export async function getAuctionDossier(
     packageRows: Array.isArray(doc.packageRows) ? doc.packageRows : [],
     packageColumns: packageColumnLabels(doc.packageColumns),
     descriptionPublic: doc.descriptionPublic,
+    descriptionSecondary: doc.descriptionSecondary,
     files: Array.isArray(doc.files) ? doc.files : [],
     media: Array.isArray(doc.media) ? doc.media : [],
     contact,
