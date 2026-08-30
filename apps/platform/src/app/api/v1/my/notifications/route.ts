@@ -3,8 +3,8 @@ import type { NextRequest } from 'next/server'
 
 import { verifyAccessToken } from '@/lib/auth/jwt'
 import type { NotificationDoc } from '@/lib/data/repositories/registry'
-import { getRepositories } from '@/lib/data/runtime'
 import type { WhereClause } from '@/lib/data/repositories/where'
+import { getRepositories } from '@/lib/data/runtime'
 
 const PAGE_SIZE = 25
 

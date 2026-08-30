@@ -1,7 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { renderToString } from 'react-dom/server'
-
 import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
+import { describe, expect, it } from 'vitest'
 
 import {
   PASSWORD_MIN_LENGTH,
@@ -158,7 +157,7 @@ describe('PasswordStrengthMeter markup', () => {
 
   it('lists the minimum length rule with the configured length', () => {
     const html = renderToString(createElement(PasswordStrengthMeter, { password: VALID_10 }))
-    expect(html).toContain(`Vähemalt ${PASSWORD_MIN_LENGTH} tähemärki`)
+    expect(html).toContain(`Vähemalt ${String(PASSWORD_MIN_LENGTH)} tähemärki`)
   })
 
   it('flags a password equal to the isikukood with the isikukood rule', () => {

@@ -10,10 +10,11 @@ export class ApiError extends Error {
 
 /** JSON fetch helper that surfaces the API's Estonian error messages. */
 export async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-  })
+  const headers = new Headers(init?.headers)
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  const response = await fetch(url, { ...init, headers })
   const data: unknown = await response.json().catch(() => null)
   if (!response.ok) {
     const message =

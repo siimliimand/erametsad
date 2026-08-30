@@ -772,6 +772,9 @@ export default async function AuctionPage({
                         isLeading: auction.participation?.isLeading ?? false,
                         hasRights: null,
                         hasRaamleping,
+                        // Dossier participation carries the flag only; the
+                        // autobidder row (id/max) stays a documented gap.
+                        hasAutobidder: auction.participation?.hasAutobidder ?? false,
                       }
                 }
               />

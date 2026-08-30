@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
 
+import { ProfileDashboard } from './_components/ProfileDashboard'
+import type { ProfileView, UserIdentity } from './_components/types'
+
 import { requirePortalSession } from '@/app/(portal)/_lib/session'
 import { getRepositories } from '@/lib/data/runtime'
 import type { Profile } from '@/lib/data/schema'
-
-import { ProfileDashboard } from './_components/ProfileDashboard'
-import type { ProfileView, UserIdentity } from './_components/types'
 
 export const dynamic = 'force-dynamic'
 

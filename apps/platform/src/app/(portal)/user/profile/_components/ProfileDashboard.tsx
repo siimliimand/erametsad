@@ -2,16 +2,16 @@
 
 import { Btn } from '@eametsad/ui'
 import Link from 'next/link'
-import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useCallback, useState } from 'react'
 
-import { requestJson } from './api'
 import { CompanyProfileCard } from './CompanyProfileCard'
 import { ConsentsLog } from './ConsentsLog'
 import { PasswordModal } from './PasswordModal'
 import { PrivateProfileCard } from './PrivateProfileCard'
 import { RightsMatrix } from './RightsMatrix'
 import { SessionsList } from './SessionsList'
+import { requestJson } from './api'
 import type { ProfileView, UserIdentity } from './types'
 
 interface ProfileDashboardProps {
@@ -128,7 +128,13 @@ export function ProfileDashboard({
                 Pärast parooli vahetamist logitakse kõik seadmed välja.
               </p>
             </div>
-            <Btn variant="outline" size="sm" onClick={() => setPasswordOpen(true)}>
+            <Btn
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPasswordOpen(true)
+              }}
+            >
               Muuda parooli
             </Btn>
           </div>
@@ -138,7 +144,12 @@ export function ProfileDashboard({
 
       {consentsSource && <ConsentsLog profile={consentsSource} onChanged={handleSaved} />}
 
-      <PasswordModal isOpen={passwordOpen} onClose={() => setPasswordOpen(false)} />
+      <PasswordModal
+        isOpen={passwordOpen}
+        onClose={() => {
+          setPasswordOpen(false)
+        }}
+      />
     </div>
   )
 }

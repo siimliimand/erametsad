@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     const row = latest.get(objectType)
     return {
       objectType,
-      granted: row !== undefined && row.revokedAt === null,
+      granted: row?.revokedAt === null,
       grantedAt: row?.grantedAt ?? null,
       revokedAt: row?.revokedAt ?? null,
     }

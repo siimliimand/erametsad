@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { redirect, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useEffect, useState, type SVGProps } from 'react'
 
+import { logoutAction } from '@/app/(portal)/_actions/logout'
 import { useMyStream } from '@/app/(portal)/_lib/use-my-stream'
 
 // Inline Lucide-geometry icons (ISC); apps/platform does not declare
@@ -126,25 +127,19 @@ export function ShellHeader({ profileName }: { profileName: string | null }) {
           setUnread(data.unreadCount)
         }
       })
-      .catch(() => {})
+      .catch(() => undefined)
     return () => {
       active = false
     }
   }, [])
 
   useEffect(
-    () => subscribe('notification', () => setUnread((count) => count + 1)),
+    () =>
+      subscribe('notification', () => {
+        setUnread((count) => count + 1)
+      }),
     [subscribe],
   )
-
-  async function logoutAction() {
-    'use server'
-    const { cookies } = await import('next/headers')
-    const cookieStore = await cookies()
-    cookieStore.delete('access_token')
-    cookieStore.delete('refresh_token')
-    redirect('/')
-  }
 
   return (
     <header className="rounded-card border border-border bg-bgPage shadow-card">
@@ -170,7 +165,7 @@ export function ShellHeader({ profileName }: { profileName: string | null }) {
         <div className="ml-auto flex items-center gap-sm">
           <Link
             href="/user/notifications"
-            aria-label={unread > 0 ? `Teavitused, ${unread} lugemata` : 'Teavitused'}
+            aria-label={unread > 0 ? `Teavitused, ${String(unread)} lugemata` : 'Teavitused'}
             className="relative flex h-9 w-9 items-center justify-center rounded-pill border border-border text-ink transition-colors duration-hover hover:border-primary hover:text-primary"
           >
             <BellIcon />

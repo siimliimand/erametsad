@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
+import { ProfileSelector, type ProfileOption } from './_components/ProfileCard'
+
 import { requirePortalSession } from '@/app/(portal)/_lib/session'
 import { auctionObjectTypes } from '@/lib/data/schema'
 import type { AuctionRight, Profile } from '@/lib/data/schema'
-
-import { ProfileSelector, type ProfileOption } from './_components/ProfileCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +36,7 @@ function grantedObjectTypes(rights: AuctionRight[]): (typeof auctionObjectTypes)
   }
   return auctionObjectTypes.filter((objectType) => {
     const row = latest.get(objectType)
-    return row !== undefined && row.revokedAt === null
+    return row?.revokedAt === null
   })
 }
 

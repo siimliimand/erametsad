@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server'
 import { verifyAccessToken } from '@/lib/auth/jwt'
 import type { AuctionDoc, CoreRepositories } from '@/lib/data/repositories'
 import { centsToEuros } from '@/lib/data/repositories'
+import { getRepositories } from '@/lib/data/runtime'
 import type {
   AuctionObjectType,
   AuctionStatus,
@@ -11,7 +12,6 @@ import type {
   BidStatus,
   County,
 } from '@/lib/data/schema'
-import { getRepositories } from '@/lib/data/runtime'
 
 // Bids carry only userId (no profile column), so this endpoint scopes to the
 // session user, not the active profile — the data model cannot express

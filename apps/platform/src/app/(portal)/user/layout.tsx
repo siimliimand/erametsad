@@ -22,7 +22,7 @@ export default async function UserLayout({ children }: { children: React.ReactNo
   // name crosses into the client Shell.
   const profileName =
     profile?.type === 'company'
-      ? profile?.companyName ?? profile?.displayName ?? null
+      ? profile.companyName ?? profile.displayName ?? null
       : profile?.displayName ?? profile?.companyName ?? null
 
   return (

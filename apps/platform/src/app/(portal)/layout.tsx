@@ -18,7 +18,7 @@ export default async function PortalLayout({ children }: { children: React.React
   const auth = await getPortalAuthState()
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg-mist">
+    <div className="flex min-h-screen flex-col bg-bgMist">
       <PortalHeader auth={auth} />
       <main className="mx-auto w-full max-w-container-xl flex-1 px-md py-lg md:px-lg">
         {children}

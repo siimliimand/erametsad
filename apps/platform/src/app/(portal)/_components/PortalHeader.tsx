@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { redirect, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 
+import { logoutAction } from '@/app/(portal)/_actions/logout'
 import type { PortalAuthState } from '@/app/(portal)/_lib/session'
 
 const marketingLinks = [
@@ -27,15 +28,6 @@ export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  async function logoutAction() {
-    'use server'
-    const { cookies } = await import('next/headers')
-    const cookieStore = await cookies()
-    cookieStore.delete('access_token')
-    cookieStore.delete('refresh_token')
-    redirect('/')
-  }
-
   const loginHref = `/login?next=${encodeURIComponent(pathname)}`
 
   return (
@@ -44,7 +36,7 @@ export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
         <div className="flex items-center gap-md py-sm">
           <Link href="/" className="flex flex-col leading-tight">
             <span className="font-heading text-h4 font-extrabold text-primaryDark">Eametsad</span>
-            <span className="text-label text-ink-muted">Oksjonid</span>
+            <span className="text-label text-inkMuted">Oksjonid</span>
           </Link>
           <nav
             aria-label="Peamenüü"
@@ -72,7 +64,7 @@ export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
                   }}
                   className="flex items-center gap-xs rounded-pill border border-border bg-bgPage px-sm py-2xs text-bodySm font-semibold text-ink transition-colors duration-hover hover:border-primary hover:text-primary"
                 >
-                  <span className="flex h-6 w-6 items-center justify-center rounded-pill bg-primary text-label text-ink-inverse">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-pill bg-primary text-label text-inkInverse">
                     {(auth.profileName ?? 'K').charAt(0).toUpperCase()}
                   </span>
                   <span className="max-w-32 truncate">{auth.profileName ?? 'Minu konto'}</span>
@@ -90,7 +82,7 @@ export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
                         onClick={() => {
                           setMenuOpen(false)
                         }}
-                        className="block px-sm py-xs text-bodySm text-ink transition-colors duration-hover hover:bg-primary-light hover:text-primary"
+                        className="block px-sm py-xs text-bodySm text-ink transition-colors duration-hover hover:bg-primaryLight hover:text-primary"
                       >
                         {item.label}
                       </Link>
@@ -99,7 +91,7 @@ export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
                       <form action={logoutAction}>
                         <button
                           type="submit"
-                          className="block w-full px-sm py-xs text-left text-bodySm text-danger transition-colors duration-hover hover:bg-danger-light"
+                          className="block w-full px-sm py-xs text-left text-bodySm text-danger transition-colors duration-hover hover:bg-dangerLight"
                         >
                           Logi välja
                         </button>
@@ -111,7 +103,7 @@ export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
             ) : (
               <Link
                 href={loginHref}
-                className="rounded-button bg-primary px-sm py-2xs text-bodySm font-semibold text-ink-inverse transition-colors duration-hover hover:bg-primary-hover"
+                className="rounded-button bg-primary px-sm py-2xs text-bodySm font-semibold text-inkInverse transition-colors duration-hover hover:bg-primaryHover"
               >
                 Logi sisse
               </Link>

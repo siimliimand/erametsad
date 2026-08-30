@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-import { requirePortalSession } from '@/app/(portal)/_lib/session'
-
 import { PasswordForm } from '../_components/PasswordForm'
+
+import { requirePortalSession } from '@/app/(portal)/_lib/session'
 
 interface UpdatePasswordPageProps {
   searchParams: Promise<{ first?: string | string[] }>

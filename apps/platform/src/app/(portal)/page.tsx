@@ -1,8 +1,8 @@
-import { LotCard, type LotCardProps } from '@eametsad/ui'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { ListingFilters } from './_components/ListingFilters'
+import { ListingMap } from './_components/ListingMap'
 import {
   LISTING_TAB_IDS,
   ListingTabs,
@@ -11,29 +11,25 @@ import {
   resolveListingTab,
   type RawSearchParams,
 } from './_components/ListingTabs'
+import { LiveListing } from './_components/LiveListing'
 import {
   buildActiveSummary,
   type ActiveListingStats,
   type ListingTabId,
 } from './_lib/summary'
+import { AuctionStreamProvider } from './_lib/use-auction-stream'
 
 import {
   DEFAULT_AUCTION_LIST_LIMIT,
   activeStatsByObjectType,
+  listAuctionMapPoints,
   listAuctions,
   type AuctionListResult,
   type AuctionSummary,
 } from '@/lib/auction/queries'
-import type { CoreRepositories } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 
 export const dynamic = 'force-dynamic'
-
-// CSP allows only 'self' data: blob: for images, so lots without media get
-// an inline SVG placeholder instead of an external image host.
-const LOT_IMAGE_FALLBACK = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" role="img" aria-label="Erametsad"><rect width="640" height="400" fill="#2E6B4F"/><text x="320" y="208" fill="#FFFFFF" font-family="sans-serif" font-size="28" text-anchor="middle">Erametsad</text></svg>',
-)}`
 
 const EMPTY_RESULT: AuctionListResult = {
   auctions: [],
@@ -41,6 +37,14 @@ const EMPTY_RESULT: AuctionListResult = {
   page: 1,
   limit: DEFAULT_AUCTION_LIST_LIMIT,
   totalPages: 1,
+}
+
+// ?view=kart shows the map; every other value (and absence) is the list.
+type ListingView = 'list' | 'kart'
+
+function resolveListingView(raw: string | string[] | undefined): ListingView {
+  const value = Array.isArray(raw) ? raw[0] : raw
+  return value === 'kart' ? 'kart' : 'list'
 }
 
 function rawPage(raw: string | string[] | undefined): number {
@@ -61,16 +65,17 @@ function statsForTab(tab: ListingTabId, stats: Awaited<ReturnType<typeof activeS
   return merged
 }
 
-async function loadTabListings(
-  repos: CoreRepositories,
+/** Tab objectTypes + active filters; shared by listAuctions, the map query and LiveListing. */
+function buildTabQuery(
   tab: ListingTabId,
   page: number,
   params: RawSearchParams,
-): Promise<AuctionListResult> {
+): URLSearchParams {
   const { objectTypes } = listingTabDef(tab)
-  if (objectTypes.length === 0) return EMPTY_RESULT
   const search = new URLSearchParams()
-  search.set('objectType', objectTypes.join(','))
+  if (objectTypes.length > 0) {
+    search.set('objectType', objectTypes.join(','))
+  }
   search.set('auctionStatus', 'active')
   for (const key of ['county', 'parish', 'species', 'loggingType', 'sort', 'order']) {
     const value = params[key]
@@ -82,20 +87,24 @@ async function loadTabListings(
     if (typeof value === 'string' && value !== '') search.set(key, value)
   }
   if (page > 1) search.set('page', String(page))
-  return listAuctions(repos, search)
+  return search
 }
 
-function lotCardProps(auction: AuctionSummary): LotCardProps {
-  return {
-    image: { src: auction.image ?? LOT_IMAGE_FALLBACK, alt: auction.title },
-    title: auction.title,
-    alghind: auction.minBid,
-    county: auction.county?.name ?? auction.address ?? 'Eesti',
-    area: auction.area ?? 0,
-    endsAt: auction.endsAt ?? new Date().toISOString(),
-    status: 'active',
-    href: `/oksjon/${auction.id}`,
+/** View-toggle href: keeps tab and filters, resets pagination, encodes the view. */
+function buildViewHref(
+  tab: ListingTabId,
+  params: RawSearchParams,
+  view: ListingView,
+): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (key === 'tab' || key === 'page' || key === 'view' || value === undefined) continue
+    for (const entry of Array.isArray(value) ? value : [value]) search.append(key, entry)
   }
+  search.set('tab', tab)
+  if (view === 'kart') search.set('view', 'kart')
+  const qs = search.toString()
+  return qs === '' ? '/' : `/?${qs}`
 }
 
 function paginationPages(page: number, totalPages: number): (number | '…')[] {
@@ -169,47 +178,82 @@ export async function generateMetadata({
 export default async function PortalListingPage({ searchParams }: PortalListingPageProps) {
   const params = await searchParams
   const tab = resolveListingTab(params.tab)
+  const view = resolveListingView(params.view)
   const page = rawPage(params.page)
 
   const repos = await getRepositories()
-  const [typeStats, result] = await Promise.all([
+  const tabDef = listingTabDef(tab)
+  const listingQuery = buildTabQuery(tab, page, params)
+  const hasTypes = tabDef.objectTypes.length > 0
+
+  const [typeStats, result, mapPoints] = await Promise.all([
     activeStatsByObjectType(repos),
-    loadTabListings(repos, tab, page, params),
+    view === 'list' && hasTypes
+      ? listAuctions(repos, listingQuery)
+      : Promise.resolve(EMPTY_RESULT),
+    view === 'kart' && hasTypes
+      ? listAuctionMapPoints(repos, listingQuery)
+      : Promise.resolve([] as AuctionSummary[]),
   ])
 
   const counts = Object.fromEntries(
     LISTING_TAB_IDS.map((id) => [id, statsForTab(id, typeStats).count]),
   ) as Record<ListingTabId, number>
 
-  const tabDef = listingTabDef(tab)
   const summary = buildActiveSummary(tab, statsForTab(tab, typeStats))
 
+  const viewToggleClass = (active: boolean): string =>
+    `flex items-center gap-2xs rounded-button px-sm py-2xs text-label font-semibold transition-colors duration-hover ease-hover ${
+      active
+        ? 'bg-primary text-white'
+        : 'border border-border text-ink hover:border-primary hover:text-primary'
+    }`
+
   return (
-    <div className="flex flex-col gap-lg">
-      <h1 className="font-heading text-h2 text-ink">{tabDef.heading}</h1>
+    <AuctionStreamProvider>
+      <div className="flex flex-col gap-lg">
+        <h1 className="font-heading text-h2 text-ink">{tabDef.heading}</h1>
 
-      <ListingTabs activeTab={tab} counts={counts} params={params} />
+        <ListingTabs activeTab={tab} counts={counts} params={params} />
 
-      <p className="font-body text-body text-inkMuted">{summary}</p>
+        <p className="font-body text-body text-inkMuted">{summary}</p>
 
-      <ListingFilters tab={tab} />
+        <ListingFilters tab={tab} />
 
-      {result.auctions.length === 0 ? (
-        <div className="rounded-card border border-border bg-white p-lg text-center">
-          <p className="font-body text-body text-inkMuted">
-            Hetkel ei ole käimasolevaid {tabDef.label.toLowerCase()} oksjoneid. Telli
-            teavitus, et uutest oksjonidest teada saada.
-          </p>
+        <div role="group" aria-label="Vaate valik" className="flex gap-2xs">
+          <Link
+            href={buildViewHref(tab, params, 'list')}
+            aria-current={view === 'list' ? 'true' : undefined}
+            className={viewToggleClass(view === 'list')}
+          >
+            Loendivaade
+          </Link>
+          <Link
+            href={buildViewHref(tab, params, 'kart')}
+            aria-current={view === 'kart' ? 'true' : undefined}
+            className={viewToggleClass(view === 'kart')}
+          >
+            Kaardivaade
+          </Link>
         </div>
-      ) : (
-        <div className="grid gap-md sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {result.auctions.map((auction) => (
-            <LotCard key={auction.id} {...lotCardProps(auction)} />
-          ))}
-        </div>
-      )}
 
-      <ListingPagination tab={tab} page={result.page} totalPages={result.totalPages} params={params} />
-    </div>
+        {view === 'kart' ? (
+          <ListingMap lots={mapPoints} />
+        ) : result.auctions.length === 0 ? (
+          <div className="rounded-card border border-border bg-white p-lg text-center">
+            <p className="font-body text-body text-inkMuted">
+              Hetkel ei ole käimasolevaid {tabDef.label.toLowerCase()} oksjoneid. Telli
+              teavitus, et uutest oksjonidest teada saada.
+            </p>
+          </div>
+        ) : (
+          <LiveListing lots={result.auctions} query={listingQuery.toString()} />
+        )}
+
+        {view === 'list' && (
+          <ListingPagination tab={tab} page={result.page} totalPages={result.totalPages} params={params} />
+        )}
+      </div>
+    </AuctionStreamProvider>
   )
 }

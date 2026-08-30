@@ -18,8 +18,12 @@ export function SessionsList() {
 
   const load = useCallback(() => {
     requestJson<{ sessions: SessionView[] }>('/api/v1/my/sessions')
-      .then((data) => setSessions(data.sessions))
-      .catch(() => setError('Sessioonide laadimine ebaõnnestus.'))
+      .then((data) => {
+        setSessions(data.sessions)
+      })
+      .catch(() => {
+        setError('Sessioonide laadimine ebaõnnestus.')
+      })
   }, [])
 
   useEffect(() => {

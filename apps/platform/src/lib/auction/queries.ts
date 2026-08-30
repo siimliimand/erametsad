@@ -453,6 +453,12 @@ export interface AuctionSummary {
   endsAt: string | null
   coordinates: { lat: number; lng: number } | null
   image: string | null
+  /**
+   * First cadastre or registry number for the listing-map popup
+   * (cadastres[0] ?? registryNumbers[0]); additive, so list consumers
+   * simply ignore it.
+   */
+  registryNumber: string | null
 }
 
 function auctionSummary(doc: AuctionDoc, lookups: LocationLookups): AuctionSummary {
@@ -481,6 +487,8 @@ function auctionSummary(doc: AuctionDoc, lookups: LocationLookups): AuctionSumma
     endsAt: isoOrNull(doc.endsAt),
     coordinates: coordinatesOf(doc.coordinates),
     image: imageOf(doc.media),
+    registryNumber:
+      stringList(doc.cadastres)[0] ?? stringList(doc.registryNumbers)[0] ?? null,
   }
 }
 

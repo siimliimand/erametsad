@@ -1,7 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
-import { renderToString } from 'react-dom/server'
-
 import { createElement, type ReactNode } from 'react'
+import { renderToString } from 'react-dom/server'
+import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
@@ -114,7 +113,9 @@ describe('BidPanel states', () => {
 
   it('renders the no-rights panel for viewers without bidding rights', () => {
     const html = render(
-      baseProps({ viewer: { ...baseProps().viewer!, hasRights: false } }),
+      baseProps({
+        viewer: { hasBid: false, isLeading: false, hasRights: false, hasRaamleping: true },
+      }),
     )
     expect(html).toContain('Sul ei ole õigust selle objektitüübi pakkumiste tegemiseks.')
     expect(html).toContain('Pakkumisõiguse saamiseks pöördu müüja poole.')
@@ -166,7 +167,9 @@ describe('BidPanel active state', () => {
 
   it('warns when the viewer has not signed the raamleping', () => {
     const html = render(
-      baseProps({ viewer: { ...baseProps().viewer!, hasRaamleping: false } }),
+      baseProps({
+        viewer: { hasBid: false, isLeading: false, hasRights: true, hasRaamleping: false },
+      }),
     )
     expect(html).toContain(
       'Enampakkumise tegemiseks tuleb esmalt allkirjastada raamleping.',

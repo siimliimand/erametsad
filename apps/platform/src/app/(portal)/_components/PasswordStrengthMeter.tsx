@@ -43,8 +43,8 @@ export function evaluatePassword(
   return { valid, tier, rules }
 }
 
-const RULE_CHECKS: ReadonlyArray<{ key: keyof PasswordRules; label: string }> = [
-  { key: 'minLength', label: `Vähemalt ${PASSWORD_MIN_LENGTH} tähemärki` },
+const RULE_CHECKS: readonly { key: keyof PasswordRules; label: string }[] = [
+  { key: 'minLength', label: `Vähemalt ${String(PASSWORD_MIN_LENGTH)} tähemärki` },
   { key: 'hasUppercase', label: 'Vähemalt üks suurtäht' },
   { key: 'hasNumber', label: 'Vähemalt üks number' },
   { key: 'hasSymbol', label: 'Vähemalt üks sümbol' },

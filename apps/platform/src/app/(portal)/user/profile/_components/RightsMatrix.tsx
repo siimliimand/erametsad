@@ -15,8 +15,6 @@ const objectTypeLabels: Record<ObjectTypeView, string> = {
   pakett: 'Pakett',
 }
 
-const objectTypes: ObjectTypeView[] = ['raieoigus', 'kinnistu', 'kiire', 'pakett']
-
 export function RightsMatrix() {
   const [rights, setRights] = useState<RightView[] | null>(null)
   const [pendingRequests, setPendingRequests] = useState<ReadonlySet<string>>(new Set())
@@ -40,11 +38,7 @@ export function RightsMatrix() {
 
   async function requestRight(objectType: ObjectTypeView) {
     setBusyType(objectType)
-    setRowErrors((prev) => {
-      const next = { ...prev }
-      delete next[objectType]
-      return next
-    })
+    setRowErrors(({ [objectType]: _cleared, ...rest }) => rest)
     try {
       await requestJson('/api/v1/my/rights-requests', {
         method: 'POST',
