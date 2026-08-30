@@ -40,14 +40,6 @@ const EMPTY_RESULT: AuctionListResult = {
   totalPages: 1,
 }
 
-// ?view=kart shows the map; every other value (and absence) is the list.
-type ListingView = 'list' | 'kart'
-
-function resolveListingView(raw: string | string[] | undefined): ListingView {
-  const value = Array.isArray(raw) ? raw[0] : raw
-  return value === 'kart' ? 'kart' : 'list'
-}
-
 function rawPage(raw: string | string[] | undefined): number {
   const value = Number(Array.isArray(raw) ? raw[0] : raw)
   return Number.isFinite(value) && value >= 1 ? Math.floor(value) : 1
@@ -81,23 +73,6 @@ function buildTabQuery(
   }
   if (page > 1) search.set('page', String(page))
   return search
-}
-
-/** View-toggle href: keeps tab and filters, resets pagination, encodes the view. */
-function buildViewHref(
-  tab: ListingTabId,
-  params: RawSearchParams,
-  view: ListingView,
-): string {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (key === 'tab' || key === 'page' || key === 'view' || value === undefined) continue
-    for (const entry of Array.isArray(value) ? value : [value]) search.append(key, entry)
-  }
-  search.set('tab', tab)
-  if (view === 'kart') search.set('view', 'kart')
-  const qs = search.toString()
-  return qs === '' ? '/' : `/?${qs}`
 }
 
 function paginationPages(page: number, totalPages: number): (number | '…')[] {
@@ -171,20 +146,18 @@ export async function generateMetadata({
 export default async function PortalListingPage({ searchParams }: PortalListingPageProps) {
   const params = await searchParams
   const tab = resolveListingTab(params.tab)
-  const view = resolveListingView(params.view)
   const page = rawPage(params.page)
 
   const repos = await getRepositories()
   const tabDef = listingTabDef(tab)
   const listingQuery = buildTabQuery(tab, page, params)
-  const hasTypes = tabDef.allTypes || tabDef.objectTypes.length > 0
+  const hasTypes = tabDef.allTypes ?? tabDef.objectTypes.length > 0
 
+  // Legacy ?view=kart links land here too: the param is accepted and ignored (D3).
   const [typeStats, result, mapPoints] = await Promise.all([
     activeStatsByObjectType(repos),
-    view === 'list' && hasTypes
-      ? listAuctions(repos, listingQuery)
-      : Promise.resolve(EMPTY_RESULT),
-    view === 'kart' && hasTypes
+    hasTypes ? listAuctions(repos, listingQuery) : Promise.resolve(EMPTY_RESULT),
+    hasTypes
       ? listAuctionMapPoints(repos, listingQuery)
       : Promise.resolve([] as AuctionSummary[]),
   ])
@@ -195,58 +168,36 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
 
   const summary = buildActiveSummary(tab, statsForTab(tab, typeStats))
 
-  const viewToggleClass = (active: boolean): string =>
-    `flex items-center gap-2xs rounded-button px-sm py-2xs text-label font-semibold transition-colors duration-hover ease-hover ${
-      active
-        ? 'bg-primary text-white'
-        : 'border border-border text-ink hover:border-primary hover:text-primary'
-    }`
-
   return (
     <AuctionStreamProvider>
-      <div className="flex flex-col gap-lg">
-        <h1 className="font-heading text-h2 text-ink">{tabDef.heading}</h1>
+      <div className="grid grid-cols-12 gap-lg">
+        <aside className="col-span-12 lg:col-span-3">
+          <ListingFilters tab={tab} />
+        </aside>
 
-        <ListingTabs activeTab={tab} counts={counts} params={params} />
+        <div className="col-span-12 flex flex-col gap-lg lg:col-span-9">
+          <h1 className="font-heading text-h2 text-ink">{tabDef.heading}</h1>
 
-        <p className="font-body text-body text-inkMuted">{summary}</p>
+          <ListingTabs activeTab={tab} counts={counts} params={params} />
 
-        <ListingFilters tab={tab} />
+          <p className="font-body text-body text-inkMuted">{summary}</p>
 
-        <div role="group" aria-label="Vaate valik" className="flex gap-2xs">
-          <Link
-            href={buildViewHref(tab, params, 'list')}
-            aria-current={view === 'list' ? 'true' : undefined}
-            className={viewToggleClass(view === 'list')}
-          >
-            Loendivaade
-          </Link>
-          <Link
-            href={buildViewHref(tab, params, 'kart')}
-            aria-current={view === 'kart' ? 'true' : undefined}
-            className={viewToggleClass(view === 'kart')}
-          >
-            Kaardivaade
-          </Link>
-        </div>
+          <ListingMap lots={mapPoints} className="h-96" />
 
-        {view === 'kart' ? (
-          <ListingMap lots={mapPoints} />
-        ) : result.auctions.length === 0 ? (
-          <div className="rounded-card border border-border bg-white p-lg text-center">
-            <p className="font-body text-body text-inkMuted">
-              {tabDef.allTypes
-                ? 'Hetkel ei ole käimasolevaid oksjoneid. Telli teavitus, et uutest oksjonidest teada saada.'
-                : `Hetkel ei ole käimasolevaid ${tabDef.label.toLowerCase()} oksjoneid. Telli teavitus, et uutest oksjonidest teada saada.`}
-            </p>
-          </div>
-        ) : (
-          <LiveListing lots={result.auctions} query={listingQuery.toString()} />
-        )}
+          {result.auctions.length === 0 ? (
+            <div className="rounded-card border border-border bg-white p-lg text-center">
+              <p className="font-body text-body text-inkMuted">
+                {tabDef.allTypes
+                  ? 'Hetkel ei ole käimasolevaid oksjoneid. Telli teavitus, et uutest oksjonidest teada saada.'
+                  : `Hetkel ei ole käimasolevaid ${tabDef.label.toLowerCase()} oksjoneid. Telli teavitus, et uutest oksjonidest teada saada.`}
+              </p>
+            </div>
+          ) : (
+            <LiveListing lots={result.auctions} query={listingQuery.toString()} />
+          )}
 
-        {view === 'list' && (
           <ListingPagination tab={tab} page={result.page} totalPages={result.totalPages} params={params} />
-        )}
+        </div>
       </div>
     </AuctionStreamProvider>
   )
