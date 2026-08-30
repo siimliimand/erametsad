@@ -27,10 +27,21 @@ export function StepDone({ target, displayName, profileType, approvalStatus }: S
       <p className="font-body text-bodySm text-inkMuted">
         Konto on avatud ajutise parooliga. Määra endale püsiv parool{' '}
         <Link
-          href="/update-password"
+          href="/update-password?first=1"
           className="font-semibold text-primary underline-offset-2 hover:underline"
         >
           parooli määramise lehel
+        </Link>
+        .
+      </p>
+
+      <p className="font-body text-bodySm text-inkMuted">
+        Enne oksjonitel osalemist tutvu{' '}
+        <Link
+          href="/lepingud/raamleping"
+          className="font-semibold text-primary underline-offset-2 hover:underline"
+        >
+          raamlepinguga
         </Link>
         .
       </p>

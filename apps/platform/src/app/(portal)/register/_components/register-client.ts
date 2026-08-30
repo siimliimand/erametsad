@@ -76,6 +76,8 @@ export interface RegistrationInput {
   consents: { terms: string; privacy: string; marketing: string }
   regCode?: string
   companyName?: string
+  phone?: string
+  address?: string
 }
 
 export interface RegisteredProfile {

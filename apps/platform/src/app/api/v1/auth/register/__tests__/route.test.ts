@@ -124,3 +124,69 @@ describe('POST /api/v1/auth/register isikukood handling', () => {
     expect(row?.isikukood_hash).toBeNull()
   })
 })
+
+describe('POST /api/v1/auth/register session issuance', () => {
+  it('issues a live session and sets both session cookies on success', async () => {
+    const response = await registerRoute(
+      registerRequest(validBody({ identifier: 'sessioon@example.ee' }), '10.0.1.1'),
+    )
+    expect(response.status).toBe(200)
+
+    const cookies = response.headers.getSetCookie()
+    expect(cookies.some((cookie) => cookie.startsWith('access_token='))).toBe(true)
+    expect(cookies.some((cookie) => cookie.startsWith('refresh_token='))).toBe(true)
+
+    const body = (await response.json()) as {
+      user?: { id?: unknown }
+      profile?: { id?: unknown }
+    }
+    const userId = String(body.user?.id)
+    const profileId = String(body.profile?.id)
+
+    const row = testDb.raw
+      .prepare('SELECT user_id, profile_id, revoked_at FROM sessions WHERE user_id = ?')
+      .get(userId) as
+      | { user_id: string; profile_id: string | null; revoked_at: string | null }
+      | undefined
+    expect(row?.profile_id).toBe(profileId)
+    expect(row?.revoked_at).toBeNull()
+  })
+})
+
+describe('POST /api/v1/auth/register phone persistence', () => {
+  it('persists a valid phone on the profile', async () => {
+    const response = await registerRoute(
+      registerRequest(
+        validBody({ identifier: 'telefon@example.ee', phone: '+37251234567' }),
+        '10.0.2.1',
+      ),
+    )
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { user?: { id?: unknown } }
+    const row = testDb.raw
+      .prepare('SELECT phone FROM profiles WHERE user_id = ?')
+      .get(String(body.user?.id)) as { phone: string | null } | undefined
+    expect(row?.phone).toBe('+37251234567')
+  })
+
+  it('rejects a phone that fails the Estonian format with 400', async () => {
+    const response = await registerRoute(
+      registerRequest(validBody({ phone: '51234567' }), '10.0.2.2'),
+    )
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'Vigane telefoninumber' })
+    expect(userCount()).toBe(0)
+  })
+
+  it('leaves the phone column unset when no phone is sent', async () => {
+    const response = await registerRoute(
+      registerRequest(validBody({ identifier: 'ilmatelefon@example.ee' }), '10.0.2.3'),
+    )
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { user?: { id?: unknown } }
+    const row = testDb.raw
+      .prepare('SELECT phone FROM profiles WHERE user_id = ?')
+      .get(String(body.user?.id)) as { phone: string | null } | undefined
+    expect(row?.phone).toBeNull()
+  })
+})
