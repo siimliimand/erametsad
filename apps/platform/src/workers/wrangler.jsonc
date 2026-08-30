@@ -1,0 +1,35 @@
+// Dedicated queue-consumer Worker. Kept separate from the OpenNext app shim
+// because wrangler cannot statically detect the `queue` export through the
+// shim's re-export chain (main-worker deploys failed with code 11001).
+// Bindings mirror QueueConsumerEnv: DB for fan-out reads, KV for dedupe,
+// BUCKET for contract artifacts, EMAIL is inherited from the account's
+// sending uses the same EMAIL binding as the app, so fan-out email
+{
+  "name": "eametsad-queue-consumer",
+  "main": "consumer.ts",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "queues": {
+    "consumers": [
+      {
+        "queue": "eametsad-jobs",
+        "max_retries": 3,
+        "dead_letter_queue": "eametsad-dlq"
+      }
+    ]
+  },
+  "kv_namespaces": [
+    { "binding": "KV", "id": "5b67cd2c595f4d31b3b1be5db76e9bef" }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "eametsad-db",
+      "database_id": "6ffb35ca-6a2d-4447-9559-4dbc00b9a6c8"
+    }
+  ],
+  "send_email": [{ "name": "EMAIL", "remote": true }],
+  "r2_buckets": [
+    { "binding": "BUCKET", "bucket_name": "eametsad-media" }
+  ]
+}

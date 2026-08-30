@@ -12,7 +12,6 @@ import '../lib/workers/auction-ending'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore generated .open-next output, see above
 export { default } from '../../.open-next/worker.js'
-export { queue } from '../workers/queue-consumer'
 export { AuctionDO } from './auction'
 export { RateLimiterDO } from './rate-limiter'
 
