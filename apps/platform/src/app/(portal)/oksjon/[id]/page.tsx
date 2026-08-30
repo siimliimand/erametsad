@@ -7,10 +7,11 @@ import { DossierTable, PackageSection, type DossierRow } from './_components/Dos
 import { Gallery, type GalleryImage } from './_components/Gallery'
 import { SellerContact } from './_components/SellerContact'
 
-import { getPortalAuthState } from '@/app/(portal)/_lib/session'
+import { getPortalAuthState, getActiveProfile } from '@/app/(portal)/_lib/session'
 import { getAuctionDossier, type AuctionDossier } from '@/lib/auction/queries'
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
+import { SealedBidPanel, type SealedViewerSnapshot } from './_components/sealed/SealedBidPanel'
 
 type PillStatus = React.ComponentProps<typeof StatusPill>['status']
 
@@ -301,22 +302,80 @@ function EndedPanel({ auction, unsold }: { auction: AuctionDossier; unsold: bool
   )
 }
 
-function SealedBidSlot({ auction }: { auction: AuctionDossier }) {
-  // Task 4.6 replaces this placeholder with the sealed-bid form.
-  return (
-    <section
-      id="bid-panel"
-      data-bid-panel-placeholder
-      className="flex flex-col gap-2xs rounded-card border border-dashed border-border bg-bgPage p-md"
-    >
-      <h2 className="font-heading text-h4 text-ink">Pakkumine</h2>
-      <p className="text-bodySm text-inkMuted">
-        {auction.bidCount !== null
-          ? `Pakkumisi: ${String(auction.bidCount)}`
-          : 'Suletud pakkumine.'}
-      </p>
-    </section>
-  )
+// ── Sealed viewer snapshot (task 4.6) ───────────────────────────────────
+
+/**
+ * Server-side snapshot for the sealed panel: own sealed bids, the settings
+ * revision cap, the opening-ceremony outcome, and identity prefill. Own-bid
+ * data only — sealed disclosure to everyone else stays at the bid count.
+ */
+async function buildSealedViewer(
+  repositories: CoreRepositories,
+  auth: { userId: string; profileId: string | null },
+  auctionId: string,
+): Promise<SealedViewerSnapshot> {
+  const [profile, systemRepositories, settings] = await Promise.all([
+    getActiveProfile(),
+    getRepositories(),
+    findGateDoc(repositories, 'settings', {}),
+  ])
+
+  // Own isikukood is read as system context from the users row, the same
+  // owner-scoped disclosure the profile page uses.
+  const user = await systemRepositories.findByID({ collection: 'users', id: auth.userId })
+  const userRecord = (user ?? {}) as Record<string, unknown>
+  const rawIsikukood = userRecord.isikukood
+  const isikukood =
+    typeof rawIsikukood === 'string' && rawIsikukood.trim() !== '' ? rawIsikukood : null
+
+  const ownBids = await repositories.find({
+    collection: 'bids',
+    where: {
+      and: [
+        { auction: { equals: auctionId } },
+        { user: { equals: auth.userId } },
+        { type: { equals: 'sealed' } },
+      ],
+    },
+    limit: 100,
+  })
+
+  let ownBidCount = 0
+  let latestSubmittedAt: string | null = null
+  let outcome: SealedViewerSnapshot['outcome'] = null
+  for (const doc of ownBids.docs) {
+    const bid = doc as Record<string, unknown>
+    if (bid.status === 'rejected') continue
+    ownBidCount += 1
+    if (bid.status === 'won' || bid.status === 'lost') {
+      outcome = bid.status
+    }
+    const createdAt = typeof bid.createdAt === 'string' ? bid.createdAt : null
+    if (createdAt !== null && (latestSubmittedAt === null || createdAt > latestSubmittedAt)) {
+      latestSubmittedAt = createdAt
+    }
+  }
+
+  const revisionCap =
+    typeof settings?.sealedRevisionCap === 'number' ? settings.sealedRevisionCap : 3
+
+  const profileType: SealedViewerSnapshot['profileType'] =
+    profile?.type === 'company' ? 'company' : 'private'
+  const displayName =
+    profileType === 'company'
+      ? (profile?.companyName ?? profile?.displayName ?? null)
+      : (profile?.displayName ?? null)
+
+  return {
+    profileType,
+    displayName,
+    isikukood,
+    registrikood: profileType === 'company' ? (profile?.companyRegCode ?? null) : null,
+    revisionCap,
+    ownBidCount,
+    latestSubmittedAt,
+    outcome,
+  }
 }
 
 // ── Page ────────────────────────────────────────────────────────────────
@@ -338,6 +397,13 @@ export default async function AuctionPage({
 
   const auction = await getAuctionDossier(repositories, id, viewer)
   if (!auction) notFound()
+
+  // Sealed panels get a server-built viewer snapshot (own bids, revision
+  // cap, outcome, identity prefill); open panels keep the dossier fields.
+  const sealedViewer =
+    auction.type === 'sealed' && auth !== null
+      ? await buildSealedViewer(repositories, auth, auction.id)
+      : null
 
   const images = galleryImages(auction.media, auction.title)
   const files = fileLinks([...auction.files, ...auction.media])
@@ -361,8 +427,9 @@ export default async function AuctionPage({
     auction.status === 'archived' ||
     auction.status === 'unsold'
 
-  // Open auctions mount the BidPanel; it renders the scheduled/active (and,
-  // defensively, ended) variants itself. Sealed keeps its placeholder (task 4.6).
+  // Open auctions mount the BidPanel for scheduled/active (and, defensively,
+  // ended) statuses. Sealed auctions always mount SealedBidPanel: it renders
+  // its own scheduled/active/locked/opening-result states.
   const mountBidPanel = !isEndedLike && auction.type === 'open'
   let antiSnipeMinutes: number | null = null
   let hasRaamleping: boolean | null = null
@@ -549,10 +616,19 @@ export default async function AuctionPage({
         </div>
 
         <div className="flex flex-col gap-lg">
-          {isEndedLike ? (
+          {auction.type === 'sealed' ? (
+            <SealedBidPanel
+              auctionId={auction.id}
+              status={auction.status}
+              startsAt={auction.startsAt}
+              endsAt={auction.endsAt}
+              minBid={auction.minBid}
+              bidCount={auction.bidCount}
+              finalPrice={auction.finalPrice}
+              viewer={sealedViewer}
+            />
+          ) : isEndedLike ? (
             <EndedPanel auction={auction} unsold={auction.status === 'unsold'} />
-          ) : auction.type === 'sealed' ? (
-            <SealedBidSlot auction={auction} />
           ) : (
             <BidPanel
               auctionId={auction.id}
