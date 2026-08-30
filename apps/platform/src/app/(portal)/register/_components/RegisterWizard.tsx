@@ -71,6 +71,7 @@ export function RegisterWizard({ next }: RegisterWizardProps) {
     const consentAt = new Date().toISOString()
     const result = await submitRegistration({
       identifier: data.email,
+      isikukood: identity.isikukood,
       profileType,
       consents: {
         terms: consentAt,

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+import { EEIsikukood } from '@eametsad/types'
+
 import { hashCredentialPassword } from '@/lib/auth/password'
 import { createSession, setSessionCookies } from '@/lib/auth/session'
 import { getRepositories } from '@/lib/data/runtime'
@@ -34,6 +36,20 @@ export async function POST(request: NextRequest) {
 
   if (profileType !== 'private' && profileType !== 'company') {
     return NextResponse.json({ error: 'Vale profiili tüüp' }, { status: 400 })
+  }
+
+  // Login by isikukood and completeEidLogin match users by isikukoodHash.
+  // The code passes to storage as plaintext; the users write hook then
+  // encrypts and hashes it exactly like the eID identity path does.
+  const rawIsikukood = body.isikukood
+  let isikukood: string | undefined
+  if (rawIsikukood !== undefined && rawIsikukood !== null && rawIsikukood !== '') {
+    const parsed =
+      typeof rawIsikukood === 'string' ? EEIsikukood.safeParse(rawIsikukood) : null
+    if (!parsed?.success) {
+      return NextResponse.json({ error: 'Vigane isikukood' }, { status: 400 })
+    }
+    isikukood = parsed.data
   }
 
   const consentTimestamps: Record<string, string> = {}
@@ -73,6 +89,9 @@ export async function POST(request: NextRequest) {
     role: profileType === 'company' ? 'company' : 'private',
     authMethod: 'password',
     status: 'active',
+  }
+  if (isikukood) {
+    userData.isikukood = isikukood
   }
 
   let user: Record<string, unknown>

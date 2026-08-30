@@ -71,6 +71,7 @@ export async function lookupCompany(regCode: string): Promise<CompanyLookup> {
 
 export interface RegistrationInput {
   identifier: string
+  isikukood?: string
   profileType: 'private' | 'company'
   consents: { terms: string; privacy: string; marketing: string }
   regCode?: string
