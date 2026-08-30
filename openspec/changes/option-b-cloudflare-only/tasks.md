@@ -44,7 +44,8 @@
 ## 4. Phase 3: Email Service
 
 - [x] 4.1 `src/lib/notifications/email-sender.ts` transport chain (EMAIL binding, then REST API, then SMTP) with `CLOUDFLARE_EMAIL_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` env; `next dev` keeps Mailpit <!-- agent: fullstack-engineer.build, depends_on: [1.3, 1.6], touches: [apps/platform/src/lib/notifications/email-sender.ts] -->
-- [ ] 4.2 `send_email` binding in `wrangler.jsonc`; verify sending domain `erametsad.ee` and sender `noreply@erametsad.ee` <!-- agent: fullstack-engineer.build, depends_on: [4.1], touches: [apps/platform/wrangler.jsonc] -->
+- [x] 4.2 `send_email` binding in `wrangler.jsonc`; verify sending domain `erametsad.ee` and sender `noreply@erametsad.ee` <!-- agent: fullstack-engineer.build, depends_on: [4.1], touches: [apps/platform/wrangler.jsonc] -->
+  - Done on the prototype domain per the addendum: `erametsad.ww0.dev` onboarded (id 4d1f904b...), MX/SPF/DKIM/DMARC auto-created, binding `send_email: [{name: EMAIL, remote: true}]`. First test send to the account owner bounced (permanent_bounce, minutes-old subdomain) — retry at 8.6. Quota endpoint not exposed by the API; 3,000/month docs baseline stands.
 - [x] 4.3 Surface `error.code` (`E_RATE_LIMIT_EXCEEDED`, `E_DAILY_LIMIT_EXCEEDED`, and others) in notification logs; record per-recipient result (`delivered`/`queued`/`permanent_bounces`) on the notifications rows <!-- agent: fullstack-engineer.build, depends_on: [2.5, 4.1], touches: [apps/platform/src/lib/notifications/service.ts, apps/platform/src/lib/data/schema/**] -->
 - [x] 4.4 GDPR: `List-Unsubscribe` headers on marketing templates; review transactional templates for the same <!-- agent: fullstack-engineer.build, depends_on: [4.1], touches: [packages/emails/src/templates/**] -->
 
