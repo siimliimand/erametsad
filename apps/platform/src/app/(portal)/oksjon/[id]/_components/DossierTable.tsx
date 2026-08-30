@@ -1,3 +1,5 @@
+'use client'
+
 import { DataTable, type Column } from '@eametsad/ui'
 
 export interface DossierRow {
