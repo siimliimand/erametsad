@@ -53,13 +53,6 @@
     //   pnpm exec wrangler queues create eametsad-dlq
     // DLQ-depth alerting lives in the Cloudflare dashboard (account-level queue
     // alerts), not in wrangler config; this comment is the wiring record.
-    "consumers": [
-      {
-        "queue": "eametsad-jobs",
-        "max_retries": 3,
-        "dead_letter_queue": "eametsad-dlq"
-      }
-    ]
   },
   // Cron safety net (task 6.2): AuctionDO alarms own the end transition;
   // the every-minute scheduled() sweep in src/do/index.ts only wakes DOs
