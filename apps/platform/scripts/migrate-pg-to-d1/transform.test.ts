@@ -207,9 +207,10 @@ describe('transformNdjson', () => {
 })
 
 describe('table graph', () => {
-  it('covers all 28 D1 tables (27 + sessions)', () => {
-    expect(tableNames()).toHaveLength(28)
+  it('covers all 29 D1 tables (28 + sessions)', () => {
+    expect(tableNames()).toHaveLength(29)
     expect(tableNames()).toContain('sessions')
+    expect(tableNames()).toContain('rights_requests')
   })
 
   it('inserts FK parents before children', () => {
@@ -219,6 +220,7 @@ describe('table graph', () => {
     before('users', 'sessions')
     before('users', 'profiles')
     before('users', 'auctions')
+    before('users', 'rights_requests')
     before('auctions', 'bids')
     before('users', 'bids')
     before('auctions', 'autobidders')
