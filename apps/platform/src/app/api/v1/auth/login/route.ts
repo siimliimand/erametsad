@@ -82,8 +82,10 @@ export async function POST(request: NextRequest) {
   }
 
   if (user.status === 'suspended') {
+    // Distinguishable from the generic 401 so the login page can render
+    // SuspendedBanner (the client checks for this exact code).
     return NextResponse.json(
-      { error: 'Vale kasutajanimi või parool' },
+      { error: 'Vale kasutajanimi või parool', code: 'ACCOUNT_SUSPENDED' },
       { status: 401 },
     )
   }

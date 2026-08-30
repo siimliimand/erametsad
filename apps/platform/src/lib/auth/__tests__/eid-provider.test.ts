@@ -111,6 +111,74 @@ describe('DemoEidProvider', () => {
   })
 })
 
+describe('DemoEidProvider with seeded users', () => {
+  let find: ReturnType<typeof vi.fn>
+  const seededIsikukood = '10000000002'
+
+  beforeEach(() => {
+    find = vi.fn()
+    vi.mocked(getRepositories).mockImplementation(() => ({ find }) as never)
+  })
+
+  it('starts a session for any isikukood that hashes to a seeded user', async () => {
+    find.mockResolvedValue({
+      docs: [
+        {
+          id: 'user-2',
+          email: 'private@eametsad.ee',
+          name: 'Eraklient Erika',
+          role: 'private',
+          status: 'active',
+        },
+      ],
+    })
+    const provider = new DemoEidProvider()
+    const { sessionRef } = await provider.start(seededIsikukood)
+
+    expect(find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'users',
+        where: { isikukoodHash: { equals: hash(seededIsikukood) } },
+      }),
+    )
+    expect(await provider.status(sessionRef)).toEqual({ status: 'pending' })
+    const finalStatus = await provider.status(sessionRef)
+    expect(finalStatus.status).toBe('completed')
+    expect(finalStatus.user).toMatchObject({ email: 'private@eametsad.ee' })
+    await expect(provider.complete(sessionRef)).resolves.toHaveProperty(
+      'isikukood',
+      seededIsikukood,
+    )
+  })
+
+  it('starts a session for a suspended seeded user; complete rejects later', async () => {
+    find.mockResolvedValue({
+      docs: [
+        {
+          id: 'user-2',
+          email: 'private@eametsad.ee',
+          role: 'private',
+          status: 'suspended',
+        },
+      ],
+    })
+    const provider = new DemoEidProvider()
+
+    await expect(provider.start(seededIsikukood)).resolves.toHaveProperty(
+      'sessionRef',
+    )
+  })
+
+  it('rejects an isikukood with no seeded user', async () => {
+    find.mockResolvedValue({ docs: [] })
+    const provider = new DemoEidProvider()
+
+    await expect(provider.start(seededIsikukood)).rejects.toThrow(
+      'Unknown isikukood',
+    )
+  })
+})
+
 describe('completeEidLogin', () => {
   let find: ReturnType<typeof vi.fn>
 
@@ -192,10 +260,12 @@ describe('completeEidLogin', () => {
     const response = await completeEidLogin('smartid', sessionRef)
 
     expect(response.status).toBe(401)
+    const body = (await response.json()) as { code?: unknown }
+    expect(body.code).toBeUndefined()
     expect(response.cookies.get('access_token')).toBeUndefined()
   })
 
-  it('returns 401 for a suspended user', async () => {
+  it('returns 401 with the ACCOUNT_SUSPENDED code for a suspended user', async () => {
     const sessionRef = await startCompletedSession()
     find.mockResolvedValue({
       docs: [
@@ -211,6 +281,8 @@ describe('completeEidLogin', () => {
     const response = await completeEidLogin('smartid', sessionRef)
 
     expect(response.status).toBe(401)
+    const body = (await response.json()) as { code?: unknown }
+    expect(body.code).toBe('ACCOUNT_SUSPENDED')
     expect(response.cookies.get('access_token')).toBeUndefined()
   })
 })
