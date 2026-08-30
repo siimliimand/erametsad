@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, type SyntheticEvent } from 'react'
 
+import { AlapakkumineToggle } from './AlapakkumineToggle'
+import { AutobidderControl } from './AutobidderControl'
 import { BidConfirmModal } from './BidConfirmModal'
 
 import type { AuctionObjectType, AuctionStatus } from '@/lib/data/schema'
@@ -30,6 +32,17 @@ export interface BidPanelViewerFlags {
    * decides on submit and the panel redirects to the raamleping flow.
    */
   hasRaamleping: boolean | null
+  /**
+   * Server reports an active autobidder for the caller on this auction
+   * (dossier `participation.hasAutobidder`). `null` = not derivable.
+   */
+  hasAutobidder?: boolean | null
+  /**
+   * The caller's autobidder row when the page can supply it. Without the
+   * row the control falls back to the POST upsert and hides "Eemalda".
+   */
+  autobidderId?: string | null
+  autobidderMaxAmount?: number | null
 }
 
 /** Input for the default bid submission (POST /api/v1/bids/create contract). */
@@ -71,12 +84,13 @@ export interface BidPanelProps {
   /** `null` renders the guest panel. */
   viewer: BidPanelViewerFlags | null
   /**
-   * Task 4.3 hook. `true` lets amounts below minBid submit as pending
-   * alapakkumine bids; the toggle UI itself belongs to task 4.3.
+   * Settings-level alapakkumineEnabled flag. `true` renders the under-start
+   * toggle; a toggled-on submission below minBid then pends for the seller
+   * (API outcome `pending_approval`).
    */
   allowUnderStart?: boolean
   /**
-   * Task 4.3 hook: replaces the default POST /api/v1/bids/create call.
+   * Replaces the default POST /api/v1/bids/create call.
    * Must only run after the confirm modal resolves.
    */
   onSubmitBid?: (input: BidSubmitInput) => Promise<BidSubmitOutcome>
@@ -239,6 +253,7 @@ export function BidPanel({
   const [pendingAmount, setPendingAmount] = useState<number | null>(null)
   const [gateNotice, setGateNotice] = useState(false)
   const [fetchedRights, setFetchedRights] = useState<boolean | null>(null)
+  const [underbidRequested, setUnderbidRequested] = useState(false)
 
   const step = bidStep ?? 0
   const minimumNext = localLeading !== null ? localLeading + step : minBid
@@ -349,6 +364,12 @@ export function BidPanel({
   const isLeadingBidder = localParticipation?.isLeading ?? viewer.isLeading
   const hasOwnBid = localParticipation?.hasBid ?? viewer.hasBid
   const endsAtLabel = endsAt !== null ? fmtDateTime(endsAt) : null
+  const existingAutobidder =
+    typeof viewer.autobidderId === 'string' &&
+    typeof viewer.autobidderMaxAmount === 'number'
+      ? { id: viewer.autobidderId, maxAmount: viewer.autobidderMaxAmount }
+      : null
+  const hasAutobidder = existingAutobidder !== null || viewer.hasAutobidder === true
 
   function openConfirm(event: SyntheticEvent): void {
     event.preventDefault()
@@ -362,7 +383,7 @@ export function BidPanel({
       return
     }
     const isUnderStart = amount < minBid
-    const underStartAllowed = allowUnderStart && isUnderStart
+    const underStartAllowed = allowUnderStart && underbidRequested && isUnderStart
     if (amount < minimumNext && !underStartAllowed) {
       setError(`Pakkumine peab olema vähemalt ${inputAmount(minimumNext)} €.`)
       return
@@ -457,6 +478,12 @@ export function BidPanel({
         <p className="text-bodySm text-inkMuted">Oksjon lõpeb: {endsAtLabel}</p>
       )}
 
+      {pendingAmount !== null && (
+        <span className="inline-flex items-center self-start rounded-pill bg-statusEndingSoon/10 px-2 py-0.5 text-xs font-medium text-statusEndingSoon">
+          Alapakkumine ootab müüja kinnitust
+        </span>
+      )}
+
       <form onSubmit={openConfirm} className="flex flex-col gap-xs">
         <label htmlFor="bid-amount" className="text-label font-semibold text-ink">
           Sinu pakkumine (€)
@@ -501,6 +528,16 @@ export function BidPanel({
         <p className="text-bodySm text-inkMuted">
           Vähim lubatud pakkumine: {inputAmount(minimumNext)} €
         </p>
+        {allowUnderStart && (
+          <AlapakkumineToggle
+            checked={underbidRequested}
+            onChange={(checked) => {
+              setUnderbidRequested(checked)
+              setError(null)
+            }}
+            disabled={isSubmitting}
+          />
+        )}
         {error !== null && (
           <p role="alert" className="text-bodySm text-danger">
             {error}
@@ -538,6 +575,15 @@ export function BidPanel({
         </Btn>
       </form>
 
+      <AutobidderControl
+        auctionId={auctionId}
+        minBid={minBid}
+        bidStep={bidStep}
+        currentLeading={localLeading}
+        existing={existingAutobidder}
+        hasAutobidder={hasAutobidder}
+      />
+
       <div className="flex flex-col gap-2xs rounded-card bg-bgMist p-xs">
         <p className="text-bodySm text-inkMuted">
           Teenustasu 3% + käibemaks lisandub võidetud hinnale ja makstakse tehingu
@@ -561,7 +607,9 @@ export function BidPanel({
         }}
         amount={modalAmount ?? 0}
         nextStepAmount={step > 0 ? modalAmount !== null ? modalAmount + step : null : null}
-        requiresSellerApproval={modalAmount !== null && modalAmount < minBid}
+        requiresSellerApproval={
+          modalAmount !== null && underbidRequested && modalAmount < minBid
+        }
         isSubmitting={isSubmitting}
         onConfirm={() => {
           void confirmBid()
