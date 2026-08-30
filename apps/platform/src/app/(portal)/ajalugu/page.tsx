@@ -13,6 +13,7 @@ import { parseListingFilters, type ListingFilterState } from '../_lib/filter-par
 import { formatEstonianInteger, type ListingTabId } from '../_lib/summary'
 
 import {
+  ARCHIVE_SORT_OPTIONS,
   archivedStatsByObjectType,
   listArchivedAuctions,
   type ArchivedAuctionTypeStats,
@@ -60,13 +61,6 @@ const LOGGING_TYPE_OPTIONS = [
   { value: 't', label: 'Taastusraie (T)' },
   { value: 'l', label: 'Langu- ja kahjustuspuude raie (L)' },
   { value: 'r', label: 'Sanitaarraie (R)' },
-] as const
-
-const SORT_CHOICES = [
-  { field: 'endPrice', direction: 'desc', label: 'Lõpphind: kõrgem enne' },
-  { field: 'endPrice', direction: 'asc', label: 'Lõpphind: madalam enne' },
-  { field: 'endTime', direction: 'desc', label: 'Lõpuaeg: uuem enne' },
-  { field: 'startPrice', direction: 'desc', label: 'Alghind: kõrgem enne' },
 ] as const
 
 function rawPage(raw: string | string[] | undefined): number {
@@ -178,6 +172,82 @@ function archiveSummarySentence(tab: ListingTabId, total: number): string {
     return `Arhiivis ei ole lõppenud ${genitive} oksjoneid.`
   }
   return `Arhiivis on ${formatEstonianInteger(total)} lõppenud ${genitive} oksjonit.`
+}
+
+interface ArchiveTabTotals {
+  count: number
+  areaHa: number
+  volumeM3: number
+  finalPriceEur: number
+}
+
+function archiveTabTotals(
+  tab: ListingTabId,
+  stats: Record<AuctionObjectType, ArchivedAuctionTypeStats>,
+): ArchiveTabTotals {
+  return listingTabDef(tab).objectTypes.reduce<ArchiveTabTotals>(
+    (sum, objectType) => ({
+      count: sum.count + stats[objectType].count,
+      areaHa: sum.areaHa + stats[objectType].areaHa,
+      volumeM3: sum.volumeM3 + stats[objectType].volumeM3,
+      finalPriceEur: sum.finalPriceEur + stats[objectType].finalPriceEur,
+    }),
+    { count: 0, areaHa: 0, volumeM3: 0, finalPriceEur: 0 },
+  )
+}
+
+// All-time per-tab totals (trust signal, filter-independent). The band
+// hides entirely for an empty tab and zero sums collapse away.
+function ArchiveStatsBand({
+  tab,
+  stats,
+}: {
+  tab: ListingTabId
+  stats: Record<AuctionObjectType, ArchivedAuctionTypeStats>
+}) {
+  const totals = archiveTabTotals(tab, stats)
+  if (totals.count <= 0) return null
+  const metrics = [
+    { label: 'Lõppenud oksjonit', value: formatEstonianInteger(totals.count) },
+    { label: 'Pindala kokku (ha)', value: formatEstonianInteger(totals.areaHa) },
+    ...(tab === 'raieoigused' && totals.volumeM3 > 0
+      ? [{ label: 'Raiemahu kokku (m³)', value: formatEstonianInteger(totals.volumeM3) }]
+      : []),
+    ...(totals.finalPriceEur > 0
+      ? [{ label: 'Kogumaksumus (€)', value: formatEstonianInteger(totals.finalPriceEur) }]
+      : []),
+  ]
+  return (
+    <dl className="grid gap-sm rounded-card border border-border bg-white p-md sm:grid-cols-2 lg:grid-cols-4">
+      {metrics.map((metric) => (
+        <div key={metric.label} className="flex flex-col gap-xs">
+          <dt className="font-body text-bodySm text-inkMuted">{metric.label}</dt>
+          <dd className="font-mono text-h4 font-bold text-primaryDark">{metric.value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+// Mirrors countActiveFilters in _lib/filter-params, but relative to the
+// archive's lõpphind desc default and counting the endYear chips too.
+function countArchiveFilters(
+  tab: ListingTabId,
+  state: ListingFilterState,
+  selectedYears: string[],
+): number {
+  let count = 0
+  if (state.county.length > 0) count += 1
+  if (state.parish.length > 0) count += 1
+  if (state.areaMin !== undefined || state.areaMax !== undefined) count += 1
+  if (state.priceMin !== undefined || state.priceMax !== undefined) count += 1
+  if (selectedYears.length > 0) count += 1
+  if (tab === 'raieoigused') {
+    if (state.species.length > 0) count += 1
+    if (state.loggingTypes.length > 0) count += 1
+  }
+  if (state.sortField !== 'endPrice' || state.sortDirection !== 'desc') count += 1
+  return count
 }
 
 interface ArchiveTabsProps {
@@ -354,12 +424,6 @@ function ArchiveRangeForm({ tab, params, state, counties, parishes }: ArchiveRan
         >
           Rakenda filtrid
         </button>
-        <Link
-          href={`/ajalugu?tab=${tab}`}
-          className="inline-flex items-center justify-center rounded-button border border-border px-4 py-2 font-body text-bodySm font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary"
-        >
-          Tühjenda
-        </Link>
       </div>
     </form>
   )
@@ -406,9 +470,9 @@ function ArchiveSort({ tab, params, state }: {
   return (
     <ArchiveChips
       label="Sorteeri"
-      options={SORT_CHOICES.map((choice) => ({
-        value: `${choice.field}:${choice.direction}`,
-        label: choice.label,
+      options={ARCHIVE_SORT_OPTIONS.map((option) => ({
+        value: `${option.field}:${option.direction}`,
+        label: option.label,
       }))}
       selected={[`${state.sortField}:${state.sortDirection}`]}
       buildHref={(value) => {
@@ -512,6 +576,8 @@ export default async function AjaluguPage({ searchParams }: ArchivePageProps) {
     LISTING_TAB_IDS.map((id) => [id, archivedCountForTab(id, typeStats)]),
   ) as Record<ListingTabId, number>
 
+  const activeFilterCount = countArchiveFilters(tab, state, selectedYears)
+
   const yearOptions = endYearsForTab(tab, typeStats).map((year) => ({
     value: String(year),
     label: String(year),
@@ -523,12 +589,32 @@ export default async function AjaluguPage({ searchParams }: ArchivePageProps) {
 
       <ArchiveTabs activeTab={tab} counts={counts} params={params} />
 
+      <ArchiveStatsBand tab={tab} stats={typeStats} />
+
       <p className="font-body text-body text-inkMuted">{archiveSummarySentence(tab, result.total)}</p>
 
       <Card
         hover={false}
         content={
           <div className="flex flex-col gap-md">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-xs font-heading text-h4 font-semibold text-ink">
+                Filtrid
+                {activeFilterCount > 0 && (
+                  <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-primary px-1.5 font-mono text-[11px] font-bold text-inkInverse">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </span>
+              {activeFilterCount > 0 && (
+                <Link
+                  href={`/ajalugu?tab=${tab}`}
+                  className="font-body text-bodySm font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryDark"
+                >
+                  Tühjenda
+                </Link>
+              )}
+            </div>
             <ArchiveRangeForm
               tab={tab}
               params={params}
