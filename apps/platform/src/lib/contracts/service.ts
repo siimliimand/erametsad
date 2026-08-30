@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 
 import { renderTemplate } from './render'
 import type { ContractTemplate } from './render'
-import { getPayloadClient } from '../../payload/payloadClient'
+import { getRepositories } from '../data/runtime'
 
 export interface Contract {
   id: string
@@ -15,15 +15,41 @@ export interface Contract {
   renderedHtml?: string | undefined
 }
 
+interface ContractRow {
+  id: string
+  templateId: string
+  lotId: string
+  status: Contract['status']
+  signedAt: string | null
+  signedBy: string | null
+  contentHash: string | null
+  renderedHtml: string | null
+}
+
+// The repository returns storage column names (templateId, lotId); the
+// Contract surface keeps the Payload relation names (template, lot).
+function toContract(row: ContractRow): Contract {
+  return {
+    id: row.id,
+    template: row.templateId,
+    lot: row.lotId,
+    status: row.status,
+    ...(row.signedAt !== null ? { signedAt: row.signedAt } : {}),
+    ...(row.signedBy !== null ? { signedBy: row.signedBy } : {}),
+    ...(row.contentHash !== null ? { contentHash: row.contentHash } : {}),
+    ...(row.renderedHtml !== null ? { renderedHtml: row.renderedHtml } : {}),
+  }
+}
+
 const SIGNING_EXPIRY_MS = 15 * 60 * 1000
 
 export async function prepareContract(
   auctionId: string,
   type: 'framework' | 'auction',
 ): Promise<Contract> {
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const templateResult = await payload.find({
+  const templateResult = await repos.find({
     collection: 'contract-templates',
     where: {
       and: [
@@ -32,7 +58,6 @@ export async function prepareContract(
       ],
     },
     limit: 1,
-    depth: 0,
   })
 
   const templateDoc = templateResult.docs[0] as Record<string, unknown> | undefined
@@ -40,11 +65,10 @@ export async function prepareContract(
     throw new Error(`No active ${type} contract template found`)
   }
 
-  const auctionResult = await payload.find({
+  const auctionResult = await repos.find({
     collection: 'auctions',
     where: { id: { equals: auctionId } },
     limit: 1,
-    depth: 1,
   })
   const auction = auctionResult.docs[0] as Record<string, unknown> | undefined
   if (!auction) {
@@ -77,34 +101,29 @@ export async function prepareContract(
 
   const rendered = renderTemplate(template, data)
 
-  // Payload's relationship validation rejects numeric strings for
-  // number-typed ids, so coerce the auction id before create.
-  const lotValue = /^\d+$/.test(auctionId) ? Number(auctionId) : auctionId
-
-  const newContract = await payload.create({
+  const newContract = await repos.create({
     collection: 'contracts',
     data: {
       template: templateDoc.id,
-      lot: lotValue,
+      lot: auctionId,
       status: 'prepared',
       renderedHtml: rendered.html,
     },
   })
 
-  return newContract as unknown as Contract
+  return toContract(newContract)
 }
 
 export async function signContract(
   contractId: string,
   signerId: string,
 ): Promise<Contract> {
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const contractResult = await payload.find({
+  const contractResult = await repos.find({
     collection: 'contracts',
     where: { id: { equals: contractId } },
     limit: 1,
-    depth: 0,
   })
   const contract = contractResult.docs[0] as Record<string, unknown> | undefined
   if (!contract) {
@@ -118,7 +137,7 @@ export async function signContract(
   const createdAt = contract.createdAt as string
   const elapsed = Date.now() - new Date(createdAt).getTime()
   if (elapsed > SIGNING_EXPIRY_MS) {
-    await payload.update({
+    await repos.update({
       collection: 'contracts',
       id: contractId,
       data: { status: 'voided' },
@@ -129,31 +148,27 @@ export async function signContract(
   const renderedHtml = contract.renderedHtml as string | undefined
   const contentHash = crypto.createHash('sha256').update(renderedHtml ?? contractId).digest('hex')
 
-  // Relationship fields reject numeric strings for number-typed ids.
-  const signerValue = /^\d+$/.test(signerId) ? Number(signerId) : signerId
-
-  const updated = await payload.update({
+  const updated = await repos.update({
     collection: 'contracts',
     id: contractId,
     data: {
       status: 'signed',
       signedAt: new Date().toISOString(),
-      signedBy: signerValue,
+      signedBy: signerId,
       contentHash,
     },
   })
 
-  return updated as unknown as Contract
+  return toContract(updated)
 }
 
 export async function voidContract(contractId: string): Promise<void> {
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const contractResult = await payload.find({
+  const contractResult = await repos.find({
     collection: 'contracts',
     where: { id: { equals: contractId } },
     limit: 1,
-    depth: 0,
   })
   const contract = contractResult.docs[0] as Record<string, unknown> | undefined
   if (!contract) {
@@ -164,7 +179,7 @@ export async function voidContract(contractId: string): Promise<void> {
     throw new Error('Cannot void a signed contract')
   }
 
-  await payload.update({
+  await repos.update({
     collection: 'contracts',
     id: contractId,
     data: { status: 'voided' },

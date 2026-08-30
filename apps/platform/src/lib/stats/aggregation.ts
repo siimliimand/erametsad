@@ -1,6 +1,5 @@
-import type { Payload } from 'payload'
-
-import { getPayloadClient } from '../../payload/payloadClient'
+import type { CoreRepositories } from '../data/repositories'
+import { getRepositories } from '../data/runtime'
 
 export interface SnapshotDelta {
   objectType: string
@@ -9,7 +8,7 @@ export interface SnapshotDelta {
   eur?: number
 }
 
-export async function upsertSnapshot(payload: Payload, delta: SnapshotDelta): Promise<void> {
+export async function upsertSnapshot(repos: CoreRepositories, delta: SnapshotDelta): Promise<void> {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -17,7 +16,7 @@ export async function upsertSnapshot(payload: Payload, delta: SnapshotDelta): Pr
   const area = delta.area ?? 0
   const eur = delta.eur ?? 0
 
-  const existing = await payload.find({
+  const existing = await repos.find({
     collection: 'statistics-snapshots',
     where: {
       and: [
@@ -26,12 +25,11 @@ export async function upsertSnapshot(payload: Payload, delta: SnapshotDelta): Pr
       ],
     },
     limit: 1,
-    depth: 0,
   })
 
   if (existing.docs.length > 0) {
     const doc = existing.docs[0] as Record<string, unknown>
-    await payload.update({
+    await repos.update({
       collection: 'statistics-snapshots',
       id: doc.id as string,
       data: {
@@ -39,10 +37,9 @@ export async function upsertSnapshot(payload: Payload, delta: SnapshotDelta): Pr
         area: (Number(doc.area) || 0) + area,
         eur: (Number(doc.eur) || 0) + eur,
       },
-      depth: 0,
     })
   } else {
-    await payload.create({
+    await repos.create({
       collection: 'statistics-snapshots',
       data: {
         date: today.toISOString(),
@@ -51,7 +48,6 @@ export async function upsertSnapshot(payload: Payload, delta: SnapshotDelta): Pr
         area,
         eur,
       },
-      depth: 0,
     })
   }
 }
@@ -65,9 +61,9 @@ export interface StatisticsResult {
 }
 
 export async function computeStats(): Promise<StatisticsResult[]> {
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const snapshots = await payload.find({
+  const snapshots = await repos.find({
     collection: 'statistics-snapshots',
     limit: 1000,
     sort: '-date',

@@ -23,18 +23,18 @@ afterAll(() => {
   }
 })
 
-vi.mock('@/payload/payloadClient', () => ({
-  getPayloadClient: vi.fn(),
+vi.mock('@/lib/data/runtime', () => ({
+  getRepositories: vi.fn(),
 }))
 
-import { getPayloadClient } from '@/payload/payloadClient'
+import { getRepositories } from '@/lib/data/runtime'
 
-let mockPayload: { find: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> }
+let mockRepos: { find: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockPayload = { find: vi.fn(), create: vi.fn(), update: vi.fn() }
-  vi.mocked(getPayloadClient).mockResolvedValue(mockPayload as never)
+  mockRepos = { find: vi.fn(), create: vi.fn(), update: vi.fn() }
+  vi.mocked(getRepositories).mockResolvedValue(mockRepos as never)
 })
 
 describe('encryption / decryption', () => {
@@ -64,27 +64,27 @@ describe('submitSealedBid', () => {
   }
 
   function mockUser(user?: Record<string, unknown>) {
-    mockPayload.find.mockResolvedValueOnce({ docs: user ? [user] : [] })
+    mockRepos.find.mockResolvedValueOnce({ docs: user ? [user] : [] })
   }
 
   function mockAuction(auction?: Record<string, unknown>) {
-    mockPayload.find.mockResolvedValueOnce({ docs: auction ? [auction] : [] })
+    mockRepos.find.mockResolvedValueOnce({ docs: auction ? [auction] : [] })
   }
 
   function mockRights(hasRights: boolean) {
-    mockPayload.find.mockResolvedValueOnce({ docs: hasRights ? [{ id: 'right-1' }] : [] })
+    mockRepos.find.mockResolvedValueOnce({ docs: hasRights ? [{ id: 'right-1' }] : [] })
   }
 
   function mockExistingBids(docs: Record<string, unknown>[]) {
-    mockPayload.find.mockResolvedValueOnce({ docs })
+    mockRepos.find.mockResolvedValueOnce({ docs })
   }
 
   function mockSettings(revisionCap: number) {
-    mockPayload.find.mockResolvedValueOnce({ docs: [{ sealedRevisionCap: revisionCap }] })
+    mockRepos.find.mockResolvedValueOnce({ docs: [{ sealedRevisionCap: revisionCap }] })
   }
 
   function mockIdempotencyCheck(found = false) {
-    mockPayload.find.mockResolvedValueOnce({ docs: found ? [{ id: 'dup' }] : [] })
+    mockRepos.find.mockResolvedValueOnce({ docs: found ? [{ id: 'dup' }] : [] })
   }
 
   it('returns error when user is not found', async () => {
@@ -114,7 +114,7 @@ describe('submitSealedBid', () => {
 
   it('returns 403 when the user lacks the auction objectType right', async () => {
     mockUser({ id: 'user-1' })
-    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
+    mockAuction({ status: 'active', minBidCents: 10000, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
     mockRights(false)
 
     const result = await submitSealedBid(baseParams)
@@ -125,7 +125,7 @@ describe('submitSealedBid', () => {
 
   it('returns error when amount is below minBid', async () => {
     mockUser({ id: 'user-1' })
-    mockAuction({ status: 'active', minBid: 100000, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
+    mockAuction({ status: 'active', minBidCents: 10000000, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
     mockRights(true)
 
     const result = await submitSealedBid({ ...baseParams, amount: 50000 })
@@ -135,7 +135,7 @@ describe('submitSealedBid', () => {
 
   it('enforces the revision cap with the Estonian limit message', async () => {
     mockUser({ id: 'user-1' })
-    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
+    mockAuction({ status: 'active', minBidCents: 10000, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
     mockRights(true)
     mockExistingBids(Array.from({ length: 4 }, (_, i) => ({ id: `bid-${String(i)}`, status: 'leading' })))
     mockSettings(3)
@@ -150,12 +150,12 @@ describe('submitSealedBid', () => {
 
   it('accepts up to one original bid plus N revisions when under the cap', async () => {
     mockUser({ id: 'user-1' })
-    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
+    mockAuction({ status: 'active', minBidCents: 10000, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
     mockRights(true)
     mockExistingBids(Array.from({ length: 3 }, (_, i) => ({ id: `bid-${String(i)}`, status: 'leading' })))
     mockSettings(3)
     mockIdempotencyCheck(false)
-    mockPayload.create.mockResolvedValueOnce({ id: 'sealed-bid-4' })
+    mockRepos.create.mockResolvedValueOnce({ id: 'sealed-bid-4' })
 
     const result = await submitSealedBid(baseParams)
     expect(result.success).toBe(true)
@@ -163,26 +163,26 @@ describe('submitSealedBid', () => {
 
   it('accepts bid when under revision cap', async () => {
     mockUser({ id: 'user-1' })
-    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
+    mockAuction({ status: 'active', minBidCents: 10000, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
     mockRights(true)
     mockExistingBids([])
     mockSettings(3)
     mockIdempotencyCheck(false)
-    mockPayload.create.mockResolvedValueOnce({ id: 'sealed-bid-1' })
+    mockRepos.create.mockResolvedValueOnce({ id: 'sealed-bid-1' })
 
     const result = await submitSealedBid(baseParams)
     expect(result.success).toBe(true)
-    expect(mockPayload.create).toHaveBeenCalled()
-    const createCall = mockPayload.create.mock.calls[0] as unknown[]
+    expect(mockRepos.create).toHaveBeenCalled()
+    const createCall = mockRepos.create.mock.calls[0] as unknown[]
     const createData = (createCall[0] as { data: Record<string, unknown> }).data
     expect(createData.type).toBe('sealed')
-    expect(createData.amount).toBe(0)
+    expect(createData.amountCents).toBe(0)
     expect(createData.identitySnapshot).toBeTruthy()
   })
 
   it('prevents duplicate with idempotency key', async () => {
     mockUser({ id: 'user-1' })
-    mockAuction({ status: 'active', minBid: 100, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
+    mockAuction({ status: 'active', minBidCents: 10000, endsAt: '2099-01-01T00:00:00Z', objectType: 'forest' })
     mockRights(true)
     mockExistingBids([])
     mockSettings(3)

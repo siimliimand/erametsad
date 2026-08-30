@@ -1,3 +1,5 @@
+// Transactional (auction-ended notice). GDPR exempts it from
+// List-Unsubscribe headers; reviewed, no change needed.
 export function auctionEndedTemplate(params: {
   auctionTitle: string
   finalPrice?: number

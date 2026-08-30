@@ -1,200 +1,179 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 import {
-  addClient,
-  removeClient,
-  emitBidCreated,
-  emitAuctionExtended,
-  emitAuctionEnded,
-  emitAuctionPublished,
-  getEventStream,
+  AuctionStreamError,
+  createAuctionFeedStream,
+  createAuctionStream,
+  ingestAuctionEvent,
 } from '../auction-stream'
 
 const decoder = new TextDecoder()
 
-interface Frame {
-  event: string
-  data: Record<string, unknown>
-  raw: string
+interface RecordedCall {
+  auctionId: string
+  operation: string
+  url: string
 }
 
-function parseFrame(chunk: Uint8Array): Frame {
-  const raw = decoder.decode(chunk)
-  const eventMatch = /^event: (.+)$/m.exec(raw)
-  const dataMatch = /^data: (.+)$/m.exec(raw)
-  const event = eventMatch?.[1]
-  const data = dataMatch?.[1]
-  if (!event || !data) {
-    throw new Error(`Unexpected SSE frame: ${raw}`)
-  }
-  return {
-    event,
-    data: JSON.parse(data) as Record<string, unknown>,
-    raw,
-  }
+function makeDoFetch(
+  respond?: (call: RecordedCall) => Response | null,
+): { doFetch: ReturnType<typeof vi.fn>; calls: RecordedCall[] } {
+  const calls: RecordedCall[] = []
+  const doFetch = vi.fn((auctionId: string, operation: string, call: { body?: string }) => {
+    const body = call.body ?? ''
+    const url = (JSON.parse(body) as { url?: string }).url ?? ''
+    const record = { auctionId, operation, url }
+    calls.push(record)
+    if (respond) return Promise.resolve(respond(record))
+    return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+  })
+  return { doFetch, calls }
 }
 
-function firstEnqueued(enqueue: ReturnType<typeof vi.fn>): Uint8Array {
-  const call = enqueue.mock.calls[0]
-  if (!call) throw new Error('no frame enqueued')
-  return call[0] as Uint8Array
+function subscriptionIdOf(calls: RecordedCall[], auctionId: string): string {
+  const call = calls.find((c) => c.operation === 'subscribe' && c.auctionId === auctionId)
+  if (!call) throw new Error('no subscribe call recorded')
+  const last = call.url.split('/').pop()
+  if (last === undefined) throw new Error('subscriber URL missing its id')
+  return last
 }
 
-function fakeController(): {
-  controller: ReadableStreamDefaultController<Uint8Array>
-  enqueue: ReturnType<typeof vi.fn>
-} {
-  const enqueue = vi.fn()
-  const controller = { enqueue } as unknown as ReadableStreamDefaultController<Uint8Array>
-  return { controller, enqueue }
+const ORIGIN = 'https://app.test'
+
+async function readChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): Promise<string> {
+  const { value } = await reader.read()
+  if (value === undefined) throw new Error('stream ended')
+  return decoder.decode(value)
 }
 
-describe('auction-stream public events', () => {
-  let clientId = ''
+describe('createAuctionStream registration', () => {
+  it('registers a unique subscriber URL on the AuctionDO', async () => {
+    const { doFetch, calls } = makeDoFetch()
+    await createAuctionStream('auction-1', { origin: ORIGIN, doFetch })
 
-  afterEach(() => {
-    if (clientId) {
-      removeClient(clientId)
-      clientId = ''
-    }
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.operation).toBe('subscribe')
+    expect(calls[0]?.url).toMatch(
+      /^https:\/\/app\.test\/api\/v1\/internal\/auction-events\/[0-9a-f-]{36}$/,
+    )
   })
 
-  it('emitBidCreated sends an anonymised bid:created frame to every client', () => {
-    const first = fakeController()
-    const second = fakeController()
-    const firstClient = addClient(first.controller)
-    const secondClient = addClient(second.controller)
-    clientId = firstClient.clientId
-
-    const placedAt = new Date('2024-06-15T12:00:00Z')
-    emitBidCreated({ auctionId: 'auction-1', amount: 250, placedAt })
-
-    expect(first.enqueue).toHaveBeenCalledTimes(1)
-    expect(second.enqueue).toHaveBeenCalledTimes(1)
-
-    const frame = parseFrame(firstEnqueued(first.enqueue))
-    expect(frame.event).toBe('bid:created')
-    expect(frame.data).toEqual({
-      auctionId: 'auction-1',
-      amount: 250,
-      placedAt: placedAt.toISOString(),
-    })
-    expect(frame.raw).not.toContain('bidder')
-    expect(frame.raw).not.toContain('user')
-
-    removeClient(secondClient.clientId)
+  it('rejects when the AuctionDO refuses the subscription', async () => {
+    const { doFetch } = makeDoFetch(() =>
+      new Response(JSON.stringify({ error: 'auction not found' }), { status: 404 }),
+    )
+    await expect(
+      createAuctionStream('auction-1', { origin: ORIGIN, doFetch }),
+    ).rejects.toBeInstanceOf(AuctionStreamError)
   })
 
-  it('emitBidCreated defaults placedAt to the current time', () => {
-    const now = new Date('2024-06-15T12:00:00Z')
+  it('rejects when the DO transport throws', async () => {
+    const doFetch = vi.fn(() => Promise.reject(new Error('network unreachable')))
+    await expect(
+      createAuctionStream('auction-1', { origin: ORIGIN, doFetch }),
+    ).rejects.toBeInstanceOf(AuctionStreamError)
+  })
+
+  it('degrades to a heartbeat-only stream without a DO binding', async () => {
     vi.useFakeTimers()
-    vi.setSystemTime(now)
-    const { controller, enqueue } = fakeController()
-    const client = addClient(controller)
-    clientId = client.clientId
-
-    emitBidCreated({ auctionId: 'auction-1', amount: 100 })
-
-    const frame = parseFrame(firstEnqueued(enqueue))
-    expect(frame.data.placedAt).toBe(now.toISOString())
-    vi.useRealTimers()
-  })
-
-  it('emitAuctionExtended broadcasts the new end time', () => {
-    const { controller, enqueue } = fakeController()
-    const client = addClient(controller)
-    clientId = client.clientId
-
-    const previousEndsAt = new Date('2024-06-15T12:00:00Z')
-    const endsAt = new Date('2024-06-15T12:05:00Z')
-    emitAuctionExtended({ auctionId: 'auction-1', previousEndsAt, endsAt })
-
-    const frame = parseFrame(firstEnqueued(enqueue))
-    expect(frame.event).toBe('auction:extended')
-    expect(frame.data).toEqual({
-      auctionId: 'auction-1',
-      previousEndsAt: previousEndsAt.toISOString(),
-      endsAt: endsAt.toISOString(),
-    })
-  })
-
-  it('emitAuctionEnded broadcasts without winner identity', () => {
-    const { controller, enqueue } = fakeController()
-    const client = addClient(controller)
-    clientId = client.clientId
-
-    emitAuctionEnded({ auctionId: 'auction-1', type: 'open', hasWinner: true })
-
-    const frame = parseFrame(firstEnqueued(enqueue))
-    expect(frame.event).toBe('auction:ended')
-    expect(frame.data).toEqual({
-      auctionId: 'auction-1',
-      type: 'open',
-      hasWinner: true,
-    })
-    expect(frame.raw).not.toContain('winner')
-    expect(frame.raw).not.toContain('userId')
-  })
-
-  it('emitAuctionPublished broadcasts the activation payload', () => {
-    const { controller, enqueue } = fakeController()
-    const client = addClient(controller)
-    clientId = client.clientId
-
-    const endsAt = new Date('2024-06-20T18:00:00Z')
-    emitAuctionPublished({ auctionId: 'auction-1', endsAt, objectType: 'puit' })
-
-    const frame = parseFrame(firstEnqueued(enqueue))
-    expect(frame.event).toBe('auction:published')
-    expect(frame.data).toEqual({
-      auctionId: 'auction-1',
-      endsAt: endsAt.toISOString(),
-      objectType: 'puit',
-    })
-  })
-
-  it('drops a client whose controller throws and keeps the others', () => {
-    const healthy = fakeController()
-    const healthyClient = addClient(healthy.controller)
-    clientId = healthyClient.clientId
-
-    let calls = 0
-    const brokenEnqueue = vi.fn(() => {
-      calls++
-      if (calls === 1) throw new Error('stream closed')
-    })
-    const brokenController = {
-      enqueue: brokenEnqueue,
-    } as unknown as ReadableStreamDefaultController<Uint8Array>
-    const brokenClient = addClient(brokenController)
-
-    emitAuctionEnded({ auctionId: 'auction-1', type: 'open' })
-
-    expect(brokenEnqueue).toHaveBeenCalledTimes(1)
-    expect(healthy.enqueue).toHaveBeenCalledTimes(1)
-
-    emitAuctionEnded({ auctionId: 'auction-1', type: 'open' })
-    expect(brokenEnqueue).toHaveBeenCalledTimes(1)
-    expect(healthy.enqueue).toHaveBeenCalledTimes(2)
-
-    removeClient(brokenClient.clientId)
+    try {
+      const { doFetch } = makeDoFetch(() => null)
+      const stream = await createAuctionStream('auction-1', { origin: ORIGIN, doFetch })
+      const reader = stream.getReader()
+      const readPromise = reader.read()
+      vi.advanceTimersByTime(30_000)
+      const { value } = await readPromise
+      expect(decoder.decode(value)).toBe(': heartbeat\n\n')
+      await reader.cancel()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
-describe('auction-stream connection', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
+describe('createAuctionStream event piping', () => {
+  it('pipes every public event name through with identical frame bytes', async () => {
+    const { doFetch, calls } = makeDoFetch()
+    const stream = await createAuctionStream('auction-1', { origin: ORIGIN, doFetch })
+    const reader = stream.getReader()
+    const subscriptionId = subscriptionIdOf(calls, 'auction-1')
+
+    const events = [
+      {
+        type: 'bid:created',
+        data: { auctionId: 'auction-1', amount: 250, placedAt: '2024-06-15T12:00:00.000Z' },
+        raw:
+          'event: bid:created\n' +
+          'data: {"auctionId":"auction-1","amount":250,"placedAt":"2024-06-15T12:00:00.000Z"}\n\n',
+      },
+      {
+        type: 'auction:extended',
+        data: {
+          auctionId: 'auction-1',
+          previousEndsAt: '2024-06-15T12:00:00.000Z',
+          endsAt: '2024-06-15T12:05:00.000Z',
+        },
+        raw:
+          'event: auction:extended\n' +
+          'data: {"auctionId":"auction-1","previousEndsAt":"2024-06-15T12:00:00.000Z","endsAt":"2024-06-15T12:05:00.000Z"}\n\n',
+      },
+      {
+        type: 'auction:ended',
+        data: { auctionId: 'auction-1', type: 'open', hasWinner: true },
+        raw:
+          'event: auction:ended\n' +
+          'data: {"auctionId":"auction-1","type":"open","hasWinner":true}\n\n',
+      },
+      {
+        type: 'auction:published',
+        data: {
+          auctionId: 'auction-1',
+          endsAt: '2024-06-20T18:00:00.000Z',
+          objectType: 'puit',
+        },
+        raw:
+          'event: auction:published\n' +
+          'data: {"auctionId":"auction-1","endsAt":"2024-06-20T18:00:00.000Z","objectType":"puit"}\n\n',
+      },
+    ] as const
+
+    for (const event of events) {
+      const delivered = ingestAuctionEvent(subscriptionId, {
+        type: event.type,
+        auctionId: 'auction-1',
+        data: event.data,
+      })
+      expect(delivered).toBe(true)
+      expect(await readChunk(reader)).toBe(event.raw)
+    }
+
+    await reader.cancel()
   })
 
-  afterEach(async () => {
-    await vi.runOnlyPendingTimersAsync()
-    vi.useRealTimers()
+  it('keeps the bid payload anonymised', async () => {
+    const { doFetch, calls } = makeDoFetch()
+    const stream = await createAuctionStream('auction-1', { origin: ORIGIN, doFetch })
+    const reader = stream.getReader()
+    const subscriptionId = subscriptionIdOf(calls, 'auction-1')
+
+    ingestAuctionEvent(subscriptionId, {
+      type: 'bid:created',
+      data: { auctionId: 'auction-1', amount: 250, placedAt: '2024-06-15T12:00:00.000Z' },
+    })
+    const raw = await readChunk(reader)
+    expect(raw).not.toContain('bidder')
+    expect(raw).not.toContain('user')
+
+    await reader.cancel()
   })
 
   it('sends a 30-second comment heartbeat', async () => {
-    const stream = getEventStream()
+    vi.useFakeTimers()
+    const { doFetch } = makeDoFetch()
+    const stream = await createAuctionStream('auction-1', { origin: ORIGIN, doFetch })
     const reader = stream.getReader()
-
     try {
       const readPromise = reader.read()
       vi.advanceTimersByTime(30_000)
@@ -202,6 +181,130 @@ describe('auction-stream connection', () => {
       expect(decoder.decode(value)).toBe(': heartbeat\n\n')
     } finally {
       await reader.cancel()
+      vi.useRealTimers()
+    }
+  })
+
+  it('unsubscribes from the DO on cancellation', async () => {
+    const { doFetch, calls } = makeDoFetch()
+    const stream = await createAuctionStream('auction-1', { origin: ORIGIN, doFetch })
+    const reader = stream.getReader()
+    const subscriptionId = subscriptionIdOf(calls, 'auction-1')
+
+    await reader.cancel()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const unsubscribe = calls.find((c) => c.operation === 'unsubscribe')
+    expect(unsubscribe?.url).toBe(`${ORIGIN}/api/v1/internal/auction-events/${subscriptionId}`)
+
+    expect(
+      ingestAuctionEvent(subscriptionId, {
+        type: 'bid:created',
+        data: { auctionId: 'auction-1', amount: 1 },
+      }),
+    ).toBe(false)
+  })
+})
+
+describe('fan-out ingestion edge cases', () => {
+  it('rejects unknown subscription ids', () => {
+    expect(ingestAuctionEvent('missing', { type: 'bid:created', data: {} })).toBe(false)
+  })
+
+  it('rejects payloads without a known event name', async () => {
+    const { doFetch, calls } = makeDoFetch()
+    const stream = await createAuctionStream('auction-1', { origin: ORIGIN, doFetch })
+    const reader = stream.getReader()
+    const subscriptionId = subscriptionIdOf(calls, 'auction-1')
+
+    expect(ingestAuctionEvent(subscriptionId, { type: 'user:deleted', data: {} })).toBe(false)
+    expect(ingestAuctionEvent(subscriptionId, 'not-an-object')).toBe(false)
+
+    await reader.cancel()
+  })
+})
+
+describe('createAuctionFeedStream merged stream', () => {
+  it('pipes events from every subscribed auction and skips failed feeds', async () => {
+    const { doFetch, calls } = makeDoFetch((call) =>
+      call.auctionId === 'auction-dead'
+        ? new Response(JSON.stringify({ error: 'auction not found' }), { status: 404 })
+        : new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    )
+    const stream = await createAuctionFeedStream(
+      ['auction-1', 'auction-dead', 'auction-2'],
+      { origin: ORIGIN, doFetch },
+    )
+    const reader = stream.getReader()
+
+    expect(calls.filter((c) => c.operation === 'subscribe')).toHaveLength(3)
+
+    const first = subscriptionIdOf(calls, 'auction-1')
+    const second = subscriptionIdOf(calls, 'auction-2')
+
+    ingestAuctionEvent(first, {
+      type: 'bid:created',
+      data: { auctionId: 'auction-1', amount: 100, placedAt: '2024-06-15T12:00:00.000Z' },
+    })
+    expect(await readChunk(reader)).toContain('"auctionId":"auction-1"')
+
+    ingestAuctionEvent(second, {
+      type: 'auction:ended',
+      data: { auctionId: 'auction-2', type: 'open', hasWinner: false },
+    })
+    expect(await readChunk(reader)).toContain('"auctionId":"auction-2"')
+
+    await reader.cancel()
+  })
+
+  it('serves a heartbeat-only stream when the auction list is empty', async () => {
+    vi.useFakeTimers()
+    const { doFetch, calls } = makeDoFetch()
+    const stream = await createAuctionFeedStream([], { origin: ORIGIN, doFetch })
+    const reader = stream.getReader()
+    try {
+      expect(calls).toHaveLength(0)
+      const readPromise = reader.read()
+      vi.advanceTimersByTime(30_000)
+      const { value } = await readPromise
+      expect(decoder.decode(value)).toBe(': heartbeat\n\n')
+    } finally {
+      await reader.cancel()
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('legacy emit shims', () => {
+  it('emit helpers stay callable and produce no frames', async () => {
+    vi.useFakeTimers()
+    try {
+      const { emitBidCreated, emitAuctionExtended, emitAuctionEnded, emitAuctionPublished } =
+        await import('../auction-stream')
+      const { doFetch, calls } = makeDoFetch()
+      const stream = await createAuctionStream('auction-1', { origin: ORIGIN, doFetch })
+      const reader = stream.getReader()
+      const subscriptionId = subscriptionIdOf(calls, 'auction-1')
+
+      emitBidCreated({ auctionId: 'auction-1', amount: 10 })
+      emitAuctionExtended({
+        auctionId: 'auction-1',
+        previousEndsAt: new Date(),
+        endsAt: new Date(),
+      })
+      emitAuctionEnded({ auctionId: 'auction-1', type: 'open' })
+      emitAuctionPublished({ auctionId: 'auction-1' })
+
+      const readPromise = reader.read()
+      vi.advanceTimersByTime(30_000)
+      const { value } = await readPromise
+      expect(decoder.decode(value)).toBe(': heartbeat\n\n')
+      expect(
+        ingestAuctionEvent(subscriptionId, { type: 'bid:created', data: {} }),
+      ).toBe(true)
+      await reader.cancel()
+    } finally {
+      vi.useRealTimers()
     }
   })
 })

@@ -1,0 +1,23 @@
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "queue-consumer-test",
+  "main": "../queue-consumer.ts",
+  "compatibility_date": "2025-04-01",
+  // nodejs_compat: the repository layer pulls in nodeIsikukoodCodec
+  // (node:crypto), same reason as the AuctionDO test worker.
+  "compatibility_flags": ["nodejs_compat"],
+  "kv_namespaces": [
+    { "binding": "KV", "id": "00000000000000000000000000000000" }
+  ],
+  "r2_buckets": [
+    { "binding": "BUCKET", "bucket_name": "queue-consumer-test" }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "queue-consumer-test",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../../drizzle"
+    }
+  ]
+}

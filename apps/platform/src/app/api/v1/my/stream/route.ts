@@ -1,7 +1,13 @@
 import { verifyAccessToken } from '@/lib/auth/jwt'
-import { getUserEventStream } from '@/lib/realtime/my-stream'
+import { createMyStream } from '@/lib/realtime/my-stream'
 
-export function GET(request: Request) {
+const SSE_HEADERS = {
+  'Content-Type': 'text/event-stream',
+  'Cache-Control': 'no-cache',
+  Connection: 'keep-alive',
+} as const
+
+export async function GET(request: Request) {
   const cookies = request.headers.get('cookie') ?? ''
   const match = /(?:^|;\s*)access_token=([^;]+)/.exec(cookies)
   const token = match?.[1]
@@ -15,13 +21,12 @@ export function GET(request: Request) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const stream = getUserEventStream(payload.userId)
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    },
-  })
+  try {
+    const stream = await createMyStream(payload.userId, {
+      origin: new URL(request.url).origin,
+    })
+    return new Response(stream, { headers: SSE_HEADERS })
+  } catch {
+    return new Response('Stream unavailable', { status: 502 })
+  }
 }

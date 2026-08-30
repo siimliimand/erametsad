@@ -11,9 +11,9 @@ license: MIT
 ## Architecture Constraints
 
 - Three deployment units share one monorepo: marketing site (`eametsad.ee`), auction portal (`oksjonid.eametsad.ee`), and core backend + admin (`api.eametsad.ee` / `admin.eametsad.ee`). Do not split them into separate repositories.
-- Use subdomain routing per the established pattern: `eametsad.ee` (marketing), `oksjonid.eametsad.ee` (portal), `api.eametsad.ee` (API), `admin.eametsad.ee` (admin), optional `metsauhistu.eametsad.ee` (Phase 5).
-- The backend is a single Payload CMS 3 instance embedded into Next.js. The admin panel is the same instance with role-based access control — do not build a separate admin API.
-- Auction timing is server-authoritative only. End-of-auction transitions are processed by a queue worker with row locks, never triggered by a client request.
+- Use subdomain routing per the established pattern: `eametsad.ee` (marketing), `oksjonid.eametsad.ee` (portal), `api.eametsad.ee` (API), `admin.eametsad.ee` (admin), optional `metsauhistu.eametsad.ee` (Phase 5). Prototype runs under `ww0.dev` (`erametsad.ww0.dev`, `oksjonid.erametsad.ww0.dev`, `api.erametsad.ww0.dev`, `admin.erametsad.ww0.dev`). Production `.ee` cutover is a separate future step.
+- The backend is a Next.js 15 App Router application on Cloudflare Workers (via OpenNext) with Cloudflare D1 (SQLite) via Drizzle ORM. The data layer uses a repository pattern (`apps/platform/src/lib/data/`) with 28 schema tables, access guards (`guards.ts`), and runtime helpers (`runtime.ts`). Do not use Payload CMS 3.
+- Auction timing is server-authoritative only. End-of-auction transitions are DO-alarm-driven with a cron sweep safety net, never triggered by a client request.
 - Bids are append-only. Corrections use compensating entries, not deletions or updates. Sealed bids are encrypted at rest until the admin opening ceremony.
 - The marketing site uses SSG/ISR where possible, with live data fetched client-side (auction ticker, form submissions).
 
@@ -22,6 +22,7 @@ license: MIT
 - Code identifiers, comments, and internal naming in English. Product-facing labels, UI text, and URLs in Estonian.
 - Page-level components use PascalCase (`FilterPanel`, `LotCard`, `AuctionTicker`). Utility or layout components use the `<ComponentName>` pattern from the design spec.
 - API routes follow RESTful conventions: `GET /api/v1/auctions`, `POST /api/v1/bids/create`, using kebab-case for multi-word paths.
+- Admin UI labels are in Estonian (custom Next.js `(admin)/` route group, not Payload admin).
 - Git branch names should reference the feature or phase number from the delivery plan (e.g. `phase-1-marketing-site`, `fix/bid-sniping`).
 
 ## Code Style
@@ -34,7 +35,8 @@ license: MIT
 ## Testing
 
 - Unit tests with Vitest for utility functions, validators, and the bid engine (rules, autobidder logic, anti-sniping, sealed-bid resolution).
-- Integration tests for API endpoints using a test database. Cover every auction lifecycle status transition.
+- Integration tests with Vitest node pool (better-sqlite3) for repository layer, guards, money handling.
+- Durable Object tests with `@cloudflare/vitest-pool-workers` for AuctionDO, RateLimiterDO, queue consumer.
 - E2E tests with Playwright for critical user journeys: register → browse → bid → win → sign contract.
 - Coverage gate: minimum 80% line coverage for the bid engine and auth modules.
 
@@ -44,18 +46,20 @@ license: MIT
 - Build via Turborepo pipeline: `turbo run build` builds all packages in dependency order.
 - The application must pass `pnpm lint`, `pnpm typecheck`, and `pnpm build` before deployment.
 - Environment variables are documented in `.env.example` at the monorepo root. Secrets use a vault or secret store — never commit `.env` files.
-- Host in an EU region (Hetzner, CyberCloud, or Suppcloud). Dedicated PostgreSQL instance — no shared database.
+- Deploy to Cloudflare Workers via `wrangler`. Entry shim at `src/do/index.ts` re-exports the OpenNext fetch handler, DO classes, and queue consumer.
 
 ## Data & State
 
-- Migrations run through Payload CMS migrations or a dedicated migration tool (e.g. Knex or Drizzle-kit for schema changes outside Payload's scope).
-- Auction status transitions are immutable: `draft → scheduled → active → ended → contract → completed → archived`. An `unsold` branch is valid from `ended`. Do not skip or reorder statuses.
-- Redis stores sessions, rate-limiting counters, BullMQ job queue data, and SSE pub/sub channels. It is a cache layer, not a primary data store.
+- Migrations run through Drizzle Kit. Schema lives in `apps/platform/src/lib/data/schema/`. Repository layer in `apps/platform/src/lib/data/repositories/`.
+- Money is INTEGER cents with EUR conversion at the repository boundary. Schema lint (`pnpm lint`) bans REAL money columns and enum-like TEXT without CHECK constraints.
+- TEXT-JSON columns for flexible data. TEXT `crypto.randomUUID()` for IDs. TEXT ISO-8601 UTC timestamps.
+- Auction status transitions are immutable: `draft → scheduled → active → ended → sealed-opening-pending → contract → completed → archived`. An `unsold` or `appraised` branch is valid from `ended`. Do not skip or reorder statuses. Auction end transitions are DO-alarm-driven with a cron sweep safety net.
+- `AuctionDO` owns bid admission (serialized), alarms, anti-snipe/end transitions, and SSE event hub. `RateLimiterDO` owns rate-limit counters.
 - Statistics are written as snapshots on auction completion. They are computed from the archive, not recalculated from live data.
 
 ## Security
 
-- eID (Smart-ID, Mobile-ID, ID-card) is the primary authentication method via an aggregator (eID Easy or Signicat). Password fallback is rate-limited with optional 2FA for company accounts.
+- eID (Smart-ID, Mobile-ID, ID-card) is the primary authentication method via eID Easy REST provider + demo fallback. JWT HS256 via Web Crypto (async canonical; node:crypto sync bridges remain temporarily). D1-backed sessions with token-family rotation.
 - Bidding rights are granted per auction type by admin. Validate rights server-side on every bid submission — never trust the client.
 - Lead and newsletter forms include honeypot fields and server-side rate limiting. Consent checkboxes are always visible, unchecked, and required — no pre-checked defaults.
 - All admin actions touching users, bids, or contracts are logged to an immutable audit log.
@@ -63,7 +67,7 @@ license: MIT
 
 ## Dependencies
 
-- Next.js 15 (App Router), React, TypeScript, Tailwind CSS, Payload CMS 3, PostgreSQL 16, Redis, BullMQ, Lucide React, Leaflet, and the chosen eID aggregator SDK.
+- Next.js 15 (App Router), React, TypeScript, Tailwind CSS, Cloudflare D1, Drizzle ORM, Durable Objects (AuctionDO, RateLimiterDO), Cloudflare queues, Cloudflare Email Service, Cloudflare R2, Lucide React, Leaflet, and the eID Easy SDK. nodemailer stays as SMTP/Mailpit fallback for local dev.
 - Do not add jQuery, Bootstrap, or any UI framework that duplicates Tailwind's role.
 - Do not add a WebSocket library unless realtime collaboration features (chat, multiplayer) are explicitly scoped. SSE is the chosen realtime transport.
 
@@ -81,4 +85,4 @@ license: MIT
 - The 3% + VAT success fee is paid only on completion — never show fees on an active or unsold auction.
 - Anonymity rules: bid lists show amounts and relative times but never bidder identities. Archive shows only `finalPrice` — no winner identity, no bid count.
 
-<!-- Last updated: 2026-08-27 -->
+<!-- Last updated: 2026-08-30 -->

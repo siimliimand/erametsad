@@ -5,8 +5,8 @@ import nodemailer, { type Transporter } from 'nodemailer'
 import { env } from '@/env'
 import { createResetToken } from '@/lib/auth/reset-tokens'
 import { hash } from '@/lib/crypto'
+import { getRepositories } from '@/lib/data/runtime'
 import { authRateLimiter } from '@/lib/rate-limit'
-import { getPayloadClient } from '@/payload/payloadClient'
 
 const NEUTRAL_MESSAGE =
   'Kui konto on olemas, saadeti parooli lähtestamise link e-posti aadressile'
@@ -67,26 +67,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Identifikaator on kohustuslik' }, { status: 400 })
   }
 
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
   const isEmail = identifier.includes('@')
   let user: Record<string, unknown> | null = null
 
   if (isEmail) {
-    const result = await payload.find({
+    const result = await repos.find({
       collection: 'users',
       where: { email: { equals: identifier } },
       limit: 1,
-      depth: 0,
     })
     user = (result.docs[0] as Record<string, unknown> | undefined) ?? null
   } else {
     const isikukoodHash = hash(identifier)
-    const result = await payload.find({
+    const result = await repos.find({
       collection: 'users',
       where: { isikukoodHash: { equals: isikukoodHash } },
       limit: 1,
-      depth: 0,
     })
     user = (result.docs[0] as Record<string, unknown> | undefined) ?? null
   }

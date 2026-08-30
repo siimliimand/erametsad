@@ -9,8 +9,8 @@ import {
   confirmWinner,
 } from '../sealed-opening'
 
-vi.mock('@/payload/payloadClient', () => ({
-  getPayloadClient: vi.fn(),
+vi.mock('@/lib/data/runtime', () => ({
+  getRepositories: vi.fn(),
 }))
 
 vi.mock('@/lib/contracts/service', () => ({
@@ -18,7 +18,7 @@ vi.mock('@/lib/contracts/service', () => ({
 }))
 
 import { prepareContract } from '@/lib/contracts/service'
-import { getPayloadClient } from '@/payload/payloadClient'
+import { getRepositories } from '@/lib/data/runtime'
 
 const OPENING_TTL_SECONDS = 30 * 60
 
@@ -47,7 +47,7 @@ interface MockFindArgs {
   collection?: string
 }
 
-let mockPayload: {
+let mockRepos: {
   find: ReturnType<typeof vi.fn>
   create: ReturnType<typeof vi.fn>
   update: ReturnType<typeof vi.fn>
@@ -67,12 +67,12 @@ beforeEach(() => {
   vi.clearAllMocks()
   findQueues = {}
   auctionId = `auction-${crypto.randomUUID()}`
-  mockPayload = { find: vi.fn(), create: vi.fn(), update: vi.fn() }
-  mockPayload.find.mockImplementation((args: MockFindArgs) => {
+  mockRepos = { find: vi.fn(), create: vi.fn(), update: vi.fn() }
+  mockRepos.find.mockImplementation((args: MockFindArgs) => {
     const queue = findQueues[args.collection ?? ''] ?? []
     return { docs: queue.length > 0 ? queue.shift() : [] }
   })
-  vi.mocked(getPayloadClient).mockResolvedValue(mockPayload as never)
+  vi.mocked(getRepositories).mockResolvedValue(mockRepos as never)
   emitSpy = vi.spyOn(eventBus, 'emit')
 })
 
@@ -94,7 +94,7 @@ function endedAuction(overrides: Record<string, unknown> = {}): Record<string, u
     id: auctionId,
     status: 'ended',
     title: 'Suletud pakkumise testoksjon',
-    reservePrice: 100_000,
+    reservePriceCents: 10_000_000,
     ...overrides,
   }
 }
@@ -152,7 +152,7 @@ async function approvedSession(
 }
 
 function auctionUpdates(): { collection: string; data: Record<string, unknown> }[] {
-  return mockPayload.update.mock.calls
+  return mockRepos.update.mock.calls
     .map((call) => call[0] as { collection: string; data: Record<string, unknown> })
     .filter((call) => call.collection === 'auctions')
 }
@@ -164,7 +164,7 @@ function endedEvents(): { userId: string | number; payload: Record<string, unkno
 }
 
 function auditCreateActions(): string[] {
-  return mockPayload.create.mock.calls
+  return mockRepos.create.mock.calls
     .map((call) => call[0] as { collection: string; data: { action: string } })
     .filter((call) => call.collection === 'audit-entry')
     .map((call) => call.data.action)
@@ -284,7 +284,7 @@ describe('confirmWinner', () => {
     await expect(
       confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin')),
     ).rejects.toThrow("Auction must be in 'ended' status")
-    expect(mockPayload.update).not.toHaveBeenCalled()
+    expect(mockRepos.update).not.toHaveBeenCalled()
     expect(prepareContract).not.toHaveBeenCalled()
   })
 
@@ -295,7 +295,7 @@ describe('confirmWinner', () => {
     await expect(
       confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin')),
     ).rejects.toThrow('Suletud pakkumiste avamise tseremoonia ei ole kahesammuliselt kinnitatud')
-    expect(mockPayload.update).not.toHaveBeenCalled()
+    expect(mockRepos.update).not.toHaveBeenCalled()
     expect(prepareContract).not.toHaveBeenCalled()
   })
 
@@ -307,7 +307,7 @@ describe('confirmWinner', () => {
     await expect(
       confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin')),
     ).rejects.toThrow('Suletud pakkumiste avamise tseremoonia ei ole kahesammuliselt kinnitatud')
-    expect(mockPayload.update).not.toHaveBeenCalled()
+    expect(mockRepos.update).not.toHaveBeenCalled()
     expect(prepareContract).not.toHaveBeenCalled()
   })
 
@@ -358,13 +358,13 @@ describe('confirmWinner', () => {
     expect(auctionUpdates()[0]?.data).toEqual({
       status: 'appraised',
       winningBid: 'bid-early',
-      finalPrice: 150_000,
+      finalPriceCents: 15_000_000,
     })
   })
 
   it('publishes finalPrice with the decrypted amount and queues the contract when the top bid meets the reserve', async () => {
     await approvedSession('opener-admin', 'approver-admin')
-    queueFind('auctions', [endedAuction({ reservePrice: 100_000 })])
+    queueFind('auctions', [endedAuction({ reservePriceCents: 10_000_000 })])
     queueFind('bids', [
       sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' }),
       sealedBid({ id: 'bid-b', user: 'user-b', amount: 120_000, createdAt: '2026-02-01T10:05:00Z' }),
@@ -373,16 +373,16 @@ describe('confirmWinner', () => {
 
     await confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin'))
 
-    expect(mockPayload.update).toHaveBeenCalledWith(
+    expect(mockRepos.update).toHaveBeenCalledWith(
       expect.objectContaining({ collection: 'bids', id: 'bid-a', data: { status: 'won' } }),
     )
-    expect(mockPayload.update).toHaveBeenCalledWith(
+    expect(mockRepos.update).toHaveBeenCalledWith(
       expect.objectContaining({ collection: 'bids', id: 'bid-b', data: { status: 'lost' } }),
     )
     expect(auctionUpdates()[0]?.data).toEqual({
       status: 'appraised',
       winningBid: 'bid-a',
-      finalPrice: 150_000,
+      finalPriceCents: 15_000_000,
     })
     expect(prepareContract).toHaveBeenCalledWith(auctionId, 'auction')
     expect(auditCreateActions()).toContain('winner_confirmed')
@@ -390,7 +390,7 @@ describe('confirmWinner', () => {
 
   it('backfills the statistics snapshot eur from the published finalPrice without recounting the auction', async () => {
     await approvedSession()
-    queueFind('auctions', [endedAuction({ objectType: 'forest', reservePrice: 25_000 })])
+    queueFind('auctions', [endedAuction({ objectType: 'forest', reservePriceCents: 2_500_000 })])
     queueFind('bids', [
       sealedBid({ id: 'bid-a', user: 'user-a', amount: 27_500, createdAt: '2026-02-01T10:00:00Z' }),
     ])
@@ -401,7 +401,7 @@ describe('confirmWinner', () => {
 
     await confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin'))
 
-    expect(mockPayload.update).toHaveBeenCalledWith(
+    expect(mockRepos.update).toHaveBeenCalledWith(
       expect.objectContaining({
         collection: 'statistics-snapshots',
         id: 'snap-1',
@@ -412,7 +412,7 @@ describe('confirmWinner', () => {
 
   it('treats a bid equal to the reserve price as meeting the reserve', async () => {
     await approvedSession()
-    queueFind('auctions', [endedAuction({ reservePrice: 150_000 })])
+    queueFind('auctions', [endedAuction({ reservePriceCents: 15_000_000 })])
     queueFind('bids', [sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' })])
     queueFind('bids', [])
 
@@ -421,13 +421,13 @@ describe('confirmWinner', () => {
     expect(auctionUpdates()[0]?.data).toEqual({
       status: 'appraised',
       winningBid: 'bid-a',
-      finalPrice: 150_000,
+      finalPriceCents: 15_000_000,
     })
   })
 
   it('marks the auction unsold when the top decrypted bid is below the reserve', async () => {
     await approvedSession()
-    queueFind('auctions', [endedAuction({ reservePrice: 200_000 })])
+    queueFind('auctions', [endedAuction({ reservePriceCents: 20_000_000 })])
     queueFind('bids', [
       sealedBid({ id: 'bid-a', user: 'user-a', amount: 150_000, createdAt: '2026-02-01T10:00:00Z' }),
       sealedBid({ id: 'bid-b', user: 'user-b', amount: 120_000, createdAt: '2026-02-01T10:05:00Z' }),
@@ -436,13 +436,13 @@ describe('confirmWinner', () => {
     await confirmWinner(auctionId, 'bid-a', adminToken('confirmer-admin'))
 
     expect(auctionUpdates()[0]?.data).toEqual({ status: 'unsold' })
-    expect(mockPayload.update).not.toHaveBeenCalledWith(
+    expect(mockRepos.update).not.toHaveBeenCalledWith(
       expect.objectContaining({ collection: 'bids', id: 'bid-a' }),
     )
-    expect(mockPayload.update).not.toHaveBeenCalledWith(
+    expect(mockRepos.update).not.toHaveBeenCalledWith(
       expect.objectContaining({ collection: 'statistics-snapshots' }),
     )
-    expect(mockPayload.create).not.toHaveBeenCalledWith(
+    expect(mockRepos.create).not.toHaveBeenCalledWith(
       expect.objectContaining({ collection: 'statistics-snapshots' }),
     )
     expect(prepareContract).not.toHaveBeenCalled()
@@ -510,7 +510,7 @@ describe('confirmWinner', () => {
     expect(auctionUpdates()[0]?.data).toEqual({
       status: 'appraised',
       winningBid: 'bid-a',
-      finalPrice: 150_000,
+      finalPriceCents: 15_000_000,
     })
     errorSpy.mockRestore()
   })

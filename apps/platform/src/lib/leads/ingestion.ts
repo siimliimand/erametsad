@@ -1,4 +1,4 @@
-import { getPayloadClient } from '../../payload/payloadClient'
+import { getRepositories } from '../data/runtime'
 
 export interface LeadInput {
   formName: string
@@ -21,9 +21,9 @@ export async function ingestLead(data: LeadInput): Promise<Record<string, unknow
     throw new Error('consentAt is required')
   }
 
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const doc = await payload.create({
+  const doc = await repos.create({
     collection: 'leads',
     data: {
       formName: data.formName,

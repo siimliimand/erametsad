@@ -1,6 +1,6 @@
 import { placeBid } from './place-bid'
-
-import { getPayloadClient } from '@/payload/payloadClient'
+import { centsToEuros } from '../data/repositories/money'
+import { getRepositories } from '../data/runtime'
 
 type AutobidderDoc = Record<string, unknown>
 
@@ -9,21 +9,20 @@ function createdAtMs(autobidder: AutobidderDoc): number {
 }
 
 export async function evaluateAutobidders(auctionId: string): Promise<void> {
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  const auctionResult = await payload.find({
+  const auctionResult = await repos.find({
     collection: 'auctions',
     where: { id: { equals: auctionId } },
     limit: 1,
-    depth: 0,
   })
   const auction = auctionResult.docs[0] as AutobidderDoc | undefined
   if (!auction) return
 
-  const bidStep = auction.bidStep as number
-  const minBid = auction.minBid as number
+  const bidStepCents = auction.bidStepCents as number | null
+  const minBidCents = auction.minBidCents as number
 
-  const leadingResult = await payload.find({
+  const leadingResult = await repos.find({
     collection: 'bids',
     where: {
       and: [
@@ -32,13 +31,12 @@ export async function evaluateAutobidders(auctionId: string): Promise<void> {
       ],
     },
     limit: 1,
-    depth: 0,
   })
   const leadingBid = leadingResult.docs[0] as AutobidderDoc | undefined
-  const leadingUser = leadingBid?.user as string | undefined
-  const leadingAmount = leadingBid?.amount as number | undefined
+  const leadingUser = leadingBid?.userId as string | undefined
+  const leadingAmountCents = leadingBid?.amountCents as number | undefined
 
-  const autobiddersResult = await payload.find({
+  const autobiddersResult = await repos.find({
     collection: 'autobidders',
     where: {
       and: [
@@ -47,17 +45,16 @@ export async function evaluateAutobidders(auctionId: string): Promise<void> {
       ],
     },
     sort: 'createdAt',
-    depth: 0,
   })
   const autobidders = autobiddersResult.docs as AutobidderDoc[]
 
   // No self-overbid: the autobidder whose user already leads never raises.
-  const candidates = autobidders.filter((a) => a.user !== leadingUser)
+  const candidates = autobidders.filter((a) => a.userId !== leadingUser)
   if (candidates.length === 0) return
 
   const winner = candidates.reduce((best, candidate) => {
-    const candidateMax = candidate.maxAmount as number
-    const bestMax = best.maxAmount as number
+    const candidateMax = candidate.maxAmountCents as number
+    const bestMax = best.maxAmountCents as number
     if (
       candidateMax > bestMax ||
       (candidateMax === bestMax && createdAtMs(candidate) < createdAtMs(best))
@@ -67,27 +64,31 @@ export async function evaluateAutobidders(auctionId: string): Promise<void> {
     return best
   })
 
-  let rivalMax: number | null = null
+  let rivalMaxCents: number | null = null
   for (const autobidder of autobidders) {
     if (autobidder === winner) continue
-    const max = autobidder.maxAmount as number
-    if (rivalMax === null || max > rivalMax) rivalMax = max
+    const max = autobidder.maxAmountCents as number
+    if (rivalMaxCents === null || max > rivalMaxCents) rivalMaxCents = max
   }
 
-  const required =
-    leadingAmount !== undefined ? leadingAmount + bidStep : minBid
-  const winnerMax = winner.maxAmount as number
-  if (winnerMax < required) return
+  const requiredCents =
+    leadingAmountCents !== undefined
+      ? leadingAmountCents + (bidStepCents ?? 0)
+      : minBidCents
+  const winnerMaxCents = winner.maxAmountCents as number
+  if (winnerMaxCents < requiredCents) return
 
   // Single pass: clear the minimum and the strongest rival max in one bid.
-  let target = required
-  if (rivalMax !== null) target = Math.max(target, rivalMax + bidStep)
-  target = Math.min(target, winnerMax)
+  let targetCents = requiredCents
+  if (rivalMaxCents !== null) {
+    targetCents = Math.max(targetCents, rivalMaxCents + (bidStepCents ?? 0))
+  }
+  targetCents = Math.min(targetCents, winnerMaxCents)
 
   await placeBid({
-    userId: winner.user as string,
+    userId: winner.userId as string,
     auctionId,
-    amount: target,
+    amount: centsToEuros(targetCents),
     type: 'open',
     source: 'autobidder',
   })

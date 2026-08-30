@@ -1,0 +1,3 @@
+# Generated export/transform/import artifacts never belong in git.
+.export/
+import-d1.sql

@@ -39,8 +39,9 @@ eametsad/
 ├── .codegraph/           # Code intelligence index
 ├── .opencode/            # OpenCode configuration, harness, agents, plugins
 ├── apps/
-│   └── platform/         # Core backend: Next.js 15 + Payload CMS 3 (API, admin,
-│                         # bidding engine, auth, SSE, workers, seed data)
+│   └── platform/         # Core backend: Next.js 15 on Cloudflare Workers
+│                         # (API, custom admin, bidding engine, auth, SSE,
+│                         # Durable Objects, queue, seed data)
 ├── packages/
 │   ├── config/           # Shared ESLint, Prettier, and TypeScript configuration
 │   ├── emails/           # Notification e-mail templates (React templates)
@@ -65,7 +66,7 @@ eametsad/
 └── skills-lock.json      # Installed agent skills manifest
 ```
 
-The monorepo is under active implementation. `apps/platform` holds the core backend: a Next.js 15 App Router application with an embedded Payload CMS 3 instance covering the API, admin panel, collections, auth flows, bidding engine, SSE streams, the auction-ending worker, and seed data. Remaining phases are defined in `docs/EAMETSAD-PLAN.md`.
+The monorepo is under active implementation. `apps/platform` holds the core backend: a Next.js 15 App Router application running on Cloudflare Workers via OpenNext, with Cloudflare D1 (SQLite) for storage, Drizzle ORM for the data layer, Durable Objects for bid serialization and rate limiting, a Cloudflare queue for background jobs, and a custom admin UI. Remaining phases are defined in `docs/EAMETSAD-PLAN.md`.
 
 ---
 
@@ -82,25 +83,28 @@ The monorepo is under active implementation. `apps/platform` holds the core back
          ▼                           ▼                               ▼
 ┌──────────────────┐      ┌──────────────────────────┐     ┌──────────────────────┐
 │ oksjonid.eametsad│      │  api.eametsad.ee (core)   │     │ admin.eametsad.ee    │
-│ .ee — SPA portal │────▶│  Auction engine, auth,    │◀────│ Admin panel          │
-│ Bids, my pages   │      │  contracts, notifications │     │ (role-gated same API)│
+│ .ee — SPA portal │────▶│  Auction engine, auth,    │◀────│ Custom admin UI      │
+│ Bids, my pages   │      │  contracts, notifications │     │ (role-gated, Next.js)│
 │ Map, filters     │      │  users, leads, CMS content│     │                      │
 └──────────────────┘      └────────────┬──────────────┘     └──────────────────────┘
-                                        │
-          ┌─────────────┬───────────────┼────────────────┬──────────────┐
-          ▼             ▼               ▼                ▼              ▼
-     PostgreSQL    eID provider    e-signing         E-mail/SMS     Maps/geo
-     (+Redis)      Smart-ID/M-ID   (contracts)       provider       Leaflet+LMV
-                   ID-card         Dokobit/eIDEasy   Mailgun+SMS    or Google Maps
+                                       │
+         ┌─────────────┬───────────────┼────────────────┬──────────────┐
+         ▼             ▼               ▼                ▼              ▼
+    Cloudflare    eID provider    e-signing        Email Service   Maps/geo
+    D1 (SQLite)   Smart-ID/M-ID   (contracts)     (Cloudflare)    Leaflet+LMV
+    Durable Obj.  ID-card         eIDEasy          or SMTP fallback
+    Queues
 ```
 
 **Three deployment units, one backend:**
 
-| Deployment | Role | Tech (recommended) |
+| Deployment | Role | Tech |
 |---|---|---|
 | `eametsad.ee` | Public marketing & SEO site | Next.js 15 (SSG/ISR), static where possible |
 | `oksjonid.eametsad.ee` | Auction portal SPA | React SPA or Next.js client-heavy routes |
-| `api.eametsad.ee` + `admin.eametsad.ee` | Core backend + role-gated admin | Payload CMS 3 (embeds into Next.js) |
+| `api.eametsad.ee` + `admin.eametsad.ee` | Core backend + role-gated admin | Next.js on Cloudflare Workers (via OpenNext) |
+
+**Prototype domains (ww0.dev):** Under the `ww0.dev` zone, the prototype runs at `erametsad.ww0.dev`, `oksjonid.erametsad.ww0.dev`, `api.erametsad.ww0.dev`, and `admin.erametsad.ww0.dev`. The production `.ee` cutover is a separate future step.
 
 ---
 
@@ -113,11 +117,11 @@ The monorepo is under active implementation. `apps/platform` holds the core back
 | **URL** | `eametsad.ee` |
 | **Audience** | Forest owners, buyers (public, no auth) |
 | **Stack** | Next.js 15 App Router, SSG/ISR |
-| **Content** | Pages, articles, FAQ categories, specialists, testimonials, partner services — all from Payload CMS collections |
+| **Content** | Pages, articles, FAQ categories, specialists, testimonials, partner services — all from D1-backed CMS content tables |
 | **Dynamic elements** | Live auction ticker (client-side fetch + refresh), lead forms, newsletter subscription |
 | **Key routes** | `/`, `/teenused/*`, `/metsateatis`, `/kiiroksjon`, `/hindamisaktid`, `/kkk/*`, `/paringud/*`, `/meist/*`, `/artiklid/*`, `/lepingud`, `/kontakt` |
 
-All marketing-site content is managed via Payload CMS collections. The site generates statically where possible and hydrates live data client-side.
+All marketing-site content is managed via D1-backed CMS content tables. The site generates statically where possible and hydrates live data client-side.
 
 ### 3.2 Auction Portal
 
@@ -136,23 +140,24 @@ All marketing-site content is managed via Payload CMS collections. The site gene
 | Attribute | Value |
 |---|---|
 | **URL** | `api.eametsad.ee` |
-| **Stack** | Payload CMS 3 (TypeScript, REST API, built on Next.js) |
-| **Primary storage** | PostgreSQL 16 |
-| **Cache/sessions** | Redis |
-| **Background jobs** | BullMQ (auction ending worker, notifications, digests, PDF generation). Prototype: worker and dispatcher run in-process from `instrumentation.ts` on a 30s interval behind the queue interface |
+| **Stack** | Next.js 15 App Router on Cloudflare Workers (via OpenNext) |
+| **Primary storage** | Cloudflare D1 (SQLite) via Drizzle ORM |
+| **Background jobs** | Cloudflare queue `eametsad-jobs` with DLQ `eametsad-dlq` (max_retries 3). Cron sweep wakes evicted Durable Objects. |
 | **Realtime** | SSE for live bid/countdown updates |
+| **Bid serialization** | `AuctionDO` (Durable Object, one per auction) owns bid admission, alarms, anti-snipe, end transitions, and SSE event hub |
+| **Rate limiting** | `RateLimiterDO` (Durable Object) owns rate-limit counters; in-memory fallback outside Workers |
 
-**API endpoints (summary, as implemented in Phase 2):**
+**API endpoints (summary):**
 
 | Area | Endpoints |
 |---|---|
-| Auth | `POST /api/v1/auth/login`, `/register`, `/reset-password/:token`, `/{smartid\|mobileid\|idcard}/start\|status` (demo eID simulator behind a provider interface) |
+| Auth | `POST /api/v1/auth/login`, `/register`, `/reset-password/:token`, `/{smartid\|mobileid\|idcard}/start\|status` (eID Easy provider + demo fallback) |
 | Bidding | `POST /api/v1/bids/create`, `GET/POST /api/v1/auto-bidders` |
 | Contracts | `POST /api/v1/bids/contract/{prepare\|complete}`, `/api/v1/bids/framework-contract/{prepare\|complete}` |
 | Profiles | `POST /api/v1/profiles/:id/select`, `POST /api/v1/business/request-access` |
 | Realtime | `GET /api/v1/auctions/stream` (public SSE), `GET /api/v1/my/stream` (authenticated SSE) |
 | Public data | `GET /api/v1/statistics`, `GET /api/v1/company-lookup` (registry fixtures) |
-| Admin | `POST /api/v1/admin/auctions/:id/open-sealed`, `/approve-sealed`, `/confirm-winner`, plus Payload CRUD |
+| Admin | `POST /api/v1/admin/auctions/:id/open-sealed`, `/approve-sealed`, `/confirm-winner`, plus admin CRUD routes |
 | Forms | `POST /api/leads` (honeypot + rate-limited) |
 
 ### 3.4 Admin Backend
@@ -161,10 +166,10 @@ All marketing-site content is managed via Payload CMS collections. The site gene
 |---|---|
 | **URL** | `admin.eametsad.ee` |
 | **Audience** | Eametsad staff (role-gated) |
-| **Stack** | Payload CMS 3 built-in admin panel (role-gated) |
+| **Stack** | Custom Next.js `(admin)/` route group with Estonian labels |
 | **Modules** | Dashboard, auction management, bid monitoring, users & rights, contracts, CRM (leads), service request routing, CMS content, statistics, settings, audit log |
 
-The admin is the same Payload CMS instance as the core API, with role-based access control.
+The admin is a separate Next.js route group with role-based access control. It is not Payload admin.
 
 ---
 
@@ -173,12 +178,12 @@ The admin is the same Payload CMS instance as the core API, with role-based acce
 ### Key user journey: forest owner sells cutting rights
 
 1. Owner lands on `eametsad.ee`, reads service page, submits lead form.
-2. Lead POSTs to `POST /api/v1/leads` → stored in PostgreSQL → notification sent to assigned specialist.
+2. Lead POSTs to `POST /api/v1/leads` → stored in D1 → notification sent to assigned specialist.
 3. Specialist contacts owner, prepares forest data, creates auction lot via admin.
 4. Lot published → status `draft → scheduled → active`.
 5. Buyers browse on `oksjonid.eametsad.ee`, place bids.
 6. Anti-sniping extends end time if bid within last 5 minutes.
-7. At end time, worker transitions `active → ended` → computes outcome.
+7. At end time, AuctionDO alarm fires → transitions `active → ended` → computes outcome.
 8. Winner invited to sign contract via eID provider → contract stored.
 9. Status moves `ended → contract → completed → archived`.
 10. Statistics snapshot written.
@@ -188,7 +193,7 @@ The admin is the same Payload CMS instance as the core API, with role-based acce
 ```
 Buyer submits bid
   → Server validates: auth, active auction, type right, amount ≥ leading + step
-  → Row lock on auction row
+  → AuctionDO serialization (single-threaded per auction)
   → Anti-snipe check: extends endTime if within window
   → Bid appended to bids table (append-only)
   → AutoBidder engine runs: resolves next leading bid
@@ -202,14 +207,17 @@ Buyer submits bid
 
 | Store | Type | Purpose |
 |---|---|---|
-| PostgreSQL 16 | Relational (primary) | All transactional data: users, profiles, auctions, bids, contracts, leads, CMS content, audit log. JSONB for flexible lot attributes. |
-| Redis | Key-value cache | Session store, rate limiting counters, SSE pub/sub channels, BullMQ job queue backing. |
+| Cloudflare D1 (SQLite) | Relational (primary) | All transactional data: users, profiles, auctions, bids, contracts, leads, CMS content, audit log, sessions. 28 tables defined via Drizzle ORM schema in `apps/platform/src/lib/data/schema/`. |
+| Durable Objects | Stateful compute | `AuctionDO`: serialized bid admission, alarms, anti-snipe, end transitions, SSE event hub. `RateLimiterDO`: rate-limit counters. |
+| Cloudflare R2 | Object storage | Media uploads (images, documents) |
+| Cloudflare KV | Key-value cache | Ephemeral cache where needed |
+| Cloudflare queue | Job queue | Background jobs: `eametsad-jobs` producer, `eametsad-dlq` dead-letter queue (max_retries 3). Cron sweep wakes evicted DOs. |
 
 ### Core entities
 
-`User`, `Profile` (private/company), `CompanyAccessRequest`, `AuctionRight`, `Auction` (with full field model: location, forest data, pricing, content, packages), `Bid` (append-only), `AutoBidder`, `AuctionSubscription`, `Contract`, `ContractTemplate`, `Lead`, `ServiceRequest`, `NewsletterSubscriber`, `Specialist`, CMS collections (`Page`, `Article`, `FAQCategory`, `FAQItem`, `Testimonial`, `PartnerService`, `LegalDocument`, `Redirect`), `County`, `Parish`, `Notification`, `AuditEntry`, `StatisticsSnapshot`, `Settings` (singleton: fees, anti-snipe and alapakkumine defaults, feature flags).
+`User`, `Profile` (private/company), `CompanyAccessRequest`, `AuctionRight`, `Auction` (with full field model: location, forest data, pricing, content, packages), `Bid` (append-only), `Autobidder`, `AuctionSubscription`, `Contract`, `ContractTemplate`, `Lead`, `Notification`, `AuditEntry`, `Settings` (singleton: fees, anti-snipe and alapakkumine defaults, feature flags), plus CMS content tables (`Article`, `Content`, `Page`, `FaqCategory`, `FaqItem`, `Testimonial`, `PartnerService`, `LegalDocument`, `Redirect`, `Specialist`, `Media`), and geographic tables (`County`, `Parish`), `StatisticsSnapshot`.
 
-See `docs/EAMETSAD-PLAN.md` §8 for the complete data model.
+Schema source: `apps/platform/src/lib/data/schema/`. The repository layer at `apps/platform/src/lib/data/repositories/` wraps Drizzle queries. Access rules live in `apps/platform/src/lib/data/guards.ts`. Money uses INTEGER cents with EUR conversion at the repository boundary.
 
 ---
 
@@ -217,15 +225,14 @@ See `docs/EAMETSAD-PLAN.md` §8 for the complete data model.
 
 | Integration | Purpose | Method | Notes |
 |---|---|---|---|
-| eID (Smart-ID, Mobile-ID, ID-card) | Authentication | Aggregator API (eID Easy or Signicat) | Phase 0 decision. Phase 2 ships a demo simulator behind a provider interface (`lib/auth/eid-provider.ts`) until the aggregator is contracted |
-| e-signing (same provider) | Contract signing | Aggregator API | Wraps Smart-ID/M-ID/ID-card signing |
+| eID (Smart-ID, Mobile-ID, ID-card) | Authentication | eID Easy REST provider + demo fallback | JWT HS256 via Web Crypto (async canonical). D1-backed sessions with token-family rotation. |
+| e-signing (same provider) | Contract signing | eID Easy API | Wraps Smart-ID/M-ID/ID-card signing |
 | Äriregister (e-Business Register) | Company registry lookup | REST API / X-Road | Validates registrikood on company registration |
 | Maa-amet (Land Board) WMS/orthophoto | Map tiles | Leaflet + WMS | Free, local — primary map provider |
 | Google Maps (fallback) | Map tiles | JS API | Fallback only |
-| Mailgun (SendGrid) | Transactional e-mail | REST API / SMTP | Phase 2 — templates done; e-mail sends via SMTP (Mailpit in dev) until the provider is contracted |
-| SMS provider (Messente/CM.com) | Bid/auction-critical SMS | REST API | Phase 2 — SMS channel is a log stub until the provider is contracted |
+| Cloudflare Email Service (beta) | Transactional e-mail | EMAIL binding + REST API, SMTP/Mailpit fallback | Sending subdomain `erametsad.ww0.dev` (prototype). 3,000 emails/month included. |
 | Gotenberg or Puppeteer | PDF generation | HTTP API | Self-hosted — contract PDFs |
-| Plausible or GA4 | Analytics | JS snippet + API | Phase 1 — GDPR consent gated |
+| Plausible or GA4 | Analytics | JS snippet + API | GDPR consent gated |
 
 ---
 
@@ -233,13 +240,15 @@ See `docs/EAMETSAD-PLAN.md` §8 for the complete data model.
 
 | Layer | Technology | Architectural relevance |
 |---|---|---|
-| **Runtime** | Node.js (via Next.js) | Server-rendered React + API routes |
+| **Runtime** | Cloudflare Workers (via OpenNext) | Serverless edge runtime for the Next.js app |
 | **Framework** | Next.js 15 (App Router) | SSG/ISR for marketing, API routes for backend |
-| **CMS/Admin** | Payload CMS 3 | Gives admin panel, collections, REST/GraphQL, auth, media, localization — embedded into Next.js |
+| **Database** | Cloudflare D1 (SQLite) | Primary store — Drizzle ORM for schema and queries |
+| **ORM** | Drizzle ORM | Schema definition, migrations, type-safe queries. 28 tables in `apps/platform/src/lib/data/schema/`. |
+| **Bid serialization** | Durable Objects (`AuctionDO`) | Single-threaded per auction — owns bid admission, alarms, anti-snipe, end transitions, SSE hub |
+| **Rate limiting** | Durable Objects (`RateLimiterDO`) | Per-identifier rate-limit counters |
+| **Queue** | Cloudflare queues (`eametsad-jobs`) | Background jobs with DLQ (`eametsad-dlq`, max_retries 3). Cron sweep wakes evicted DOs. |
+| **Email** | Cloudflare Email Service (beta) | EMAIL binding + REST API. Sending subdomain `erametsad.ww0.dev`. |
 | **Frontend** | React, TypeScript, Tailwind CSS | Component library shared across marketing site, portal, admin |
-| **Database** | PostgreSQL 16 | Primary store — JSONB for flexible attributes, relational integrity for bids/contracts |
-| **Cache** | Redis | Sessions, pub/sub, BullMQ queue backing, rate limiting |
-| **Queue** | BullMQ | Background jobs (auction ending, notifications, digest, PDF generation) |
 | **Realtime** | SSE | Live bid and countdown updates |
 | **Maps** | Leaflet + Maa-amet WMS | Free, local — primary map rendering |
 | **Icons** | Lucide React | Clean, tree-shakeable icon library |
@@ -250,16 +259,22 @@ See `docs/EAMETSAD-PLAN.md` §8 for the complete data model.
 
 ## 8. Deployment & Infrastructure
 
-Not yet implemented. Phase 0 will establish hosting. Key requirements:
+The application runs on Cloudflare Workers via OpenNext. All stateful components are Cloudflare-native.
 
-- **Hosting region:** EU (Hetzner, CyberCloud, or Suppcloud recommended)
-- **Database:** Dedicated PostgreSQL 16 instance — auction timing demands isolation
-- **Build system:** Turborepo + pnpm monorepo
-- **CI/CD:** GitHub Actions (recommended)
-- **Environment config:** `.env` files (not committed), secrets in vault/secret store
-- **Containers:** Docker recommended for background workers (BullMQ, Gotenberg)
+| Concern | Approach |
+|---|---|
+| **Runtime** | Cloudflare Workers (nodejs_compat flag) |
+| **Database** | Cloudflare D1 (`eametsad-db`) — single writer per database, SQLite dialect |
+| **Object storage** | Cloudflare R2 (`eametsad-media`) |
+| **Queue** | Cloudflare queues (`eametsad-jobs` → `eametsad-dlq`, max_retries 3) |
+| **Durable Objects** | `AuctionDO` (one per auction), `RateLimiterDO` (per-identifier) |
+| **Email** | Cloudflare Email Service (beta, sending subdomain `erametsad.ww0.dev`) |
+| **Build** | Turborepo + pnpm monorepo |
+| **Entry shim** | `src/do/index.ts` re-exports the OpenNext fetch handler plus DO classes and queue consumer |
+| **Cron** | Every-minute sweep wakes evicted DOs whose alarms were lost |
+| **Prototype domain** | `erametsad.ww0.dev` under zone `ww0.dev`. Production `.ee` cutover is a separate future step (see `docs/runbooks/cutover-cloudflare-only.md`). |
 
-Not evident from the repository: hosting provider, domain registration, SSL certificate management, container registry, Kubernetes/ECS configuration.
+Not yet implemented: production `.ee` domain cutover, eID Easy production contract, DNS migration from `ww0.dev` to `erametsad.ee`.
 
 ---
 
@@ -267,16 +282,17 @@ Not evident from the repository: hosting provider, domain registration, SSL cert
 
 | Concern | Approach |
 |---|---|
-| **Authentication** | eID (Smart-ID, Mobile-ID, ID-card) via aggregator + fallback password login with rate limiting |
+| **Authentication** | eID (Smart-ID, Mobile-ID, ID-card) via eID Easy REST provider + demo fallback. JWT HS256 via Web Crypto (async canonical; node:crypto sync bridges remain temporarily). |
+| **Sessions** | D1-backed sessions table with token-family rotation |
 | **Authorization** | Role-based: guest, registered (private/company), seller, specialist, admin, superadmin |
-| **Bid integrity** | Bids in serializable transaction with row lock; append-only audit table |
+| **Bid integrity** | `AuctionDO` serialization (single-threaded per auction); append-only audit table |
 | **Sealed bids** | Encrypted at rest until admin opening ceremony (two-person approval enforced at the API level) |
-| **Rate limiting** | Auth endpoints, bid submission, form submissions — backed by Redis |
+| **Rate limiting** | `RateLimiterDO` on auth endpoints, bid submission, form submissions |
 | **CSP** | Content Security Policy on all responses |
 | **Honeypot fields** | Invisible form fields to block bots on all forms |
 | **GDPR** | Explicit consents (no pre-checked boxes), data export/erasure self-service, retention schedules |
 | **Audit log** | Immutable log of all admin actions touching users/bids/contracts |
-| **Anti-sniping** | Time extension mechanism to prevent last-second bid sniping |
+| **Anti-sniping** | Time extension mechanism to prevent last-second bid sniping. AuctionDO alarm-driven with a cron sweep safety net. |
 
 Security posture targets OWASP ASVS Level 2 with penetration testing before launch.
 
@@ -303,7 +319,7 @@ Not evident from the repository: APM tooling, structured logging framework, heal
 | **Auction listing** | Server-side pagination (cursor or page-based) |
 | **Lot caching** | Lot pages cached until first bid |
 | **Concurrent viewers** | Target 10,000 concurrent viewers, 500 concurrent bidders |
-| **Timing correctness** | Server-authoritative clocks; end-of-auction processed by queue worker with row locks — never by client |
+| **Timing correctness** | Server-authoritative clocks; end-of-auction processed by AuctionDO alarm with a cron sweep safety net — never by client |
 | **Idempotency** | All background jobs idempotent and retryable |
 | **LCP target** | < 2.5s on 3G |
 | **Accessibility** | WCAG 2.1 AA target |
@@ -312,7 +328,7 @@ Not evident from the repository: APM tooling, structured logging framework, heal
 
 ## 12. Development Workflow
 
-Build tooling is established: a pnpm workspace driven by a Turborepo pipeline. ESLint, Prettier, and the shared TypeScript configuration live in `packages/config`. Database seed and reset run through `pnpm seed:reset` in `apps/platform`.
+Build tooling is established: a pnpm workspace driven by a Turborepo pipeline. ESLint, Prettier, and the shared TypeScript configuration live in `packages/config`. Schema lint (`pnpm lint` chain) bans REAL money columns and enum-like TEXT without CHECK constraints.
 
 | Command | Purpose |
 |---|---|
@@ -329,13 +345,15 @@ Not yet established: pre-commit hooks, commit message convention.
 
 ## 13. Testing Strategy
 
-Unit tests are implemented with Vitest in `apps/platform`. They cover the bid engine (place-bid validation chain, autobidder tie-breaks, anti-snipe boundary, alapakkumine approval, sealed-bid encrypt/decrypt) and the auction-ending worker (idempotent double-fire). The remaining layers are still planned:
+Three test layers are wired into `pnpm test`:
 
 | Layer | Framework | Scope |
 |---|---|---|
-| **Integration** | Supertest + test DB | API endpoints, auction lifecycle, auth flows |
-| **E2E** | Playwright | Critical user journeys: register → bid → win → sign |
-| **Visual** | Playwright (pc-ops-evidence) | UI snapshot testing in CI |
+| **Unit + integration** | Vitest node pool (better-sqlite3) | Repository layer, guards, money handling, JSON fields, hooks, bid engine (rules, autobidder, anti-snipe, sealed-bid) |
+| **Durable Object** | `@cloudflare/vitest-pool-workers` | AuctionDO (bid admission, alarms, end transitions), RateLimiterDO, queue consumer |
+| **Spikes** | Various | Targeted prototypes for specific subsystems |
+
+All suites run under `pnpm test`. Schema lint enforces data conventions (no REAL money columns, CHECK constraints on enum-like TEXT).
 
 ---
 
@@ -344,13 +362,14 @@ Unit tests are implemented with Vitest in `apps/platform`. They cover the bid en
 | Decision | Rationale |
 |---|---|
 | **Monorepo (Turborepo/pnpm)** | Mirrors reference architecture proven for this exact product class; shared types and components across three sites |
-| **Next.js + Payload CMS 3** | Payload embeds into Next.js — one framework for marketing, API, and admin; TypeScript throughout; localization built in |
-| **PostgreSQL over document DB** | Bids, contracts, and financial data need relational integrity; JSONB for flexible lot attributes gives best of both |
+| **Cloudflare Workers via OpenNext** | All stateful components on one platform: D1, Durable Objects, queues, Email Service, R2, KV. No external database or cache vendor. |
+| **D1 (SQLite) over PostgreSQL** | Eliminates external Postgres dependency; D1 runs on the same edge as Workers. INTEGER cents, TEXT timestamps, TEXT UUIDs, TEXT-JSON columns. |
+| **Drizzle ORM** | Type-safe schema and queries over D1. Replaces Payload CMS collections. 28 tables with repository-layer access rules. |
+| **Durable Objects for bid serialization** | `AuctionDO` is single-threaded per auction — replaces `SELECT ... FOR UPDATE` row locks that D1 cannot provide. |
 | **SSE over WebSockets** | Lower complexity for server-to-client bid/countdown updates; WebSocket overhead not justified until chat/multiplayer features added |
-| **BullMQ for background jobs** | Queue-backed, idempotent, retryable — critical for auction-ending correctness |
-| **Server-authoritative timing** | Auction end processed by queue worker with row locks; never trusted from client — prevents manipulation |
+| **Cloudflare queues over BullMQ** | Queue and DLQ run on the same platform. Cron sweep wakes evicted DOs. |
 | **Leaflet + Maa-amet over Google Maps** | Free, local, works offline; Estonian Land Board data is authoritative for cadastral information |
-| **Subdomain strategy** | Matches proven reference pattern; clear SEO and mental model separation |
+| **Custom admin over Payload admin** | Estonian labels, role-gated, full control over the UI. Payload CMS removed in the migration. |
 
 ---
 
@@ -364,6 +383,9 @@ Unit tests are implemented with Vitest in `apps/platform`. They cover the bid en
 | **Estonian-only at launch** | Scope | Architecture ready for i18n, but not active |
 | **WCAG 2.1 AA target** | Ongoing effort | Accessible by design from day one — but adds development time |
 | **Phase 5 (association) optional** | Scope | Affects data model extensibility — design for it but defer implementation |
+| **Production .ee cutover is future** | External dependency | Prototype under `ww0.dev`; DNS, email, and domain migration pending (see `docs/runbooks/cutover-cloudflare-only.md`) |
+| **node:crypto sync bridges remain** | Technical debt | `jwt.ts`, `password.ts`, `crypto.ts`, `encryption.ts` still use sync node:crypto. Slated for removal as callers go async to Web Crypto. |
+| **Neon/Postgres references in docs** | Technical debt | Legacy references from the old stack. Migration tooling exists at `scripts/migrate-pg-to-d1/` for the data path. |
 
 ---
 
@@ -371,8 +393,10 @@ Unit tests are implemented with Vitest in `apps/platform`. They cover the bid en
 
 | Item | Phase | Recommendation |
 |---|---|---|
+| **Production .ee domain cutover** | Post-prototype | DNS migration from `ww0.dev` to `erametsad.ee`, email sending domain swap, runbook at `docs/runbooks/cutover-cloudflare-only.md` |
+| **eID Easy production contract** | Post-prototype | Replace demo fallback with production eID provider |
 | **Association subsite** | Phase 5 | Design subsidy content model now to avoid retrofitting; defer implementation |
-| **i18n (EN/RU)** | Post-launch | Architecture should handle it (Payload has built-in localization); Estonian-only for Phase 1-4 |
+| **i18n (EN/RU)** | Post-launch | Architecture should handle it; Estonian-only for Phase 1-4 |
 | **Mobile app** | Post-launch | Progressive Web App (PWA) covers most needs initially |
 | **AI forest valuation** | Future | Planned for data-rich future — uses transaction comparison + own auction results |
 | **Partner marketplace automation** | Future | Auto-routing of service requests to partner companies with SLAs |
@@ -385,10 +409,10 @@ Unit tests are implemented with Vitest in `apps/platform`. They cover the bid en
 |---|---|
 | **Name** | Eametsad |
 | **Type** | Greenfield — Estonian forest-transaction auction platform |
-| **Primary language** | TypeScript/JavaScript (Next.js, Payload CMS, React) |
-| **Database** | PostgreSQL 16 |
-| **Runtime** | Node.js |
-| **Date of review** | 2026-08-28 |
+| **Primary language** | TypeScript (Next.js, Drizzle ORM, React) |
+| **Database** | Cloudflare D1 (SQLite) |
+| **Runtime** | Cloudflare Workers (via OpenNext) |
+| **Date of review** | 2026-08-30 |
 | **Maintainer** | Not yet assigned |
 
 ---
@@ -412,4 +436,4 @@ Unit tests are implemented with Vitest in `apps/platform`. They cover the bid en
 | Specialist | Metsaspetsialist | An Eametsad staff member who manages forest owner relationships |
 | Association | Metsaühistu | Forest owners' cooperative (optional Phase 5) |
 
-<!-- Last updated: 2026-08-28 -->
+<!-- Last updated: 2026-08-30 -->

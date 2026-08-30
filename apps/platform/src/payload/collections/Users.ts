@@ -1,94 +1,16 @@
-import type { CollectionConfig } from 'payload'
-
+// Isikukood encryption hooks of the former Payload users collection. The
+// Payload bootstrap was removed (OpenSpec option-b task 2.12); these hooks
+// stay because src/lib/__tests__/encryption.test.ts exercises them as the
+// contract for isikukood envelope handling.
 import { decrypt, encrypt, hash } from '../../lib/crypto'
 
-export const Users: CollectionConfig = {
+type UsersDoc = Record<string, unknown>
+
+export const Users = {
   slug: 'users',
-  auth: true,
-  admin: {
-    useAsTitle: 'email',
-    preview: (doc: Record<string, unknown> | null) => {
-      if (!doc?.id) return ''
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
-      const secret = process.env.PAYLOAD_PREVIEW_SECRET ?? ''
-      const id: string =
-        typeof doc.id === 'string' || typeof doc.id === 'number'
-          ? String(doc.id)
-          : ''
-      return `${appUrl}/api/preview?collection=users&id=${id}&draft=true&secret=${secret}`
-    },
-  },
-  fields: [
-    {
-      name: 'email',
-      type: 'email',
-      required: true,
-      unique: true,
-    },
-    {
-      name: 'name',
-      type: 'text',
-    },
-    {
-      name: 'role',
-      type: 'select',
-      defaultValue: 'guest',
-      options: [
-        { label: 'Guest', value: 'guest' },
-        { label: 'Private', value: 'private' },
-        { label: 'Company', value: 'company' },
-        { label: 'Seller', value: 'seller' },
-        { label: 'Specialist', value: 'specialist' },
-        { label: 'Admin', value: 'admin' },
-        { label: 'Superadmin', value: 'superadmin' },
-      ],
-    },
-    {
-      name: 'phone',
-      type: 'text',
-    },
-    {
-      name: 'status',
-      type: 'select',
-      defaultValue: 'active',
-      options: [
-        { label: 'Active', value: 'active' },
-        { label: 'Suspended', value: 'suspended' },
-      ],
-    },
-    {
-      name: 'authMethod',
-      type: 'select',
-      defaultValue: 'password',
-      options: [
-        { label: 'eID', value: 'eid' },
-        { label: 'Password', value: 'password' },
-      ],
-    },
-    {
-      name: 'isikukoodEncrypted',
-      type: 'text',
-      admin: { hidden: true },
-    },
-    {
-      name: 'isikukoodIv',
-      type: 'text',
-      admin: { hidden: true },
-    },
-    {
-      name: 'isikukoodAuthTag',
-      type: 'text',
-      admin: { hidden: true },
-    },
-    {
-      name: 'isikukoodHash',
-      type: 'text',
-      admin: { hidden: true },
-    },
-  ],
   hooks: {
     beforeChange: [
-      ({ data }: { data: Record<string, unknown> }) => {
+      ({ data }: { data: UsersDoc }) => {
         const raw = data.isikukood as string | undefined
         if (!raw) return data
 
@@ -104,7 +26,7 @@ export const Users: CollectionConfig = {
       },
     ],
     afterRead: [
-      ({ doc }: { doc: Record<string, unknown> }) => {
+      ({ doc }: { doc: UsersDoc }) => {
         const encrypted = doc.isikukoodEncrypted as string | undefined
         const iv = doc.isikukoodIv as string | undefined
         const authTag = doc.isikukoodAuthTag as string | undefined
@@ -123,11 +45,5 @@ export const Users: CollectionConfig = {
         }
       },
     ],
-  },
-  access: {
-    read: ({ req: { user } }) => {
-      if (user?.role === 'admin' || user?.role === 'superadmin') return true
-      return false
-    },
   },
 }

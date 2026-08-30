@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+import { hashCredentialPassword } from '@/lib/auth/password'
 import { consumeResetToken } from '@/lib/auth/reset-tokens'
 import { revokeAllUserSessions } from '@/lib/auth/session'
+import { getRepositories } from '@/lib/data/runtime'
 import { authRateLimiter } from '@/lib/rate-limit'
-import { getPayloadClient } from '@/payload/payloadClient'
 
 export async function POST(request: NextRequest) {
   const forwarded = request.headers.get('x-forwarded-for') ?? 'global'
@@ -46,13 +47,18 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const payload = await getPayloadClient()
+  const repos = await getRepositories()
 
-  // Raw password: Payload's auth field applies its own hashing on update.
-  await payload.update({
+  // Hash with the seed's scrypt credential scheme; the raw password never
+  // reaches storage.
+  const credentials = hashCredentialPassword(password)
+  await repos.update({
     collection: 'users',
     id: userId,
-    data: { password },
+    data: {
+      passwordHash: credentials.hash,
+      passwordSalt: credentials.salt,
+    },
   })
 
   await revokeAllUserSessions(userId)

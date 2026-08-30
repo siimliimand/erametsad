@@ -10,23 +10,23 @@ import {
   revokeSession,
 } from '@/lib/auth/session'
 
-function authenticate(
+async function authenticate(
   request: NextRequest,
-): { userId: string; sessionId: string | null } | null {
+): Promise<{ userId: string; sessionId: string | null } | null> {
   const token = request.cookies.get('access_token')?.value
   if (!token) return null
 
   const payload = verifyAccessToken(token)
   if (!payload) return null
 
-  const ref = resolveAccessTokenSession(token)
+  const ref = await resolveAccessTokenSession(token)
   if (ref.state === 'revoked') return null
 
   return { userId: payload.userId, sessionId: ref.state === 'active' ? ref.sessionId : null }
 }
 
 export async function GET(request: NextRequest) {
-  const auth = authenticate(request)
+  const auth = await authenticate(request)
   if (!auth) {
     return NextResponse.json({ error: 'Autentimine ebaõnnestus' }, { status: 401 })
   }
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const auth = authenticate(request)
+  const auth = await authenticate(request)
   if (!auth) {
     return NextResponse.json({ error: 'Autentimine ebaõnnestus' }, { status: 401 })
   }
