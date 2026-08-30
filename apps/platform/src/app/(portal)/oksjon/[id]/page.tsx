@@ -1,15 +1,16 @@
-import { Countdown, DocumentLink, MapEstonia, StatusPill } from '@eametsad/ui'
+import { DocumentLink, MapEstonia, StatusPill } from '@eametsad/ui'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { BidList } from './_components/BidList'
-import { BidPanel } from './_components/BidPanel'
 import {
   DossierTable,
   PackageSection,
   type DossierRow,
 } from './_components/DossierTable'
 import { Gallery, type GalleryImage } from './_components/Gallery'
+import { LiveBidPanel } from './_components/LiveBidPanel'
+import { LiveCountdown } from './_components/LiveCountdown'
 import { SellerContact } from './_components/SellerContact'
 import {
   SealedBidPanel,
@@ -518,6 +519,8 @@ export default async function AuctionPage({
 
   const endsAtIso = auction.endsAt
   const endsAt = endsAtIso !== null ? Date.parse(endsAtIso) : Number.NaN
+  // Epoch ms anchor for the client countdown's drift correction (design D4).
+  const serverNow = Date.now()
   const countdownEndsAt =
     endsAtIso !== null &&
     (auction.status === 'scheduled' || auction.status === 'active') &&
@@ -671,7 +674,12 @@ export default async function AuctionPage({
               </span>
             )}
             {countdownEndsAt !== null && (
-              <Countdown endsAt={countdownEndsAt} className="ml-auto" />
+              <LiveCountdown
+                auctionId={auction.id}
+                endsAt={countdownEndsAt}
+                serverNow={serverNow}
+                className="ml-auto"
+              />
             )}
           </div>
         </div>
@@ -799,7 +807,7 @@ export default async function AuctionPage({
                 unsold={auction.status === 'unsold'}
               />
             ) : (
-              <BidPanel
+              <LiveBidPanel
                 auctionId={auction.id}
                 objectType={auction.objectType}
                 status={auction.status}
