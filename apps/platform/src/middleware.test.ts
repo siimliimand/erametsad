@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server'
 import { describe, expect, it } from 'vitest'
 
-import { middleware } from '@/middleware'
 import { DEFAULT_HOSTNAME, PORTAL_HOSTNAME } from '@/lib/routing/host-areas'
+import { middleware } from '@/middleware'
 
 function requestFor(host: string, pathAndQuery: string): NextRequest {
   return new NextRequest(`http://localhost:3000${pathAndQuery}`, {

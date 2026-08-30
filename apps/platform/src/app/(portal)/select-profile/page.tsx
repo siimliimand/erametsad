@@ -4,9 +4,9 @@ import { redirect } from 'next/navigation'
 import { ProfileSelector, type ProfileOption } from './_components/ProfileCard'
 
 import { requirePortalSession } from '@/app/(portal)/_lib/session'
+import type { ProfileDoc } from '@/lib/data/repositories/registry'
 import { auctionObjectTypes } from '@/lib/data/schema'
 import type { AuctionRight } from '@/lib/data/schema'
-import type { ProfileDoc } from '@/lib/data/repositories/registry'
 
 export const dynamic = 'force-dynamic'
 

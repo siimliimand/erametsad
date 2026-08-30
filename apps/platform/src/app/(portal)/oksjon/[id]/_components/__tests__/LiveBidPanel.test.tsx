@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, createElement, type ReactElement, type ReactNode } from 'react'
+import { act, createElement, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -11,7 +11,7 @@ const nav = vi.hoisted(() => ({
 // Captures the auction stream subscriptions so tests can emit SSE payloads
 // directly instead of going through EventSource.
 const stream = vi.hoisted(() => {
-  const handlers: Map<string, Set<(payload: unknown) => void>> = new Map()
+  const handlers = new Map<string, Set<(payload: unknown) => void>>()
   return {
     handlers,
     emit(event: string, payload: unknown): void {
@@ -94,23 +94,26 @@ async function mount(props: LiveBidPanelProps): Promise<void> {
     document.body.appendChild(container)
     root = createRoot(container)
     root.render(createElement(LiveBidPanel, props))
+    await Promise.resolve()
   })
 }
 
 async function rerender(props: LiveBidPanelProps): Promise<void> {
   await act(async () => {
     root.render(createElement(LiveBidPanel, props))
+    await Promise.resolve()
   })
 }
 
 function emit(event: 'auction:extended' | 'auction:ended', payload: object): Promise<void> {
   return act(async () => {
     stream.emit(event, payload)
+    await Promise.resolve()
   })
 }
 
 function text(): string {
-  return container.textContent ?? ''
+  return container.textContent
 }
 
 afterEach(() => {

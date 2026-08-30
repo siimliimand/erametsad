@@ -207,10 +207,11 @@ describe('transformNdjson', () => {
 })
 
 describe('table graph', () => {
-  it('covers all 29 D1 tables (28 + sessions)', () => {
-    expect(tableNames()).toHaveLength(29)
+  it('covers all 30 D1 tables (28 + sessions + password_reset_tokens)', () => {
+    expect(tableNames()).toHaveLength(30)
     expect(tableNames()).toContain('sessions')
     expect(tableNames()).toContain('rights_requests')
+    expect(tableNames()).toContain('password_reset_tokens')
   })
 
   it('inserts FK parents before children', () => {

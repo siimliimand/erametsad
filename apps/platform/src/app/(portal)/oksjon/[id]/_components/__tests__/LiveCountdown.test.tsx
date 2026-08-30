@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, createElement, type ReactElement } from 'react'
+import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -11,7 +11,7 @@ const nav = vi.hoisted(() => ({
 // Captures the auction stream subscriptions so tests can emit SSE payloads
 // directly instead of going through EventSource.
 const stream = vi.hoisted(() => {
-  const handlers: Map<string, Set<(payload: unknown) => void>> = new Map()
+  const handlers = new Map<string, Set<(payload: unknown) => void>>()
   return {
     handlers,
     emit(event: string, payload: unknown): void {
@@ -83,6 +83,7 @@ async function mount(props: {
         ...(props.serverNow !== undefined ? { serverNow: props.serverNow } : {}),
       }),
     )
+    await Promise.resolve()
   })
 }
 
@@ -91,11 +92,12 @@ async function rerender(props: { endsAt: string }): Promise<void> {
     root.render(
       createElement(LiveCountdown, { auctionId: 'a1', endsAt: props.endsAt }),
     )
+    await Promise.resolve()
   })
 }
 
 function text(): string {
-  return container.textContent ?? ''
+  return container.textContent
 }
 
 describe('LiveCountdown', () => {
@@ -114,6 +116,7 @@ describe('LiveCountdown', () => {
         previousEndsAt: '2026-08-30T12:00:00.000Z',
         endsAt: '2026-08-31T12:00:00.000Z',
       })
+      await Promise.resolve()
     })
 
     expect(text()).toContain('4p 0h 0m 0s')
@@ -131,6 +134,7 @@ describe('LiveCountdown', () => {
         previousEndsAt: '2026-08-30T12:00:00.000Z',
         endsAt: '2026-08-31T12:00:00.000Z',
       })
+      await Promise.resolve()
     })
 
     expect(text()).toContain('3p 0h 0m 0s')
@@ -144,6 +148,7 @@ describe('LiveCountdown', () => {
         previousEndsAt: '2026-08-30T12:00:00.000Z',
         endsAt: '2026-08-31T12:00:00.000Z',
       })
+      await Promise.resolve()
     })
     expect(text()).toContain('4p 0h 0m 0s')
 
@@ -157,6 +162,7 @@ describe('LiveCountdown', () => {
 
     await act(async () => {
       vi.advanceTimersByTime(5500)
+      await Promise.resolve()
     })
 
     expect(nav.refresh).toHaveBeenCalledTimes(1)

@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
 
+import { placeBid } from '../place-bid'
 import {
   buildSealedIdentitySnapshot,
   resolveSealedRevisionCap,
   sealedStorageAmountCents,
 } from '../sealed-admission'
 import { decryptSealedBids } from '../sealed-bid'
-import { placeBid } from '../place-bid'
 import { fakeD1, type FakeD1, type RecordedStatement } from './fake-d1'
 import { setD1ForTests } from '../../db'
 
@@ -91,7 +91,8 @@ function insertFor(): RecordedStatement {
     statement.sql.includes('insert into bids'),
   )
   expect(insert).toBeDefined()
-  return insert as RecordedStatement
+  if (insert === undefined) throw new Error('insert into bids statement missing')
+  return insert
 }
 
 describe('sealed admission helpers', () => {

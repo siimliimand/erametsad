@@ -190,12 +190,7 @@ export function ShellHeader({ profileName }: { profileName: string | null }) {
       .then((response) => (response.ok ? (response.json() as Promise<ProfilesResponse>) : null))
       .then((data) => {
         if (!active || !data || !Array.isArray(data.profiles)) return
-        const valid = data.profiles.filter(
-          (profile) =>
-            typeof profile?.id === 'string' &&
-            (profile.type === 'private' || profile.type === 'company'),
-        )
-        setProfiles(valid)
+        setProfiles(data.profiles)
       })
       .catch(() => undefined)
     return () => {

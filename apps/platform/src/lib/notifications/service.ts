@@ -128,7 +128,7 @@ function channelEnabled(
 ): boolean {
   const override = stored?.[eventType]
   if (override && typeof override[channel] === 'boolean') {
-    return override[channel] as boolean
+    return override[channel]
   }
   return DEFAULT_CHANNEL_ENABLED[channel]
 }

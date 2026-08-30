@@ -3,9 +3,10 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { BidPanel, type BidPanelProps } from './BidPanel'
+
 import { useAuctionStream } from '@/app/(portal)/_lib/use-auction-stream'
 
-import { BidPanel, type BidPanelProps } from './BidPanel'
 
 // Client wrapper around the lot page bid panel (task 3.3). It consumes the
 // auction stream events the panel itself knows nothing about:

@@ -1,7 +1,7 @@
 'use client'
 
-import { Btn, ConsentCheck, FormInput } from '@eametsad/ui'
 import { EEPhone } from '@eametsad/types'
+import { Btn, ConsentCheck, FormInput } from '@eametsad/ui'
 import Link from 'next/link'
 import { useState } from 'react'
 

@@ -21,7 +21,7 @@ vi.mock('@/app/(portal)/_lib/use-my-stream', () => ({
 }))
 
 vi.mock('@/app/(portal)/_actions/logout', () => ({
-  logoutAction: async () => undefined,
+  logoutAction: () => Promise.resolve(),
 }))
 
 import { ShellHeader, toSwitcherOption, type ProfileSummary } from '../ShellHeader'

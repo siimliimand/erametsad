@@ -17,13 +17,13 @@ vi.mock('@/lib/data/runtime', () => ({
 import { EventBus, type DomainEvent } from '../event-bus'
 import { startListening } from '../service'
 
+import { createSqliteTestDb, sqliteBatchRunner, type SqliteTestDb } from '@/lib/data/__tests__/sqlite'
 import {
   createCoreRepositories,
   nodeIsikukoodCodec,
   type CoreRepositories,
 } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
-import { createSqliteTestDb, sqliteBatchRunner, type SqliteTestDb } from '@/lib/data/__tests__/sqlite'
 
 process.env.ISIKUKOOD_ENCRYPTION_KEY = process.env.ISIKUKOOD_ENCRYPTION_KEY ?? 'integration-test-key'
 
@@ -350,16 +350,18 @@ describe('persisted preferences reload into the channel matrix', () => {
     const stored = testDb.raw
       .prepare('select notification_preferences from profiles where user_id = ?')
       .get('u-persist-a') as { notification_preferences: string | null } | undefined
-    expect(typeof stored?.notification_preferences).toBe('string')
-    expect(JSON.parse(stored?.notification_preferences as string)).toEqual(mutedEmail)
+    if (typeof stored?.notification_preferences !== 'string') {
+      throw new Error('notification preferences not stored')
+    }
+    expect(JSON.parse(stored.notification_preferences)).toEqual(mutedEmail)
 
     vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
     bus.emit(outbidEvent('u-persist-a', 'Mets N'))
-    await vi.waitFor(() => expect(storedChannels('u-persist-a')).toEqual(['in_app']))
+    await vi.waitFor(() => { expect(storedChannels('u-persist-a')).toEqual(['in_app']); })
 
     vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
     bus.emit(auctionWonEvent('u-persist-b', 'Mets O'))
-    await vi.waitFor(() => expect(storedChannels('u-persist-b')).toEqual(['email', 'in_app', 'sms']))
+    await vi.waitFor(() => { expect(storedChannels('u-persist-b')).toEqual(['email', 'in_app', 'sms']); })
   })
 
   it('falls back to the default matrix when the stored TEXT is not valid JSON', async () => {
@@ -374,6 +376,6 @@ describe('persisted preferences reload into the channel matrix', () => {
 
     vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
     bus.emit(auctionWonEvent('u-corrupt', 'Mets P'))
-    await vi.waitFor(() => expect(storedChannels('u-corrupt')).toEqual(['email', 'in_app']))
+    await vi.waitFor(() => { expect(storedChannels('u-corrupt')).toEqual(['email', 'in_app']); })
   })
 })

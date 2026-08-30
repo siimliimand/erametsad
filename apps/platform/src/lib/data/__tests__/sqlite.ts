@@ -98,7 +98,7 @@ function sqliteD1(raw: Database.Database): DbDatabase {
         return Promise.resolve({ results: [], success: true, meta: { changes: run.changes } })
       },
     }
-    return bound as DbPreparedStatement
+    return bound
   }
   return {
     prepare,

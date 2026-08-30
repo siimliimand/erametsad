@@ -4,8 +4,8 @@ import { ProfileDashboard } from './_components/ProfileDashboard'
 import type { ProfileView, UserIdentity } from './_components/types'
 
 import { requirePortalSession } from '@/app/(portal)/_lib/session'
-import { getRepositories } from '@/lib/data/runtime'
 import type { ProfileDoc } from '@/lib/data/repositories/registry'
+import { getRepositories } from '@/lib/data/runtime'
 
 export const dynamic = 'force-dynamic'
 

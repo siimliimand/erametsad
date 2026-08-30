@@ -1,15 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  createSqliteTestDb,
-  type SqliteTestDb,
-} from '@/lib/data/__tests__/sqlite'
-
-import {
   RESET_TOKEN_TTL_MS,
   consumeResetToken,
   createResetToken,
 } from '../reset-tokens'
+
+import {
+  createSqliteTestDb,
+  type SqliteTestDb,
+} from '@/lib/data/__tests__/sqlite'
+
 
 describe('reset tokens', () => {
   let testDb: SqliteTestDb

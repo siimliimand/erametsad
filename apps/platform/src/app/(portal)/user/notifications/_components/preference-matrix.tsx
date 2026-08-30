@@ -8,7 +8,7 @@ import {
   NOTIFICATION_EVENTS,
 } from './notifications-data'
 
-type ChannelPrefs = { email: boolean; sms: boolean }
+interface ChannelPrefs { email: boolean; sms: boolean }
 type PreferenceMap = Record<string, ChannelPrefs>
 
 function defaultPreferences(): PreferenceMap {

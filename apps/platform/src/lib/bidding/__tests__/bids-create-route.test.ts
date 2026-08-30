@@ -4,9 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // Force the legacy in-process admission fallback: no Cloudflare context in
 // the node pool, so admitViaAuctionDO returns null.
 vi.mock('@opennextjs/cloudflare', () => ({
-  getCloudflareContext: vi.fn(async () => {
-    throw new Error('no cloudflare context in tests')
-  }),
+  getCloudflareContext: vi.fn(() => Promise.reject(new Error('no cloudflare context in tests'))),
 }))
 
 vi.mock('@/lib/data/runtime', () => ({
@@ -15,6 +13,7 @@ vi.mock('@/lib/data/runtime', () => ({
 
 import { POST as createBidRoute } from '@/app/api/v1/bids/create/route'
 import { signAccessToken } from '@/lib/auth/jwt'
+import { decryptSealedBids } from '@/lib/bidding/sealed-bid'
 import { createSqliteTestDb, sqliteBatchRunner, type SqliteTestDb } from '@/lib/data/__tests__/sqlite'
 import {
   createCoreRepositories,
@@ -23,7 +22,6 @@ import {
 } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 import { setD1ForTests } from '@/lib/db'
-import { decryptSealedBids } from '@/lib/bidding/sealed-bid'
 
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'route-test-jwt-secret'
 process.env.SEALED_BID_ENCRYPTION_KEY =

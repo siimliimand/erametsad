@@ -11,8 +11,8 @@ import {
 import { Gallery, type GalleryImage } from './_components/Gallery'
 import { LiveBidPanel } from './_components/LiveBidPanel'
 import { LiveCountdown } from './_components/LiveCountdown'
-import { SellerContact } from './_components/SellerContact'
 import { RichText, richTextBlocks } from './_components/RichText'
+import { SellerContact } from './_components/SellerContact'
 import {
   SealedBidPanel,
   type SealedViewerSnapshot,

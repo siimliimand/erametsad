@@ -187,6 +187,7 @@ async function mount(element: ReactElement): Promise<void> {
   await act(async () => {
     root = createRoot(el)
     root.render(element)
+    await Promise.resolve()
   })
 }
 
@@ -222,11 +223,13 @@ describe('AutobidderControl flows', () => {
   it('PATCHes the existing row when saving a new maximum', async () => {
     const fetchMock =
       vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
-        async () =>
-          new Response(JSON.stringify({ id: 'ab1' }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          }),
+        () =>
+          Promise.resolve(
+            new Response(JSON.stringify({ id: 'ab1' }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }),
+          ),
       )
     vi.stubGlobal('fetch', fetchMock)
     await mountControl({ id: 'ab1', maxAmount: 5000 })
@@ -238,6 +241,7 @@ describe('AutobidderControl flows', () => {
     })
     await act(async () => {
       findButton('Uuenda').click()
+      await Promise.resolve()
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -247,8 +251,8 @@ describe('AutobidderControl flows', () => {
     if (init === undefined) throw new Error('fetch init missing')
     expect(url).toBe('/api/v1/auto-bidders/ab1')
     expect(init.method).toBe('PATCH')
-    expect(JSON.parse(String(init.body))).toEqual({ maxAmount: 5200 })
-    expect(plain(node().textContent ?? '')).toContain(
+    expect(JSON.parse(init.body as string)).toEqual({ maxAmount: 5200 })
+    expect(plain(node().textContent)).toContain(
       `Automaatpakkuja maksimaalne summa on ${plain(eur(5200))}.`,
     )
     expect(nav.refresh).toHaveBeenCalledTimes(1)
@@ -257,13 +261,14 @@ describe('AutobidderControl flows', () => {
   it('DELETEs the row, hides delete and announces the removal', async () => {
     const fetchMock =
       vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
-        async () => new Response(null, { status: 204 }),
+        () => Promise.resolve(new Response(null, { status: 204 })),
       )
     vi.stubGlobal('fetch', fetchMock)
     await mountControl({ id: 'ab1', maxAmount: 5000 })
 
     await act(async () => {
       findButton('Eemalda').click()
+      await Promise.resolve()
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -273,7 +278,7 @@ describe('AutobidderControl flows', () => {
     if (init === undefined) throw new Error('fetch init missing')
     expect(url).toBe('/api/v1/auto-bidders/ab1')
     expect(init.method).toBe('DELETE')
-    expect(plain(node().textContent ?? '')).toContain(
+    expect(plain(node().textContent)).toContain(
       'Automaatpakkuja on eemaldatud. Viimane tehtud pakkumine jääb jõusse.',
     )
     expect(

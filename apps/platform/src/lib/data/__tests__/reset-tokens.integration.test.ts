@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createSqliteTestDb, type SqliteTestDb } from './sqlite'
 import {
   RESET_TOKEN_TTL_MS,
   consumeResetToken,
   createResetToken,
 } from '../../auth/reset-tokens'
-import { createSqliteTestDb, type SqliteTestDb } from './sqlite'
 
 let testDb: SqliteTestDb
 

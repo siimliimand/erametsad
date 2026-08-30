@@ -2,10 +2,10 @@ import { and, eq, gt, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import crypto from 'node:crypto'
 
-import { getD1Database } from '../db'
 import type { CoreDatabase } from '../data/repositories'
 import * as schema from '../data/schema'
 import { passwordResetTokens } from '../data/schema'
+import { getD1Database } from '../db'
 
 export const RESET_TOKEN_TTL_MS = 2 * 60 * 60 * 1000
 

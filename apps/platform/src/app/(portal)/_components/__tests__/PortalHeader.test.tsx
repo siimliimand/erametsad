@@ -22,7 +22,7 @@ vi.mock('next/link', () => ({
 }))
 
 vi.mock('@/app/(portal)/_actions/logout', () => ({
-  logoutAction: async () => undefined,
+  logoutAction: () => Promise.resolve(),
 }))
 
 import { PortalHeader } from '../PortalHeader'
