@@ -5,6 +5,8 @@ vi.mock('@/lib/data/runtime', () => ({
   getRepositories: vi.fn(),
 }))
 
+import { POST as changePasswordRoute } from '@/app/api/v1/auth/change-password/route'
+import { POST as loginRoute } from '@/app/api/v1/auth/login/route'
 import { POST as registerRoute } from '@/app/api/v1/auth/register/route'
 import { hash } from '@/lib/crypto'
 import { createSqliteTestDb, sqliteBatchRunner, type SqliteTestDb } from '@/lib/data/__tests__/sqlite'
@@ -22,6 +24,8 @@ const BASE = 'http://localhost:3000/api/v1'
 // Checksum-valid: weights 1..9,1 give 75 % 11 = 9, matching the last digit.
 const VALID_ISIKUKOOD = '32708100019'
 const BAD_CHECKSUM = '32708100011'
+// Meets the shared password policy (10+ chars, upper, number, symbol).
+const FIRST_PASSWORD = 'UusParool1!'
 
 let testDb: SqliteTestDb
 let repos: CoreRepositories
@@ -65,7 +69,6 @@ function validBody(overrides: Record<string, unknown> = {}): Record<string, unkn
     identifier: 'uuskasutaja@example.ee',
     isikukood: VALID_ISIKUKOOD,
     profileType: 'private',
-    password: 'ajutine-salasana',
     consents: {
       terms: consentAt,
       privacy: consentAt,
@@ -73,6 +76,23 @@ function validBody(overrides: Record<string, unknown> = {}): Record<string, unkn
     },
     ...overrides,
   }
+}
+
+function storedCredentials(userId: string): {
+  password_hash: string | null
+  password_salt: string | null
+} | undefined {
+  return testDb.raw
+    .prepare('SELECT password_hash, password_salt FROM users WHERE id = ?')
+    .get(userId) as
+    | { password_hash: string | null; password_salt: string | null }
+    | undefined
+}
+
+function bearerCookie(cookies: string[], name: string): string {
+  const cookie = cookies.find((value) => value.startsWith(`${name}=`))
+  if (cookie === undefined) throw new Error(`cookie not found: ${name}`)
+  return (cookie.split(';')[0] ?? '').slice(name.length + 1)
 }
 
 function userCount(): number {
@@ -188,5 +208,88 @@ describe('POST /api/v1/auth/register phone persistence', () => {
       .prepare('SELECT phone FROM profiles WHERE user_id = ?')
       .get(String(body.user?.id)) as { phone: string | null } | undefined
     expect(row?.phone).toBeNull()
+  })
+})
+
+describe('POST /api/v1/auth/register passwordless accounts', () => {
+  it('creates the account without a stored credential', async () => {
+    const response = await registerRoute(
+      registerRequest(validBody({ identifier: 'paroolita@example.ee' }), '10.0.3.1'),
+    )
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { user?: { id?: unknown } }
+    const stored = storedCredentials(String(body.user?.id))
+    expect(stored?.password_hash).toBeNull()
+    expect(stored?.password_salt).toBeNull()
+  })
+
+  it('ignores a password that a client still sends in the payload', async () => {
+    const response = await registerRoute(
+      registerRequest(
+        validBody({ identifier: 'salasona@example.ee', password: 'paastunudSalasana1!' }),
+        '10.0.3.2',
+      ),
+    )
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { user?: { id?: unknown } }
+    const stored = storedCredentials(String(body.user?.id))
+    expect(stored?.password_hash).toBeNull()
+    expect(stored?.password_salt).toBeNull()
+  })
+
+  it('rejects the payload without identifier with 400', async () => {
+    const body = validBody()
+    delete body.identifier
+    const response = await registerRoute(registerRequest(body, '10.0.3.3'))
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'Puuduvad kohustuslikud väljad' })
+  })
+})
+
+describe('POST /api/v1/auth/register first-set and password login flow', () => {
+  // The realistic new-user path: register passwordless, set the first
+  // password with only newPassword (the ?first=1 contract), then log in
+  // with that password.
+  it('registers, sets the first password and logs in with it', async () => {
+    const registerResponse = await registerRoute(
+      registerRequest(validBody({ identifier: 'esimene@example.ee' }), '10.0.4.1'),
+    )
+    expect(registerResponse.status).toBe(200)
+    const registered = (await registerResponse.json()) as { user?: { id?: unknown } }
+    const userId = String(registered.user?.id)
+    expect(storedCredentials(userId)?.password_hash).toBeNull()
+
+    const accessToken = bearerCookie(registerResponse.headers.getSetCookie(), 'access_token')
+    const changeResponse = await changePasswordRoute(
+      new NextRequest(`${BASE}/auth/change-password`, {
+        method: 'POST',
+        body: JSON.stringify({ newPassword: FIRST_PASSWORD }),
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': '10.0.4.2',
+          cookie: `access_token=${accessToken}`,
+        },
+      }),
+    )
+    expect(changeResponse.status).toBe(200)
+
+    const credentials = storedCredentials(userId)
+    expect(credentials?.password_hash).toEqual(expect.any(String))
+    expect(credentials?.password_salt).toEqual(expect.any(String))
+
+    // The new password is now the account's only credential and logs in.
+    const loginResponse = await loginRoute(
+      new NextRequest(`${BASE}/auth/login`, {
+        method: 'POST',
+        body: JSON.stringify({ identifier: 'esimene@example.ee', password: FIRST_PASSWORD }),
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': '10.0.4.9',
+        },
+      }),
+    )
+    expect(loginResponse.status).toBe(200)
+    const loginBody = (await loginResponse.json()) as { user?: { id?: unknown } }
+    expect(String(loginBody.user?.id)).toBe(userId)
   })
 })

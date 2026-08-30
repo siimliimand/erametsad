@@ -6,8 +6,9 @@ vi.mock('@/lib/data/runtime', () => ({
 }))
 
 import { POST as changePasswordRoute } from '@/app/api/v1/auth/change-password/route'
-import { hashCredentialPassword, verifyCredentialPassword } from '@/lib/auth/password'
+import { POST as loginRoute } from '@/app/api/v1/auth/login/route'
 import { signAccessToken } from '@/lib/auth/jwt'
+import { hashCredentialPassword, verifyCredentialPassword } from '@/lib/auth/password'
 import { createSqliteTestDb, sqliteBatchRunner, type SqliteTestDb } from '@/lib/data/__tests__/sqlite'
 import {
   createCoreRepositories,
@@ -50,7 +51,7 @@ function changeRequest(
   userId: string,
 ): NextRequest {
   nextIp += 1
-  const ip = `10.1.0.${nextIp}`
+  const ip = `10.1.0.${String(nextIp)}`
   return new NextRequest(`${BASE}/auth/change-password`, {
     method: 'POST',
     body: JSON.stringify(body),
@@ -66,6 +67,8 @@ interface CreatedUser {
   id: string
 }
 
+// Register-shaped user: the register route now creates accounts with
+// authMethod 'eid' and no credential columns.
 async function createUser(
   overrides: { passwordHash?: string | null; passwordSalt?: string | null } = {},
 ): Promise<CreatedUser> {
@@ -95,6 +98,8 @@ function storedCredentials(userId: string): {
 }
 
 describe('POST /api/v1/auth/change-password first-time set', () => {
+  // The register flow's ?first=1 path: a fresh passwordless account sets its
+  // first password without oldPassword, then logs in with that password.
   it('sets the password without oldPassword for a user with no stored credential', async () => {
     const user = await createUser()
     const response = await changePasswordRoute(changeRequest({ newPassword: NEW_PASSWORD }, user.id))
@@ -109,6 +114,21 @@ describe('POST /api/v1/auth/change-password first-time set', () => {
     expect(
       verifyCredentialPassword(NEW_PASSWORD, stored?.password_hash ?? null, stored?.password_salt ?? null),
     ).toBe(true)
+
+    // The set password is the account's only credential and logs in.
+    const loginResponse = await loginRoute(
+      new NextRequest(`${BASE}/auth/login`, {
+        method: 'POST',
+        body: JSON.stringify({ identifier: `${user.id}@example.ee`, password: NEW_PASSWORD }),
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': `10.2.0.${String(nextIp + 1)}`,
+        },
+      }),
+    )
+    expect(loginResponse.status).toBe(200)
+    const loginBody = (await loginResponse.json()) as { user?: { id?: unknown } }
+    expect(String(loginBody.user?.id)).toBe(user.id)
   })
 
   it('succeeds even when the client sends an oldPassword it could not have verified', async () => {
@@ -212,7 +232,7 @@ describe('POST /api/v1/auth/change-password session handling', () => {
       body: JSON.stringify({ newPassword: NEW_PASSWORD }),
       headers: {
         'content-type': 'application/json',
-        'x-forwarded-for': `10.1.1.${nextIp}`,
+        'x-forwarded-for': `10.1.1.${String(nextIp)}`,
       },
     })
     const response = await changePasswordRoute(request)

@@ -1,9 +1,8 @@
+import { EEIsikukood, EEPhone } from '@eametsad/types'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { EEIsikukood, EEPhone } from '@eametsad/types'
 
-import { hashCredentialPassword } from '@/lib/auth/password'
 import { createSession, setSessionCookies } from '@/lib/auth/session'
 import type { CreateDataFor } from '@/lib/data/repositories/registry'
 import { getRepositories } from '@/lib/data/runtime'
@@ -25,13 +24,15 @@ export async function POST(request: NextRequest) {
   }
 
   const identifier = body.identifier as string | undefined
-  const password = body.password as string | undefined
   const profileType = body.profileType as string | undefined
   const consents = body.consents as Record<string, unknown> | undefined
   const regCode = body.regCode as string | undefined
   const companyName = body.companyName as string | undefined
 
-  if (!identifier || !password || !profileType || !consents) {
+  // No password field: new accounts start passwordless. The register
+  // response issues the session; the first password is set afterwards via
+  // /update-password?first=1 (the no-credential path of change-password).
+  if (!identifier || !profileType || !consents) {
     return NextResponse.json({ error: 'Puuduvad kohustuslikud väljad' }, { status: 400 })
   }
 
@@ -74,10 +75,6 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (password.length < 8) {
-    return NextResponse.json({ error: 'Parool peab olema vähemalt 8 tähemärki' }, { status: 400 })
-  }
-
   const rawPhone = body.phone
   let phone: string | undefined
   if (rawPhone !== undefined && rawPhone !== null && rawPhone !== '') {
@@ -91,15 +88,12 @@ export async function POST(request: NextRequest) {
 
   const repos = await getRepositories()
 
-  // Hash with the seed's scrypt credential scheme (password_hash +
-  // password_salt); the raw password never reaches storage.
-  const credentials = hashCredentialPassword(password)
   const userData: Record<string, unknown> = {
     email: identifier,
-    passwordHash: credentials.hash,
-    passwordSalt: credentials.salt,
+    // No credential columns: passwordless until the first password is set.
+    // The account authenticates via the issued session and the isikukood.
     role: profileType === 'company' ? 'company' : 'private',
-    authMethod: 'password',
+    authMethod: 'eid',
     status: 'active',
   }
   if (isikukood) {

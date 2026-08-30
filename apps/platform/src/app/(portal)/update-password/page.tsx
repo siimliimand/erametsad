@@ -51,14 +51,6 @@ export default async function UpdatePasswordPage({
           <PasswordForm
             endpoint="/api/v1/auth/change-password"
             isikukood={user?.isikukood ?? null}
-            buildBody={
-              first
-                ? ({ newPassword }) => ({ newPassword })
-                : ({ currentPassword, newPassword }) => ({
-                    oldPassword: currentPassword,
-                    newPassword,
-                  })
-            }
             withCurrentPassword={!first}
             submitLabel={heading}
             fallbackError="Parooli muutmine ei õnnestunud. Proovi uuesti."

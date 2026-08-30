@@ -89,28 +89,18 @@ export type RegisterResult =
   | { ok: true; profile: RegisteredProfile | null }
   | { ok: false; message: string; existingAccount: boolean }
 
-// The register contract requires a password, but the wizard has no password
-// step. The account starts with this throwaway value and the user sets a
-// real one afterwards via /update-password.
-function generateTemporaryPassword(): string {
-  const bytes = new Uint8Array(16)
-  crypto.getRandomValues(bytes)
-  let password = ''
-  for (const byte of bytes) {
-    password += (byte % 36).toString(36)
-  }
-  return password
-}
-
 export async function submitRegistration(
   input: RegistrationInput,
 ): Promise<RegisterResult> {
   let response: Response
   try {
+    // No password field: new accounts start passwordless. The issued session
+    // authenticates the user, who then sets the first password via
+    // /update-password?first=1.
     response = await fetch('/api/v1/auth/register', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...input, password: generateTemporaryPassword() }),
+      body: JSON.stringify(input),
     })
   } catch {
     return {
