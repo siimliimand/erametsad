@@ -39,6 +39,7 @@ import type {
   NewPartnerService,
   NewProfile,
   NewRedirect,
+  NewRightsRequest,
   NewSettings,
   NewSpecialist,
   NewStatisticsSnapshot,
@@ -50,6 +51,7 @@ import type {
   PartnerService,
   Profile,
   Redirect,
+  RightsRequest,
   SettingsRow,
   Specialist,
   StatisticsSnapshot,
@@ -79,6 +81,7 @@ import {
   partnerServices,
   profiles,
   redirects,
+  rightsRequests,
   settings,
   specialists,
   statisticsSnapshots,
@@ -93,6 +96,7 @@ export type CoreCollectionSlug =
   | 'users'
   | 'profile'
   | 'company-access-request'
+  | 'rights-request'
   | 'auction-rights'
   | 'auctions'
   | 'auction-subscriptions'
@@ -194,6 +198,7 @@ export interface CoreCollectionDocs {
   users: UserDoc
   profile: Profile
   'company-access-request': CompanyAccessRequest
+  'rights-request': RightsRequest
   'auction-rights': AuctionRight
   auctions: AuctionDoc
   'auction-subscriptions': AuctionSubscriptionDoc
@@ -211,6 +216,7 @@ export interface CoreCollectionCreates {
   users: UserCreateData
   profile: CreateData<NewProfile>
   'company-access-request': CreateData<NewCompanyAccessRequest>
+  'rights-request': CreateData<NewRightsRequest>
   'auction-rights': CreateData<NewAuctionRight>
   auctions: AuctionCreateData
   'auction-subscriptions': AuctionSubscriptionCreateData
@@ -294,6 +300,13 @@ export const coreCollections: Readonly<Record<CoreCollectionSlug, RepositoryColl
   'company-access-request': {
     table: companyAccessRequests,
     aliases: {},
+    jsonFields: {},
+    isikukood: false,
+    templateActivation: false,
+  },
+  'rights-request': {
+    table: rightsRequests,
+    aliases: { user: 'userId' },
     jsonFields: {},
     isikukood: false,
     templateActivation: false,
