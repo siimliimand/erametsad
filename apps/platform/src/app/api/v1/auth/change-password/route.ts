@@ -36,11 +36,8 @@ export async function POST(request: NextRequest) {
   const oldPassword = body.oldPassword as string | undefined
   const newPassword = body.newPassword as string | undefined
 
-  if (!oldPassword || !newPassword) {
-    return NextResponse.json(
-      { error: 'Vana ja uus parool on kohustuslikud' },
-      { status: 400 },
-    )
+  if (!newPassword) {
+    return NextResponse.json({ error: 'Uus parool on kohustuslik' }, { status: 400 })
   }
 
   const repos = await getRepositories()
@@ -56,16 +53,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: policyViolation.message }, { status: 400 })
   }
 
-  // Verify the old password against the stored credential columns (the
-  // scrypt scheme the seed writes); a missing stored credential behaves
-  // exactly like a wrong password.
-  const oldPasswordOk = verifyCredentialPassword(
-    oldPassword,
-    user?.passwordHash ?? null,
-    user?.passwordSalt ?? null,
-  )
-  if (!oldPasswordOk) {
-    return NextResponse.json({ error: 'Vale vana parool' }, { status: 400 })
+  // First-time set (eID-only user): no stored credential, so there is no old
+  // password to demand. A user with a stored credential must present and
+  // pass the old-password check — it is never skipped.
+  const storedHash = user?.passwordHash ?? null
+  const storedSalt = user?.passwordSalt ?? null
+  if (storedHash && storedSalt) {
+    if (!oldPassword) {
+      return NextResponse.json(
+        { error: 'Vana ja uus parool on kohustuslikud' },
+        { status: 400 },
+      )
+    }
+
+    // Verify the old password against the stored credential columns (the
+    // scrypt scheme the seed writes).
+    const oldPasswordOk = verifyCredentialPassword(
+      oldPassword,
+      storedHash,
+      storedSalt,
+    )
+    if (!oldPasswordOk) {
+      return NextResponse.json({ error: 'Vale vana parool' }, { status: 400 })
+    }
   }
 
   // Hash with the same credential scheme; the raw password never reaches
