@@ -113,6 +113,42 @@ function parseAmount(raw: string): number | null {
   return Number.isFinite(value) ? value : null
 }
 
+/** Smallest amount the next bid may carry: leading bid + step, or the start price. */
+export function minimumNextAmount(
+  minBid: number,
+  bidStep: number | null,
+  leadingBidAmount: number | null,
+): number {
+  return leadingBidAmount !== null ? leadingBidAmount + (bidStep ?? 0) : minBid
+}
+
+export type BidAmountValidation =
+  | { ok: true; amount: number }
+  | { ok: false; message: string }
+
+/** Client-side amount gate: parse the input and enforce the current minimum. */
+export function validateBidAmount(
+  raw: string,
+  minBid: number,
+  minimumNext: number,
+  underbidRequested: boolean,
+  allowUnderStart: boolean,
+): BidAmountValidation {
+  const amount = parseAmount(raw)
+  if (amount === null || amount <= 0) {
+    return { ok: false, message: 'Sisesta korrektne summa eurodes.' }
+  }
+  const isUnderStart = amount < minBid
+  const underStartAllowed = allowUnderStart && underbidRequested && isUnderStart
+  if (amount < minimumNext && !underStartAllowed) {
+    return {
+      ok: false,
+      message: `Pakkumine peab olema vähemalt ${inputAmount(minimumNext)} €.`,
+    }
+  }
+  return { ok: true, amount }
+}
+
 function fmtDateTime(iso: string): string | null {
   const time = Date.parse(iso)
   if (Number.isNaN(time)) return null
@@ -223,6 +259,15 @@ const ENDED_STATUSES: readonly AuctionStatus[] = [
 const PANEL_CLASSES =
   'flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card'
 
+/** Chip for a bid accepted below the start price while the seller has not confirmed it. */
+export function PendingApprovalChip() {
+  return (
+    <span className="inline-flex items-center self-start rounded-pill bg-statusEndingSoon/10 px-2 py-0.5 text-xs font-medium text-statusEndingSoon">
+      Alapakkumine ootab müüja kinnitust
+    </span>
+  )
+}
+
 export function BidPanel({
   auctionId,
   objectType,
@@ -256,7 +301,7 @@ export function BidPanel({
   const [underbidRequested, setUnderbidRequested] = useState(false)
 
   const step = bidStep ?? 0
-  const minimumNext = localLeading !== null ? localLeading + step : minBid
+  const minimumNext = minimumNextAmount(minBid, bidStep, localLeading)
 
   useEffect(() => {
     setLocalLeading(leadingBidAmount)
@@ -377,19 +422,19 @@ export function BidPanel({
     setSuccessAmount(null)
     setPendingAmount(null)
     setGateNotice(false)
-    const amount = parseAmount(amountStr)
-    if (amount === null || amount <= 0) {
-      setError('Sisesta korrektne summa eurodes.')
-      return
-    }
-    const isUnderStart = amount < minBid
-    const underStartAllowed = allowUnderStart && underbidRequested && isUnderStart
-    if (amount < minimumNext && !underStartAllowed) {
-      setError(`Pakkumine peab olema vähemalt ${inputAmount(minimumNext)} €.`)
+    const validation = validateBidAmount(
+      amountStr,
+      minBid,
+      minimumNext,
+      underbidRequested,
+      allowUnderStart,
+    )
+    if (!validation.ok) {
+      setError(validation.message)
       return
     }
     // No API call here: the fetch happens only when the modal confirms.
-    setModalAmount(amount)
+    setModalAmount(validation.amount)
   }
 
   async function confirmBid(): Promise<void> {
@@ -478,11 +523,7 @@ export function BidPanel({
         <p className="text-bodySm text-inkMuted">Oksjon lõpeb: {endsAtLabel}</p>
       )}
 
-      {pendingAmount !== null && (
-        <span className="inline-flex items-center self-start rounded-pill bg-statusEndingSoon/10 px-2 py-0.5 text-xs font-medium text-statusEndingSoon">
-          Alapakkumine ootab müüja kinnitust
-        </span>
-      )}
+      {pendingAmount !== null && <PendingApprovalChip />}
 
       <form onSubmit={openConfirm} className="flex flex-col gap-xs">
         <label htmlFor="bid-amount" className="text-label font-semibold text-ink">
