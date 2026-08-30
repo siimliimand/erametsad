@@ -2,16 +2,32 @@ import { Countdown, DocumentLink, MapEstonia, StatusPill } from '@eametsad/ui'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { BidList } from './_components/BidList'
 import { BidPanel } from './_components/BidPanel'
-import { DossierTable, PackageSection, type DossierRow } from './_components/DossierTable'
+import {
+  DossierTable,
+  PackageSection,
+  type DossierRow,
+} from './_components/DossierTable'
 import { Gallery, type GalleryImage } from './_components/Gallery'
 import { SellerContact } from './_components/SellerContact'
+import {
+  SealedBidPanel,
+  type SealedViewerSnapshot,
+} from './_components/sealed/SealedBidPanel'
 
-import { getPortalAuthState, getActiveProfile } from '@/app/(portal)/_lib/session'
-import { getAuctionDossier, type AuctionDossier } from '@/lib/auction/queries'
+import {
+  getPortalAuthState,
+  getActiveProfile,
+} from '@/app/(portal)/_lib/session'
+import { AuctionStreamProvider } from '@/app/(portal)/_lib/use-auction-stream'
+import {
+  getAuctionBids,
+  getAuctionDossier,
+  type AuctionDossier,
+} from '@/lib/auction/queries'
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
-import { SealedBidPanel, type SealedViewerSnapshot } from './_components/sealed/SealedBidPanel'
 
 type PillStatus = React.ComponentProps<typeof StatusPill>['status']
 
@@ -45,12 +61,19 @@ interface MediaEntry {
 
 function mediaEntryOf(value: unknown): MediaEntry | null {
   if (typeof value === 'string') {
-    return { id: value, url: null, filename: null, mimeType: null, filesize: null }
+    return {
+      id: value,
+      url: null,
+      filename: null,
+      mimeType: null,
+      filesize: null,
+    }
   }
   if (typeof value !== 'object' || value === null) return null
   const record = value as Record<string, unknown>
   const id = typeof record.id === 'string' ? record.id : null
-  const url = typeof record.url === 'string' && record.url !== '' ? record.url : null
+  const url =
+    typeof record.url === 'string' && record.url !== '' ? record.url : null
   if (id === null && url === null) return null
   return {
     id,
@@ -62,7 +85,10 @@ function mediaEntryOf(value: unknown): MediaEntry | null {
 }
 
 function srcOf(entry: MediaEntry): string | null {
-  if (entry.url && (entry.url.startsWith('/') || entry.url.startsWith('http'))) {
+  if (
+    entry.url &&
+    (entry.url.startsWith('/') || entry.url.startsWith('http'))
+  ) {
     return entry.url
   }
   return entry.id !== null ? `/api/v1/media/${entry.id}` : null
@@ -84,7 +110,8 @@ function galleryImages(entries: unknown[], title: string): GalleryImage[] {
 
 function fileSizeLabel(bytes: number | null): string | undefined {
   if (bytes === null || bytes <= 0) return undefined
-  if (bytes < 1024 * 1024) return `${String(Math.max(1, Math.round(bytes / 1024)))} kB`
+  if (bytes < 1024 * 1024)
+    return `${String(Math.max(1, Math.round(bytes / 1024)))} kB`
   return `${(bytes / (1024 * 1024)).toLocaleString('et-EE', { maximumFractionDigits: 1 })} MB`
 }
 
@@ -108,7 +135,9 @@ function fileLinks(entries: unknown[]): FileLink[] {
     .map(mediaEntryOf)
     .filter((entry): entry is MediaEntry => entry !== null && !isImage(entry))
     .map((entry) => ({ entry, src: srcOf(entry) }))
-    .filter((item): item is { entry: MediaEntry; src: string } => item.src !== null)
+    .filter(
+      (item): item is { entry: MediaEntry; src: string } => item.src !== null,
+    )
     .map(({ entry, src }): FileLink => {
       const size = fileSizeLabel(entry.filesize)
       const format = formatOf(entry)
@@ -129,7 +158,9 @@ function richTextParagraphs(value: string | null): string[] {
     const parsed: unknown = JSON.parse(value)
     const paragraphs: string[] = []
     collectText(parsed, paragraphs)
-    const cleaned = paragraphs.map((text) => text.trim()).filter((text) => text !== '')
+    const cleaned = paragraphs
+      .map((text) => text.trim())
+      .filter((text) => text !== '')
     return cleaned.length > 0 ? cleaned : [value.trim()]
   } catch {
     return value
@@ -156,7 +187,10 @@ function collectText(node: unknown, out: string[]): void {
 
 // ── Deadlines / approvals (tolerant over the free-form deadlines JSON) ──
 
-function deadlineValue(deadlines: unknown, keys: readonly string[]): string | null {
+function deadlineValue(
+  deadlines: unknown,
+  keys: readonly string[],
+): string | null {
   if (typeof deadlines !== 'object' || deadlines === null) return null
   const record = deadlines as Record<string, unknown>
   for (const key of keys) {
@@ -168,7 +202,10 @@ function deadlineValue(deadlines: unknown, keys: readonly string[]): string | nu
   return null
 }
 
-function approvalLabel(deadlines: unknown, keys: readonly string[]): string | null {
+function approvalLabel(
+  deadlines: unknown,
+  keys: readonly string[],
+): string | null {
   if (typeof deadlines !== 'object' || deadlines === null) return null
   const record = deadlines as Record<string, unknown>
   for (const key of keys) {
@@ -188,7 +225,10 @@ function rentalLabel(deadlines: unknown): string | null {
     record.hasRentalAgreement === 'true' ||
     record.rentalAgreement === true
   if (!has) return null
-  const until = deadlineValue(deadlines, ['rentalAgreementDeadline', 'rentalDeadline'])
+  const until = deadlineValue(deadlines, [
+    'rentalAgreementDeadline',
+    'rentalDeadline',
+  ])
   return until !== null ? `Jah, kuni ${until}` : 'Jah'
 }
 
@@ -200,7 +240,8 @@ function notificationNumbers(entries: unknown[]): string[] {
         const record = entry as Record<string, unknown>
         for (const key of ['nr', 'number', 'metsateatis']) {
           const value = record[key]
-          if (typeof value === 'string' && value.trim() !== '') return value.trim()
+          if (typeof value === 'string' && value.trim() !== '')
+            return value.trim()
         }
       }
       return null
@@ -280,7 +321,13 @@ function similarLink(auction: AuctionDossier): string {
     : `/?tab=${auction.objectType}`
 }
 
-function EndedPanel({ auction, unsold }: { auction: AuctionDossier; unsold: boolean }) {
+function EndedPanel({
+  auction,
+  unsold,
+}: {
+  auction: AuctionDossier
+  unsold: boolean
+}) {
   return (
     <section className="flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card">
       <h2 className="font-heading text-h3 text-ink">
@@ -288,7 +335,10 @@ function EndedPanel({ auction, unsold }: { auction: AuctionDossier; unsold: bool
       </h2>
       {!unsold && auction.finalPrice !== null && (
         <p className="text-body text-inkMuted">
-          Lõpphind: <span className="font-semibold text-ink">{eur(auction.finalPrice)}</span>
+          Lõpphind:{' '}
+          <span className="font-semibold text-ink">
+            {eur(auction.finalPrice)}
+          </span>
           {auction.vatIncluded ? ' (sisaldab käibemaksu)' : ''}
         </p>
       )}
@@ -322,11 +372,16 @@ async function buildSealedViewer(
 
   // Own isikukood is read as system context from the users row, the same
   // owner-scoped disclosure the profile page uses.
-  const user = await systemRepositories.findByID({ collection: 'users', id: auth.userId })
+  const user = await systemRepositories.findByID({
+    collection: 'users',
+    id: auth.userId,
+  })
   const userRecord = (user ?? {}) as Record<string, unknown>
   const rawIsikukood = userRecord.isikukood
   const isikukood =
-    typeof rawIsikukood === 'string' && rawIsikukood.trim() !== '' ? rawIsikukood : null
+    typeof rawIsikukood === 'string' && rawIsikukood.trim() !== ''
+      ? rawIsikukood
+      : null
 
   const ownBids = await repositories.find({
     collection: 'bids',
@@ -351,13 +406,18 @@ async function buildSealedViewer(
       outcome = bid.status
     }
     const createdAt = typeof bid.createdAt === 'string' ? bid.createdAt : null
-    if (createdAt !== null && (latestSubmittedAt === null || createdAt > latestSubmittedAt)) {
+    if (
+      createdAt !== null &&
+      (latestSubmittedAt === null || createdAt > latestSubmittedAt)
+    ) {
       latestSubmittedAt = createdAt
     }
   }
 
   const revisionCap =
-    typeof settings?.sealedRevisionCap === 'number' ? settings.sealedRevisionCap : 3
+    typeof settings?.sealedRevisionCap === 'number'
+      ? settings.sealedRevisionCap
+      : 3
 
   const profileType: SealedViewerSnapshot['profileType'] =
     profile?.type === 'company' ? 'company' : 'private'
@@ -370,7 +430,8 @@ async function buildSealedViewer(
     profileType,
     displayName,
     isikukood,
-    registrikood: profileType === 'company' ? (profile?.companyRegCode ?? null) : null,
+    registrikood:
+      profileType === 'company' ? (profile?.companyRegCode ?? null) : null,
     revisionCap,
     ownBidCount,
     latestSubmittedAt,
@@ -386,17 +447,29 @@ export default async function AuctionPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [auth, repositories] = await Promise.all([getPortalAuthState(), getRepositories()])
+  const [auth, repositories] = await Promise.all([
+    getPortalAuthState(),
+    getRepositories(),
+  ])
   const viewer =
     auth === null
       ? null
       : {
           userId: auth.userId,
-          ...(auth.profileId !== null ? { activeProfileId: auth.profileId } : {}),
+          ...(auth.profileId !== null
+            ? { activeProfileId: auth.profileId }
+            : {}),
         }
 
   const auction = await getAuctionDossier(repositories, id, viewer)
   if (!auction) notFound()
+
+  // Role-shaped bid list (task 4.5); open auctions only — sealed pages keep
+  // the count on SealedBidPanel.
+  const bidView =
+    auction.type === 'open'
+      ? await getAuctionBids(repositories, id, viewer)
+      : null
 
   // Sealed panels get a server-built viewer snapshot (own bids, revision
   // cap, outcome, identity prefill); open panels keep the dossier fields.
@@ -451,15 +524,25 @@ export default async function AuctionPage({
 
   const rows: DossierRow[] = []
   if (auction.cadastres.length > 0) {
-    rows.push({ label: 'Katastritunnused', value: auction.cadastres.join(', ') })
+    rows.push({
+      label: 'Katastritunnused',
+      value: auction.cadastres.join(', '),
+    })
   }
   if (auction.registryNumbers.length > 0) {
-    rows.push({ label: 'Kinnistu registrinumber', value: auction.registryNumbers.join(', ') })
+    rows.push({
+      label: 'Kinnistu registrinumber',
+      value: auction.registryNumbers.join(', '),
+    })
   }
-  if (auction.county !== null) rows.push({ label: 'Maakond', value: auction.county.name })
-  if (auction.parish !== null) rows.push({ label: 'Vald', value: auction.parish.name })
-  if (auction.address !== null) rows.push({ label: 'Aadress', value: auction.address })
-  if (auction.area !== null) rows.push({ label: 'Pindala', value: `${num(auction.area)} ha` })
+  if (auction.county !== null)
+    rows.push({ label: 'Maakond', value: auction.county.name })
+  if (auction.parish !== null)
+    rows.push({ label: 'Vald', value: auction.parish.name })
+  if (auction.address !== null)
+    rows.push({ label: 'Aadress', value: auction.address })
+  if (auction.area !== null)
+    rows.push({ label: 'Pindala', value: `${num(auction.area)} ha` })
   if (auction.volume !== null) {
     rows.push({ label: 'Raiemaht', value: `${num(auction.volume)} m³` })
   }
@@ -476,17 +559,30 @@ export default async function AuctionPage({
   if (notifications.length > 0) {
     rows.push({ label: 'Metsateatise nr', value: notifications.join(', ') })
   }
-  const loggingDeadline = deadlineValue(auction.deadlines, ['loggingDeadline', 'logging', 'raie'])
+  const loggingDeadline = deadlineValue(auction.deadlines, [
+    'loggingDeadline',
+    'logging',
+    'raie',
+  ])
   if (loggingDeadline !== null) {
     rows.push({ label: 'Raie teostamise tähtaeg', value: loggingDeadline })
   }
-  const removalDeadline = deadlineValue(auction.deadlines, ['removalDeadline', 'removal'])
+  const removalDeadline = deadlineValue(auction.deadlines, [
+    'removalDeadline',
+    'removal',
+  ])
   if (removalDeadline !== null) {
     rows.push({ label: 'Väljaveo tähtaeg', value: removalDeadline })
   }
-  const storageApproval = approvalLabel(auction.deadlines, ['storageLocationApproval', 'storageApproval'])
+  const storageApproval = approvalLabel(auction.deadlines, [
+    'storageLocationApproval',
+    'storageApproval',
+  ])
   if (storageApproval !== null) {
-    rows.push({ label: 'Ladustamiskohtade kooskõlastus', value: storageApproval })
+    rows.push({
+      label: 'Ladustamiskohtade kooskõlastus',
+      value: storageApproval,
+    })
   }
   const removalRoads = approvalLabel(auction.deadlines, ['removalRoads'])
   if (removalRoads !== null) {
@@ -507,158 +603,189 @@ export default async function AuctionPage({
     (auction.cadastres.length === 1 && firstCadastre !== undefined
       ? `https://ky.kataster.ee/?cdr=${encodeURIComponent(firstCadastre)}`
       : 'https://ky.kataster.ee')
-  const metsaregisterHref = auction.metsaregisterLink ?? 'https://register.metsad.ee'
+  const metsaregisterHref =
+    auction.metsaregisterLink ?? 'https://register.metsad.ee'
 
   return (
-    <div className="flex flex-col gap-lg">
-      <div className="flex flex-col gap-xs">
-        <Link href="/" className="text-bodySm text-inkMuted hover:text-primary">
-          ‹ Kõik oksjonid
-        </Link>
-        <div className="flex flex-wrap items-center gap-sm">
-          <h1 className="font-heading text-h2 text-ink">{auction.title}</h1>
-          <StatusBadge auction={auction} />
-          {auction.isQuickAuction && (
-            <span className="inline-flex items-center rounded-pill bg-primaryLight px-2 py-0.5 text-xs font-medium text-primaryDark">
-              Kiiroksjon
-            </span>
-          )}
-          {countdownEndsAt !== null && <Countdown endsAt={countdownEndsAt} className="ml-auto" />}
+    <AuctionStreamProvider>
+      <div className="flex flex-col gap-lg">
+        <div className="flex flex-col gap-xs">
+          <Link
+            href="/"
+            className="text-bodySm text-inkMuted hover:text-primary"
+          >
+            ‹ Kõik oksjonid
+          </Link>
+          <div className="flex flex-wrap items-center gap-sm">
+            <h1 className="font-heading text-h2 text-ink">{auction.title}</h1>
+            <StatusBadge auction={auction} />
+            {auction.isQuickAuction && (
+              <span className="inline-flex items-center rounded-pill bg-primaryLight px-2 py-0.5 text-xs font-medium text-primaryDark">
+                Kiiroksjon
+              </span>
+            )}
+            {countdownEndsAt !== null && (
+              <Countdown endsAt={countdownEndsAt} className="ml-auto" />
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="grid gap-lg lg:grid-cols-3">
-        <div className="flex flex-col gap-lg lg:col-span-2">
-          <Gallery images={images} />
+        <div className="grid gap-lg lg:grid-cols-3">
+          <div className="flex flex-col gap-lg lg:col-span-2">
+            <Gallery images={images} />
 
-          <section className="flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card">
-            <h2 className="font-heading text-h4 text-ink">Asukoht ja kaart</h2>
-            <p className="text-bodySm text-inkMuted">
-              {[auction.county?.name, auction.parish?.name, auction.address]
-                .filter((part) => part !== undefined && part !== null && part !== '')
-                .join(' · ') || 'Asukoht määramata'}
-            </p>
-            {auction.coordinates !== null && (
-              <MapEstonia
-                pins={[{ lat: auction.coordinates.lat, lng: auction.coordinates.lng, label: auction.title }]}
-                center={[auction.coordinates.lat, auction.coordinates.lng]}
-                zoom={13}
-                className="h-72 w-full rounded-card"
+            <section className="flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card">
+              <h2 className="font-heading text-h4 text-ink">
+                Asukoht ja kaart
+              </h2>
+              <p className="text-bodySm text-inkMuted">
+                {[auction.county?.name, auction.parish?.name, auction.address]
+                  .filter(
+                    (part) =>
+                      part !== undefined && part !== null && part !== '',
+                  )
+                  .join(' · ') || 'Asukoht määramata'}
+              </p>
+              {auction.coordinates !== null && (
+                <MapEstonia
+                  pins={[
+                    {
+                      lat: auction.coordinates.lat,
+                      lng: auction.coordinates.lng,
+                      label: auction.title,
+                    },
+                  ]}
+                  center={[auction.coordinates.lat, auction.coordinates.lng]}
+                  zoom={13}
+                  className="h-72 w-full rounded-card"
+                />
+              )}
+              <div className="flex flex-wrap gap-sm">
+                <a
+                  href={katasterHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-bodySm font-semibold text-primary hover:text-primaryHover"
+                >
+                  Kataster ↗
+                </a>
+                <a
+                  href={metsaregisterHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-bodySm font-semibold text-primary hover:text-primaryHover"
+                >
+                  Metsaregister ↗
+                </a>
+              </div>
+            </section>
+
+            {rows.length > 0 && (
+              <section className="flex flex-col gap-sm">
+                <h2 className="font-heading text-h4 text-ink">Andmetabel</h2>
+                <DossierTable rows={rows} />
+              </section>
+            )}
+
+            {auction.packageRows.length > 0 && (
+              <section className="flex flex-col gap-sm">
+                <h2 className="font-heading text-h4 text-ink">Pakett</h2>
+                <PackageSection
+                  header={auction.packageHeader}
+                  columns={auction.packageColumns}
+                  rows={auction.packageRows}
+                />
+              </section>
+            )}
+
+            {description.length > 0 && (
+              <section className="flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card">
+                <h2 className="font-heading text-h4 text-ink">
+                  Oksjoni info ja erisused
+                </h2>
+                <div className="flex flex-col gap-xs">
+                  {description.map((paragraph, index) => (
+                    <p key={index} className="text-body text-ink">
+                      {paragraph}
+                    </p>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {files.length > 0 && (
+              <section className="flex flex-col gap-sm">
+                <h2 className="font-heading text-h4 text-ink">Failid</h2>
+                <div className="grid gap-sm sm:grid-cols-2">
+                  {files.map((file) => (
+                    <DocumentLink
+                      key={file.href}
+                      title={file.title}
+                      href={file.href}
+                      {...(file.size !== undefined
+                        ? { fileSize: file.size }
+                        : {})}
+                      {...(file.format !== undefined
+                        ? { format: file.format }
+                        : {})}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-lg">
+            {auction.type === 'sealed' ? (
+              <SealedBidPanel
+                auctionId={auction.id}
+                status={auction.status}
+                startsAt={auction.startsAt}
+                endsAt={auction.endsAt}
+                minBid={auction.minBid}
+                bidCount={auction.bidCount}
+                finalPrice={auction.finalPrice}
+                viewer={sealedViewer}
+              />
+            ) : isEndedLike ? (
+              <EndedPanel
+                auction={auction}
+                unsold={auction.status === 'unsold'}
+              />
+            ) : (
+              <BidPanel
+                auctionId={auction.id}
+                objectType={auction.objectType}
+                status={auction.status}
+                startsAt={auction.startsAt}
+                endsAt={auction.endsAt}
+                minBid={auction.minBid}
+                bidStep={auction.bidStep}
+                leadingBidAmount={auction.leadingBidAmount}
+                finalPrice={auction.finalPrice}
+                antiSnipeMinutes={antiSnipeMinutes}
+                viewer={
+                  auth === null
+                    ? null
+                    : {
+                        hasBid: auction.participation?.hasBid ?? false,
+                        isLeading: auction.participation?.isLeading ?? false,
+                        hasRights: null,
+                        hasRaamleping,
+                      }
+                }
               />
             )}
-            <div className="flex flex-wrap gap-sm">
-              <a
-                href={katasterHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-bodySm font-semibold text-primary hover:text-primaryHover"
-              >
-                Kataster ↗
-              </a>
-              <a
-                href={metsaregisterHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-bodySm font-semibold text-primary hover:text-primaryHover"
-              >
-                Metsaregister ↗
-              </a>
-            </div>
-          </section>
-
-          {rows.length > 0 && (
-            <section className="flex flex-col gap-sm">
-              <h2 className="font-heading text-h4 text-ink">Andmetabel</h2>
-              <DossierTable rows={rows} />
-            </section>
-          )}
-
-          {auction.packageRows.length > 0 && (
-            <section className="flex flex-col gap-sm">
-              <h2 className="font-heading text-h4 text-ink">Pakett</h2>
-              <PackageSection
-                header={auction.packageHeader}
-                columns={auction.packageColumns}
-                rows={auction.packageRows}
-              />
-            </section>
-          )}
-
-          {description.length > 0 && (
-            <section className="flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card">
-              <h2 className="font-heading text-h4 text-ink">Oksjoni info ja erisused</h2>
-              <div className="flex flex-col gap-xs">
-                {description.map((paragraph, index) => (
-                  <p key={index} className="text-body text-ink">
-                    {paragraph}
-                  </p>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {files.length > 0 && (
-            <section className="flex flex-col gap-sm">
-              <h2 className="font-heading text-h4 text-ink">Failid</h2>
-              <div className="grid gap-sm sm:grid-cols-2">
-                {files.map((file) => (
-                  <DocumentLink
-                    key={file.href}
-                    title={file.title}
-                    href={file.href}
-                    {...(file.size !== undefined ? { fileSize: file.size } : {})}
-                    {...(file.format !== undefined ? { format: file.format } : {})}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-lg">
-          {auction.type === 'sealed' ? (
-            <SealedBidPanel
-              auctionId={auction.id}
-              status={auction.status}
-              startsAt={auction.startsAt}
-              endsAt={auction.endsAt}
-              minBid={auction.minBid}
-              bidCount={auction.bidCount}
-              finalPrice={auction.finalPrice}
-              viewer={sealedViewer}
+            {bidView !== null && (
+              <BidList auctionId={auction.id} initialView={bidView} />
+            )}
+            <SellerContact
+              specialist={auction.contact.specialist}
+              aliasEmail={auction.contact.aliasEmail}
             />
-          ) : isEndedLike ? (
-            <EndedPanel auction={auction} unsold={auction.status === 'unsold'} />
-          ) : (
-            <BidPanel
-              auctionId={auction.id}
-              objectType={auction.objectType}
-              status={auction.status}
-              startsAt={auction.startsAt}
-              endsAt={auction.endsAt}
-              minBid={auction.minBid}
-              bidStep={auction.bidStep}
-              leadingBidAmount={auction.leadingBidAmount}
-              finalPrice={auction.finalPrice}
-              antiSnipeMinutes={antiSnipeMinutes}
-              viewer={
-                auth === null
-                  ? null
-                  : {
-                      hasBid: auction.participation?.hasBid ?? false,
-                      isLeading: auction.participation?.isLeading ?? false,
-                      hasRights: null,
-                      hasRaamleping,
-                    }
-              }
-            />
-          )}
-          <SellerContact
-            specialist={auction.contact.specialist}
-            aliasEmail={auction.contact.aliasEmail}
-          />
+          </div>
         </div>
       </div>
-    </div>
+    </AuctionStreamProvider>
   )
 }
