@@ -4,8 +4,8 @@ import type { NextRequest } from 'next/server'
 import { verifyAccessToken } from '@/lib/auth/jwt'
 import type { AccessTokenPayload } from '@/lib/auth/jwt'
 import { resolveAccessTokenSession } from '@/lib/auth/session'
+import type { ProfileDoc } from '@/lib/data/repositories/registry'
 import { getRepositories, sessionGuardContext } from '@/lib/data/runtime'
-import type { Profile } from '@/lib/data/schema'
 
 async function authenticate(request: NextRequest): Promise<AccessTokenPayload | null> {
   const token = request.cookies.get('access_token')?.value
@@ -22,7 +22,7 @@ async function authenticate(request: NextRequest): Promise<AccessTokenPayload | 
 
 // The company registry fields (companyName, companyRegCode) are read-only;
 // type, approvalStatus and userId are never client-writable.
-function toPublicProfile(profile: Profile): Record<string, unknown> {
+function toPublicProfile(profile: ProfileDoc): Record<string, unknown> {
   const out: Record<string, unknown> = {
     id: profile.id,
     type: profile.type,
@@ -32,6 +32,7 @@ function toPublicProfile(profile: Profile): Record<string, unknown> {
     termsConsentAt: profile.termsConsentAt,
     privacyConsentAt: profile.privacyConsentAt,
     marketingConsentAt: profile.marketingConsentAt,
+    notificationPreferences: profile.notificationPreferences,
     createdAt: profile.createdAt,
     updatedAt: profile.updatedAt,
   }
@@ -49,6 +50,30 @@ const CONSENT_AT_FIELDS = {
   privacyConsent: 'privacyConsentAt',
   marketingConsent: 'marketingConsentAt',
 } as const
+
+// notificationPreferences: { [event]: { email?: boolean, sms?: boolean } }.
+// At least one channel per event; bounded count keeps the TEXT cell small.
+const MAX_PREFERENCE_EVENTS = 32
+
+function validateNotificationPreferences(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+  const entries = Object.entries(value as Record<string, unknown>)
+  if (entries.length > MAX_PREFERENCE_EVENTS) return null
+  const out: Record<string, unknown> = {}
+  for (const [event, channels] of entries) {
+    if (event.trim() === '') return null
+    if (typeof channels !== 'object' || channels === null || Array.isArray(channels)) return null
+    const { email, sms } = channels as Record<string, unknown>
+    if (email !== undefined && typeof email !== 'boolean') return null
+    if (sms !== undefined && typeof sms !== 'boolean') return null
+    if (email === undefined && sms === undefined) return null
+    const cleaned: Record<string, boolean> = {}
+    if (email !== undefined) cleaned.email = email
+    if (sms !== undefined) cleaned.sms = sms
+    out[event] = cleaned
+  }
+  return out
+}
 
 export async function GET(request: NextRequest) {
   const payload = await authenticate(request)
@@ -98,6 +123,17 @@ export async function PATCH(request: NextRequest) {
         : null
       continue
     }
+    if (key === 'notificationPreferences') {
+      const prefs = validateNotificationPreferences(value)
+      if (prefs === null) {
+        return NextResponse.json(
+          { error: 'Vigane väli: notificationPreferences' },
+          { status: 400 },
+        )
+      }
+      data[key] = prefs
+      continue
+    }
     return NextResponse.json({ error: `Lubamatu väli: ${key}` }, { status: 400 })
   }
 
@@ -111,7 +147,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Profiili ei leitud' }, { status: 404 })
   }
 
-  const updated: Profile[] = []
+  const updated: ProfileDoc[] = []
   for (const profile of docs) {
     updated.push(await repos.update({ collection: 'profile', id: profile.id, data }))
   }

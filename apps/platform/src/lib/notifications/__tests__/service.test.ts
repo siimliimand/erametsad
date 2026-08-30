@@ -17,7 +17,15 @@ vi.mock('@/lib/data/runtime', () => ({
 import { EventBus, type DomainEvent } from '../event-bus'
 import { startListening } from '../service'
 
+import { createSqliteTestDb, sqliteBatchRunner, type SqliteTestDb } from '@/lib/data/__tests__/sqlite'
+import {
+  createCoreRepositories,
+  nodeIsikukoodCodec,
+  type CoreRepositories,
+} from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
+
+process.env.ISIKUKOOD_ENCRYPTION_KEY = process.env.ISIKUKOOD_ENCRYPTION_KEY ?? 'integration-test-key'
 
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 
@@ -28,7 +36,7 @@ interface CreateCall {
 
 function makeRepos(overrides: Record<string, ReturnType<typeof vi.fn>> = {}) {
   return {
-    find: vi.fn().mockRejectedValue(new Error('UnknownCollection: notification-preferences')),
+    find: vi.fn().mockRejectedValue(new Error('UnknownCollection: profile')),
     findByID: vi.fn().mockResolvedValue({ email: 'user@example.ee' }),
     create: vi.fn().mockResolvedValue({}),
     ...overrides,
@@ -40,6 +48,22 @@ function outbidEvent(userId: string, auctionTitle: string): DomainEvent {
     type: 'outbid',
     userId,
     payload: { auctionTitle, currentBid: 150 },
+  }
+}
+
+function auctionWonEvent(userId: string, auctionTitle: string): DomainEvent {
+  return {
+    type: 'auction.won',
+    userId,
+    payload: { auctionTitle, winningBid: 150 },
+  }
+}
+
+function contractReadyEvent(userId: string, auctionTitle: string): DomainEvent {
+  return {
+    type: 'contract.ready',
+    userId,
+    payload: { auctionTitle },
   }
 }
 
@@ -170,7 +194,9 @@ describe('notification email dispatch', () => {
 
   it('honors notification preferences from the repository when present', async () => {
     const repos = makeRepos({
-      find: vi.fn().mockResolvedValue({ docs: [{ email: false, sms: false, inApp: true }] }),
+      find: vi.fn().mockResolvedValue({
+        docs: [{ notificationPreferences: { outbid: { email: false, sms: false } } }],
+      }),
     })
     const localCreate = repos.create
     vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
@@ -194,5 +220,162 @@ describe('notification email dispatch', () => {
       ([options]) => (options as CreateCall).data.channel === 'email',
     )
     expect(emailCalls).toHaveLength(1)
+  })
+})
+
+describe('default channel matrix', () => {
+  it('queues the historical channels when the profile stores no preferences', async () => {
+    sendEmailMock.mockResolvedValue({ success: true, transport: 'smtp', messageId: '<m-matrix@mailpit>' })
+    const repos = makeRepos({
+      find: vi.fn().mockResolvedValue({
+        docs: [{ id: 'p-matrix', notificationPreferences: null }],
+      }),
+    })
+    const localCreate = repos.create
+    vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
+
+    const calls = await emitAndCollect(bus, auctionWonEvent('u-defaults', 'Mets H'), localCreate, 2)
+
+    expect(calls.map((call) => call.data.channel).sort()).toEqual(['email', 'in_app'])
+    expect(sendEmailMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('queues the historical channels when no profile exists', async () => {
+    sendEmailMock.mockResolvedValue({ success: true, transport: 'smtp', messageId: '<m-noprofile@mailpit>' })
+    const repos = makeRepos({ find: vi.fn().mockResolvedValue({ docs: [] }) })
+    const localCreate = repos.create
+    vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
+
+    const calls = await emitAndCollect(bus, auctionWonEvent('u-noprofile', 'Mets I'), localCreate, 2)
+
+    expect(calls.map((call) => call.data.channel).sort()).toEqual(['email', 'in_app'])
+  })
+})
+
+describe('muted channels', () => {
+  it('skips the email channel the profile muted for the event', async () => {
+    const repos = makeRepos({
+      find: vi.fn().mockResolvedValue({
+        docs: [{ notificationPreferences: { outbid: { email: false } } }],
+      }),
+    })
+    const localCreate = repos.create
+    vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
+
+    const calls = await emitAndCollect(bus, outbidEvent('u-email-muted', 'Mets J'), localCreate, 1)
+
+    expect(sendEmailMock).not.toHaveBeenCalled()
+    expect(calls.map((call) => call.data.channel)).toEqual(['in_app'])
+  })
+
+  it('skips the sms channel the profile muted for the event', async () => {
+    sendEmailMock.mockResolvedValue({ success: true, transport: 'smtp', messageId: '<m-sms-muted@mailpit>' })
+    const repos = makeRepos({
+      find: vi.fn().mockResolvedValue({
+        docs: [{ notificationPreferences: { 'contract.ready': { sms: false } } }],
+      }),
+    })
+    const localCreate = repos.create
+    vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
+
+    const calls = await emitAndCollect(bus, contractReadyEvent('u-sms-muted', 'Mets K'), localCreate, 2)
+
+    expect(calls.map((call) => call.data.channel).sort()).toEqual(['email', 'in_app'])
+  })
+
+  it('keeps other events unaffected by an event-level mute', async () => {
+    sendEmailMock.mockResolvedValue({ success: true, transport: 'smtp', messageId: '<m-eventmute@mailpit>' })
+    const repos = makeRepos({
+      find: vi.fn().mockResolvedValue({
+        docs: [{ notificationPreferences: { outbid: { email: false, sms: false } } }],
+      }),
+    })
+    const localCreate = repos.create
+    vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
+
+    const muted = await emitAndCollect(bus, outbidEvent('u-event-mute', 'Mets L'), localCreate, 1)
+    expect(muted.map((call) => call.data.channel)).toEqual(['in_app'])
+
+    vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
+    const after = await emitAndCollect(bus, auctionWonEvent('u-event-mute', 'Mets M'), localCreate, 3)
+    const wonRows = after.filter((call) => call.data.event === 'auction.won')
+    expect(wonRows.map((call) => call.data.channel).sort()).toEqual(['email', 'in_app'])
+  })
+})
+
+describe('persisted preferences reload into the channel matrix', () => {
+  let testDb: SqliteTestDb
+
+  beforeEach(() => {
+    sendEmailMock.mockResolvedValue({ success: true, transport: 'smtp', messageId: '<m-persist@mailpit>' })
+    testDb = createSqliteTestDb()
+  })
+
+  afterEach(() => {
+    testDb.close()
+  })
+
+  function realRepos(): CoreRepositories {
+    return createCoreRepositories(testDb.database, {
+      isikukoodCodec: nodeIsikukoodCodec,
+      batch: sqliteBatchRunner(testDb.raw),
+    })
+  }
+
+  function storedChannels(userId: string): string[] {
+    return (
+      testDb.raw
+        .prepare('select channel from notifications where user_id = ?')
+        .all(userId) as { channel: string }[]
+    )
+      .map((row) => row.channel)
+      .sort()
+  }
+
+  it('writes preferences as TEXT-JSON through the profile repository and honors them on dispatch', async () => {
+    const repos = realRepos()
+    await repos.create({ collection: 'users', data: { id: 'u-persist-a', email: 'persist-a@example.ee' } })
+    await repos.create({ collection: 'users', data: { id: 'u-persist-b', email: 'persist-b@example.ee' } })
+    const mutedEmail = { outbid: { email: false } }
+    const smsOptIn = { 'auction.won': { sms: true }, 'not.a.domain.event': { email: false, sms: false } }
+    await repos.create({
+      collection: 'profile',
+      data: { type: 'private', userId: 'u-persist-a', notificationPreferences: mutedEmail },
+    })
+    await repos.create({
+      collection: 'profile',
+      data: { type: 'private', userId: 'u-persist-b', notificationPreferences: smsOptIn },
+    })
+
+    const stored = testDb.raw
+      .prepare('select notification_preferences from profiles where user_id = ?')
+      .get('u-persist-a') as { notification_preferences: string | null } | undefined
+    if (typeof stored?.notification_preferences !== 'string') {
+      throw new Error('notification preferences not stored')
+    }
+    expect(JSON.parse(stored.notification_preferences)).toEqual(mutedEmail)
+
+    vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
+    bus.emit(outbidEvent('u-persist-a', 'Mets N'))
+    await vi.waitFor(() => { expect(storedChannels('u-persist-a')).toEqual(['in_app']); })
+
+    vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
+    bus.emit(auctionWonEvent('u-persist-b', 'Mets O'))
+    await vi.waitFor(() => { expect(storedChannels('u-persist-b')).toEqual(['email', 'in_app', 'sms']); })
+  })
+
+  it('falls back to the default matrix when the stored TEXT is not valid JSON', async () => {
+    const repos = realRepos()
+    await repos.create({ collection: 'users', data: { id: 'u-corrupt', email: 'corrupt@example.ee' } })
+    const now = new Date().toISOString()
+    testDb.raw
+      .prepare(
+        "insert into profiles (id, type, approval_status, user_id, notification_preferences, created_at, updated_at) values ('p-corrupt', 'private', 'pending', 'u-corrupt', '{nope', ?, ?)",
+      )
+      .run(now, now)
+
+    vi.mocked(getRepositories).mockImplementationOnce(() => Promise.resolve(repos as never))
+    bus.emit(auctionWonEvent('u-corrupt', 'Mets P'))
+    await vi.waitFor(() => { expect(storedChannels('u-corrupt')).toEqual(['email', 'in_app']); })
   })
 })

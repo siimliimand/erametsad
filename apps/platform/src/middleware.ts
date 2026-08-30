@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
 import { apiRateLimiter, authRateLimiter } from '@/lib/rate-limit'
+import { normalizeHostname, resolveHostRedirect } from '@/lib/routing/host-areas'
 
 const CSP = [
   "default-src 'self'",
@@ -44,7 +45,21 @@ function applyRateLimitHeaders(headers: Headers, result: ReturnType<typeof apiRa
 }
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const { pathname, search } = request.nextUrl
+  // 308 keeps method, path, and query across the host switch. Unmapped
+  // hostnames fall through here untouched (D7: every branch except the
+  // two mapped hosts is a no-op).
+  const hostRedirect = resolveHostRedirect(
+    normalizeHostname(request.headers.get('host')),
+    pathname,
+    search,
+  )
+  if (hostRedirect) {
+    const redirect = NextResponse.redirect(hostRedirect, 308)
+    applySecurityHeaders(redirect.headers)
+    return redirect
+  }
+
   const origin = request.headers.get('origin') ?? ''
   const isApiRoute = pathname.startsWith('/api')
 

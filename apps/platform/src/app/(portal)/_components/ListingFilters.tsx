@@ -1,9 +1,10 @@
 'use client'
 
-import { Btn, Card, FormRange, FormSelect } from '@eametsad/ui'
+import { Btn, Card, FormRange, FormSelect, Toast } from '@eametsad/ui'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
+import { SubscribeDialog } from './SubscribeDialog'
 import {
   AREA_RANGE,
   DEFAULT_LISTING_FILTERS,
@@ -134,6 +135,8 @@ export function ListingFilters({ tab }: { tab: string }) {
   const [draft, setDraft] = useState<ListingFilterState | null>(null)
   const [counties, setCounties] = useState<CountyOption[] | null>(null)
   const [resetEpoch, setResetEpoch] = useState(0)
+  const [subscribeOpen, setSubscribeOpen] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
 
   const state = draft !== null && !listingFiltersEqual(draft, urlState) ? draft : urlState
   const activeCount = countActiveFilters(state)
@@ -312,10 +315,28 @@ export function ListingFilters({ tab }: { tab: string }) {
             />
           </div>
 
-          {activeCount > 0 && (
-            <Btn variant="outline" onClick={clear} className="w-full sm:w-auto sm:self-start">
-              Tühjenda
+          <div className="flex flex-col gap-sm sm:flex-row sm:items-center">
+            <Btn type="button" onClick={() => { setSubscribeOpen(true); }}>
+              Telli teavitus
             </Btn>
+            {activeCount > 0 && (
+              <Btn type="button" variant="outline" onClick={clear} className="sm:self-start">
+                Tühjenda
+              </Btn>
+            )}
+          </div>
+
+          <SubscribeDialog
+            isOpen={subscribeOpen}
+            filter={state}
+            onClose={() => { setSubscribeOpen(false); }}
+            onSaved={() => {
+              setSubscribeOpen(false)
+              setToast('Otsingutellimus on salvestatud.')
+            }}
+          />
+          {toast !== null && (
+            <Toast message={toast} type="success" isVisible onClose={() => { setToast(null); }} />
           )}
         </div>
       }

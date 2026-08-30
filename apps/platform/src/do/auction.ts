@@ -1,6 +1,14 @@
 import { DurableObject, type DurableObjectState } from 'cloudflare:workers'
 import { drizzle } from 'drizzle-orm/d1'
 
+import { parseIdentitySnapshot } from '../lib/bidding/identity-snapshot'
+import {
+  buildSealedIdentitySnapshot,
+  countUserSealedBids,
+  resolveSealedRevisionCap,
+  sealedRevisionCapMessage,
+  sealedStorageAmountCents,
+} from '../lib/bidding/sealed-admission'
 import {
   createCoreRepositories,
   nodeIsikukoodCodec,
@@ -55,6 +63,8 @@ export interface BidRequest {
   source?: BidSource
   requestIp?: string
   idempotencyKey?: string
+  /** Validated identity snapshot (JSON string) for sealed admissions. */
+  identitySnapshot?: string
 }
 
 export interface AutobidInfo {
@@ -68,7 +78,7 @@ export interface BidAdmissionResult {
   bid?: Record<string, unknown>
   error?: string
   status?: number
-  code?: 'framework_contract_required'
+  code?: 'framework_contract_required' | 'revision_cap_exceeded'
   redirectUrl?: string
   replayed?: boolean
   /** Leader displaced by this bid; feeds the route's outbid push. */
@@ -168,12 +178,13 @@ interface InsertBidInput {
   status: 'leading' | 'pending_approval'
   ipHash?: string
   idempotencyKey?: string
+  identitySnapshot?: string
 }
 
 function insertBidStatement(input: InsertBidInput, now: string): SqlStatement {
   return {
-    sql: `insert into bids (id, auction_id, user_id, amount_cents, type, source, status, ip_hash, idempotency_key, created_at, updated_at)
-      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `insert into bids (id, auction_id, user_id, amount_cents, type, source, status, identity_snapshot, ip_hash, idempotency_key, created_at, updated_at)
+      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     params: [
       input.bidId,
       input.auctionId,
@@ -182,6 +193,7 @@ function insertBidStatement(input: InsertBidInput, now: string): SqlStatement {
       input.type,
       input.source,
       input.status,
+      input.identitySnapshot ?? null,
       input.ipHash ?? null,
       input.idempotencyKey ?? null,
       now,
@@ -341,6 +353,9 @@ function mapBid(input: InsertBidInput, now: string): Record<string, unknown> {
     ...(input.ipHash !== undefined ? { ipHash: input.ipHash } : {}),
     ...(input.idempotencyKey !== undefined
       ? { idempotencyKey: input.idempotencyKey }
+      : {}),
+    ...(input.identitySnapshot !== undefined
+      ? { identitySnapshot: input.identitySnapshot }
       : {}),
     createdAt: now,
     updatedAt: now,
@@ -700,6 +715,12 @@ export class AuctionDO extends DurableObject<Env> {
     ) {
       return errorResponse(400, 'source must be manual or autobidder')
     }
+    let identitySnapshot: string | undefined
+    if (body.identitySnapshot !== undefined) {
+      const snapshot = parseIdentitySnapshot(body.identitySnapshot)
+      if (!snapshot.ok) return errorResponse(400, snapshot.error)
+      identitySnapshot = snapshot.snapshot
+    }
     const result = await this.serialize(() =>
       this.admitBid({
         auctionId,
@@ -711,6 +732,7 @@ export class AuctionDO extends DurableObject<Env> {
         ...(body.idempotencyKey !== undefined
           ? { idempotencyKey: body.idempotencyKey }
           : {}),
+        ...(identitySnapshot !== undefined ? { identitySnapshot } : {}),
       }),
     )
     return jsonResponse(result)
@@ -836,7 +858,7 @@ export class AuctionDO extends DurableObject<Env> {
         if (!signed) {
           return deny(403, 'Framework contract required', {
             code: 'framework_contract_required',
-            redirectUrl: '/contracts/framework',
+            redirectUrl: '/lepingud/raamleping',
           })
         }
       }
@@ -860,20 +882,42 @@ export class AuctionDO extends DurableObject<Env> {
       }
     }
 
+    // 8.5 Sealed revision budget (D2): 1 initial bid + N revisions from
+    //     Settings, enforced in this same serialized admission turn and
+    //     counted after the idempotency replay so a retried final bid
+    //     still replays instead of tripping the cap. Open bids skip it.
+    if (type === 'sealed') {
+      const revisionCap = resolveSealedRevisionCap(settings)
+      const sealedCount = await countUserSealedBids(repos, input.auctionId, userId)
+      if (sealedCount >= revisionCap + 1) {
+        return deny(400, sealedRevisionCapMessage(revisionCap), {
+          code: 'revision_cap_exceeded',
+        })
+      }
+    }
+
     const ipHash =
       requestIp !== undefined
         ? await computeIpHash(normalizeRequestIp(requestIp))
+        : undefined
+    // Sealed rows store no readable amount: amount_cents 0 at rest, the
+    // real amount and the snapshot inside the encrypted envelope.
+    const storageAmountCents = sealedStorageAmountCents(type, amountCents)
+    const sealedPayload =
+      type === 'sealed'
+        ? await buildSealedIdentitySnapshot(amount, input.identitySnapshot)
         : undefined
     const insertInput: InsertBidInput = {
       bidId: crypto.randomUUID(),
       auctionId: input.auctionId,
       userId,
-      amountCents,
+      amountCents: storageAmountCents,
       type,
       source,
       status: isUnderStartBid ? 'pending_approval' : 'leading',
       ...(ipHash !== undefined ? { ipHash } : {}),
       ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+      ...(sealedPayload !== undefined ? { identitySnapshot: sealedPayload } : {}),
     }
 
     // 9. Writes. An under-start bid lands as pending_approval and never
@@ -908,7 +952,7 @@ export class AuctionDO extends DurableObject<Env> {
           null,
           {
             auctionId: input.auctionId,
-            amountCents,
+            amountCents: storageAmountCents,
             status: 'pending_approval',
             source,
           },
@@ -976,7 +1020,7 @@ export class AuctionDO extends DurableObject<Env> {
           : null,
         {
           auctionId: input.auctionId,
-          amountCents,
+          amountCents: storageAmountCents,
           status: 'leading',
           source,
           ...(extended !== null ? { extended } : {}),
@@ -1014,11 +1058,15 @@ export class AuctionDO extends DurableObject<Env> {
       throw error
     }
 
-    // Hot state catches up to the write that just committed.
+    // Hot state catches up to the write that just committed. Sealed bids
+    // move the price by 0 so the hot state never leaks a sealed amount.
     await this.updateHotState(
       extended !== null
-        ? { currentPriceCents: amountCents, endsAt: extended.endsAt }
-        : { currentPriceCents: amountCents },
+        ? {
+            currentPriceCents: storageAmountCents,
+            endsAt: extended.endsAt,
+          }
+        : { currentPriceCents: storageAmountCents },
     )
     if (extended) {
       // The alarm must track the extension or the auction would end at
@@ -1030,7 +1078,7 @@ export class AuctionDO extends DurableObject<Env> {
       type: 'bid:created',
       data: {
         auctionId: input.auctionId,
-        amount: centsToEuros(amountCents),
+        amount: centsToEuros(storageAmountCents),
         placedAt: now,
       },
     })

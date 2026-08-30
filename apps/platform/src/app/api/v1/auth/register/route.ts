@@ -1,8 +1,10 @@
+import { EEIsikukood, EEPhone } from '@eametsad/types'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { hashCredentialPassword } from '@/lib/auth/password'
+
 import { createSession, setSessionCookies } from '@/lib/auth/session'
+import type { CreateDataFor } from '@/lib/data/repositories/registry'
 import { getRepositories } from '@/lib/data/runtime'
 import { authRateLimiter } from '@/lib/rate-limit'
 
@@ -22,18 +24,34 @@ export async function POST(request: NextRequest) {
   }
 
   const identifier = body.identifier as string | undefined
-  const password = body.password as string | undefined
   const profileType = body.profileType as string | undefined
   const consents = body.consents as Record<string, unknown> | undefined
   const regCode = body.regCode as string | undefined
   const companyName = body.companyName as string | undefined
 
-  if (!identifier || !password || !profileType || !consents) {
+  // No password field: new accounts start passwordless. The register
+  // response issues the session; the first password is set afterwards via
+  // /update-password?first=1 (the no-credential path of change-password).
+  if (!identifier || !profileType || !consents) {
     return NextResponse.json({ error: 'Puuduvad kohustuslikud väljad' }, { status: 400 })
   }
 
   if (profileType !== 'private' && profileType !== 'company') {
     return NextResponse.json({ error: 'Vale profiili tüüp' }, { status: 400 })
+  }
+
+  // Login by isikukood and completeEidLogin match users by isikukoodHash.
+  // The code passes to storage as plaintext; the users write hook then
+  // encrypts and hashes it exactly like the eID identity path does.
+  const rawIsikukood = body.isikukood
+  let isikukood: string | undefined
+  if (rawIsikukood !== undefined && rawIsikukood !== null && rawIsikukood !== '') {
+    const parsed =
+      typeof rawIsikukood === 'string' ? EEIsikukood.safeParse(rawIsikukood) : null
+    if (!parsed?.success) {
+      return NextResponse.json({ error: 'Vigane isikukood' }, { status: 400 })
+    }
+    isikukood = parsed.data
   }
 
   const consentTimestamps: Record<string, string> = {}
@@ -57,22 +75,29 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (password.length < 8) {
-    return NextResponse.json({ error: 'Parool peab olema vähemalt 8 tähemärki' }, { status: 400 })
+  const rawPhone = body.phone
+  let phone: string | undefined
+  if (rawPhone !== undefined && rawPhone !== null && rawPhone !== '') {
+    const parsed =
+      typeof rawPhone === 'string' ? EEPhone.safeParse(rawPhone.trim()) : null
+    if (!parsed?.success) {
+      return NextResponse.json({ error: 'Vigane telefoninumber' }, { status: 400 })
+    }
+    phone = parsed.data
   }
 
   const repos = await getRepositories()
 
-  // Hash with the seed's scrypt credential scheme (password_hash +
-  // password_salt); the raw password never reaches storage.
-  const credentials = hashCredentialPassword(password)
   const userData: Record<string, unknown> = {
     email: identifier,
-    passwordHash: credentials.hash,
-    passwordSalt: credentials.salt,
+    // No credential columns: passwordless until the first password is set.
+    // The account authenticates via the issued session and the isikukood.
     role: profileType === 'company' ? 'company' : 'private',
-    authMethod: 'password',
+    authMethod: 'eid',
     status: 'active',
+  }
+  if (isikukood) {
+    userData.isikukood = isikukood
   }
 
   let user: Record<string, unknown>
@@ -92,9 +117,9 @@ export async function POST(request: NextRequest) {
   const userId = String(user.id)
   const displayName = profileType === 'company' ? companyName : identifier.split('@')[0] ?? identifier
 
-  const profileData: Record<string, unknown> = {
+  const profileData: CreateDataFor<'profile'> = {
     type: profileType,
-    user: userId,
+    userId,
     displayName,
     approvalStatus: profileType === 'company' ? 'pending' : 'approved',
     termsConsentAt: consentTimestamps.terms ?? '',
@@ -106,6 +131,11 @@ export async function POST(request: NextRequest) {
     profileData.companyName = companyName
     profileData.companyRegCode = regCode
   }
+  if (phone) {
+    profileData.phone = phone
+  }
+  // The payload may carry an address, but the profiles table has no address
+  // column; persisting it needs a schema migration, which is out of scope.
 
   const profile = (await repos.create({
     collection: 'profile',

@@ -17,12 +17,22 @@ const marketingLinks = [
   { label: 'Metsaspetsialistid', href: 'https://eametsad.ee' },
 ]
 
+const portalLinks = [
+  { label: 'Ajalugu', href: '/ajalugu' },
+  { label: 'Registreeru', href: '/register' },
+]
+
 const userMenuItems = [
   { label: 'Minu pakkumised', href: '/user/bids' },
   { label: 'Minu müügid', href: '/user/objects' },
   { label: 'Minu profiil', href: '/user/profile' },
   { label: 'Teavitused', href: '/user/notifications' },
 ]
+
+// Same rule as the user-area Sidebar: exact match, or a child path of href.
+function isActive(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
 
 export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
   const pathname = usePathname()
@@ -51,6 +61,21 @@ export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
                 {link.label}
               </a>
             ))}
+            {portalLinks.map((link) => {
+              const active = isActive(pathname, link.href)
+              return (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  aria-current={active ? 'page' : undefined}
+                  className={`whitespace-nowrap transition-colors duration-hover hover:text-primary ${
+                    active ? 'text-primary' : 'text-ink'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              )
+            })}
           </nav>
           <div className="ml-auto flex items-center">
             {auth ? (
@@ -123,6 +148,21 @@ export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
               {link.label}
             </a>
           ))}
+          {portalLinks.map((link) => {
+            const active = isActive(pathname, link.href)
+            return (
+              <Link
+                key={link.label}
+                href={link.href}
+                aria-current={active ? 'page' : undefined}
+                className={`whitespace-nowrap transition-colors duration-hover hover:text-primary ${
+                  active ? 'text-primary' : 'text-ink'
+                }`}
+              >
+                {link.label}
+              </Link>
+            )
+          })}
         </nav>
       </div>
     </header>

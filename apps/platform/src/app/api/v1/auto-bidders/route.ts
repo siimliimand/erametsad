@@ -5,6 +5,61 @@ import { verifyAccessToken } from '@/lib/auth/jwt'
 import { centsToEuros, eurosToCents } from '@/lib/data/repositories/money'
 import { getRepositories, sessionGuardContext } from '@/lib/data/runtime'
 
+// Only an active row counts: DELETE cancels by flipping status to 'paused',
+// and a paused autobidder must surface as 204 so the UI treats it as absent.
+function toOwnAutobidder(row: Record<string, unknown>): { id: string; max: number } | null {
+  if (typeof row.id !== 'string' || typeof row.maxAmountCents !== 'number') {
+    return null
+  }
+  return { id: row.id, max: centsToEuros(row.maxAmountCents) }
+}
+
+// The caller's own active autobidder row for one auction: the id enables
+// PATCH/DELETE and `max` prefills the editor. Foreign rows are invisible
+// through the session guard context.
+export async function GET(request: NextRequest) {
+  const accessToken = request.cookies.get('access_token')?.value
+  if (!accessToken) {
+    return NextResponse.json({ error: 'Autentimata' }, { status: 401 })
+  }
+
+  const tokenPayload = verifyAccessToken(accessToken)
+  if (!tokenPayload) {
+    return NextResponse.json({ error: 'Sessioon on aegunud' }, { status: 401 })
+  }
+
+  const auctionId = request.nextUrl.searchParams.get('auction')
+  if (auctionId === null || auctionId === '') {
+    return NextResponse.json(
+      { error: 'auction query parameter is required' },
+      { status: 400 },
+    )
+  }
+
+  const repos = await getRepositories(sessionGuardContext(tokenPayload))
+
+  const result = await repos.find({
+    collection: 'autobidders',
+    where: {
+      and: [
+        { user: { equals: tokenPayload.userId } },
+        { auction: { equals: auctionId } },
+        { status: { equals: 'active' } },
+      ],
+    },
+    limit: 1,
+  })
+
+  const autobidder = toOwnAutobidder(
+    (result.docs[0] as Record<string, unknown> | undefined) ?? {},
+  )
+  if (autobidder === null) {
+    return new NextResponse(null, { status: 204 })
+  }
+
+  return NextResponse.json(autobidder)
+}
+
 export async function POST(request: NextRequest) {
   const accessToken = request.cookies.get('access_token')?.value
   if (!accessToken) {

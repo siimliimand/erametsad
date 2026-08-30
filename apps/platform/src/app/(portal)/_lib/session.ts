@@ -5,8 +5,8 @@ import { verifyAccessToken, type AccessTokenPayload } from '@/lib/auth/jwt'
 import { getActiveProfileId } from '@/lib/auth/profile-scope'
 import { getUserSession } from '@/lib/auth/session'
 import type { CoreRepositories } from '@/lib/data/repositories'
+import type { ProfileDoc } from '@/lib/data/repositories/registry'
 import { getRepositories, sessionGuardContext } from '@/lib/data/runtime'
-import type { Profile } from '@/lib/data/schema'
 
 /**
  * Server-only session helpers for the (portal) route group. Pages and route
@@ -28,7 +28,7 @@ export interface PortalSession {
     sessionId: string
     profileId: string | null
   }
-  profile: Profile | null
+  profile: ProfileDoc | null
   repositories: CoreRepositories
 }
 
@@ -78,7 +78,7 @@ async function findActiveProfile(
   repositories: CoreRepositories,
   userId: string,
   profileId: string | null,
-): Promise<Profile | null> {
+): Promise<ProfileDoc | null> {
   if (!profileId) return null
   const result = await repositories.find({
     collection: 'profile',
@@ -88,7 +88,7 @@ async function findActiveProfile(
   return result.docs[0] ?? null
 }
 
-function profileDisplayName(profile: Profile | null): string | null {
+function profileDisplayName(profile: ProfileDoc | null): string | null {
   if (!profile) return null
   if (profile.type === 'company') {
     return profile.companyName ?? profile.displayName
@@ -142,7 +142,7 @@ export async function getPortalAuthState(): Promise<PortalAuthState | null> {
 }
 
 /** Active profile for the current session; null when anonymous or none selected. */
-export async function getActiveProfile(): Promise<Profile | null> {
+export async function getActiveProfile(): Promise<ProfileDoc | null> {
   const payload = await readAccessToken()
   const sessionId = payload?.sessionId ?? null
   const sessionRecord = await loadSessionRecord(sessionId)

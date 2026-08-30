@@ -26,7 +26,7 @@ export default async function ResetPasswordTokenPage({
         <div className="mt-md">
           <PasswordForm
             endpoint="/api/v1/auth/reset-password"
-            buildBody={({ newPassword }) => ({ token, password: newPassword })}
+            resetToken={token}
             submitLabel="Määra parool"
             fallbackError="Parooli lähtestamine ei õnnestunud. Proovi uuesti."
             errorFooter={

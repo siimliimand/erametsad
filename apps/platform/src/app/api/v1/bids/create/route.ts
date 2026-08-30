@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server'
 import { verifyAccessToken } from '@/lib/auth/jwt'
 import { checkAntiSnipe } from '@/lib/bidding/anti-snipe'
 import { evaluateAutobidders } from '@/lib/bidding/autobidder'
+import { parseIdentitySnapshot } from '@/lib/bidding/identity-snapshot'
 import { placeBid } from '@/lib/bidding/place-bid'
 import type { BidResult } from '@/lib/bidding/place-bid'
 import type { CoreRepositories } from '@/lib/data/repositories'
@@ -32,7 +33,7 @@ interface AuctionDOAdmission {
   bid?: Record<string, unknown>
   error?: string
   status?: number
-  code?: 'framework_contract_required'
+  code?: 'framework_contract_required' | 'revision_cap_exceeded'
   redirectUrl?: string
   replayed?: boolean
   previousLeading?: { userId: string; amount: number } | null
@@ -79,6 +80,7 @@ async function admitViaAuctionDO(input: {
   amount: number
   type: string
   idempotencyKey?: string
+  identitySnapshot?: string
   requestIp: string
 }): Promise<AuctionDOAdmission | null> {
   let namespace: AuctionDONamespace | undefined
@@ -101,6 +103,9 @@ async function admitViaAuctionDO(input: {
         type: input.type,
         ...(input.idempotencyKey !== undefined
           ? { idempotencyKey: input.idempotencyKey }
+          : {}),
+        ...(input.identitySnapshot !== undefined
+          ? { identitySnapshot: input.identitySnapshot }
           : {}),
         requestIp: input.requestIp,
       }),
@@ -263,6 +268,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'type must be open or sealed' }, { status: 400 })
   }
 
+  let identitySnapshot: string | undefined
+  if (body.identitySnapshot !== undefined) {
+    const snapshot = parseIdentitySnapshot(body.identitySnapshot)
+    if (!snapshot.ok) {
+      return NextResponse.json({ error: snapshot.error }, { status: 400 })
+    }
+    identitySnapshot = snapshot.snapshot
+  }
+
   const requestIp = request.headers.get('x-forwarded-for') ?? 'unknown'
 
   const admission = await admitViaAuctionDO({
@@ -271,6 +285,7 @@ export async function POST(request: NextRequest) {
     amount,
     type,
     ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+    ...(identitySnapshot !== undefined ? { identitySnapshot } : {}),
     requestIp,
   })
 
@@ -289,13 +304,18 @@ export async function POST(request: NextRequest) {
           {
             error: admission.error,
             code: admission.code,
-            redirectUrl: admission.redirectUrl ?? '/contracts/framework',
+            redirectUrl: admission.redirectUrl ?? '/lepingud/raamleping',
           },
           { status: admission.status ?? 403 },
         )
       }
       return NextResponse.json(
-        { error: admission.error ?? 'Bid rejected' },
+        {
+          error: admission.error ?? 'Bid rejected',
+          // Coded rejections (revision_cap_exceeded) must reach the client
+          // so the panel can lock revisions; uncoded ones stay code-free.
+          ...(admission.code !== undefined ? { code: admission.code } : {}),
+        },
         { status: admission.status ?? 400 },
       )
     }
@@ -321,6 +341,7 @@ export async function POST(request: NextRequest) {
       source: 'manual',
       requestIp,
       ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+      ...(identitySnapshot !== undefined ? { identitySnapshot } : {}),
     })
   } catch (error) {
     console.error('[bids/create] placeBid failed', error)
@@ -333,12 +354,18 @@ export async function POST(request: NextRequest) {
         {
           error: result.error,
           code: result.code,
-          redirectUrl: result.redirectUrl ?? '/contracts/framework',
+          redirectUrl: result.redirectUrl ?? '/lepingud/raamleping',
         },
         { status: 403 },
       )
     }
-    return NextResponse.json({ error: result.error }, { status: result.status })
+    return NextResponse.json(
+      {
+        error: result.error,
+        ...(result.code !== undefined ? { code: result.code } : {}),
+      },
+      { status: result.status },
+    )
   }
 
   const bid = result.bid

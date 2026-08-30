@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     if (email) {
       const token = await createResetToken(userId)
-      const resetLink = `${env.NEXT_PUBLIC_APP_URL}/parooli-taastamine?token=${token}`
+      const resetLink = `${env.NEXT_PUBLIC_APP_URL}/reset-password/${token}`
 
       try {
         await sendResetEmail(email, resetLink)

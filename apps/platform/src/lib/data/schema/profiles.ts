@@ -28,6 +28,9 @@ export const profiles = sqliteTable(
     termsConsentAt: text('terms_consent_at'),
     privacyConsentAt: text('privacy_consent_at'),
     marketingConsentAt: text('marketing_consent_at'),
+    // Per-event channel toggles stored as a JSON object in TEXT; the
+    // repository json-fields layer (registry) parses and serializes it.
+    notificationPreferences: text('notification_preferences'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, type SVGProps } from 'react'
 
 import { logoutAction } from '@/app/(portal)/_actions/logout'
@@ -60,6 +60,53 @@ interface NotificationsResponse {
   unreadCount: number
 }
 
+// GET /api/v1/profiles contract: { profiles: toPublicProfile(...) } — the
+// fields the switcher needs from the public profile shape.
+export interface ProfileSummary {
+  id: string
+  type: 'private' | 'company'
+  displayName: string | null
+  companyName?: string | null
+  approvalStatus?: string | null
+}
+
+interface ProfilesResponse {
+  profiles: ProfileSummary[]
+}
+
+export interface ProfileSwitcherOption {
+  id: string
+  name: string
+  active: boolean
+  disabled: boolean
+}
+
+// Mirrors profileDisplayName in (portal)/_lib/session.ts so the dropdown
+// names match what the header chip and server components show.
+function profileOptionName(profile: ProfileSummary): string {
+  const isCompany = profile.type === 'company'
+  return (
+    (isCompany ? (profile.companyName ?? profile.displayName) : profile.displayName) ??
+    (isCompany ? 'Ettevõte' : 'Eraisik')
+  )
+}
+
+// The select endpoint only checks ownership, so the unapproved-company gate
+// from the select-profile page is applied client-side here as well.
+export function toSwitcherOption(
+  profile: ProfileSummary,
+  activeProfileName: string | null,
+): ProfileSwitcherOption {
+  const name = profileOptionName(profile)
+  const selectable = profile.type !== 'company' || profile.approvalStatus === 'approved'
+  return {
+    id: profile.id,
+    name,
+    active: selectable && activeProfileName !== null && name === activeProfileName,
+    disabled: !selectable,
+  }
+}
+
 const profileMenuItems = [
   { label: 'Minu pakkumised', href: '/user/bids' },
   { label: 'Minu müügid', href: '/user/objects' },
@@ -114,9 +161,13 @@ function ShellBreadcrumbs() {
 }
 
 export function ShellHeader({ profileName }: { profileName: string | null }) {
+  const router = useRouter()
   const { subscribe } = useMyStream()
   const [unread, setUnread] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [profiles, setProfiles] = useState<ProfileSummary[] | null>(null)
+  const [switching, setSwitching] = useState(false)
+  const [switchError, setSwitchError] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -133,6 +184,20 @@ export function ShellHeader({ profileName }: { profileName: string | null }) {
     }
   }, [])
 
+  useEffect(() => {
+    let active = true
+    fetch('/api/v1/profiles')
+      .then((response) => (response.ok ? (response.json() as Promise<ProfilesResponse>) : null))
+      .then((data) => {
+        if (!active || !data || !Array.isArray(data.profiles)) return
+        setProfiles(data.profiles)
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [])
+
   useEffect(
     () =>
       subscribe('notification', () => {
@@ -140,6 +205,40 @@ export function ShellHeader({ profileName }: { profileName: string | null }) {
       }),
     [subscribe],
   )
+
+  const switcherOptions = profiles?.map((profile) => toSwitcherOption(profile, profileName)) ?? null
+
+  // The select endpoint re-issues the access-token cookie in its response, so
+  // router.refresh() re-renders the server components (layout, header chip)
+  // with the new active profile — same rule as the select-profile page's
+  // full navigation.
+  async function handleProfilePick(profileId: string) {
+    if (switching) return
+    setSwitching(true)
+    setSwitchError(null)
+    try {
+      const response = await fetch(`/api/v1/profiles/${profileId}/select`, {
+        method: 'POST',
+      })
+      if (!response.ok) {
+        let message = 'Profiili vahetamine ei õnnestunud. Proovi uuesti.'
+        try {
+          const body = (await response.json()) as { error?: unknown }
+          if (typeof body.error === 'string' && body.error !== '') message = body.error
+        } catch {
+          // Keep the fallback copy.
+        }
+        setSwitchError(message)
+        setSwitching(false)
+        return
+      }
+      setMenuOpen(false)
+      router.refresh()
+    } catch {
+      setSwitchError('Võrguühendus ei ole saadaval. Proovi uuesti.')
+      setSwitching(false)
+    }
+  }
 
   return (
     <header className="rounded-card border border-border bg-bgPage shadow-card">
@@ -213,6 +312,46 @@ export function ShellHeader({ profileName }: { profileName: string | null }) {
                     {item.label}
                   </Link>
                 ))}
+                {switcherOptions !== null && switcherOptions.length > 0 && (
+                  <div className="mt-2xs border-t border-border pt-2xs">
+                    <p className="truncate px-sm py-2xs text-label font-semibold text-inkMuted">
+                      Profiilid
+                    </p>
+                    <div role="group" aria-label="Profiilid">
+                      {switcherOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={option.active}
+                          disabled={option.disabled || switching}
+                          onClick={() => {
+                            if (option.active) {
+                              setMenuOpen(false)
+                              return
+                            }
+                            void handleProfilePick(option.id)
+                          }}
+                          className={`block w-full px-sm py-xs text-left text-bodySm transition-colors duration-hover ${
+                            option.disabled
+                              ? 'cursor-not-allowed text-inkMuted opacity-60'
+                              : option.active
+                                ? 'font-semibold text-primary hover:bg-primaryLight'
+                                : 'text-ink hover:bg-primaryLight hover:text-primary'
+                          }`}
+                        >
+                          {option.name}
+                          {option.active && <span className="sr-only"> (aktiivne)</span>}
+                        </button>
+                      ))}
+                    </div>
+                    {switchError !== null && (
+                      <p role="alert" className="px-sm py-2xs text-bodySm text-danger">
+                        {switchError}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="mt-2xs border-t border-border pt-2xs">
                   <form action={logoutAction}>
                     <button

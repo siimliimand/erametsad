@@ -4,8 +4,8 @@ import { ProfileDashboard } from './_components/ProfileDashboard'
 import type { ProfileView, UserIdentity } from './_components/types'
 
 import { requirePortalSession } from '@/app/(portal)/_lib/session'
+import type { ProfileDoc } from '@/lib/data/repositories/registry'
 import { getRepositories } from '@/lib/data/runtime'
-import type { Profile } from '@/lib/data/schema'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   title: 'Minu profiil',
 }
 
-function toProfileView(profile: Profile): ProfileView {
+function toProfileView(profile: ProfileDoc): ProfileView {
   return {
     id: profile.id,
     type: profile.type,

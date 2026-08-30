@@ -71,12 +71,15 @@ export function RegisterWizard({ next }: RegisterWizardProps) {
     const consentAt = new Date().toISOString()
     const result = await submitRegistration({
       identifier: data.email,
+      isikukood: identity.isikukood,
       profileType,
       consents: {
         terms: consentAt,
         privacy: consentAt,
         marketing: data.consents.marketing ? consentAt : NO_CONSENT_SENTINEL,
       },
+      phone: data.phone,
+      address: data.address,
       ...(company
         ? { regCode: company.regCode, companyName: company.companyName }
         : {}),

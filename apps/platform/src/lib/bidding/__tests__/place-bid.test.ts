@@ -412,7 +412,7 @@ describe('placeBid', () => {
       assertBidError(result)
       expect(result.status).toBe(403)
       expect(result.code).toBe('framework_contract_required')
-      expect(result.redirectUrl).toBe('/contracts/framework')
+      expect(result.redirectUrl).toBe('/lepingud/raamleping')
     })
 
     it('passes a signed bidder when the gate is active', async () => {

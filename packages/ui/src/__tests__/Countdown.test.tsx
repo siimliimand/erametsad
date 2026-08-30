@@ -48,6 +48,63 @@ describe('Countdown', () => {
     expect(onEnd).toHaveBeenCalled()
   })
 
+  it('fires onEnd exactly once even long after the deadline', () => {
+    const onEnd = vi.fn()
+    render(<Countdown endsAt={new Date('2026-08-27T12:00:03Z')} onEnd={onEnd} />)
+
+    act(() => {
+      vi.advanceTimersByTime(10_000)
+    })
+
+    expect(onEnd).toHaveBeenCalledTimes(1)
+  })
+
+  it('fires onEnd again when a new deadline follows an extension', () => {
+    const onEnd = vi.fn()
+    const { rerender } = render(
+      <Countdown endsAt={new Date('2026-08-27T12:00:02Z')} onEnd={onEnd} />,
+    )
+
+    act(() => {
+      vi.advanceTimersByTime(5_000)
+    })
+    expect(onEnd).toHaveBeenCalledTimes(1)
+
+    rerender(<Countdown endsAt={new Date('2026-08-27T12:01:00Z')} onEnd={onEnd} />)
+    act(() => {
+      vi.advanceTimersByTime(61_000)
+    })
+
+    expect(onEnd).toHaveBeenCalledTimes(2)
+  })
+
+  it('derives remaining time from serverNow instead of the client clock', () => {
+    // System time is 12:00:00; the server anchor is 30s ahead of it, so the
+    // drifted client must still show 30 seconds remaining.
+    render(
+      <Countdown
+        endsAt={new Date('2026-08-27T12:01:00Z')}
+        serverNow={Date.parse('2026-08-27T12:00:30Z')}
+      />,
+    )
+    expect(screen.getByText(/0h 0m 30s/)).toBeDefined()
+  })
+
+  it('keeps ticking from the serverNow anchor after mount', () => {
+    render(
+      <Countdown
+        endsAt={new Date('2026-08-27T12:01:00Z')}
+        serverNow={Date.parse('2026-08-27T12:00:30Z')}
+      />,
+    )
+
+    act(() => {
+      vi.advanceTimersByTime(2000)
+    })
+
+    expect(screen.getByText(/0h 0m 28s/)).toBeDefined()
+  })
+
   it('does not show "Aega jäänud" label when showLabel is false', () => {
     const endsAt = new Date('2026-08-30T12:00:00Z')
     render(<Countdown endsAt={endsAt} showLabel={false} />)

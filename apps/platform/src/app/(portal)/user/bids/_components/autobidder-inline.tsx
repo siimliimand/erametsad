@@ -25,11 +25,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-// Gap (task 4.3 note): no GET exposes the caller's autobidder row, so this
-// editor starts blind and POST /api/v1/auto-bidders acts as an upsert; the
-// id from the first successful save enables PATCH/DELETE afterwards. A max
-// saved before this page opened is unknown until then, so the server 422
-// (minAllowed) remains the authority.
+// GET /api/v1/auto-bidders?auction= supplies the caller's own active row on
+// mount, so the editor prefills the stored max and enables PATCH/DELETE.
+// Without a row (204 or failed lookup) the editor starts blind and POST
+// /api/v1/auto-bidders acts as an upsert; the server 422 (minAllowed)
+// remains the authority.
 export function AutobidderInline({
   auctionId,
   minBidEur,
@@ -46,6 +46,31 @@ export function AutobidderInline({
   const minimumNext =
     currentLeadingEur !== null ? currentLeadingEur + step : minBidEur
   const [maxStr, setMaxStr] = useState(() => formatEurInput(minimumNext))
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/v1/auto-bidders?auction=${encodeURIComponent(auctionId)}`,
+          { signal: controller.signal },
+        )
+        if (response.status === 204) return
+        if (!response.ok) return
+        const payload: unknown = await response.json()
+        if (!isRecord(payload) || typeof payload.id !== 'string') return
+        if (typeof payload.max !== 'number') return
+        setSaved({ id: payload.id, maxAmountEur: payload.max })
+        setMaxStr(formatEurInput(payload.max))
+      } catch {
+        // Aborted or failed lookups leave the editor blind; POST still
+        // upserts and the endpoints stay the authority.
+      }
+    })()
+    return () => {
+      controller.abort()
+    }
+  }, [auctionId])
 
   useEffect(() => {
     if (saved === null) {

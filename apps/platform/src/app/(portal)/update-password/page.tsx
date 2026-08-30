@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { PasswordForm } from '../_components/PasswordForm'
 
 import { requirePortalSession } from '@/app/(portal)/_lib/session'
+import { getRepositories } from '@/lib/data/runtime'
 
 interface UpdatePasswordPageProps {
   searchParams: Promise<{ first?: string | string[] }>
@@ -27,9 +28,14 @@ export async function generateMetadata({
 export default async function UpdatePasswordPage({
   searchParams,
 }: UpdatePasswordPageProps) {
-  await requirePortalSession('/update-password')
+  const { session } = await requirePortalSession('/update-password')
   const first = isFirstPassword(await searchParams)
   const heading = first ? 'Määra parool' : 'Muuda parool'
+
+  // Unguarded like the change-password route: the users collection is
+  // admin-only under the guard, but a viewer may always read their own record.
+  const repos = await getRepositories()
+  const user = await repos.findByID({ collection: 'users', id: session.userId })
 
   return (
     <div className="mx-auto w-full max-w-container-sm">
@@ -44,14 +50,7 @@ export default async function UpdatePasswordPage({
         <div className="mt-md">
           <PasswordForm
             endpoint="/api/v1/auth/change-password"
-            buildBody={
-              first
-                ? ({ newPassword }) => ({ newPassword })
-                : ({ currentPassword, newPassword }) => ({
-                    oldPassword: currentPassword,
-                    newPassword,
-                  })
-            }
+            isikukood={user?.isikukood ?? null}
             withCurrentPassword={!first}
             submitLabel={heading}
             fallbackError="Parooli muutmine ei õnnestunud. Proovi uuesti."

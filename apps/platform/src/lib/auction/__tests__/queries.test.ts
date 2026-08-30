@@ -8,12 +8,15 @@ import {
 } from '../../data/repositories'
 import { setD1ForTests } from '../../db'
 import {
+  ARCHIVE_SORT_OPTIONS,
   AuctionQueryError,
   DEFAULT_AUCTION_LIST_LIMIT,
+  archivedStatsByObjectType,
   getAuctionBids,
   getAuctionDossier,
   listAuctionMapPoints,
   listAuctions,
+  listArchivedAuctions,
   parseAuctionSearchParams,
   type AuctionViewer,
 } from '../queries'
@@ -270,6 +273,98 @@ describe('listAuctionMapPoints', () => {
 function isIsoDateTime(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)
 }
+
+describe('listArchivedAuctions sorts', () => {
+  beforeEach(async () => {
+    await seedUser('seller-1')
+    await seedAuction('arch-a', {
+      status: 'ended',
+      minBidCents: 20_000,
+      finalPriceCents: 30_000,
+      endsAt: '2026-09-01T00:00:00.000Z',
+      endYear: 2026,
+    })
+    await seedAuction('arch-b', {
+      status: 'archived',
+      minBidCents: 50_000,
+      finalPriceCents: 90_000,
+      endsAt: '2026-09-05T00:00:00.000Z',
+      endYear: 2025,
+    })
+  })
+
+  it('offers all six archive sort combinations', () => {
+    expect(ARCHIVE_SORT_OPTIONS.map((option) => `${option.field}:${option.direction}`)).toEqual([
+      'endPrice:desc',
+      'endPrice:asc',
+      'endTime:desc',
+      'endTime:asc',
+      'startPrice:desc',
+      'startPrice:asc',
+    ])
+  })
+
+  it('defaults to endPrice descending', async () => {
+    const result = await listArchivedAuctions(repos, new URLSearchParams(''))
+    expect(result.auctions.map((a) => a.id)).toEqual(['arch-b', 'arch-a'])
+  })
+
+  it('sorts by endTime ascending', async () => {
+    const result = await listArchivedAuctions(
+      repos,
+      new URLSearchParams('sort=endTime&order=asc'),
+    )
+    expect(result.auctions.map((a) => a.id)).toEqual(['arch-a', 'arch-b'])
+  })
+
+  it('sorts by startPrice ascending', async () => {
+    const result = await listArchivedAuctions(
+      repos,
+      new URLSearchParams('sort=startPrice&order=asc'),
+    )
+    expect(result.auctions.map((a) => a.id)).toEqual(['arch-a', 'arch-b'])
+  })
+})
+
+describe('archivedStatsByObjectType', () => {
+  it('aggregates count, area, volume and final-price sums per type', async () => {
+    await seedUser('seller-1')
+    await seedAuction('arch-a', {
+      status: 'ended',
+      finalPriceCents: 30_000,
+      endYear: 2026,
+      packageRows: [{ area: 10, volume: 500 }],
+    })
+    await seedAuction('arch-b', {
+      status: 'archived',
+      finalPriceCents: 90_000,
+      endYear: 2025,
+      packageRows: [{ area: 5.5, volume: 250 }],
+    })
+    await seedAuction('arch-unsold', {
+      status: 'unsold',
+      objectType: 'kinnistu',
+      finalPriceCents: null,
+      endYear: 2025,
+    })
+
+    const stats = await archivedStatsByObjectType(repos)
+    expect(stats.raieoigus).toEqual({
+      count: 2,
+      areaHa: 15.5,
+      volumeM3: 750,
+      finalPriceEur: 1200,
+      endYears: [2026, 2025],
+    })
+    expect(stats.kinnistu).toEqual({
+      count: 1,
+      areaHa: 0,
+      volumeM3: 0,
+      finalPriceEur: 0,
+      endYears: [2025],
+    })
+  })
+})
 
 describe('getAuctionBids role shaping', () => {
   beforeEach(async () => {

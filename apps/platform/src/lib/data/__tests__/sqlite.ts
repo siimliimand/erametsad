@@ -19,7 +19,8 @@ export interface SqliteTestDb {
   database: CoreDatabase
   /** Raw better-sqlite3 handle for direct SQL assertions and seeding. */
   raw: Database.Database
-  /** D1-shaped adapter for the raw executor (`db.query` in src/lib/db.ts). */
+  /** D1-shaped adapter for the raw executor (`db.query` in src/lib/db.ts)
+   *  and for the drizzle D1 driver (raw/run for RETURNING statements). */
   d1: DbDatabase
   close(): void
 }
@@ -68,7 +69,7 @@ function sqliteD1(raw: Database.Database): DbDatabase {
   const prepare = (sqlText: string): DbPreparedStatement => {
     const statement = raw.prepare(sqlText)
     let params: SqlParam[] = []
-    const bound: DbPreparedStatement = {
+    const bound = {
       bind(...values: SqlParam[]) {
         params = values
         return bound
@@ -81,6 +82,18 @@ function sqliteD1(raw: Database.Database): DbDatabase {
             meta: {},
           })
         }
+        const run = statement.run(...(params as never[]))
+        return Promise.resolve({ results: [], success: true, meta: { changes: run.changes } })
+      },
+      // Drizzle's D1 driver calls raw() for RETURNING queries and run() for
+      // mutations; re-prepare for raw mode so the shared statement's row
+      // shape is never mutated.
+      raw<T = unknown>(): Promise<T[]> {
+        return Promise.resolve(
+          raw.prepare(sqlText).raw().all(...(params as never[])) as T[],
+        )
+      },
+      run<T = unknown>(): Promise<DbResult<T>> {
         const run = statement.run(...(params as never[]))
         return Promise.resolve({ results: [], success: true, meta: { changes: run.changes } })
       },

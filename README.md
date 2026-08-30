@@ -97,3 +97,17 @@ docker compose down -v && docker compose up -d
 The Payload admin panel is at `http://localhost:3000/admin`. In development,
 create a user through the registration flow or seed script (see Payload
 foundation spec for seed data details).
+
+## Demo eID login
+
+Without aggregator credentials (`EIDEASY_CLIENT_ID` and `EIDEASY_SECRET`), the
+login page uses a demo eID simulator instead of the eID Easy service. The
+simulator accepts the isikukood of any seeded user, for example `10000000002`
+(see `apps/platform/src/lib/data/seed/users.ts`).
+
+Start a session, then poll until it completes. The simulator completes on the
+second poll, so accept the control code twice.
+
+`EID_DEMO_ISIKUKOOD` holds a comma-separated list of extra demo identities.
+These work even on an empty database, before you run the seed script.
+Defaults: `38803160272`, `47012130215`, `60001010205`.

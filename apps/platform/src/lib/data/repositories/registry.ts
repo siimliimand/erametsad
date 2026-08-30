@@ -142,6 +142,7 @@ export const auctionsJsonFields = {
 } as const satisfies JsonFieldSpec
 
 export const contractTemplatesJsonFields = { placeholders: 'array' } as const satisfies JsonFieldSpec
+export const profilesJsonFields = { notificationPreferences: 'json' } as const satisfies JsonFieldSpec
 export const notificationsJsonFields = {
   payload: 'json',
   sendResult: 'json',
@@ -168,6 +169,7 @@ type CreateData<T, J extends JsonFieldSpec = Record<string, never>> = Omit<
   Partial<Record<keyof J & string, unknown>>
 
 export type UserDoc = User & { isikukood?: string | undefined }
+export type ProfileDoc = JsonDoc<Profile, typeof profilesJsonFields>
 export type AuctionDoc = JsonDoc<Auction, typeof auctionsJsonFields>
 export type ContractTemplateDoc = JsonDoc<ContractTemplate, typeof contractTemplatesJsonFields>
 export type NotificationDoc = JsonDoc<NotificationRow, typeof notificationsJsonFields>
@@ -196,7 +198,7 @@ export type StatisticsSnapshotCreateData = Omit<CreateData<NewStatisticsSnapshot
 
 export interface CoreCollectionDocs {
   users: UserDoc
-  profile: Profile
+  profile: ProfileDoc
   'company-access-request': CompanyAccessRequest
   'rights-request': RightsRequest
   'auction-rights': AuctionRight
@@ -214,7 +216,7 @@ export interface CoreCollectionDocs {
 
 export interface CoreCollectionCreates {
   users: UserCreateData
-  profile: CreateData<NewProfile>
+  profile: CreateData<NewProfile, typeof profilesJsonFields>
   'company-access-request': CreateData<NewCompanyAccessRequest>
   'rights-request': CreateData<NewRightsRequest>
   'auction-rights': CreateData<NewAuctionRight>
@@ -293,7 +295,7 @@ export const coreCollections: Readonly<Record<CoreCollectionSlug, RepositoryColl
   profile: {
     table: profiles,
     aliases: { user: 'userId' },
-    jsonFields: {},
+    jsonFields: profilesJsonFields,
     isikukood: false,
     templateActivation: false,
   },

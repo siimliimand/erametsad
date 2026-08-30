@@ -9,31 +9,48 @@ driving the demo simulator endpoints (`start`/`status`/`complete`), plus an
 isikukood + password fallback form. The page SHALL honor `?next=` with
 same-origin validation and redirect to `/select-profile?next=` when the
 user has multiple profiles. eID pending state SHALL show the control code
-with cancel; expired and rejected states SHALL offer restart.
+with cancel; expired and rejected states SHALL offer restart. The demo
+provider SHALL accept any seeded isikukood, and a suspended account SHALL
+produce a distinguishable response that renders the "Sinu konto on
+peatatud" banner instead of the neutral error.
 
-#### Scenario: Smart-ID login completes
-- **WHEN** the user picks Smart-ID, enters a demo isikukood, and confirms
-  in the simulator
+#### Scenario: Seeded user completes demo login
+- **WHEN** the user enters a seeded isikukood and confirms in the
+  simulator
 - **THEN** polling observes `completed`, the session cookie is set, and
   the browser redirects to `next`
+
+#### Scenario: Suspended account banner
+- **WHEN** a suspended user logs in by password or eID
+- **THEN** the page shows "Sinu konto on peatatud" contact banner instead
+  of entering the portal
 
 #### Scenario: Wrong password yields neutral error
 - **WHEN** the fallback form is submitted with wrong credentials
 - **THEN** the error copy does not reveal which field was wrong
 
-#### Scenario: Suspended account banner
-- **WHEN** a suspended user logs in
-- **THEN** the page shows "Sinu konto on peatatud" contact banner instead
-  of entering the portal
-
 ### Requirement: Registration wizard
 `/register` SHALL implement 4 steps: eID identify (or email + isikukood
-token fallback), profile type (Eraisik, or Ettevõte with 8-digit
-registrikood lookup), contact data with 3 consent checkboxes
-(2 required, timestamps stored), and a done screen. A company already
-registered SHALL route to the access-request dead-end pending screen.
-Existing eID accounts SHALL short-circuit to login. `next` SHALL survive
-the whole flow.
+fallback), profile type (Eraisik, or Ettevõte with 8-digit registrikood
+lookup), contact data (name, phone, address) with 3 consent checkboxes
+(2 required, timestamps stored), and a done screen. The wizard SHALL
+submit the isikukood and the server SHALL validate its checksum and store
+it hashed, so password login by isikukood and future eID matching work.
+Registration SHALL issue a session. The done screen SHALL link to
+`/update-password?first=1` and to `/lepingud/raamleping`. A company
+already registered SHALL route to the access-request dead-end pending
+screen. Existing eID accounts SHALL short-circuit to login. `next` SHALL
+survive the whole flow.
+
+#### Scenario: Isikukood stored at registration
+- **WHEN** a user registers with isikukood 47001010002
+- **THEN** the stored account logs in later by that isikukood and
+  password
+
+#### Scenario: Done screen leads to first password
+- **WHEN** the wizard reaches the done screen
+- **THEN** the password link opens the first-set form without asking for
+  a current password
 
 #### Scenario: Company access request dead-end
 - **WHEN** the entered registrikood matches an already-registered company
@@ -58,16 +75,29 @@ switch the session's active profile and redirect to `next`.
 
 ### Requirement: Password pages
 The password pages SHALL enforce the password rules: minimum 10 characters,
-one uppercase, one number, one symbol, not equal to the isikukood.
-`/update-password` covers the authed change and the eID-user first-password
-set, `/reset-password` uses neutral request copy with no account
-enumeration, and `/reset-password/:token` handles the valid, used, expired,
-and invalid token states. A live strength meter SHALL gate submit
+one uppercase, one number, one symbol, not equal to the isikukood. The
+server SHALL enforce all rules on change and reset, not only the client
+meter. `/update-password` covers the authed change and the eID-user
+first-password set, `/reset-password` uses neutral request copy with no
+account enumeration, and `/reset-password/:token` handles the valid, used,
+expired, and invalid token states. Reset links SHALL point at
+`/reset-password/:token` and tokens SHALL persist in the database with a
+2-hour expiry and single use. A live strength meter SHALL gate submit
 until at least "Kesine". Successful reset SHALL revoke all other sessions.
+
+#### Scenario: Reset email link resolves
+- **WHEN** the reset email is generated
+- **THEN** its link opens `/reset-password/:token`, an existing route
+
+#### Scenario: Server rejects weak password
+- **WHEN** a password passing the client meter but failing a server rule
+  reaches the API
+- **THEN** the API rejects it with the specific rule error
 
 #### Scenario: Reset token expired
 - **WHEN** the user opens a reset link older than 2 hours
-- **THEN** the page shows the expired state with a link to request a new one
+- **THEN** the page shows the expired state with a link to request a new
+  one
 
 #### Scenario: Reset revokes other sessions
 - **WHEN** a reset completes

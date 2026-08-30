@@ -53,6 +53,7 @@ export const auctions = sqliteTable(
     vatIncluded: integer('vat_included', { mode: 'boolean' }).notNull().default(true),
     descriptionPublic: text('description_public'),
     descriptionInternal: text('description_internal'),
+    descriptionSecondary: text('description_secondary'),
     aliasEmail: text('alias_email'),
     media: text('media'),
     files: text('files'),

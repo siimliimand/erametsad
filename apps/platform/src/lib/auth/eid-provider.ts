@@ -75,15 +75,48 @@ function buildDemoUsers(): Record<string, Record<string, unknown>> {
   return users
 }
 
+// Same lookup completeEidLogin performs: a demo session may start for any
+// isikukood that hashes to an existing user. Errors degrade to "not found"
+// so the simulator still works where the database is unavailable (unit
+// tests, empty local environments).
+async function findUserByIsikukoodHash(
+  isikukood: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const repos = await getRepositories()
+    const result = await repos.find({
+      collection: 'users',
+      where: { isikukoodHash: { equals: hash(isikukood) } },
+      limit: 1,
+    })
+    return (result.docs[0] as Record<string, unknown> | undefined) ?? null
+  } catch {
+    return null
+  }
+}
+
+function toSessionUser(doc: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: String(doc.id),
+    email: doc.email,
+    name: doc.name,
+    role: doc.role,
+  }
+}
+
 export class DemoEidProvider implements EidProvider {
   private sessions = new Map<string, EidSession>()
 
-  start(
+  async start(
     isikukood: string,
   ): Promise<{ sessionRef: string; controlCode?: string }> {
-    const user = buildDemoUsers()[isikukood]
+    const demoUser = buildDemoUsers()[isikukood]
+    const seededUser = demoUser
+      ? null
+      : await findUserByIsikukoodHash(isikukood)
+    const user = demoUser ?? (seededUser ? toSessionUser(seededUser) : null)
     if (!user) {
-      return Promise.reject(new Error('Unknown isikukood'))
+      throw new Error('Unknown isikukood')
     }
 
     const sessionRef = crypto.randomUUID()
@@ -98,7 +131,7 @@ export class DemoEidProvider implements EidProvider {
       pollCount: 0,
     })
 
-    return Promise.resolve({ sessionRef, controlCode })
+    return { sessionRef, controlCode }
   }
 
   status(
@@ -297,8 +330,17 @@ export async function completeEidLogin(
   })
   const user = (result.docs[0] as Record<string, unknown> | undefined) ?? null
 
-  if (!user || user.status === 'suspended') {
+  if (!user) {
     return NextResponse.json({ error: 'Authentication failed' }, { status: 401 })
+  }
+
+  // Distinguishable from the generic 401 so the login page can render
+  // SuspendedBanner (the client checks for this exact code).
+  if (user.status === 'suspended') {
+    return NextResponse.json(
+      { error: 'Authentication failed', code: 'ACCOUNT_SUSPENDED' },
+      { status: 401 },
+    )
   }
 
   const role = getUserRole(user.role as string | undefined)

@@ -1,10 +1,16 @@
 'use client'
 
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 
 export interface CountdownProps {
   endsAt: string | Date
   onEnd?: () => void
+  /**
+   * Epoch ms captured during SSR. When present, the tick computes
+   * `serverNow + (Date.now() - mountTime)` instead of `Date.now()`, so a
+   * drifted client clock cannot skew the countdown.
+   */
+  serverNow?: number
   showLabel?: boolean
   size?: 'sm' | 'md' | 'lg'
   className?: string
@@ -16,8 +22,8 @@ const sizeClasses = {
   lg: 'text-lg',
 } as const
 
-function calcRemaining(endsAt: number) {
-  const total = endsAt - Date.now()
+function calcRemaining(endsAt: number, nowMs: number) {
+  const total = endsAt - nowMs
   if (total <= 0) return { total: 0, days: 0, hours: 0, minutes: 0, seconds: 0 }
   const s = Math.floor(total / 1000)
   return {
@@ -32,6 +38,7 @@ function calcRemaining(endsAt: number) {
 export function Countdown({
   endsAt,
   onEnd,
+  serverNow,
   showLabel = true,
   size = 'md',
   className,
@@ -41,26 +48,43 @@ export function Countdown({
     [endsAt],
   )
 
-  const initial = useMemo(() => calcRemaining(endMs), [endMs])
-  const [remaining, setRemaining] = useState(initial)
+  // Frozen at first render; hydration keeps the server value, so the
+  // elapsed offset measures real time even on a drifted client clock.
+  const [mountTime] = useState(() => Date.now())
+  const nowMs = useCallback(
+    () =>
+      serverNow === undefined
+        ? Date.now()
+        : serverNow + (Date.now() - mountTime),
+    [serverNow, mountTime],
+  )
+
+  const [remaining, setRemaining] = useState(() => calcRemaining(endMs, nowMs()))
   const onEndRef = useRef(onEnd)
   onEndRef.current = onEnd
+  const firedRef = useRef(false)
 
   useEffect(() => {
-    setRemaining(calcRemaining(endMs))
+    const now = nowMs()
+    setRemaining(calcRemaining(endMs, now))
+    // A new deadline may arrive after a previous zero (anti-snipe
+    // extension), so the once-only guard resets per deadline.
+    firedRef.current = false
 
-    if (endMs <= Date.now()) return
+    if (endMs <= now) return
 
     const id = setInterval(() => {
-      const r = calcRemaining(endMs)
+      const r = calcRemaining(endMs, nowMs())
       setRemaining(r)
-      if (r.total <= 0) {
+      if (r.total <= 0 && !firedRef.current) {
+        firedRef.current = true
+        clearInterval(id)
         onEndRef.current?.()
       }
     }, 1000)
 
     return () => clearInterval(id)
-  }, [endMs])
+  }, [endMs, nowMs])
 
   const isEnded = remaining.total <= 0
 

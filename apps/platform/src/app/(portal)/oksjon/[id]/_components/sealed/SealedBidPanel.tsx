@@ -7,9 +7,13 @@ import { useState, type SyntheticEvent } from 'react'
 
 import {
   SealedIdentityForm,
+  identityAddressErrorMessage,
   identityCodeErrorMessage,
+  identityEmailErrorMessage,
   identityNameErrorMessage,
+  identityPhoneErrorMessage,
   sealedIdentitySnapshot,
+  validateEmail,
   validateIdentityCode,
   type SealedIdentityErrors,
   type SealedIdentityValues,
@@ -34,6 +38,10 @@ export interface SealedViewerSnapshot {
   /** Decoded own isikukood for prefill; `null` when unknown. */
   isikukood: string | null
   registrikood: string | null
+  /** Profile contact fields for prefill; optional until the server snapshot supplies them. */
+  address?: string | null
+  email?: string | null
+  phone?: string | null
   /** Settings.sealedRevisionCap: allowed revisions on top of the original bid. */
   revisionCap: number
   /** Viewer's non-rejected sealed bids on this auction. */
@@ -61,6 +69,8 @@ export interface SealedBidPanelProps {
 interface SealedSubmitOutcome {
   ok: boolean
   message: string | null
+  /** True when the API rejected the revision because the cap is exhausted. */
+  capExceeded?: boolean
 }
 
 // ── Formatting / parsing (mirrors BidPanel conventions) ─────────────────
@@ -134,6 +144,16 @@ async function submitSealedBidViaApi(input: {
 
   const message =
     isRecord(payload) && typeof payload.error === 'string' ? payload.error : ''
+  const code =
+    isRecord(payload) && typeof payload.code === 'string' ? payload.code : ''
+  if (code === 'revision_cap_exceeded') {
+    return {
+      ok: false,
+      capExceeded: true,
+      message:
+        'Täienduspakkumiste limiit on täis. Rohkem muudatusi ei ole võimalik teha.',
+    }
+  }
   if (response.status === 401) {
     return { ok: false, message: 'Sessioon on aegunud. Logi uuesti sisse.' }
   }
@@ -180,8 +200,17 @@ export function SealedBidPanel({
     code: viewer?.profileType === 'company'
       ? (viewer.registrikood ?? '')
       : (viewer?.isikukood ?? ''),
+    address: viewer?.address ?? '',
+    email: viewer?.email ?? '',
+    phone: viewer?.phone ?? '',
   })
-  const [errors, setErrors] = useState<SealedIdentityErrors>({ name: null, code: null })
+  const [errors, setErrors] = useState<SealedIdentityErrors>({
+    name: null,
+    code: null,
+    address: null,
+    email: null,
+    phone: null,
+  })
   const [amountError, setAmountError] = useState<string | null>(null)
   const [modalAmount, setModalAmount] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -196,6 +225,9 @@ export function SealedBidPanel({
       : null,
   )
   const [revising, setRevising] = useState(false)
+  // Set when the API answers `revision_cap_exceeded`: the form locks for the
+  // rest of the session because no further revision can be accepted.
+  const [isCapLocked, setIsCapLocked] = useState(false)
 
   const isUnsold = status === 'unsold'
   const isEnded = ENDED_STATUSES.includes(status)
@@ -208,12 +240,28 @@ export function SealedBidPanel({
 
   function openConfirm(event: SyntheticEvent): void {
     event.preventDefault()
-    const nextErrors: SealedIdentityErrors = { name: null, code: null }
+    if (isCapLocked) return
+    const nextErrors: SealedIdentityErrors = {
+      name: null,
+      code: null,
+      address: null,
+      email: null,
+      phone: null,
+    }
     if (viewer !== null && identity.name.trim() === '') {
       nextErrors.name = identityNameErrorMessage(viewer.profileType)
     }
     if (viewer !== null && !validateIdentityCode(viewer.profileType, identity.code.trim())) {
       nextErrors.code = identityCodeErrorMessage(viewer.profileType)
+    }
+    if (viewer !== null && identity.address.trim() === '') {
+      nextErrors.address = identityAddressErrorMessage()
+    }
+    if (viewer !== null && !validateEmail(identity.email.trim())) {
+      nextErrors.email = identityEmailErrorMessage()
+    }
+    if (viewer !== null && identity.phone.trim() === '') {
+      nextErrors.phone = identityPhoneErrorMessage()
     }
     setErrors(nextErrors)
 
@@ -226,7 +274,15 @@ export function SealedBidPanel({
       setAmountError(`Pakkumine peab olema vähemalt ${inputAmount(minBid)} €.`)
       return
     }
-    if (nextErrors.name !== null || nextErrors.code !== null) return
+    if (
+      nextErrors.name !== null ||
+      nextErrors.code !== null ||
+      nextErrors.address !== null ||
+      nextErrors.email !== null ||
+      nextErrors.phone !== null
+    ) {
+      return
+    }
     // No API call here: the fetch happens only when the modal confirms.
     setModalAmount(amount)
   }
@@ -240,11 +296,17 @@ export function SealedBidPanel({
       identitySnapshot: sealedIdentitySnapshot(viewer.profileType, {
         name: identity.name.trim(),
         code: identity.code.trim(),
+        address: identity.address.trim(),
+        email: identity.email.trim(),
+        phone: identity.phone.trim(),
       }),
     })
     setIsSubmitting(false)
     setModalAmount(null)
     if (!outcome.ok) {
+      // Keep `revising` as-is so the locked form stays visible with the cap
+      // message; switching to the submitted card would hide it.
+      if (outcome.capExceeded === true) setIsCapLocked(true)
       setAmountError(outcome.message)
       return
     }
@@ -466,12 +528,13 @@ export function SealedBidPanel({
           inputMode="decimal"
           autoComplete="off"
           value={amountStr}
+          disabled={isCapLocked}
           onChange={(event) => {
             setAmountStr(event.target.value)
             setAmountError(null)
           }}
           aria-invalid={amountError !== null}
-          className="h-12 w-full rounded-input border border-border bg-bgPage px-4 text-body text-ink outline-none transition-colors aria-[invalid=true]:border-danger focus:border-primary focus:ring-2 focus:ring-primary/20"
+          className="h-12 w-full rounded-input border border-border bg-bgPage px-4 text-body text-ink outline-none transition-colors aria-[invalid=true]:border-danger focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-bgMist disabled:text-inkMuted"
         />
         <p className="text-bodySm text-inkMuted">
           Vähim lubatud pakkumine: {inputAmount(minBid)} €
@@ -482,6 +545,7 @@ export function SealedBidPanel({
           values={identity}
           onChange={setIdentity}
           errors={errors}
+          disabled={isCapLocked}
         />
 
         {amountError !== null && (
@@ -490,16 +554,22 @@ export function SealedBidPanel({
           </p>
         )}
 
-        <Btn type="submit" isLoading={isSubmitting}>
+        <Btn type="submit" isLoading={isSubmitting} disabled={isCapLocked}>
           {participant ? 'Esita täienduspakkumine' : 'Esita pakkumine'}
         </Btn>
-        {participant && (
+        {participant && !isCapLocked && (
           <button
             type="button"
             className="text-bodySm font-semibold text-primary hover:text-primaryHover"
             onClick={() => {
               setRevising(false)
-              setErrors({ name: null, code: null })
+              setErrors({
+                name: null,
+                code: null,
+                address: null,
+                email: null,
+                phone: null,
+              })
               setAmountError(null)
             }}
           >

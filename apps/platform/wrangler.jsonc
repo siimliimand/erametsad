@@ -11,6 +11,14 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Host routing (design D7, change fix-phase-3-auction-portal): the portal
+  // hostname oksjonid.erametsad.ww0.dev maps to the (portal) route group in
+  // src/middleware.ts on this same Worker — no extra Worker exists for it.
+  // Attaching that hostname is a one-time dashboard step (Workers & Pages →
+  // eametsad-api → Settings → Domains & Routes → Add custom domain); see
+  // docs/runbooks/cutover-cloudflare-only.md §4. The api. and admin.
+  // hostnames are a documented follow-up: the middleware mapping table
+  // no-ops on them until their areas join the table.
   // wrangler 4 rejects the legacy top-level "bindings" array (it silently
   // drops those bindings), so producers sit next to the consumer config and
   // KV/R2 use their canonical sections.

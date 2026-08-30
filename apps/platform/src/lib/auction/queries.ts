@@ -613,6 +613,10 @@ export const ARCHIVED_AUCTION_STATUSES: readonly AuctionStatus[] = auctionStatus
 
 export interface ArchivedAuctionTypeStats {
   count: number
+  areaHa: number
+  volumeM3: number
+  /** Sum of published final prices in euros; unsold lots add nothing. */
+  finalPriceEur: number
   /** End years with archive data, newest first; feeds the filter chips. */
   endYears: number[]
 }
@@ -627,11 +631,18 @@ export async function archivedStatsByObjectType(
     sort: 'id',
   })
   const stats = Object.fromEntries(
-    auctionObjectTypes.map((objectType) => [objectType, { count: 0, endYears: [] as number[] }]),
+    auctionObjectTypes.map((objectType) => [
+      objectType,
+      { count: 0, areaHa: 0, volumeM3: 0, finalPriceEur: 0, endYears: [] as number[] },
+    ]),
   ) as Record<AuctionObjectType, ArchivedAuctionTypeStats>
   for (const doc of docs) {
+    const totals = packageTotals(doc.packageRows)
     const bucket = stats[doc.objectType]
     bucket.count += 1
+    bucket.areaHa += totals.area ?? 0
+    bucket.volumeM3 += totals.volume ?? 0
+    if (doc.finalPriceCents !== null) bucket.finalPriceEur += centsToEuros(doc.finalPriceCents)
     if (doc.endYear !== null && !bucket.endYears.includes(doc.endYear)) {
       bucket.endYears.push(doc.endYear)
     }
@@ -639,6 +650,22 @@ export async function archivedStatsByObjectType(
   for (const bucket of Object.values(stats)) bucket.endYears.sort((a, b) => b - a)
   return stats
 }
+
+export interface ArchiveSortOption {
+  field: AuctionSortField
+  direction: AuctionSortDirection
+  label: string
+}
+
+/** The six archive sort chips in render order; /ajalugu maps them 1:1. */
+export const ARCHIVE_SORT_OPTIONS: readonly ArchiveSortOption[] = [
+  { field: 'endPrice', direction: 'desc', label: 'Lõpphind: kõrgem enne' },
+  { field: 'endPrice', direction: 'asc', label: 'Lõpphind: madalam enne' },
+  { field: 'endTime', direction: 'desc', label: 'Lõpuaeg: uuem enne' },
+  { field: 'endTime', direction: 'asc', label: 'Lõpuaeg: vanem enne' },
+  { field: 'startPrice', direction: 'desc', label: 'Alghind: kõrgem enne' },
+  { field: 'startPrice', direction: 'asc', label: 'Alghind: madalam enne' },
+]
 
 function archivedEndYearTokens(params: URLSearchParams): number[] {
   const years: number[] = []
@@ -827,6 +854,8 @@ export interface AuctionContact {
     name: string
     phone: string | null
     email: string | null
+    role: string | null
+    photo: string | null
   } | null
 }
 
@@ -869,6 +898,7 @@ export interface AuctionDossier extends AuctionSummary {
   packageRows: unknown[]
   packageColumns: string[]
   descriptionPublic: string | null
+  descriptionSecondary: string | null
   files: unknown[]
   media: unknown[]
   contact: AuctionContact
@@ -896,6 +926,11 @@ async function auctionContact(
       name: specialist.name,
       phone: specialist.phone,
       email: specialist.email,
+      role: specialist.role,
+      photo:
+        specialist.photoId === null
+          ? null
+          : `/api/v1/media/${specialist.photoId}`,
     },
   }
 }
@@ -966,6 +1001,7 @@ export async function getAuctionDossier(
     packageRows: Array.isArray(doc.packageRows) ? doc.packageRows : [],
     packageColumns: packageColumnLabels(doc.packageColumns),
     descriptionPublic: doc.descriptionPublic,
+    descriptionSecondary: doc.descriptionSecondary,
     files: Array.isArray(doc.files) ? doc.files : [],
     media: Array.isArray(doc.media) ? doc.media : [],
     contact,

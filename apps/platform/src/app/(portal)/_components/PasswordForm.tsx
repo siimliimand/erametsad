@@ -12,11 +12,6 @@ import {
 const NETWORK_ERROR = 'Võrguühendus ei ole saadaval. Proovi uuesti.'
 const DEFAULT_FALLBACK_ERROR = 'Parooli salvestamine ei õnnestunud. Proovi uuesti.'
 
-export interface PasswordFormFields {
-  currentPassword: string
-  newPassword: string
-}
-
 async function readBody(response: Response): Promise<Record<string, unknown> | null> {
   try {
     const body: unknown = await response.json()
@@ -39,8 +34,11 @@ function bodyText(
 
 interface PasswordFormProps {
   endpoint: string
-  /** Defaults to `{ password }`; change-password passes oldPassword/newPassword. */
-  buildBody?: (fields: PasswordFormFields) => Record<string, unknown>
+  /**
+   * Reset-flow token: the body becomes `{ token, password }`. Omit for the
+   * change-password endpoint, which receives oldPassword/newPassword.
+   */
+  resetToken?: string
   withCurrentPassword?: boolean
   currentPasswordLabel?: string
   newPasswordLabel?: string
@@ -59,7 +57,7 @@ interface PasswordFormProps {
 
 export function PasswordForm({
   endpoint,
-  buildBody,
+  resetToken,
   withCurrentPassword = false,
   currentPasswordLabel = 'Praegune parool',
   newPasswordLabel = 'Uus parool',
@@ -86,9 +84,13 @@ export function PasswordForm({
     if (!canSubmit) return
     setError(null)
     setBusy(true)
-    const body = buildBody
-      ? buildBody({ currentPassword, newPassword })
-      : { password: newPassword }
+    // Built client-side so no function crosses the server/client boundary.
+    const body =
+      resetToken !== undefined
+        ? { token: resetToken, password: newPassword }
+        : withCurrentPassword
+          ? { oldPassword: currentPassword, newPassword }
+          : { newPassword }
     let message: string | null = null
     try {
       const response = await fetch(endpoint, {

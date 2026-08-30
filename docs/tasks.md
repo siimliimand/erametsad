@@ -256,56 +256,58 @@ Source: plan §5 (functional spec), §8 (data model), §9 (API surface), §6 (au
 
 Specs: [design/portal/](design/). Route prefix `/` of the portal area in the prototype.
 
+**Deferrals (accepted in writing):** Register email-token verification (double opt-in) — deferred by user decision; the wizard's eID identify path works. CSV exports in Minu pakkumised **[S]** — deferred with the earlier archived phase-3 change, not reopened. Digest jobs, GDPR export/delete jobs, Web Push, TOTP 2FA — remain **[L]**. Host routing covers only `oksjonid.erametsad.ww0.dev`; `api.erametsad.ww0.dev` / `admin.erametsad.ww0.dev` stay an extension point documented in the middleware mapping table. Register address is collected but not persisted (profiles table has no address column yet — needs a migration). Guest subscription email rides inside `filterJson` (`guestEmail`) — the auction-subscriptions API has no dedicated guest-email field yet. SMS notification toggles are display-only until verified phone numbers exist. Minu müügid stats mini-chart **[S]** — not delivered.
+
 ### 3.1 Shells
-- [ ] Public portal header (tabs → listing, Ajalugu, login/register or profile chip) **[M]**
-- [ ] Logged-in **Portal Shell** per [09-user-bids.md](design/portal/09-user-bids.md): ShellHeader (search, bell w/ unread badge, profile chip), collapsible sidebar, mobile bottom tab bar, breadcrumbs; mounts `/api/my/stream` **[M]**
+- [x] Public portal header (tabs → listing, Ajalugu, login/register or profile chip) **[M]**
+- [x] Logged-in **Portal Shell** per [09-user-bids.md](design/portal/09-user-bids.md): ShellHeader (search, bell w/ unread badge, profile chip), collapsible sidebar, mobile bottom tab bar, breadcrumbs; mounts `/api/my/stream` **[M]**
 
 ### 3.2 Listing — [01-listing.md](design/portal/01-listing.md)
-- [ ] Type tabs with counters + summary sentence ("Hetkel on aktiivseid … N, kokku X ha … Y m³ ja Z € väärtuses") **[M]**
-- [ ] Grid ↔ `MapEstonia` view toggle; pin popups (area/price/registry nr/end) **[M]**
-- [ ] `FilterPanel` wired to URL params: maakond→vald cascade, puuliigid, raieliigid, pindala/mahu vahemik, hind; "Tühjenda" + active-count **[M]**
-- [ ] Sorting (alghind/lõpphind asc-desc, varem/hiljem lõppevad) + server-side pagination **[M]**
-- [ ] "Telli teavitus" saved-search subscription (email + consent, frequency) **[S]**
-- [ ] SSE wiring: published-lot prepend, extension updates, ended-state flip **[M]**
+- [x] Type tabs with counters + summary sentence ("Hetkel on aktiivseid … N, kokku X ha … Y m³ ja Z € väärtuses") **[M]**
+- [x] Grid ↔ `MapEstonia` view toggle; pin popups (area/price/registry nr/end) **[M]**
+- [x] `FilterPanel` wired to URL params: maakond→vald cascade, puuliigid, raieliigid, pindala/mahu vahemik, hind; "Tühjenda" + active-count **[M]**
+- [x] Sorting (alghind/lõpphind asc-desc, varem/hiljem lõppevad) + server-side pagination **[M]**
+- [x] "Telli teavitus" saved-search subscription (email + consent, frequency) **[S]**
+- [x] SSE wiring: published-lot prepend, extension updates, ended-state flip **[M]**
 
 ### 3.3 Lot detail (shared dossier) — [02](design/portal/02-lot-detail-open.md) / [03](design/portal/03-lot-detail-sealed.md)
-- [ ] Header (name, StatusPill, server-synced Countdown), gallery lightbox **[M]**
-- [ ] `MapEstonia` pin + external links (ky.kataster.ee, register.metsad.ee) **[M]**
-- [ ] Full field DataTable (§5.4 dossier: cadastres, species, compartments, deadlines, storage, rental…) + package table for pakett **[M]**
-- [ ] Rich-text cards (extraInfo/secondaryInfo), file downloads (signed URLs), SpecialistCard w/ per-lot alias email **[M]**
+- [x] Header (name, StatusPill, server-synced Countdown), gallery lightbox **[M]**
+- [x] `MapEstonia` pin + external links (ky.kataster.ee, register.metsad.ee) **[M]**
+- [x] Full field DataTable (§5.4 dossier: cadastres, species, compartments, deadlines, storage, rental…) + package table for pakett **[M]**
+- [x] Rich-text cards (extraInfo/secondaryInfo), file downloads (signed URLs), SpecialistCard w/ per-lot alias email **[M]**
 
 ### 3.4 Open-auction bidding — [02-lot-detail-open.md](design/portal/02-lot-detail-open.md)
-- [ ] `BidPanel`: leading bid (authed only), bid input with ± step buttons, confirm Modal, "Teenustasu rakendub vaid võitmise korral" notice **[M]**
-- [ ] Alapakkumine toggle ("nõuab müüja nõusolekut"), pending chip **[M]**
-- [ ] Autobidder max-sum create/edit/delete **[M]**
-- [ ] Raamleping gate: no signed framework → redirect `/lepingud/raamleping?next=…` **[M]**
-- [ ] Guest / no-rights / not-started / ended panel states **[M]**
-- [ ] Bid list role-shaped: authed = amounts + "Pakkuja #n" labels + autobid marker; guest = count + timestamps only **[M]**
-- [ ] Outbid banner + live updates via SSE **[M]**
+- [x] `BidPanel`: leading bid (authed only), bid input with ± step buttons, confirm Modal, "Teenustasu rakendub vaid võitmise korral" notice **[M]**
+- [x] Alapakkumine toggle ("nõuab müüja nõusolekut"), pending chip **[M]**
+- [x] Autobidder max-sum create/edit/delete **[M]**
+- [x] Raamleping gate: no signed framework → redirect `/lepingud/raamleping?next=…` **[M]**
+- [x] Guest / no-rights / not-started / ended panel states **[M]**
+- [x] Bid list role-shaped: authed = amounts + "Pakkuja #n" labels + autobid marker; guest = count + timestamps only **[M]**
+- [x] Outbid banner + live updates via SSE **[M]**
 
 ### 3.5 Sealed-bid page — [03-lot-detail-sealed.md](design/portal/03-lot-detail-sealed.md)
-- [ ] Explanation card ("Kõik pakkumised avatakse üheaegselt peale lõppemist") **[M]**
-- [ ] Identity snapshot form (prefilled; isikukood/registrikood validation), amount ≥ minBid, confirm Modal ("siduv") **[M]**
-- [ ] Submitted-bid locked card; bid count only (no amounts/times anywhere); revision resubmit if enabled **[M]**
-- [ ] Post-opening states: winner (→ contract), loser ("Ei võitnud"), unsold ("Jäi müümata") **[M]**
+- [x] Explanation card ("Kõik pakkumised avatakse üheaegselt peale lõppemist") **[M]**
+- [x] Identity snapshot form (prefilled; isikukood/registrikood validation), amount ≥ minBid, confirm Modal ("siduv") **[M]**
+- [x] Submitted-bid locked card; bid count only (no amounts/times anywhere); revision resubmit if enabled **[M]**
+- [x] Post-opening states: winner (→ contract), loser ("Ei võitnud"), unsold ("Jäi müümata") **[M]**
 
 ### 3.6 Archive — [04-ajalugu.md](design/portal/04-ajalugu.md)
-- [ ] Tabs per type + archived counters; filters + endYear chips; sort by lõpphind desc default; 24/page **[M]**
-- [ ] Cards show finalPrice or "Müümata jäi" — never winner identity or bid counts; privacy footer line **[M]**
-- [ ] Statistics band (all-time totals) **[S]**
+- [x] Tabs per type + archived counters; filters + endYear chips; sort by lõpphind desc default; 24/page **[M]**
+- [x] Cards show finalPrice or "Müümata jäi" — never winner identity or bid counts; privacy footer line **[M]**
+- [x] Statistics band (all-time totals) **[S]**
 
 ### 3.7 Auth pages — [05](design/portal/05-login.md) / [06](design/portal/06-register.md) / [07](design/portal/07-select-profile.md) / [08](design/portal/08-update-password.md)
-- [ ] Login: 3 eID method cards → demo simulator flow; isikukood+password fallback; `?next=` handling; pending-company + suspended banners **[M]**
-- [ ] Register wizard (4 steps): eID identify (or email token fallback) → profile type (private / company w/ lookup mock + access request dead-end pending screen) → data + 3 consents → done **[M]**
-- [ ] `/select-profile` radio cards (rights summary, AKTIIVNE chip, pending greyed, "+ Lisa ettevõtte") **[M]**
-- [ ] Password set/change/reset with strength meter (min 10, classes, ≠ isikukood); reset revokes sessions **[M]**
+- [x] Login: 3 eID method cards → demo simulator flow; isikukood+password fallback; `?next=` handling; pending-company + suspended banners **[M]**
+- [x] Register wizard (4 steps): eID identify (or email token fallback) → profile type (private / company w/ lookup mock + access request dead-end pending screen) → data + 3 consents → done **[M]**
+- [x] `/select-profile` radio cards (rights summary, AKTIIVNE chip, pending greyed, "+ Lisa ettevõtte") **[M]**
+- [x] Password set/change/reset with strength meter (min 10, classes, ≠ isikukood); reset revokes sessions **[M]**
 
 ### 3.8 Customer area (Minu keskkond)
-- [ ] **Minu pakkumised** [09](design/portal/09-user-bids.md): tabs Aktiivsed/Lõppenud/Automaatpakkuja; leading/outbid/pending states, countdowns, inline autobidder edit; ended tab w/ result + "Allkirjasta leping" link; CSV export **[S]**; live outbid toast **[M]**
-- [ ] **Minu müügid** [10](design/portal/10-user-objects.md): lot table (view/bid counts, leading price), alapakkumine approval banner + drawer queue (approve/reject w/ 409 race handling), bid log (anonymized, autobid marker), relist-request **[M]** (stats mini-chart **[S]**)
-- [ ] **Teavitused** [11](design/portal/11-user-notifications.md): cursor-paginated inbox w/ category chips + deep links, mark read; preference matrix (8 events × email/SMS); saved-search cards CRUD + token unsubscribe **[M]** (digest scheduling **[L]**)
-- [ ] **Minu profiil** [12](design/portal/12-user-profile.md): profile data (isikukood locked when eID-verified), company re-lookup, rights matrix + rights request, password modal, sessions list, consents log **[M]** (GDPR export/delete jobs **[L]**)
-- [ ] **Lepingute allkirjastamine** [13](design/portal/13-contract-signing.md): full-page Steps flow — raamleping (data → review PDF + read-checkbox → mock eID sign w/ PIN2 control code → complete) and oksjonileping (lot data, fee, deadline countdown); contracts list; version-bump no-force-resign logic **[M]**
+- [x] **Minu pakkumised** [09](design/portal/09-user-bids.md): tabs Aktiivsed/Lõppenud/Automaatpakkuja; leading/outbid/pending states, countdowns, inline autobidder edit; ended tab w/ result + "Allkirjasta leping" link; CSV export **[S]** (deferred — see deferrals); live outbid toast **[M]**
+- [x] **Minu müügid** [10](design/portal/10-user-objects.md): lot table (view/bid counts, leading price), alapakkumine approval banner + drawer queue (approve/reject w/ 409 race handling), bid log (anonymized, autobid marker), relist-request **[M]** (stats mini-chart **[S]**, deferred — see deferrals)
+- [x] **Teavitused** [11](design/portal/11-user-notifications.md): cursor-paginated inbox w/ category chips + deep links, mark read; preference matrix (8 events × email/SMS); saved-search cards CRUD + token unsubscribe **[M]** (digest scheduling **[L]**)
+- [x] **Minu profiil** [12](design/portal/12-user-profile.md): profile data (isikukood locked when eID-verified), company re-lookup, rights matrix + rights request, password modal, sessions list, consents log **[M]** (GDPR export/delete jobs **[L]**)
+- [x] **Lepingute allkirjastamine** [13](design/portal/13-contract-signing.md): full-page Steps flow — raamleping (data → review PDF + read-checkbox → mock eID sign w/ PIN2 control code → complete) and oksjonileping (lot data, fee, deadline countdown); contracts list; version-bump no-force-resign logic **[M]**
 
 ---
 
