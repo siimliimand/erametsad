@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 
 import { verifyAccessToken } from '@/lib/auth/jwt'
 import { hashCredentialPassword, verifyCredentialPassword } from '@/lib/auth/password'
+import { checkPasswordPolicy } from '@/lib/auth/password-policy'
 import { clearSessionCookies, revokeAllUserSessions } from '@/lib/auth/session'
 import { getRepositories } from '@/lib/data/runtime'
 import { authRateLimiter } from '@/lib/rate-limit'
@@ -42,19 +43,18 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (typeof newPassword !== 'string' || newPassword.length < 10) {
-    return NextResponse.json(
-      { error: 'Parool peab olema vähemalt 10 tähemärki' },
-      { status: 400 },
-    )
-  }
-
   const repos = await getRepositories()
 
   const user = await repos.findByID({
     collection: 'users',
     id: tokenPayload.userId,
   })
+
+  // Same rules the strength meter shows the user, now also server-enforced.
+  const [policyViolation] = checkPasswordPolicy(newPassword, user?.isikukood)
+  if (policyViolation) {
+    return NextResponse.json({ error: policyViolation.message }, { status: 400 })
+  }
 
   // Verify the old password against the stored credential columns (the
   // scrypt scheme the seed writes); a missing stored credential behaves

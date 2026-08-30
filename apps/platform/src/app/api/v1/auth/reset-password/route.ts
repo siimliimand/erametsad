@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 import { hashCredentialPassword } from '@/lib/auth/password'
+import { checkPasswordPolicy } from '@/lib/auth/password-policy'
 import { consumeResetToken } from '@/lib/auth/reset-tokens'
 import { revokeAllUserSessions } from '@/lib/auth/session'
 import { getRepositories } from '@/lib/data/runtime'
@@ -32,11 +33,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (typeof password !== 'string' || password.length < 10) {
-    return NextResponse.json(
-      { error: 'Parool peab olema vähemalt 10 tähemärki' },
-      { status: 400 },
-    )
+  // Static rules first so a weak password does not burn the single-use link.
+  const [staticViolation] = checkPasswordPolicy(password)
+  if (staticViolation) {
+    return NextResponse.json({ error: staticViolation.message }, { status: 400 })
   }
 
   const userId = await consumeResetToken(token)
@@ -48,6 +48,14 @@ export async function POST(request: NextRequest) {
   }
 
   const repos = await getRepositories()
+
+  const user = await repos.findByID({ collection: 'users', id: userId })
+
+  // Same rules the strength meter shows the user, now also server-enforced.
+  const [policyViolation] = checkPasswordPolicy(password, user?.isikukood)
+  if (policyViolation) {
+    return NextResponse.json({ error: policyViolation.message }, { status: 400 })
+  }
 
   // Hash with the seed's scrypt credential scheme; the raw password never
   // reaches storage.
