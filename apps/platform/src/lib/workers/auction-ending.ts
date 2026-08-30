@@ -64,7 +64,7 @@ export async function sweepDueAuctions(
   return { due: due.results.length, woken, failed }
 }
 
-interface CronController {
+export interface CronController {
   cron: string
   scheduledTime: number
   noRetry(): void

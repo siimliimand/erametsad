@@ -12,7 +12,12 @@ test('shim wires fetch, both DO classes, queue consumer, and cron sweep', () => 
   expect(shimSource).toContain("export { default } from '../../.open-next/worker.js'")
   expect(shimSource).toContain("export { AuctionDO } from './auction'")
   expect(shimSource).toContain("export { RateLimiterDO } from './rate-limiter'")
-  expect(shimSource).toContain("export { scheduled } from '../lib/workers/auction-ending'")
+  // The cron handler must be DEFINED in the shim, not re-exported: wrangler's
+  // static detection cannot see handlers through the re-export chain, so a
+  // re-export ships code but registers no cron handler (2026-08-30 incident:
+  // every tick threw "Handler does not export a scheduled() function").
+  expect(shimSource).toContain('export function scheduled(')
+  expect(shimSource).not.toContain("export { scheduled } from")
   // The queue consumer is its own Worker (src/workers/wrangler.jsonc): wrangler
   // cannot detect the queue export through this shim's re-export chain.
   expect(shimSource).not.toContain("export { queue }")

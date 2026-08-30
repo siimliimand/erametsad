@@ -3,7 +3,12 @@
 // the OpenNext fetch handler re-exported alongside the DO classes, the queue
 // consumer, and the cron sweep, giving one Worker for HTTP, DOs, queues, and
 // cron triggers.
-import '../lib/workers/auction-ending'
+import { sweepDueAuctions } from '../lib/workers/auction-ending'
+import type {
+  CronController,
+  SweepEnv,
+  SweepExecutionContext,
+} from '../lib/workers/auction-ending'
 
 // The .open-next import target is written only after a completed build:
 // absent on clean builds, present on rebuilds. That is why this is ts-ignore
@@ -15,4 +20,17 @@ export { default } from '../../.open-next/worker.js'
 export { AuctionDO } from './auction'
 export { RateLimiterDO } from './rate-limiter'
 
-export { scheduled } from '../lib/workers/auction-ending'
+// Cron handler must be DEFINED here, not re-exported: wrangler's static
+// detection cannot see handlers through the shim's re-export chain (the
+// queue export hit the same wall with deploy error 11001). When detection
+// misses, deploy succeeds but the cron trigger has no registered handler
+// and every tick throws "Handler does not export a scheduled() function".
+// auction-ending.ts keeps its own scheduled export for tests.
+export function scheduled(
+  controller: CronController,
+  env: SweepEnv,
+  ctx: SweepExecutionContext,
+): void {
+  void controller
+  ctx.waitUntil(sweepDueAuctions(env, ctx))
+}
