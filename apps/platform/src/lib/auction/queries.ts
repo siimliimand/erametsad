@@ -596,6 +596,106 @@ export async function activeStatsByObjectType(
   return stats
 }
 
+// ── Archive lists and statistics (portal /ajalugu) ──────────────────────
+
+/** Every status after the end; the archive never shows draft/scheduled/active. */
+export const ARCHIVED_AUCTION_STATUSES: readonly AuctionStatus[] = auctionStatuses.filter(
+  (status) => status !== 'draft' && status !== 'scheduled' && status !== 'active',
+)
+
+export interface ArchivedAuctionTypeStats {
+  count: number
+  /** End years with archive data, newest first; feeds the filter chips. */
+  endYears: number[]
+}
+
+export async function archivedStatsByObjectType(
+  repos: CoreRepositories,
+): Promise<Record<AuctionObjectType, ArchivedAuctionTypeStats>> {
+  const { docs } = await repos.find({
+    collection: 'auctions',
+    where: { status: { in: [...ARCHIVED_AUCTION_STATUSES] } },
+    pagination: false,
+    sort: 'id',
+  })
+  const stats = Object.fromEntries(
+    auctionObjectTypes.map((objectType) => [objectType, { count: 0, endYears: [] as number[] }]),
+  ) as Record<AuctionObjectType, ArchivedAuctionTypeStats>
+  for (const doc of docs) {
+    const bucket = stats[doc.objectType]
+    bucket.count += 1
+    if (doc.endYear !== null && !bucket.endYears.includes(doc.endYear)) {
+      bucket.endYears.push(doc.endYear)
+    }
+  }
+  for (const bucket of Object.values(stats)) bucket.endYears.sort((a, b) => b - a)
+  return stats
+}
+
+function archivedEndYearTokens(params: URLSearchParams): number[] {
+  const years: number[] = []
+  for (const token of csvTokens(params, 'endYear')) {
+    const value = Number(token)
+    if (Number.isInteger(value) && value >= 1970 && value <= 2100 && !years.includes(value)) {
+      years.push(value)
+    }
+  }
+  return years
+}
+
+/**
+ * Archive variant of listAuctions: defaults to archived statuses and
+ * lõpphind desc, supports the endYear chip filter, and applies the price
+ * range to finalPriceCents — the live list's price range matches the
+ * start price, which is meaningless for ended lots.
+ */
+export async function listArchivedAuctions(
+  repos: CoreRepositories,
+  searchParams: URLSearchParams,
+): Promise<AuctionListResult> {
+  const filters = parseAuctionSearchParams(searchParams)
+  const hasSortParam = searchParams.get('sort') !== null || searchParams.get('order') !== null
+  if (!hasSortParam) {
+    filters.sortField = 'endPrice'
+    filters.sortDirection = 'desc'
+  }
+  const statuses =
+    filters.statuses.length > 0 ? filters.statuses : [...ARCHIVED_AUCTION_STATUSES]
+  const price = filters.price
+  filters.statuses = statuses
+  filters.price = {}
+  const endYears = archivedEndYearTokens(searchParams)
+  const docs = (await collectAuctionDocs(repos, filters)).filter((doc) => {
+    if (
+      price.min !== undefined &&
+      (doc.finalPriceCents === null || doc.finalPriceCents < eurosToCents(price.min))
+    ) {
+      return false
+    }
+    if (
+      price.max !== undefined &&
+      (doc.finalPriceCents === null || doc.finalPriceCents > eurosToCents(price.max))
+    ) {
+      return false
+    }
+    return endYears.length === 0 || (doc.endYear !== null && endYears.includes(doc.endYear))
+  })
+  const sorted = sortDocs(docs, filters.sortField, filters.sortDirection)
+  const lookups = await locationLookups(repos)
+  const summaries = sorted.map((doc) => auctionSummary(doc, lookups))
+  const total = summaries.length
+  const totalPages = Math.max(Math.ceil(total / filters.limit), 1)
+  const page = Math.min(filters.page, totalPages)
+  const start = (page - 1) * filters.limit
+  return {
+    auctions: summaries.slice(start, start + filters.limit),
+    total,
+    page,
+    limit: filters.limit,
+    totalPages,
+  }
+}
+
 // ── Bid loading and shaping ─────────────────────────────────────────────
 
 async function loadBids(repos: CoreRepositories, auctionId: string): Promise<Bid[]> {
