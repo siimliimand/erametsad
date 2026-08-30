@@ -127,15 +127,20 @@ function rangeParams(
 }
 
 export function parseAuctionSearchParams(params: URLSearchParams): AuctionFilters {
-  const rawSort = (params.get('sort') ?? '').trim().toLowerCase()
+  const rawSort = (params.get('sort') ?? '').trim()
   const sortDescending = rawSort.startsWith('-')
   const rawSortField = sortDescending ? rawSort.slice(1) : rawSort
   let sortField: AuctionSortField = 'endTime'
   if (rawSortField !== '') {
-    if (!(SORT_FIELDS as readonly string[]).includes(rawSortField)) {
+    // The portal serializes camelCase keys (serializeListingFilters writes
+    // sort=endPrice), so matching stays case-insensitive over the constants.
+    const matched = SORT_FIELDS.find(
+      (field) => field.toLowerCase() === rawSortField.toLowerCase(),
+    )
+    if (matched === undefined) {
       throw new AuctionQueryError('Vale sortimisväli')
     }
-    sortField = rawSortField as AuctionSortField
+    sortField = matched
   }
   const rawOrder = (params.get('order') ?? '').trim().toLowerCase()
   const sortDirection: AuctionSortDirection =
@@ -183,6 +188,22 @@ function isoOrNull(value: unknown): string | null {
 function stringList(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.filter((entry): entry is string => typeof entry === 'string')
+}
+
+// Seed and admin data store logging types as `{code}` objects; keep the
+// code strings so the dossier does not drop them like stringList would.
+function loggingTypeCodes(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((entry) => {
+      if (typeof entry === 'string') return entry
+      if (typeof entry === 'object' && entry !== null) {
+        const code = (entry as Record<string, unknown>).code
+        if (typeof code === 'string') return code
+      }
+      return null
+    })
+    .filter((code): code is string => code !== null)
 }
 
 function coordinatesOf(value: unknown): { lat: number; lng: number } | null {
@@ -829,7 +850,7 @@ export async function getAuctionDossier(
     metsaregisterLink: doc.metsaregisterLink,
     cadastres: stringList(doc.cadastres),
     registryNumbers: stringList(doc.registryNumbers),
-    loggingTypes: stringList(doc.loggingTypes),
+    loggingTypes: loggingTypeCodes(doc.loggingTypes),
     compartments: stringList(doc.compartments),
     forestNotifications: Array.isArray(doc.notifications) ? doc.notifications : [],
     deadlines: doc.deadlines ?? null,
