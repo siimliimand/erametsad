@@ -63,3 +63,24 @@ export async function sweepDueAuctions(
   }
   return { due: due.results.length, woken, failed }
 }
+
+interface CronController {
+  cron: string
+  scheduledTime: number
+  noRetry(): void
+}
+
+/**
+ * Cron trigger entry (task 6.2): the every-minute sweep that wakes due
+ * auctions whose DO alarm was lost to eviction. The DO alarm owns the end
+ * transition; this handler only wakes objects. Exported from here so tests
+ * can reach it without loading the built OpenNext worker (the wrangler shim
+ * re-exports it as the Worker's `scheduled` handler).
+ */
+export function scheduled(
+  _controller: CronController,
+  env: SweepEnv,
+  ctx: SweepExecutionContext,
+): void {
+  ctx.waitUntil(sweepDueAuctions(env, ctx))
+}

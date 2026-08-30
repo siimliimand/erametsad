@@ -10,3 +10,8 @@ declare module 'cloudflare:test' {
     D1_MIGRATIONS: { name: string; queries: string[] }[]
   }
 }
+
+declare module '*?raw' {
+  const source: string
+  export default source
+}
