@@ -12,6 +12,7 @@ import { Gallery, type GalleryImage } from './_components/Gallery'
 import { LiveBidPanel } from './_components/LiveBidPanel'
 import { LiveCountdown } from './_components/LiveCountdown'
 import { SellerContact } from './_components/SellerContact'
+import { RichText, richTextBlocks } from './_components/RichText'
 import {
   SealedBidPanel,
   type SealedViewerSnapshot,
@@ -150,41 +151,6 @@ function fileLinks(entries: unknown[]): FileLink[] {
         ...(format !== undefined ? { format } : {}),
       }
     })
-}
-
-// ── Rich text (Payload Lexical JSON or plain text; never HTML) ──────────
-
-function richTextParagraphs(value: string | null): string[] {
-  if (value === null || value.trim() === '') return []
-  try {
-    const parsed: unknown = JSON.parse(value)
-    const paragraphs: string[] = []
-    collectText(parsed, paragraphs)
-    const cleaned = paragraphs
-      .map((text) => text.trim())
-      .filter((text) => text !== '')
-    return cleaned.length > 0 ? cleaned : [value.trim()]
-  } catch {
-    return value
-      .split(/\n+/)
-      .map((text) => text.trim())
-      .filter((text) => text !== '')
-  }
-}
-
-function collectText(node: unknown, out: string[]): void {
-  if (typeof node === 'string') {
-    out.push(node)
-    return
-  }
-  if (Array.isArray(node)) {
-    for (const child of node) collectText(child, out)
-    return
-  }
-  if (typeof node !== 'object' || node === null) return
-  const record = node as Record<string, unknown>
-  if (Array.isArray(record.children)) collectText(record.children, out)
-  if (typeof record.text === 'string') out.push(record.text)
 }
 
 // ── Deadlines / approvals (tolerant over the free-form deadlines JSON) ──
@@ -515,7 +481,8 @@ export default async function AuctionPage({
 
   const images = galleryImages(auction.media, auction.title)
   const files = fileLinks([...auction.files, ...auction.media])
-  const description = richTextParagraphs(auction.descriptionPublic)
+  const description = richTextBlocks(auction.descriptionPublic)
+  const secondaryInfo = richTextBlocks(auction.descriptionSecondary)
 
   const endsAtIso = auction.endsAt
   const endsAt = endsAtIso !== null ? Date.parse(endsAtIso) : Number.NaN
@@ -757,13 +724,14 @@ export default async function AuctionPage({
                 <h2 className="font-heading text-h4 text-ink">
                   Oksjoni info ja erisused
                 </h2>
-                <div className="flex flex-col gap-xs">
-                  {description.map((paragraph, index) => (
-                    <p key={index} className="text-body text-ink">
-                      {paragraph}
-                    </p>
-                  ))}
-                </div>
+                <RichText blocks={description} />
+              </section>
+            )}
+
+            {secondaryInfo.length > 0 && (
+              <section className="flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card">
+                <h2 className="font-heading text-h4 text-ink">Lisainfo</h2>
+                <RichText blocks={secondaryInfo} />
               </section>
             )}
 

@@ -8,6 +8,8 @@ interface SellerContactProps {
     name: string
     phone: string | null
     email: string | null
+    role: string | null
+    photo: string | null
   } | null
   aliasEmail: string | null
 }
@@ -38,9 +40,10 @@ export function SellerContact({ specialist, aliasEmail }: SellerContactProps) {
       {specialist && (
         <SpecialistCard
           name={specialist.name}
-          role="Metsaspetsialist"
+          role={specialist.role ?? 'Metsaspetsialist'}
           {...(specialist.phone !== null ? { phone: specialist.phone } : {})}
           {...(specialist.email !== null ? { email: specialist.email } : {})}
+          {...(specialist.photo !== null ? { image: specialist.photo } : {})}
           mini
         />
       )}
