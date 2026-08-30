@@ -6,7 +6,7 @@ import { UnknownCollectionError } from '../errors'
 import { coreCollections, getCollectionConfig } from '../registry'
 
 describe('coreCollections registry', () => {
-  it('covers the 14 core collections', () => {
+  it('covers the 15 core collections', () => {
     expect(Object.keys(coreCollections).sort()).toEqual(
       [
         'auction-rights',
@@ -21,6 +21,7 @@ describe('coreCollections registry', () => {
         'leads',
         'notifications',
         'profile',
+        'rights-request',
         'settings',
         'users',
       ].sort(),
