@@ -148,6 +148,43 @@ describe('middleware legacy guide redirect', () => {
   })
 })
 
+describe('middleware unmapped-host no-op', () => {
+  it('passes marketing paths through on unmapped hostnames untouched', () => {
+    for (const host of ['api.erametsad.ww0.dev', 'admin.erametsad.ww0.dev', 'localhost:3000']) {
+      const response = middleware(requestFor(host, '/teenused/hindamine?kee=info'))
+
+      expect(response.status).toBe(200)
+      expect(response.headers.get('location')).toBeNull()
+      expect(response.headers.get('x-middleware-rewrite')).toBeNull()
+    }
+  })
+
+  it('does not fire the legacy 301 on an unmapped host', () => {
+    const response = middleware(requestFor('erametsad-preview.example.workers.dev', '/metsateatise-juhend'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull()
+  })
+
+  it('serves portal-style paths on unmapped hostnames without redirecting', () => {
+    const response = middleware(requestFor('erametsad-preview.example.workers.dev', '/oksjon/9?foo=bar'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull()
+  })
+
+  it('treats a missing host header as unmapped and passes through', () => {
+    const request = new NextRequest('http://localhost:3000/avaleht')
+    const response = middleware(request)
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull()
+  })
+})
+
 describe('middleware portal paths on the default host', () => {
   it('keeps redirecting portal contract and auth pages to the portal host', () => {
     const response = middleware(requestFor(DEFAULT_HOSTNAME, '/lepingud/raamleping?kehtiv=1'))
