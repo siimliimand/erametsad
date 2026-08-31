@@ -14,7 +14,13 @@ import { listAuctions, type AuctionSummary } from '@/lib/auction/queries'
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 
-export const revalidate = 3600
+// D7 asks for ISR (revalidate = 3600), but CI and deploy builds run
+// `next build` without a seeded D1, and the shared marketing layout reads
+// the CMS for the header, footer, and contact band — prerendering would
+// start wrangler's remote-binding proxy and fail without an API token.
+// Drop `force-dynamic` (and make the layout reads build-safe) once
+// build-time D1 seeding exists.
+export const dynamic = 'force-dynamic'
 
 export const metadata = buildMetadata({
   title: 'Metsa väärtuse hindamine — kuidas arvutada metsa hind',

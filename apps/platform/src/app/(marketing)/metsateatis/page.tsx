@@ -5,7 +5,13 @@ import { ScreenshotSteps, type TutorialStep } from './_components/ScreenshotStep
 import { buildHowToJsonLd, toJsonLdScript } from '../_lib/jsonld'
 import { buildMetadata } from '../_lib/seo'
 
-export const revalidate = 3600
+// D7 asks for ISR (revalidate = 3600), but CI and deploy builds run
+// `next build` without a seeded D1, and the shared marketing layout reads
+// the CMS for the header, footer, and contact band — prerendering would
+// start wrangler's remote-binding proxy and fail without an API token.
+// Drop `force-dynamic` (and make the layout reads build-safe) once
+// build-time D1 seeding exists.
+export const dynamic = 'force-dynamic'
 
 // Draft step copy and captions from docs/design/marketing/05-metsateatis.md
 // (8 original steps). Screenshots of register.metsad.ee are pending — each

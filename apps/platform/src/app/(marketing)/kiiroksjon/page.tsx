@@ -18,7 +18,13 @@ import {
 import { buildMetadata } from '../_lib/seo'
 import { ProcessSteps, type ProcessStep } from './_components/ProcessSteps'
 
-export const revalidate = 3600
+// D7 asks for ISR (revalidate = 3600), but CI and deploy builds run
+// `next build` without a seeded D1, and the shared marketing layout reads
+// the CMS for the header, footer, and contact band — prerendering would
+// start wrangler's remote-binding proxy and fail without an API token.
+// Drop `force-dynamic` (and make the layout reads build-safe) once
+// build-time D1 seeding exists.
+export const dynamic = 'force-dynamic'
 
 export const metadata = buildMetadata({
   title: 'Kiiroksjon — metsa müük 48 tunniga',

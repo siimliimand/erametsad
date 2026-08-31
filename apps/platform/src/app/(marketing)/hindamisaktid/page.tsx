@@ -14,7 +14,13 @@ import { buildMetadata } from '../_lib/seo'
 import { CopyEmailButton } from './_components/CopyEmailButton'
 import { SectionNav } from './_components/SectionNav'
 
-export const revalidate = 3600
+// D7 asks for ISR (revalidate = 3600), but CI and deploy builds run
+// `next build` without a seeded D1, and the shared marketing layout reads
+// the CMS for the header, footer, and contact band — prerendering would
+// start wrangler's remote-binding proxy and fail without an API token.
+// Drop `force-dynamic` (and make the layout reads build-safe) once
+// build-time D1 seeding exists.
+export const dynamic = 'force-dynamic'
 
 // Draft address from docs/design/marketing/06-hindamisaktid.md until a
 // settings seed defines the final alias.
