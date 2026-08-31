@@ -13,7 +13,7 @@ Buyers land here to discover active auctions by object type, filter/narrow to a 
 ## Wireframe (desktop)
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│ EAMETSAD ⛁  Raieõigused Metsakinnistud Põllumaad Paketid Kiiroksjonid │ ← tabs + counters
+│ ERAMETSAD ⛁  Raieõigused Metsakinnistud Põllumaad Paketid Kiiroksjonid │ ← tabs + counters
 │            [156]        [24]        [3]      [1]      [0]              │
 ├────────────────────────────────────────────────────────────────────────┤
 │ "Hetkel on aktiivseid raieõiguste oksjoneid 18, kokku 94 ha            │
@@ -78,7 +78,7 @@ Caching: list query cached 60 s at edge until any bid/extension event invalidate
 - "Kaardivaade" · "Loendivaade" · "Aega jäänud" · "Alghind" · "Telli teavitus" · "Tühjenda" · "Filtrid" · "Varem lõppevad eespool"
 
 ## SEO & analytics
-- Title: "{Tab} | Eametsad Oksjonid"; description pattern "Osta {raieõigust/metskinnistut…} oksjonil üle Eesti — {count} aktiivset pakkumist." SSR-rendered first page per tab; JSON-LD `ItemList` of first 12 lots. Events: tab_switch, filter_applied, map_toggle, subscription_created, lot_card_click.
+- Title: "{Tab} | Erametsad Oksjonid"; description pattern "Osta {raieõigust/metskinnistut…} oksjonil üle Eesti — {count} aktiivset pakkumist." SSR-rendered first page per tab; JSON-LD `ItemList` of first 12 lots. Events: tab_switch, filter_applied, map_toggle, subscription_created, lot_card_click.
 
 ## Open questions
 - Pin clustering threshold / should map respect filters or show all types?
