@@ -3,7 +3,7 @@
 > **In brief:** Staff home: KPIs, auctions ending today, action queues and system health.
 | Area | admin |
 |---|---|
-| **Route** | `admin.eametsad.ee/` (redirect target after login) |
+| **Route** | `admin.erametsad.ee/` (redirect target after login) |
 | **Access** | admin (all roles: specialist, seller, admin, superadmin — content varies by role) |
 | **In nav** | sidebar first item |
 
@@ -13,7 +13,7 @@ Staff landing screen: in one glance see what needs action today (auctions ending
 ## Admin shell (defined once, referenced by all admin files)
 ```
 ┌──────┬─────────────────────────────────────────────────────────────┐
-│ ◉ LOG│ PROD ▎ Eametsad haldus ── otsing: kasutaja/oksjon/leid...  │ ⛭ ▶ Marit V. (admin)
+│ ◉ LOG│ PROD ▎ Erametsad haldus ── otsing: kasutaja/oksjon/leid...  │ ⛭ ▶ Marit V. (admin)
 ├──────┼─────────────────────────────────────────────────────────────┤
 │ ⌂ Töö│  ⚠ Vaadeld kasutajana: Jaan T. ( veel 12:34 ) · LÕPETA     │
 │ ▤ Oks│ ────────────────────────────────────────────────────────── │
@@ -118,6 +118,6 @@ Shortcuts are latent (no input focused); shown once as onboarding toast, recalla
 | Redis lag metrics missing | health row shows "andmed pole saadaval", not red |
 
 ## Open questions
-- Should fee MTD include kiiroksjon backup-offer purchases (Eametsad as buyer)?
+- Should fee MTD include kiiroksjon backup-offer purchases (Erametsad as buyer)?
 - Does seller role need queue-lag visibility near their lot's ending?
 - Personalised dashboard per role remembered (collapsed panels) or fixed layout?
