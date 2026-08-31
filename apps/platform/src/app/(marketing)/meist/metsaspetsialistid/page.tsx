@@ -1,17 +1,18 @@
 import { SpecialistCard } from '@eametsad/ui'
-import type { Metadata } from 'next'
 
 import { CompanyCard } from '../../_components/CompanyCard'
+import { buildMetadata } from '../../_lib/seo'
 
 import { getRepositories } from '@/lib/data/runtime'
 
 export const revalidate = 3600
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Metsaspetsialistid',
   description:
     'Meie metsaspetsialistid igas maakonnas. Helista või kirjuta otse – esimene nõuanne on tasuta.',
-}
+  path: '/meist/metsaspetsialistid',
+})
 
 export default async function MetsaspetsialistidPage() {
   const repos = await getRepositories()

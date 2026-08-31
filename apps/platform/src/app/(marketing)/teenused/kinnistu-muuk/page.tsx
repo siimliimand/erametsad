@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   Wallet,
 } from 'lucide-react'
-import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { SealedExplainer } from './_components/SealedExplainer'
@@ -16,20 +15,23 @@ import {
   ProcessAccordion,
   type ProcessStepGroup,
 } from '../../_components/ProcessAccordion'
-import { marketingUrl } from '../../_lib/base-url'
+import {
+  buildBreadcrumbJsonLd,
+  buildServiceJsonLd,
+  toJsonLdScript,
+} from '../../_lib/jsonld'
+import { buildMetadata } from '../../_lib/seo'
 
 import { PORTAL_HOSTNAME } from '@/lib/routing/host-areas'
 
 export const revalidate = 3600
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Kinnistu müük oksjonil',
   description:
     'Müü metsakinnistu või põllumaa oksjonil pimepakkumisena: eelkontrollitud ostjad, notariaalne tehing ja 3% teenustasu ainult eduka müügi korral.',
-  alternates: {
-    canonical: '/teenused/kinnistu-muuk',
-  },
-}
+  path: '/teenused/kinnistu-muuk',
+})
 
 // Draft copy from docs/design/marketing/03-teenused-kinnistu-muuk.md until
 // the Page block builder lands in the CMS. Portal CTA paths follow the design
@@ -167,38 +169,16 @@ const LEAD_FORM_BENEFITS = [
   'Notar ja paberitoimingud korraldame meie',
 ]
 
-const SERVICE_JSON_LD = {
-  '@context': 'https://schema.org',
-  '@type': 'Service',
+const SERVICE_JSON_LD = buildServiceJsonLd({
   name: 'Kinnistu müük oksjonil',
   description:
     'Metsakinnistu ja põllumaa müük oksjonil pimepakkumisena (suletud pakkumine). Pakkumised esitatakse üheaegselt enne tähtaega ja avatakse korraga, võidab kõrgeim kehtiv pakkumine. Notariaalne tehing, eelkontrollitud ostjad, teenustasu 3% + km ainult eduka müügi korral.',
-  areaServed: 'Eesti',
-  provider: {
-    '@type': 'Organization',
-    name: 'Eametsad',
-    url: marketingUrl('/'),
-  },
-}
+})
 
-const BREADCRUMB_JSON_LD = {
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    {
-      '@type': 'ListItem',
-      position: 1,
-      name: 'Teenused',
-      item: marketingUrl('/teenused'),
-    },
-    {
-      '@type': 'ListItem',
-      position: 2,
-      name: 'Kinnistu müük oksjonil',
-      item: marketingUrl('/teenused/kinnistu-muuk'),
-    },
-  ],
-}
+const BREADCRUMB_JSON_LD = buildBreadcrumbJsonLd([
+  { name: 'Teenused', path: '/teenused' },
+  { name: 'Kinnistu müük oksjonil', path: '/teenused/kinnistu-muuk' },
+])
 
 const btnPrimaryClass =
   'inline-flex h-12 w-full items-center justify-center gap-2 rounded-button bg-primary px-6 font-label font-semibold text-inkInverse transition-all duration-hover ease-hover hover:bg-primaryHover motion-reduce:transition-none md:w-auto'
@@ -216,11 +196,11 @@ export default function KinnistuMuukPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(SERVICE_JSON_LD) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(SERVICE_JSON_LD) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(BREADCRUMB_JSON_LD) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(BREADCRUMB_JSON_LD) }}
       />
 
       <section className="bg-bgMist">

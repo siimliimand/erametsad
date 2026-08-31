@@ -1,17 +1,18 @@
-import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { CompanyCard } from '../_components/CompanyCard'
+import { buildMetadata } from '../_lib/seo'
 
 import { getRepositories } from '@/lib/data/runtime'
 
 export const revalidate = 3600
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Meist',
   description:
     'Eametsad OÜ – kogemus, metsaspetsialistid ja läbipaistvad metsaoksjonid. Registriandmed, missioon ja kontaktid ühes kohas.',
-}
+  path: '/meist',
+})
 
 // Draft copy from the design doc (docs/design/marketing/13-meist.md, block 4):
 // the settings schema has no CEO quote field yet, so the block ships with the

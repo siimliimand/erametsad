@@ -4,7 +4,11 @@ import Link from 'next/link'
 
 import { ArtiklidChipNav } from './ArtiklidChipNav'
 import { NewsletterSignup } from './NewsletterSignup'
-import { marketingUrl } from '../../_lib/base-url'
+import {
+  buildBreadcrumbJsonLd,
+  buildCollectionPageJsonLd,
+  toJsonLdScript,
+} from '../../_lib/jsonld'
 import {
   articleCardCategory,
   filterByCategory,
@@ -22,19 +26,6 @@ function formatDate(iso: string | null): string {
   return Number.isNaN(parsed.getTime())
     ? ''
     : parsed.toLocaleDateString('et-EE', { dateStyle: 'long' })
-}
-
-function buildBreadcrumbJsonLd(parts: { name: string; path: string }[]) {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: parts.map((part, index) => ({
-      '@type': 'ListItem',
-      position: index + 1,
-      name: part.name,
-      item: marketingUrl(part.path),
-    })),
-  }
 }
 
 interface ArtiklidHubProps {
@@ -62,12 +53,7 @@ export async function ArtiklidHub({ activeSlug, category, q, pageParam }: Artikl
   const heading = category ? category.label : 'Artiklid ja uudised'
 
   const jsonLd = [
-    {
-      '@context': 'https://schema.org',
-      '@type': 'CollectionPage',
-      name: heading,
-      url: marketingUrl(basePath),
-    },
+    buildCollectionPageJsonLd({ name: heading, path: basePath }),
     buildBreadcrumbJsonLd([
       { name: 'Avaleht', path: '/' },
       { name: 'Artiklid', path: '/artiklid' },
@@ -79,7 +65,7 @@ export async function ArtiklidHub({ activeSlug, category, q, pageParam }: Artikl
     <div className="mx-auto w-full max-w-container-xl px-md py-lg">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(jsonLd) }}
       />
 
       <h1 className="font-heading text-h1 text-ink">{heading}</h1>

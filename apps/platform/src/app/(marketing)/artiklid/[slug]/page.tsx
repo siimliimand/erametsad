@@ -3,7 +3,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { marketingUrl } from '../../_lib/base-url'
+import { buildArticleJsonLd, toJsonLdScript } from '../../_lib/jsonld'
+import { buildMetadata } from '../../_lib/seo'
 import { ArticleRichText } from '../_lib/article-body'
 import { extractHeadings } from '../_lib/article-text'
 import { articleCardCategory, loadPublishedArticles, toStringTags } from '../_lib/articles'
@@ -78,11 +79,12 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
   const { slug } = await params
   const article = await loadArticle(slug)
   if (!article) return { title: 'Artikkel' }
-  return {
+  return buildMetadata({
     title: article.title,
     description: article.excerpt,
-    alternates: { canonical: `/artiklid/${article.slug}` },
-  }
+    path: `/artiklid/${article.slug}`,
+    ogType: 'article',
+  })
 }
 
 export default async function ArticlePage({ params }: ArticlePageProps) {
@@ -94,25 +96,18 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const headings = article.content ? extractHeadings(article.content) : []
   const categoryLabel = articleCardCategory(article)
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Article',
+  const jsonLd = buildArticleJsonLd({
     headline: article.title,
-    ...(article.publishedAt && { datePublished: article.publishedAt }),
-    ...(article.author && { author: { '@type': 'Person', name: article.author } }),
-    mainEntityOfPage: marketingUrl(`/artiklid/${article.slug}`),
-    publisher: {
-      '@type': 'Organization',
-      name: 'Eametsad',
-      url: marketingUrl('/'),
-    },
-  }
+    path: `/artiklid/${article.slug}`,
+    publishedAt: article.publishedAt,
+    author: article.author,
+  })
 
   return (
     <div className="mx-auto w-full max-w-container-xl px-md py-lg">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(jsonLd) }}
       />
 
       <Link

@@ -9,6 +9,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, permanentRedirect } from 'next/navigation'
 
+import { buildMetadata } from '../../_lib/seo'
+
 import { packageTotals } from '@/lib/auction/queries'
 import { centsToEuros, type ArticleDoc, type AuctionDoc } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
@@ -137,13 +139,11 @@ export async function generateMetadata({
   const specialist = await loadSpecialist(slug)
   if (!specialist) return { title: 'Metsaspetsialistid' }
   const summary = bioParagraphs(specialist.bio)[0] ?? subtitleBits(specialist).join(' · ')
-  return {
+  return buildMetadata({
     title: `${specialist.name} — metsaspetsialist`,
     description: summary.length > 160 ? `${summary.slice(0, 157)}...` : summary,
-    alternates: {
-      canonical: `/meist/${specialist.slug}`,
-    },
-  }
+    path: `/meist/${specialist.slug}`,
+  })
 }
 
 export default async function SpecialistProfilePage({

@@ -7,10 +7,10 @@ import {
   TreePine,
   TrendingUp,
 } from 'lucide-react'
-import type { Metadata } from 'next'
 import Link from 'next/link'
 
-import { marketingUrl } from '../_lib/base-url'
+import { buildServiceJsonLd, toJsonLdScript } from '../_lib/jsonld'
+import { buildMetadata } from '../_lib/seo'
 import { CopyEmailButton } from './_components/CopyEmailButton'
 import { SectionNav } from './_components/SectionNav'
 
@@ -62,32 +62,21 @@ const PRICE_FACTORS = [
   },
 ]
 
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'Service',
+const jsonLd = buildServiceJsonLd({
   name: 'Hindamisakti koostamine',
-  areaServed: 'Eesti',
-  provider: {
-    '@type': 'Organization',
-    name: 'Eametsad',
-    url: marketingUrl('/'),
-  },
   offers: {
-    '@type': 'Offer',
     price: 480,
     priceCurrency: 'EUR',
     description: 'Hindamisakt alates 480 € + käibemaks',
   },
-}
+})
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Hindamisaktid — metsa ja põllumaa hindamisakt',
   description:
     'Koostame maatulundusmaa hindamisaktid kogu Eestis — müügiks, laenuks, päranduseks või kohtulikuks vaidluseks. Hind alates 480 € + km.',
-  alternates: {
-    canonical: '/hindamisaktid',
-  },
-}
+  path: '/hindamisaktid',
+})
 
 const h2Class = 'font-heading text-h2 text-ink'
 const btnPrimaryClass =
@@ -98,7 +87,7 @@ export default function HindamisaktidPage() {
     <main className="pb-2xl">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(jsonLd) }}
       />
 
       <section className="bg-bgMist">

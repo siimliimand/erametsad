@@ -1,8 +1,9 @@
 import { Card, LeadForm } from '@eametsad/ui'
-import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { ScreenshotSteps, type TutorialStep } from './_components/ScreenshotSteps'
+import { buildHowToJsonLd, toJsonLdScript } from '../_lib/jsonld'
+import { buildMetadata } from '../_lib/seo'
 
 export const revalidate = 3600
 
@@ -88,39 +89,27 @@ const SIDEBAR_LINKS = [
 const SUPPORT_PHONE = '+372 6000 000'
 const SUPPORT_PHONE_HREF = 'tel:+3726000000'
 
-// Pure builder, colocated for task 6.1 to move into shared jsonld.ts.
 // HowToStep images are omitted while screenshots are pending.
-function buildHowToJsonLd(steps: readonly TutorialStep[]) {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'HowTo',
-    name: 'Metsateatise esitamine metsaportaalis',
-    description:
-      'Samm-sammuline juhend metsateatise esitamiseks metsaportaalis register.metsad.ee.',
-    step: steps.map((step, index) => ({
-      '@type': 'HowToStep',
-      position: index + 1,
-      name: step.title,
-      text: step.text,
-    })),
-  }
-}
+const howToJsonLd = buildHowToJsonLd({
+  name: 'Metsateatise esitamine metsaportaalis',
+  description:
+    'Samm-sammuline juhend metsateatise esitamiseks metsaportaalis register.metsad.ee.',
+  steps: STEPS,
+})
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Metsateatise esitamine — juhend piltidega',
   description:
     'Samm-sammuline juhend metsateatise esitamiseks metsaportaalis register.metsad.ee: sisselogimine, raielangide valik, esitamine ja staatuse jälgimine.',
-  alternates: {
-    canonical: '/metsateatis',
-  },
-}
+  path: '/metsateatis',
+})
 
 export default function MetsateatisPage() {
   return (
     <main className="pb-2xl">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(buildHowToJsonLd(STEPS)) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(howToJsonLd) }}
       />
 
       <section className="bg-bgMist">

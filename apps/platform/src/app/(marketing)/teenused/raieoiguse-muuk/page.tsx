@@ -7,27 +7,29 @@ import {
   ShieldCheck,
   Wallet,
 } from 'lucide-react'
-import type { Metadata } from 'next'
 
 import { FeeCards, type FeeCardItem } from '../../_components/FeeCards'
 import {
   ProcessAccordion,
   type ProcessStepGroup,
 } from '../../_components/ProcessAccordion'
-import { marketingUrl } from '../../_lib/base-url'
+import {
+  buildBreadcrumbJsonLd,
+  buildServiceJsonLd,
+  toJsonLdScript,
+} from '../../_lib/jsonld'
+import { buildMetadata } from '../../_lib/seo'
 
 import { PORTAL_HOSTNAME } from '@/lib/routing/host-areas'
 
 export const revalidate = 3600
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Raieõiguse müük oksjonil',
   description:
     'Müü raieõigus oksjonil — ostjate konkurents toob välja metsa tegeliku turuväärtuse. Tasuta hindamine, kontrollitud ostjad ja 3% teenustasu ainult eduka müügi korral.',
-  alternates: {
-    canonical: '/teenused/raieoiguse-muuk',
-  },
-}
+  path: '/teenused/raieoiguse-muuk',
+})
 
 // Draft copy from docs/design/marketing/02-teenused-raieoiguse-muuk.md until
 // the Page block builder lands in the CMS. Portal CTA paths follow the design
@@ -164,36 +166,14 @@ const LEAD_FORM_BENEFITS = [
   'Hallatud kogu protsess',
 ]
 
-const SERVICE_JSON_LD = {
-  '@context': 'https://schema.org',
-  '@type': 'Service',
+const SERVICE_JSON_LD = buildServiceJsonLd({
   name: 'Raieõiguse müük oksjonil',
-  areaServed: 'Eesti',
-  provider: {
-    '@type': 'Organization',
-    name: 'Eametsad',
-    url: marketingUrl('/'),
-  },
-}
+})
 
-const BREADCRUMB_JSON_LD = {
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    {
-      '@type': 'ListItem',
-      position: 1,
-      name: 'Teenused',
-      item: marketingUrl('/teenused'),
-    },
-    {
-      '@type': 'ListItem',
-      position: 2,
-      name: 'Raieõiguse müük oksjonil',
-      item: marketingUrl('/teenused/raieoiguse-muuk'),
-    },
-  ],
-}
+const BREADCRUMB_JSON_LD = buildBreadcrumbJsonLd([
+  { name: 'Teenused', path: '/teenused' },
+  { name: 'Raieõiguse müük oksjonil', path: '/teenused/raieoiguse-muuk' },
+])
 
 const btnPrimaryClass =
   'inline-flex h-12 w-full items-center justify-center gap-2 rounded-button bg-primary px-6 font-label font-semibold text-inkInverse transition-all duration-hover ease-hover hover:bg-primary-hover motion-reduce:transition-none md:w-auto'
@@ -211,11 +191,11 @@ export default function RaieoiguseMuukPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(SERVICE_JSON_LD) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(SERVICE_JSON_LD) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(BREADCRUMB_JSON_LD) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(BREADCRUMB_JSON_LD) }}
       />
 
       <section className="bg-bgMist">

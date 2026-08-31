@@ -1,5 +1,4 @@
-import type { Metadata } from 'next'
-
+import { buildMetadata } from '../../_lib/seo'
 import { ArtiklidHub } from '../_components/ArtiklidHub'
 import { findArticleCategory } from '../_lib/categories'
 
@@ -11,11 +10,11 @@ export const dynamic = 'force-dynamic'
 // chip marked active. The category slug must match a seeded tag value.
 const CATEGORY = findArticleCategory('uudised')
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Artiklid — Uudised',
   description: 'Uudised metsa müügist oksjonil, hindamisest ja metsamajandusest.',
-  alternates: { canonical: '/artiklid/uudised' },
-}
+  path: '/artiklid/uudised',
+})
 
 export default function UudisedPage() {
   if (!CATEGORY) return null

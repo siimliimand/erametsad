@@ -1,8 +1,8 @@
 import { LeadForm, SpecialistCard } from '@eametsad/ui'
-import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { CompanyCard } from '../_components/CompanyCard'
+import { buildMetadata } from '../_lib/seo'
 import { MapWithFallback } from './_components/MapWithFallback'
 
 import { getRepositories } from '@/lib/data/runtime'
@@ -11,11 +11,12 @@ import { getRepositories } from '@/lib/data/runtime'
 // build-time D1 seeding moves this to ISR later.
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Kontakt',
   description:
     'Eametsad OÜ kontaktandmed, metsaspetsialistide otsenumbrid ja päringuvorm. Kirjuta või helista — vastame 1 tööpäeva jooksul.',
-}
+  path: '/kontakt',
+})
 
 // Draft office marker from the design doc (17-kontakt.md block 5): Settings
 // holds no coordinates yet, so the pin sits on central Tallinn until the CMS

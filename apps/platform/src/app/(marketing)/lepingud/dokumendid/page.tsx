@@ -1,7 +1,8 @@
 import { EmptyState } from '@eametsad/ui'
 import { FileText, Scale } from 'lucide-react'
-import type { Metadata } from 'next'
 
+import { buildItemListJsonLd, toJsonLdScript } from '../../_lib/jsonld'
+import { buildMetadata } from '../../_lib/seo'
 import { VersionNotifyForm } from '../_components/VersionNotifyForm'
 
 import { getRepositories } from '@/lib/data/runtime'
@@ -13,12 +14,12 @@ import type { LegalDocument, LegalDocumentType } from '@/lib/data/schema'
 // Drop `force-dynamic` and add ISR once build-time D1 seeding exists.
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Lepingute mallid',
   description:
     'Oksjoni- ja müügilepingute mallid koos versioonidega — liitu teavitusega, kui mall uueneb.',
-  alternates: { canonical: '/lepingud/dokumendid' },
-}
+  path: '/lepingud/dokumendid',
+})
 
 // Mirrors (admin)/_lib/labels.tsx; keyed by the schema's LegalDocumentType
 // so a schema change fails the typecheck here. Admin's map is not imported
@@ -50,21 +51,13 @@ export default async function DokumendidPage() {
     pagination: false,
   })
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    itemListElement: docs.map((doc, index) => ({
-      '@type': 'ListItem',
-      position: index + 1,
-      name: doc.title,
-    })),
-  }
+  const jsonLd = buildItemListJsonLd(docs.map((doc) => ({ name: doc.title })))
 
   return (
     <main className="mx-auto w-full max-w-container-xl px-md py-lg">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(jsonLd) }}
       />
 
       <h1 className="font-heading text-h1 text-ink">Lepingute mallid</h1>

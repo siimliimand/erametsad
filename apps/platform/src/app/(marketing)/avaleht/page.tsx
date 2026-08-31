@@ -1,12 +1,13 @@
 import { Card, LeadForm, SpecialistCard, Testimonial, ArticleCard } from '@eametsad/ui';
 import { BadgeCheck, ClipboardList, Gavel } from 'lucide-react';
-import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { HomeTicker, type TickerLotSummary } from '../_components/HomeTicker';
 import { NewsletterBlock } from '../_components/NewsletterBlock';
 import { TrustStats } from '../_components/TrustStats';
 import { marketingUrl } from '../_lib/base-url';
+import { buildOrganizationJsonLd, toJsonLdScript } from '../_lib/jsonld';
+import { buildMetadata } from '../_lib/seo';
 
 import { listAuctions, type AuctionSummary } from '@/lib/auction/queries';
 import type { CoreRepositories, SettingsDoc } from '@/lib/data/repositories';
@@ -22,14 +23,13 @@ export const dynamic = 'force-dynamic'
 
 // The default host rewrites '/' to this route (see host-areas.ts), so the
 // canonical URL is the site root, not '/avaleht'.
-export const metadata: Metadata = {
-  title: { absolute: 'Eametsad — metsa ja raieõiguse müük oksjonil' },
+export const metadata = buildMetadata({
+  title: 'Eametsad — metsa ja raieõiguse müük oksjonil',
   description:
     'Metsa müük oksjonil: müü raieõigus või metsakinnistu läbipaistval metsaoksjonil, kus konkureerivad pakkumised tagavad turuhinna. Tasuta konsultatsioon.',
-  alternates: {
-    canonical: '/',
-  },
-}
+  path: '/',
+  absoluteTitle: true,
+})
 
 const PORTAL_URL = `https://${PORTAL_HOSTNAME}`
 
@@ -282,33 +282,6 @@ async function loadSettings(repos: CoreRepositories | null): Promise<SettingsDoc
   }
 }
 
-// Colocated so task 6.1 can move it into a shared jsonld helper without
-// touching page markup.
-function buildOrganizationJsonLd(input: {
-  name: string
-  url: string
-  address: string | null
-  sameAs: string[]
-}): Record<string, unknown> {
-  const org: Record<string, unknown> = {
-    '@context': 'https://schema.org',
-    '@type': 'Organization',
-    name: input.name,
-    url: input.url,
-  }
-  if (input.address) {
-    org.address = {
-      '@type': 'PostalAddress',
-      streetAddress: input.address,
-      addressCountry: 'EE',
-    }
-  }
-  if (input.sameAs.length > 0) {
-    org.sameAs = input.sameAs
-  }
-  return org
-}
-
 const sectionHeadingClass = 'font-heading text-h2 text-ink'
 
 export default async function AvalehtPage() {
@@ -338,7 +311,7 @@ export default async function AvalehtPage() {
     <main className="pb-2xl">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(organizationJsonLd) }}
       />
 
       {/* 1. Hero — photo overlay treatment; the photo asset itself lands

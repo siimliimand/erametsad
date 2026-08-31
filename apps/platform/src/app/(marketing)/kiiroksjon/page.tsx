@@ -7,22 +7,25 @@ import {
   ShieldCheck,
   Timer,
 } from 'lucide-react'
-import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { marketingUrl } from '../_lib/base-url'
+import {
+  buildBreadcrumbJsonLd,
+  buildServiceJsonLd,
+  toJsonLdScript,
+} from '../_lib/jsonld'
+import { buildMetadata } from '../_lib/seo'
 import { ProcessSteps, type ProcessStep } from './_components/ProcessSteps'
 
 export const revalidate = 3600
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Kiiroksjon — metsa müük 48 tunniga',
   description:
     'Kiiroksjon: 48 tunniga reaalsed pakkumised sinu metsale. Salajane piirhind, alghind alates 1 € ja garanteeritud varupakkumine — ilma eelkuludeta.',
-  alternates: {
-    canonical: '/kiiroksjon',
-  },
-}
+  path: '/kiiroksjon',
+})
 
 // Draft copy from docs/design/marketing/07-kiiroksjon.md until the Page block
 // builder lands in the CMS.
@@ -84,37 +87,15 @@ const LEAD_FORM_POINTS = [
   'Eelhindamine tasuta',
 ]
 
-const SERVICE_JSON_LD = {
-  '@context': 'https://schema.org',
-  '@type': 'Service',
+const SERVICE_JSON_LD = buildServiceJsonLd({
   name: 'Kiiroksjon — metsa müük 48 tunniga',
-  areaServed: 'Eesti',
-  provider: {
-    '@type': 'Organization',
-    name: 'Eametsad',
-    url: marketingUrl('/'),
-  },
   url: marketingUrl('/kiiroksjon'),
-}
+})
 
-const BREADCRUMB_JSON_LD = {
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    {
-      '@type': 'ListItem',
-      position: 1,
-      name: 'Avaleht',
-      item: marketingUrl('/'),
-    },
-    {
-      '@type': 'ListItem',
-      position: 2,
-      name: 'Kiiroksjon',
-      item: marketingUrl('/kiiroksjon'),
-    },
-  ],
-}
+const BREADCRUMB_JSON_LD = buildBreadcrumbJsonLd([
+  { name: 'Avaleht', path: '/' },
+  { name: 'Kiiroksjon', path: '/kiiroksjon' },
+])
 
 const btnCtaClass =
   'inline-flex h-12 w-full items-center justify-center gap-2 rounded-button bg-cta px-6 font-label font-semibold text-ink transition-all duration-hover ease-hover hover:bg-cta-hover motion-reduce:transition-none md:w-auto'
@@ -125,11 +106,11 @@ export default function KiiroksjonPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(SERVICE_JSON_LD) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(SERVICE_JSON_LD) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(BREADCRUMB_JSON_LD) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(BREADCRUMB_JSON_LD) }}
       />
 
       <section className="bg-primaryDark text-inkInverse">

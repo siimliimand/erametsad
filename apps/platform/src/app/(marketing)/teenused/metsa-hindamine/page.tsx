@@ -1,7 +1,10 @@
-import type { Metadata } from 'next'
-
 import type { TickerLotSummary } from '../../_components/HomeTicker'
-import { marketingUrl } from '../../_lib/base-url'
+import {
+  buildBreadcrumbJsonLd,
+  buildServiceJsonLd,
+  toJsonLdScript,
+} from '../../_lib/jsonld'
+import { buildMetadata } from '../../_lib/seo'
 import {
   SeoArticleTemplate,
   type SeoArticleSection,
@@ -13,14 +16,12 @@ import { getRepositories } from '@/lib/data/runtime'
 
 export const revalidate = 3600
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Metsa väärtuse hindamine — kuidas arvutada metsa hind',
   description:
     'Mis metsa hinda määrab: asukoht, puuliigid, maht ja kulud. Loe, kuidas metsa väärtust hinnatakse, ja telli tasuta hindamine — vastame ühe tööpäeva jooksul.',
-  alternates: {
-    canonical: '/teenused/metsa-hindamine',
-  },
-}
+  path: '/teenused/metsa-hindamine',
+})
 
 // Draft copy from docs/design/marketing/04-teenused-metsa-hindamine.md; the
 // article body moves behind the SEOArticle CMS collection (doc 04, Admin)
@@ -90,36 +91,14 @@ const ARTICLE_SECTIONS: SeoArticleSection[] = [
   },
 ]
 
-const SERVICE_JSON_LD = {
-  '@context': 'https://schema.org',
-  '@type': 'Service',
+const SERVICE_JSON_LD = buildServiceJsonLd({
   name: 'Metsa väärtuse hindamine',
-  areaServed: 'Eesti',
-  provider: {
-    '@type': 'Organization',
-    name: 'Eametsad',
-    url: marketingUrl('/'),
-  },
-}
+})
 
-const BREADCRUMB_JSON_LD = {
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    {
-      '@type': 'ListItem',
-      position: 1,
-      name: 'Teenused',
-      item: marketingUrl('/teenused'),
-    },
-    {
-      '@type': 'ListItem',
-      position: 2,
-      name: H1,
-      item: marketingUrl('/teenused/metsa-hindamine'),
-    },
-  ],
-}
+const BREADCRUMB_JSON_LD = buildBreadcrumbJsonLd([
+  { name: 'Teenused', path: '/teenused' },
+  { name: H1, path: '/teenused/metsa-hindamine' },
+])
 
 async function loadTickerLots(
   repos: CoreRepositories | null,
@@ -155,11 +134,11 @@ export default async function MetsaHindaminePage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(SERVICE_JSON_LD) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(SERVICE_JSON_LD) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(BREADCRUMB_JSON_LD) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(BREADCRUMB_JSON_LD) }}
       />
       <SeoArticleTemplate
         title={H1}

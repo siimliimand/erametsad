@@ -4,10 +4,11 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { marketingUrl } from '../../_lib/base-url'
+import { buildFaqPageJsonLd, toJsonLdScript } from '../../_lib/jsonld'
+import { buildMetadata } from '../../_lib/seo'
 import { KkkChipNav, type KkkChipNavCategory } from '../_components/KkkChipNav'
 import { KkkFaqAccordion } from '../_components/KkkFaqAccordion'
 import { isFaqItemVisible } from '../_lib/faq-items'
-import { buildFaqPageJsonLd } from '../_lib/faq-jsonld'
 import { richTextToText } from '../_lib/faq-text'
 
 import { getRepositories } from '@/lib/data/runtime'
@@ -70,11 +71,11 @@ export async function generateMetadata({
   const { category: slug } = await params
   const { category } = await loadCategoryPage(slug)
   if (!category) return { title: 'KKK' }
-  return {
+  return buildMetadata({
     title: `KKK — ${category.title}`,
     description: `Korduma kippuvad küsimused teemal ${category.title.toLowerCase()}.`,
-    alternates: { canonical: `/kkk/${category.slug}` },
-  }
+    path: `/kkk/${category.slug}`,
+  })
 }
 
 export default async function KkkCategoryPage({ params }: KkkCategoryPageProps) {
@@ -105,7 +106,7 @@ export default async function KkkCategoryPage({ params }: KkkCategoryPageProps) 
     <main className="mx-auto w-full max-w-container-xl px-md py-lg">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: toJsonLdScript(jsonLd) }}
       />
 
       <Link href="/kkk" className="text-bodySm text-inkMuted transition-colors hover:text-ink">

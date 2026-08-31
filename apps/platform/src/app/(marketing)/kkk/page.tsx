@@ -1,9 +1,9 @@
-import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { KkkChipNav } from './_components/KkkChipNav'
 import { KkkHubSearch, type KkkHubSearchEntry } from './_components/KkkHubSearch'
 import { isFaqItemVisible } from './_lib/faq-items'
+import { buildMetadata } from '../_lib/seo'
 
 import { getRepositories } from '@/lib/data/runtime'
 
@@ -14,12 +14,12 @@ import { getRepositories } from '@/lib/data/runtime'
 // add generateStaticParams once build-time D1 seeding exists.
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'KKK',
   description:
     'Korduma kippuvad küsimused metsa müügi, oksjonite, maksmise ja metsanduse kohta.',
-  alternates: { canonical: '/kkk' },
-}
+  path: '/kkk',
+})
 
 export default async function KkkHubPage() {
   const repos = await getRepositories()
