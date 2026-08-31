@@ -1,5 +1,6 @@
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm'
 
+export * from './analytics-events'
 export * from './shared'
 export * from './users'
 export * from './sessions'
@@ -35,6 +36,7 @@ export * from './specialists'
 export * from './statistics-snapshots'
 export * from './testimonials'
 
+import type { analyticsEvents as analyticsEventsTable } from './analytics-events'
 import type { articles as articlesTable } from './articles'
 import type { auctionRights as auctionRightsTable } from './auction-rights'
 import type { auctionSubscriptions as auctionSubscriptionsTable } from './auction-subscriptions'
@@ -98,6 +100,8 @@ export type Lead = InferSelectModel<typeof leadsTable>
 export type NewLead = InferInsertModel<typeof leadsTable>
 export type SettingsRow = InferSelectModel<typeof settingsTable>
 export type NewSettings = InferInsertModel<typeof settingsTable>
+export type AnalyticsEvent = InferSelectModel<typeof analyticsEventsTable>
+export type NewAnalyticsEvent = InferInsertModel<typeof analyticsEventsTable>
 export type Article = InferSelectModel<typeof articlesTable>
 export type NewArticle = InferInsertModel<typeof articlesTable>
 export type County = InferSelectModel<typeof countiesTable>
