@@ -3,6 +3,7 @@ export { outbidTemplate } from './templates/outbid'
 export { auctionWonTemplate } from './templates/auction-won'
 export { auctionEndedTemplate } from './templates/auction-ended'
 export { contractReadyTemplate } from './templates/contract-ready'
+export { newsletterConfirmationTemplate } from './templates/newsletter-confirmation'
 
 export interface EmailTemplateParams {
   bidPlaced: { amount: number; auctionTitle: string }
@@ -10,4 +11,5 @@ export interface EmailTemplateParams {
   auctionWon: { auctionTitle: string; winningBid: number }
   auctionEnded: { auctionTitle: string; finalPrice: number }
   contractReady: { auctionTitle: string }
+  newsletterConfirmation: { confirmUrl: string }
 }

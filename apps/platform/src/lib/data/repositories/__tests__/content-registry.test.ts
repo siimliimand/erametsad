@@ -33,8 +33,8 @@ describe('contentCollections registry', () => {
     )
   })
 
-  it('keeps the core registry at the 15 core collections', () => {
-    expect(Object.keys(coreCollections)).toHaveLength(15)
+  it('keeps the core registry at the 17 core collections', () => {
+    expect(Object.keys(coreCollections)).toHaveLength(17)
     expect(contentSlugs).toHaveLength(13)
   })
 
