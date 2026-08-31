@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, JetBrains_Mono, Manrope } from 'next/font/google'
+import { Inter, JetBrains_Mono, Public_Sans } from 'next/font/google'
 
 import '../../../../packages/ui/src/styles/tokens.css'
 import './globals.css'
 
-const manrope = Manrope({
+const publicSans = Public_Sans({
   subsets: ['latin', 'latin-ext'],
-  weight: ['700', '800'],
+  weight: ['600', '700'],
   variable: '--font-heading',
 })
 
@@ -41,7 +41,7 @@ export default function RootLayout({
   return (
     <html
       lang="et"
-      className={`${manrope.variable} ${inter.variable} ${jetbrainsMono.variable}`}
+      className={`${publicSans.variable} ${inter.variable} ${jetbrainsMono.variable}`}
     >
       <body className="antialiased">{children}</body>
     </html>

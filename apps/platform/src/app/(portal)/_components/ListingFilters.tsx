@@ -2,7 +2,7 @@
 
 import { Btn, Card, FormRange, FormSelect, Toast } from '@eametsad/ui'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 
 import { SubscribeDialog } from './SubscribeDialog'
 import {
@@ -15,9 +15,8 @@ import {
   parseListingFilters,
   serializeListingFilters,
   type ListingFilterState,
-  type ListingSortDirection,
-  type ListingSortField,
 } from '../_lib/filter-params'
+import { SPECIES } from '../_lib/species'
 
 interface CountyParish {
   id: string
@@ -49,17 +48,12 @@ function parseCounties(value: unknown): CountyOption[] {
   return value.filter(isCountyOption)
 }
 
-// Values mirror what parseAuctionSearchParams matches: county and parish
-// tokens are compared against the reference data names, species codes
-// against the mänd/kuusk/... name table, logging codes against stored codes.
-const SPECIES_OPTIONS = [
-  { value: 'ma', label: 'Mänd (MA)' },
-  { value: 'ku', label: 'Kuusk (KU)' },
-  { value: 'ks', label: 'Kask (KS)' },
-  { value: 'ha', label: 'Haab (HA)' },
-  { value: 'sa', label: 'Sanglepp (SA)' },
-  { value: 'ta', label: 'Tamm (TA)' },
-] as const
+// Chips keep the "Name (CODE)" format; the plain names live in the
+// shared species table for reuse by the lot card.
+const SPECIES_CHIP_OPTIONS = SPECIES.map((species) => ({
+  value: species.value,
+  label: `${species.name} (${species.code})`,
+}))
 
 // No label taxonomy exists in the repo; seed data stores bare codes.
 const LOGGING_TYPE_OPTIONS = [
@@ -68,13 +62,6 @@ const LOGGING_TYPE_OPTIONS = [
   { value: 't', label: 'Taastusraie (T)' },
   { value: 'l', label: 'Langu- ja kahjustuspuude raie (L)' },
   { value: 'r', label: 'Sanitaarraie (R)' },
-] as const
-
-const SORT_OPTIONS = [
-  { value: 'endTime:asc', label: 'Lõpeb peatselt' },
-  { value: 'endTime:desc', label: 'Lõpeb hiljem' },
-  { value: 'startPrice:asc', label: 'Alghind: madalam enne' },
-  { value: 'startPrice:desc', label: 'Alghind: kõrgem enne' },
 ] as const
 
 function toggleToken(list: string[], value: string): string[] {
@@ -137,6 +124,8 @@ export function ListingFilters({ tab }: { tab: string }) {
   const [resetEpoch, setResetEpoch] = useState(0)
   const [subscribeOpen, setSubscribeOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const panelId = useId()
 
   const state = draft !== null && !listingFiltersEqual(draft, urlState) ? draft : urlState
   const activeCount = countActiveFilters(state)
@@ -186,144 +175,148 @@ export function ListingFilters({ tab }: { tab: string }) {
     setResetEpoch((epoch) => epoch + 1)
   }
 
+  const activeBadge =
+    activeCount > 0 ? (
+      <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-primary px-1.5 font-mono text-[11px] font-bold text-inkInverse">
+        {activeCount}
+      </span>
+    ) : null
+
   return (
     <Card
       hover={false}
       content={
         <div className="flex flex-col gap-md">
-          <div className="flex items-center justify-between">
+          {/* A native <details open> cannot be responsive-conditional, so the
+              collapse is driven by state below lg and overridden by lg:flex. */}
+          <button
+            type="button"
+            onClick={() => { setFiltersOpen((open) => !open); }}
+            aria-expanded={filtersOpen}
+            aria-controls={panelId}
+            className="flex w-full items-center justify-between gap-sm lg:hidden"
+          >
             <span className="font-heading text-h4 font-semibold text-ink">Filtrid</span>
-            {activeCount > 0 && (
-              <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-primary px-1.5 font-mono text-[11px] font-bold text-inkInverse">
-                {activeCount}
-              </span>
-            )}
+            {activeBadge}
+          </button>
+          <div className="hidden w-full items-center justify-between gap-sm lg:flex">
+            <span className="font-heading text-h4 font-semibold text-ink">Filtrid</span>
+            {activeBadge}
           </div>
 
-          <div className="grid gap-sm sm:grid-cols-2 lg:grid-cols-3">
-            <FormSelect
-              label="Maakond"
-              name="county"
-              value={countyValue}
-              onChange={(event) => { update({
-                  county: event.target.value === '' ? [] : [event.target.value],
-                  parish: [],
-                }); }
-              }
-              options={[
-                { value: '', label: 'Kõik maakonnad' },
-                ...(counties ?? []).map((county) => ({
-                  value: county.name,
-                  label: county.name,
-                })),
-              ]}
-            />
-            <FormSelect
-              label="Vald"
-              name="parish"
-              value={parishValue}
-              disabled={selectedCounty === null}
-              onChange={(event) => { update({
-                  parish: event.target.value === '' ? [] : [event.target.value],
-                }); }
-              }
-              options={[
-                { value: '', label: 'Kõik vallad' },
-                ...(selectedCounty?.parishes ?? []).map((parish) => ({
-                  value: parish.name,
-                  label: parish.name,
-                })),
-              ]}
-            />
-            <FormSelect
-              label="Sorteeri"
-              name="sort"
-              value={`${state.sortField}:${state.sortDirection}`}
-              onChange={(event) => {
-                const [field, direction] = event.target.value.split(':')
-                update({
-                  sortField: field as ListingSortField,
-                  sortDirection: direction as ListingSortDirection,
-                })
-              }}
-              options={SORT_OPTIONS.map((option) => ({ ...option }))}
-            />
-          </div>
+          <div id={panelId} className={`${filtersOpen ? 'flex' : 'hidden'} flex-col gap-md lg:flex`}>
+            <div className="grid gap-sm">
+              <FormSelect
+                label="Maakond"
+                name="county"
+                value={countyValue}
+                onChange={(event) => { update({
+                    county: event.target.value === '' ? [] : [event.target.value],
+                    parish: [],
+                  }); }
+                }
+                options={[
+                  { value: '', label: 'Kõik maakonnad' },
+                  ...(counties ?? []).map((county) => ({
+                    value: county.name,
+                    label: county.name,
+                  })),
+                ]}
+              />
+              <FormSelect
+                label="Vald"
+                name="parish"
+                value={parishValue}
+                disabled={selectedCounty === null}
+                onChange={(event) => { update({
+                    parish: event.target.value === '' ? [] : [event.target.value],
+                  }); }
+                }
+                options={[
+                  { value: '', label: 'Kõik vallad' },
+                  ...(selectedCounty?.parishes ?? []).map((parish) => ({
+                    value: parish.name,
+                    label: parish.name,
+                  })),
+                ]}
+              />
+            </div>
 
-          <FilterSection label="Puuliik">
-            <FilterChips
-              options={SPECIES_OPTIONS}
-              selected={state.species}
-              onToggle={(value) => { update({ species: toggleToken(state.species, value) }); }}
-            />
-          </FilterSection>
+            <FilterSection label="Puuliik">
+              <FilterChips
+                options={SPECIES_CHIP_OPTIONS}
+                selected={state.species}
+                onToggle={(value) => { update({ species: toggleToken(state.species, value) }); }}
+              />
+            </FilterSection>
 
-          <FilterSection label="Raieliik">
-            <FilterChips
-              options={LOGGING_TYPE_OPTIONS}
-              selected={state.loggingTypes}
-              onToggle={(value) => { update({ loggingTypes: toggleToken(state.loggingTypes, value) }); }
-              }
-            />
-          </FilterSection>
+            <FilterSection label="Raieliik">
+              <FilterChips
+                options={LOGGING_TYPE_OPTIONS}
+                selected={state.loggingTypes}
+                onToggle={(value) => { update({ loggingTypes: toggleToken(state.loggingTypes, value) }); }
+                }
+              />
+            </FilterSection>
 
-          <div className="grid gap-sm sm:grid-cols-2 lg:grid-cols-3">
-            <FormRange
-              key={`area-${String(resetEpoch)}`}
-              label="Pindala (ha)"
-              name="area"
-              min={AREA_RANGE.min}
-              max={AREA_RANGE.max}
-              step={1}
-              value={[state.areaMin ?? AREA_RANGE.min, state.areaMax ?? AREA_RANGE.max]}
-              onChange={([min, max]) => { update({
-                  areaMin: min > AREA_RANGE.min ? min : undefined,
-                  areaMax: max < AREA_RANGE.max ? max : undefined,
-                }); }
-              }
-            />
-            <FormRange
-              key={`volume-${String(resetEpoch)}`}
-              label="Maht (m³)"
-              name="volume"
-              min={VOLUME_RANGE.min}
-              max={VOLUME_RANGE.max}
-              step={1}
-              value={[
-                state.volumeMin ?? VOLUME_RANGE.min,
-                state.volumeMax ?? VOLUME_RANGE.max,
-              ]}
-              onChange={([min, max]) => { update({
-                  volumeMin: min > VOLUME_RANGE.min ? min : undefined,
-                  volumeMax: max < VOLUME_RANGE.max ? max : undefined,
-                }); }
-              }
-            />
-            <FormRange
-              key={`price-${String(resetEpoch)}`}
-              label="Hind (€)"
-              name="price"
-              min={PRICE_RANGE.min}
-              max={PRICE_RANGE.max}
-              step={100}
-              value={[state.priceMin ?? PRICE_RANGE.min, state.priceMax ?? PRICE_RANGE.max]}
-              onChange={([min, max]) => { update({
-                  priceMin: min > PRICE_RANGE.min ? min : undefined,
-                  priceMax: max < PRICE_RANGE.max ? max : undefined,
-                }); }
-              }
-            />
-          </div>
+            <div className="grid gap-sm">
+              <FormRange
+                key={`area-${String(resetEpoch)}`}
+                label="Pindala (ha)"
+                name="area"
+                min={AREA_RANGE.min}
+                max={AREA_RANGE.max}
+                step={1}
+                value={[state.areaMin ?? AREA_RANGE.min, state.areaMax ?? AREA_RANGE.max]}
+                onChange={([min, max]) => { update({
+                    areaMin: min > AREA_RANGE.min ? min : undefined,
+                    areaMax: max < AREA_RANGE.max ? max : undefined,
+                  }); }
+                }
+              />
+              <FormRange
+                key={`volume-${String(resetEpoch)}`}
+                label="Maht (m³)"
+                name="volume"
+                min={VOLUME_RANGE.min}
+                max={VOLUME_RANGE.max}
+                step={1}
+                value={[
+                  state.volumeMin ?? VOLUME_RANGE.min,
+                  state.volumeMax ?? VOLUME_RANGE.max,
+                ]}
+                onChange={([min, max]) => { update({
+                    volumeMin: min > VOLUME_RANGE.min ? min : undefined,
+                    volumeMax: max < VOLUME_RANGE.max ? max : undefined,
+                  }); }
+                }
+              />
+              <FormRange
+                key={`price-${String(resetEpoch)}`}
+                label="Hind (€)"
+                name="price"
+                min={PRICE_RANGE.min}
+                max={PRICE_RANGE.max}
+                step={100}
+                value={[state.priceMin ?? PRICE_RANGE.min, state.priceMax ?? PRICE_RANGE.max]}
+                onChange={([min, max]) => { update({
+                    priceMin: min > PRICE_RANGE.min ? min : undefined,
+                    priceMax: max < PRICE_RANGE.max ? max : undefined,
+                  }); }
+                }
+              />
+            </div>
 
-          <div className="flex flex-col gap-sm sm:flex-row sm:items-center">
-            <Btn type="button" onClick={() => { setSubscribeOpen(true); }}>
-              Telli teavitus
-            </Btn>
-            {activeCount > 0 && (
-              <Btn type="button" variant="outline" onClick={clear} className="sm:self-start">
-                Tühjenda
+            <div className="flex flex-col gap-sm sm:flex-row sm:items-center">
+              <Btn type="button" onClick={() => { setSubscribeOpen(true); }}>
+                Telli teavitus
               </Btn>
-            )}
+              {activeCount > 0 && (
+                <Btn type="button" variant="outline" onClick={clear} className="sm:self-start">
+                  Tühjenda
+                </Btn>
+              )}
+            </div>
           </div>
 
           <SubscribeDialog

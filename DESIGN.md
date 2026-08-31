@@ -1,20 +1,20 @@
 ---
-# Design tokens — Eametsad
+# Design tokens - Eametsad
 
 colors:
-  primary: "#2E6B4F"
-  primary-hover: "#25573F"
+  primary: "#012d1d"
+  primary-hover: "#1b4332"
   primary-dark: "#16382A"
-  primary-light: "#E9F0EC"
+  primary-light: "#c1ecd4"
   accent: "#58B368"
   cta: "#F2A93B"
   cta-hover: "#D98F1F"
-  ink: "#1B211D"
-  ink-muted: "#6B7570"
+  ink: "#181a2e"
+  ink-muted: "#414844"
   ink-inverse: "#FFFFFF"
-  bg-page: "#FFFFFF"
-  bg-mist: "#F1F5F2"
-  border: "#E3E7E4"
+  bg-page: "#fbf8ff"
+  bg-mist: "#f4f2ff"
+  border: "#c1c8c2"
   danger: "#B3261E"
   danger-light: "#FBEAE9"
   info: "#2D6FA8"
@@ -27,10 +27,10 @@ colors:
   status-scheduled: "#2D6FA8"
 
 typography:
-  font-heading: Manrope
+  font-heading: Public Sans
   font-body: Inter
   font-mono: JetBrains Mono
-  heading-weights: [700, 800]
+  heading-weights: [600, 700]
   body-weights: [400, 500, 600]
   mono-weights: [400, 500]
   scale:
@@ -55,17 +55,16 @@ spacing:
 
 layout:
   grid-columns: 12
-  container-max: 1280
+  container-max: 1200
   gutter: 24
   content-narrow: 720
-  content-standard: 1280
   sidebar: 280
 
 radii:
-  card: 14
-  button: 10
-  input: 10
-  hero: 16
+  card: 8
+  button: 9999
+  input: 8
+  hero: 12
   modal: 16
   pill: 9999
 
@@ -89,7 +88,7 @@ hero-overlay: "linear-gradient(90deg, rgba(22,56,42,.85), rgba(22,56,42,.35))"
 
 # Eametsad design system
 
-Eametsad is an Estonian forest-transaction platform: a marketing site, an auction portal, and an admin backend. The backend runs on Cloudflare Workers (via OpenNext) with Cloudflare D1 for storage and Durable Objects for bid serialization. The design uses the Estonian forest as its visual anchor. The look is calm, genuine, and trustworthy. Nothing is hidden. Fees are stated upfront. Consent checkboxes are visible and unchecked.
+Eametsad is an Estonian forest-transaction platform: a marketing site, an auction portal, and an admin backend. The backend runs on Cloudflare Workers (via OpenNext) with Cloudflare D1 for storage and Durable Objects for bid serialization. The design keeps the Estonian forest as its visual anchor and pairs it with a pale, lavender-tinted paper surface. The look is calm, genuine, and trustworthy. Nothing is hidden. Fees are stated upfront. Consent checkboxes are visible and unchecked.
 
 ## Design principles
 
@@ -97,37 +96,41 @@ The system follows five principles. Calm, not cluttered: generous white space, o
 
 ## Colour
 
-The palette comes from the Estonian forest: spruce green, dark soil, moss, golden birch.
+The palette keeps its forest roots and gains a pale lavender surface. Primary is a deep, near-black spruce green (`#012d1d`). It covers buttons, links, active tab markers, and the card call to action. The hover step is `#1b4332`. The dark variant (`#16382A`) still covers hero overlays and footers. The light variant (`#c1ecd4`) is a soft mint that fills count pills and selected states.
 
-Primary is a muted forest green (`#2E6B4F`). It works for buttons, links, and accent elements. The dark variant (`#16382A`) covers hero overlays and footers. The light variant (`#E9F0EC`) makes subtle section backgrounds and selected states.
+Surfaces are pale and warm. The page background is a lavender-tinted paper (`#fbf8ff`). Section alternates use a lighter mist tone (`#f4f2ff`). Borders use grey-green `#c1c8c2`. Body text is a blue-black ink (`#181a2e`), and muted text is `#414844`. Both pass WCAG AA on the paper surface.
 
-The CTA colour is amber (`#F2A93B`). It calls attention to main actions and price highlights. The accent green (`#58B368`) shows success and active states.
-
-Body text uses `#1B211D` instead of pure black. It reads softer on screen. Muted ink (`#6B7570`) works for captions, metadata, and archived items. Danger red (`#B3261E`) and info blue (`#2D6FA8`) have matching light backgrounds for inline status use.
-
-Status pills use a separate set: active green (`#2E9E5B`), amber for auctions ending within an hour, red for five minutes or less, grey for ended and archived, grey for draft, and blue for scheduled.
+The CTA amber (`#F2A93B`) and the accent green (`#58B368`) keep their roles: main actions, price highlights, and success states. Danger red (`#B3261E`) and info blue (`#2D6FA8`) keep their light background pairs. The status pill set is unchanged: active green, amber for auctions ending within an hour, red for five minutes or less, grey for ended and draft, blue for scheduled.
 
 ## Typography
 
-Three font families serve different roles. Manrope for headings: geometric, slightly warm, readable at large sizes. Inter for body and UI: clean, highly legible, with full Estonian diacritic support. JetBrains Mono for price figures, countdowns, and data tables, with tabular number alignment.
+Three font families serve different roles. Public Sans carries headings at weights 600 and 700. It loads through `next/font` as `--font-heading` and sets a sturdy, neutral tone at large sizes. Inter stays the body and UI face at weights 400, 500, and 600, with full Estonian diacritic support. JetBrains Mono at weights 400 and 500 serves price figures, countdowns, and KPI numbers. It uses tabular number alignment, so digits line up in columns.
 
-H1 uses 800 weight at 48 pixels. H2 uses 700 at 36 pixels. H3 uses 700 at 24 pixels. Body text runs at 16 pixels with generous 1.6 line-height for comfortable reading.
-
-Labels use 13 pixels with tighter line-height. Status digits and KPI numbers use a separate 32-pixel size in JetBrains Mono.
+The scale is unchanged. H1 runs at 48 pixels with a 1.15 line-height, H2 at 36, H3 at 24, and H4 at 18. Body text runs at 16 pixels with a 1.6 line-height. Labels use 13 pixels with a tighter line-height. Status digits and KPI numbers use a separate 32-pixel size in JetBrains Mono. Card prices use the mono face with tabular figures.
 
 ## Spacing and layout
 
-A 12-column CSS grid with a 1280-pixel max container and 24-pixel gutters governs all layouts. Sections alternate between 64-pixel and 96-pixel padding on desktop, stepping down one level on mobile.
+A 12-column CSS grid with a 1200-pixel max container and 24-pixel gutters governs all layouts. Sections alternate between 64-pixel and 96-pixel padding on desktop, stepping down one level on mobile.
 
 Card padding uses 24 pixels as the standard unit. Large section gaps reach 128 pixels between major blocks. A narrow content track of 720 pixels is reserved for long-form articles and FAQ answers.
+
+The portal listing page splits the container at `lg`. The filter aside takes 3 columns and the main column takes 9. The main column stacks the heading, tabs, map, results bar, a two-column card grid, and pagination. Below `lg` everything stacks in one column, and the filters collapse behind a disclosure.
 
 ## Components
 
 Every component is built once and shared across all three sites.
 
-Core interactive components include `Btn` in three styles (solid primary green, solid CTA amber, outline and ghost) and three sizes (48, 40, and 32 pixels). `Card` has rounded corners with an optional shadow and a hover lift effect. `LotCard` is a card variant for auction listings with image, price, countdown, and status.
+Core interactive components include `Btn` in three styles (solid primary green, solid CTA amber, outline and ghost) and three sizes (48, 40, and 32 pixels). Buttons use a full pill radius. `Card` has 8-pixel corners with an optional shadow and a hover lift effect.
 
-`FilterPanel` is a collapsible sidebar with chip selects and range sliders. `MapEstonia` wraps Leaflet with Maa-amet orthophoto tiles and county GeoJSON overlays. `Countdown` synchronises with the server and uses the status colour phases: neutral, amber below one hour, red below five minutes, with optional pulse.
+`LotCard` has two presentations. The enhanced listing card shows the photo with two overlays: an object-type badge at the top left and a countdown pill at the top right. Under the title sits a two-by-two metadata grid with a Lucide icon per cell: `MapPin` for the parish and county, `Ruler` for the area in hectares, `Trees` for the species list, and `Package` for the volume in cubic metres. Cells without data collapse. A divider separates the Alghind (or archive Lõpphind) price block from a "Vaata lähemalt" pill. The whole card is one link, and the call to action is a styled span inside it, so no nested interactive elements appear. Without the optional props the card renders the minimal presentation, which `AuctionTicker` and `ArchiveCard` still use.
+
+The listing filters live in a sidebar aside on desktop. They keep chip selects for species (Puuliik) and logging type (Raieliik), range sliders for area (Pindala), volume (Maht), and price (Hind), plus the "Telli teavitus" and "Tühjenda" actions. The sort control moved to the results bar. On mobile the filters collapse behind a disclosure above the map.
+
+A slim server-rendered results bar sits above the card grid. It shows the found count as "Leitud N oksjonit" with Estonian pluralization, next to a "Sorteeri" select. The select posts the same `sort` and `order` URL parameters the filter panel used, so shared links keep working.
+
+`MapEstonia` wraps Leaflet with Maa-amet orthophoto tiles and county GeoJSON overlays. On the listing page the map is always visible above the results bar. It runs 400 pixels tall at desktop and about 240 pixels on mobile. Clustering and popups stay as built. The old `?view=kart` parameter still parses but no longer changes the layout.
+
+`Countdown` synchronises with the server and uses the status colour phases: neutral, amber below one hour, red below five minutes, with optional pulse. The listing tabs row holds six tabs: Kõik objektid, Raieõigused, Metskinnistud, Põllumaad, Paketid, and Kiiroksjonid. Kõik objektid comes first and is the default view, under the heading "Aktiivsed oksjonid". Each tab carries a live count pill. Põllumaad renders its empty state until the schema stores its object type.
 
 The bidding panel (`BidPanel`) handles step-based and sealed input, auto-bidder toggle, and under-bid mode. `DataTable` uses 40-pixel rows with sortable and filterable columns. `Accordion`, `Tabs`, `Steps`, `EmptyState`, `Toast`, `Modal`, and `Drawer` cover the usual interaction patterns.
 
@@ -151,7 +154,17 @@ The hero overlay is a linear gradient from dark green transparency on the left t
 
 ## Icons
 
-Lucide React provides the icon set. Key icons map to product concepts: `TreePine` for cutting rights, `MapPinHouse` for properties, `Wheat` for fields, `Zap` for quick auctions. Social media icons use brand SVGs.
+Lucide React is the only icon set. Key icons map to product concepts: `TreePine` for cutting rights, `MapPinHouse` for properties, `Wheat` for fields, `Zap` for quick auctions. The lot card metadata grid adds four mappings: `MapPin` for location, `Ruler` for area, `Trees` for species, and `Package` for volume. Social media icons use brand SVGs. No icon font is loaded, so the CSP gains no new hosts.
+
+## Mockup deviations
+
+The listing redesign follows the approved mockup with five deliberate deviations.
+
+- Status phases stay live: the countdown runs neutral, turns amber below one hour, and turns red below five minutes. The mockup's static red badge is not used.
+- JetBrains Mono stays for prices and countdown digits.
+- Volume keeps the unit m³ from the data layer, not the mockup's "tm".
+- Lucide stays the icon set. The mockup's Material Symbols map to `MapPin`, `Ruler`, `Trees`, and `Package`.
+- The Maht and Raieliik filters stay even though the mockup lacks them.
 
 ## Brand voice
 

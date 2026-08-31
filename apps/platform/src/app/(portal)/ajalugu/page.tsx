@@ -35,8 +35,10 @@ const EMPTY_RESULT: AuctionListResult = {
   totalPages: 1,
 }
 
-// Genitive plural forms for "lõppenud {…} oksjonit".
+// Genitive plural forms for "lõppenud {…} oksjonit"; Kõik uses '' so the
+// sentence drops the qualifier entirely ("lõppenud oksjonit").
 const ARCHIVE_TAB_GENITIVE: Record<ListingTabId, string> = {
+  koik: '',
   raieoigused: 'raieõiguste',
   metskinnistud: 'metskinnistute',
   polumaad: 'põllumaade',
@@ -129,10 +131,10 @@ async function loadTabArchive(
   page: number,
   params: RawSearchParams,
 ): Promise<AuctionListResult> {
-  const { objectTypes } = listingTabDef(tab)
-  if (objectTypes.length === 0) return EMPTY_RESULT
+  const { allTypes, objectTypes } = listingTabDef(tab)
+  if (!allTypes && objectTypes.length === 0) return EMPTY_RESULT
   const search = new URLSearchParams()
-  search.set('objectType', objectTypes.join(','))
+  if (objectTypes.length > 0) search.set('objectType', objectTypes.join(','))
   search.set('limit', String(ARCHIVE_PAGE_SIZE))
   for (const key of ['county', 'parish', 'species', 'loggingType', 'sort', 'order', 'endYear']) {
     for (const value of csvValues(params, key)) search.append(key, value)
@@ -145,14 +147,20 @@ async function loadTabArchive(
   return listArchivedAuctions(repos, search)
 }
 
+/** Stat buckets behind one tab; Kõik sums every objectType bucket. */
+function archiveBucketsForTab(
+  tab: ListingTabId,
+  stats: Record<AuctionObjectType, ArchivedAuctionTypeStats>,
+): ArchivedAuctionTypeStats[] {
+  const { allTypes, objectTypes } = listingTabDef(tab)
+  return allTypes ? Object.values(stats) : objectTypes.map((objectType) => stats[objectType])
+}
+
 function archivedCountForTab(
   tab: ListingTabId,
   stats: Record<AuctionObjectType, ArchivedAuctionTypeStats>,
 ): number {
-  return listingTabDef(tab).objectTypes.reduce(
-    (sum, objectType) => sum + stats[objectType].count,
-    0,
-  )
+  return archiveBucketsForTab(tab, stats).reduce((sum, bucket) => sum + bucket.count, 0)
 }
 
 function endYearsForTab(
@@ -160,18 +168,19 @@ function endYearsForTab(
   stats: Record<AuctionObjectType, ArchivedAuctionTypeStats>,
 ): number[] {
   const years = new Set<number>()
-  for (const objectType of listingTabDef(tab).objectTypes) {
-    for (const year of stats[objectType].endYears) years.add(year)
+  for (const bucket of archiveBucketsForTab(tab, stats)) {
+    for (const year of bucket.endYears) years.add(year)
   }
   return [...years].sort((a, b) => b - a)
 }
 
 function archiveSummarySentence(tab: ListingTabId, total: number): string {
   const genitive = ARCHIVE_TAB_GENITIVE[tab]
+  const qualifier = genitive === '' ? '' : `${genitive} `
   if (total <= 0) {
-    return `Arhiivis ei ole lõppenud ${genitive} oksjoneid.`
+    return `Arhiivis ei ole lõppenud ${qualifier}oksjoneid.`
   }
-  return `Arhiivis on ${formatEstonianInteger(total)} lõppenud ${genitive} oksjonit.`
+  return `Arhiivis on ${formatEstonianInteger(total)} lõppenud ${qualifier}oksjonit.`
 }
 
 interface ArchiveTabTotals {
@@ -185,12 +194,12 @@ function archiveTabTotals(
   tab: ListingTabId,
   stats: Record<AuctionObjectType, ArchivedAuctionTypeStats>,
 ): ArchiveTabTotals {
-  return listingTabDef(tab).objectTypes.reduce<ArchiveTabTotals>(
-    (sum, objectType) => ({
-      count: sum.count + stats[objectType].count,
-      areaHa: sum.areaHa + stats[objectType].areaHa,
-      volumeM3: sum.volumeM3 + stats[objectType].volumeM3,
-      finalPriceEur: sum.finalPriceEur + stats[objectType].finalPriceEur,
+  return archiveBucketsForTab(tab, stats).reduce<ArchiveTabTotals>(
+    (sum, bucket) => ({
+      count: sum.count + bucket.count,
+      areaHa: sum.areaHa + bucket.areaHa,
+      volumeM3: sum.volumeM3 + bucket.volumeM3,
+      finalPriceEur: sum.finalPriceEur + bucket.finalPriceEur,
     }),
     { count: 0, areaHa: 0, volumeM3: 0, finalPriceEur: 0 },
   )

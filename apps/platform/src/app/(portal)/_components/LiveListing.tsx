@@ -10,12 +10,14 @@ import {
   type ReactNode,
 } from 'react'
 
+import { speciesNames } from '../_lib/species'
 import {
   useAuctionStream,
   type AuctionStreamPublishedPayload,
 } from '../_lib/use-auction-stream'
 
 import type { AuctionListResult, AuctionSummary } from '@/lib/auction/queries'
+import type { AuctionObjectType } from '@/lib/data/schema'
 
 /**
  * Drop-in client wrapper for the portal listing grid. Integration is a
@@ -51,6 +53,16 @@ const LOT_IMAGE_FALLBACK = `data:image/svg+xml;charset=utf-8,${encodeURIComponen
 
 const HIGHLIGHT_MS = 6_000
 
+// Singular card badge labels; ListingTabs only exports the plural tab
+// labels, so the badge forms live here. A new AuctionObjectType fails
+// typecheck here until it gets a label.
+const OBJECT_TYPE_LABELS: Record<AuctionObjectType, string> = {
+  raieoigus: 'Raieõigus',
+  kinnistu: 'Metskinnistu',
+  pakett: 'Pakett',
+  kiire: 'Kiiroksjon',
+}
+
 export interface LiveLotState {
   /** True briefly after the lot was prepended by a live publish event. */
   highlighted: boolean
@@ -64,9 +76,17 @@ export interface LiveListingProps {
 
 function lotCardProps(lot: AuctionSummary): LotCardProps {
   const ended = lot.status === 'ended'
+  // Optional props are spread conditionally: with exactOptionalPropertyTypes
+  // an explicit undefined would not satisfy `prop?: T`, and any one of these
+  // flips LotCard into its enhanced presentation.
+  const species = speciesNames(lot.species)
   return {
     image: { src: lot.image ?? LOT_IMAGE_FALLBACK, alt: lot.title },
     title: lot.title,
+    typeLabel: OBJECT_TYPE_LABELS[lot.objectType],
+    ...(lot.parish !== null ? { parish: lot.parish.name } : {}),
+    ...(lot.volume !== null ? { volumeM3: lot.volume } : {}),
+    ...(species.length > 0 ? { speciesNames: species } : {}),
     alghind: lot.minBid,
     county: lot.county?.name ?? lot.address ?? 'Eesti',
     area: lot.area ?? 0,
@@ -219,7 +239,7 @@ export function LiveListing({ lots, query, renderLot }: LiveListingProps) {
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
-      <div className="grid gap-md sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-md sm:grid-cols-2">
         {view.map((lot) => {
           const highlighted = highlightedIds.has(lot.id)
           const content =

@@ -37,6 +37,10 @@ export interface ListingMapLot {
 
 export interface ListingMapProps {
   lots: ListingMapLot[]
+  /**
+   * Kept for source compatibility but not applied: the component owns its
+   * responsive slot height, so caller height classes cannot fight it.
+   */
   className?: string
 }
 
@@ -137,7 +141,7 @@ function buildPins(
   return pins
 }
 
-export function ListingMap({ lots, className = '' }: ListingMapProps) {
+export function ListingMap({ lots }: ListingMapProps) {
   const router = useRouter()
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<{ center: [number, number]; zoom: number }>({
@@ -197,7 +201,7 @@ export function ListingMap({ lots, className = '' }: ListingMapProps) {
 
   if (located.length === 0) {
     return (
-      <div className={`rounded-card border border-border bg-white p-lg text-center ${className}`}>
+      <div className="rounded-card border border-border bg-white p-lg text-center">
         <p className="font-heading text-h4 text-ink">Kaardivaade ei ole saadaval</p>
         <p className="mt-2 font-body text-body text-inkMuted">
           Ükski oksjon ei sisalda kaardi asukohta.
@@ -206,8 +210,17 @@ export function ListingMap({ lots, className = '' }: ListingMapProps) {
     )
   }
 
+  // The component owns its slot height (240px below lg, 400px at lg+). The
+  // [&_.map-estonia] overrides defeat the min-height: 400px that MapEstonia.css
+  // hard-codes on the map root, its leaflet container, and the error fallback
+  // (packages/ui MapEstonia.css lines 4/10/19); without them the mobile slot
+  // is pinned at 400px and the fallback overflows the shorter wrapper.
   return (
-    <div ref={wrapperRef} onClick={handleWrapperClick} className={className}>
+    <div
+      ref={wrapperRef}
+      onClick={handleWrapperClick}
+      className="h-60 overflow-hidden rounded-card border border-border lg:h-[400px] [&_.map-estonia]:h-full [&_.map-estonia]:min-h-0 [&_.map-estonia__fallback]:h-full [&_.map-estonia__fallback]:min-h-0"
+    >
       <MapEstonia pins={pins} center={view.center} zoom={view.zoom} />
     </div>
   )

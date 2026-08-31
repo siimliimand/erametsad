@@ -1,8 +1,5 @@
-# portal-listing Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change phase-3-auction-portal. Update Purpose after archive.
-## Requirements
 ### Requirement: Type tabs with counters and summary sentence
 
 The listing at `/` SHALL present six tabs — Kõik objektid, Raieõigused,
@@ -67,26 +64,6 @@ contain the sort control; sorting lives in the results bar.
 - **WHEN** the listing renders below `lg`
 - **THEN** the filters are collapsed until the user opens the disclosure
 
-### Requirement: Saved-search subscription entry
-The listing filter panel SHALL offer a "Telli teavitus" action for the
-current filter state. For authed users it SHALL open the subscription
-modal prefilled with the active filters (channel and frequency
-selectable) and save through `POST /api/v1/auction-subscriptions`. For
-guests it SHALL ask for email with a required visible consent checkbox
-and save the subscription against that email. Success SHALL confirm with
-a toast; errors SHALL show inline.
-
-#### Scenario: Authed subscription from filters
-- **WHEN** an authed user applies a Lääne-Viru county filter and clicks
-  "Telli teavitus"
-- **THEN** the modal opens prefilled with that filter and saving creates
-  the subscription
-
-#### Scenario: Guest subscription requires consent
-- **WHEN** a guest submits the subscription form with an empty consent
-  checkbox
-- **THEN** submit is blocked with an inline error on the checkbox
-
 ### Requirement: Map view
 
 The listing SHALL render the map always visible above the results bar on
@@ -132,25 +109,7 @@ shareable page numbers.
 - **WHEN** a tab and filters match 12 auctions
 - **THEN** the results bar reads "Leitud 12 oksjonit"
 
-### Requirement: Live listing updates
-The listing SHALL subscribe to the auction SSE stream: newly published
-lots prepend with a highlight, anti-snipe extensions update countdowns
-in place, and ended lots flip to their ended presentation.
-
-#### Scenario: Extension updates countdown
-- **WHEN** an `auction:extended` event arrives for a visible lot
-- **THEN** that card's countdown resets to the new end time without a
-  reload
-
-### Requirement: Empty and error states
-An empty tab SHALL show the Estonian empty state with subscription
-guidance; zero filter results SHALL offer "Tühjenda filtrid"; load
-failures SHALL show a retry button. Kiiroksjonid with zero SHALL link to
-the marketing explainer.
-
-#### Scenario: Empty filter result
-- **WHEN** filters match no auctions
-- **THEN** the empty result message with "Tühjenda filtrid" renders
+## ADDED Requirements
 
 ### Requirement: Lot card presentation
 
@@ -174,4 +133,3 @@ remain a single link to the lot page.
 - **WHEN** `AuctionTicker` renders the card without the new props
 - **THEN** the card renders its previous minimal presentation without
   errors or empty cells
-

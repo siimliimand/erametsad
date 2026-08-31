@@ -1,18 +1,18 @@
 :root {
   /* ── Colors ── */
-  --color-primary: #2E6B4F;
-  --color-primary-hover: #25573F;
+  --color-primary: #012d1d;
+  --color-primary-hover: #1b4332;
   --color-primary-dark: #16382A;
-  --color-primary-light: #E9F0EC;
+  --color-primary-light: #c1ecd4;
   --color-accent: #58B368;
   --color-cta: #F2A93B;
   --color-cta-hover: #D98F1F;
-  --color-ink: #1B211D;
-  --color-ink-muted: #6B7570;
+  --color-ink: #181a2e;
+  --color-ink-muted: #414844;
   --color-ink-inverse: #FFFFFF;
-  --color-bg-page: #FFFFFF;
-  --color-bg-mist: #F1F5F2;
-  --color-border: #E3E7E4;
+  --color-bg-page: #fbf8ff;
+  --color-bg-mist: #f4f2ff;
+  --color-border: #c1c8c2;
   --color-danger: #B3261E;
   --color-danger-light: #FBEAE9;
   --color-info: #2D6FA8;
@@ -37,10 +37,10 @@
   --space-3xl: 128px;
 
   /* ── Radii ── */
-  --radius-card: 14px;
-  --radius-button: 10px;
-  --radius-input: 10px;
-  --radius-hero: 16px;
+  --radius-card: 8px;
+  --radius-button: 9999px;
+  --radius-input: 8px;
+  --radius-hero: 12px;
   --radius-modal: 16px;
   --radius-pill: 9999px;
 
@@ -70,12 +70,12 @@
   --motion-anti-snipe-extend-easing: cubic-bezier(0.22, 0.61, 0.36, 1);
 
   /* ── Typography ── */
-  --font-heading: "Manrope", sans-serif;
+  --font-heading: "Public Sans", sans-serif;
   --font-body: "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
   /* ── Layout ── */
-  --layout-container-max: 1280px;
+  --layout-container-max: 1200px;
   --layout-content-narrow: 720px;
   --layout-sidebar: 280px;
   --layout-grid-columns: 12;
