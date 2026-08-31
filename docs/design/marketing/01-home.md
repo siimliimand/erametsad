@@ -1,6 +1,6 @@
 # Avaleht — Homepage
 
-> **In brief:** The landing page — what Eametsad offers, live auctions, trust stats, and how to get in touch.
+> **In brief:** The landing page — what Erametsad offers, live auctions, trust stats, and how to get in touch.
 | Area | marketing |
 |---|---|
 | **Route** | `/` |
@@ -8,7 +8,7 @@
 | **In nav** | logo/kodu ikoon; kõik harud |
 
 ## Purpose & user goals
-Metsaomanik, kes kaalub metsa müüki, peab 10 sekundiga aru saama, mida Eametsad pakub (oksjonimüük, tasuta konsultatsioon), nägema elavaid oksjoneid ja saama jätta kontakti. Teine sihtgrupp — ostja — suunatakse portaali.
+Metsaomanik, kes kaalub metsa müüki, peab 10 sekundiga aru saama, mida Erametsad pakub (oksjonimüük, tasuta konsultatsioon), nägema elavaid oksjoneid ja saama jätta kontakti. Teine sihtgrupp — ostja — suunatakse portaali.
 
 ## Wireframe (desktop)
 
@@ -44,7 +44,7 @@ Metsaomanik, kes kaalub metsa müüki, peab 10 sekundiga aru saama, mida Eametsa
 ## Block-by-block spec
 1. **Hero** — täislaius foto, overlay `linear-gradient(90deg, rgba(22,56,42,.85), rgba(22,56,42,.35))`. Vasak: H1 (48px), intro, `Btn` "Vaata aktiivseid oksjoneid" → portaal, `Btn-secondary` "Oksjonite ajalugu". Parem: `LeadForm` Card (form_name `avaleht-1`), pealkiri "Tasuta konsultatsioon".
 2. **"Plaanis metsa müük?"** — `--bg-mist` band: lühitekst konsultatsioonist (tasuta, kohustuseta) + `Btn` "Räägime detailsemalt" → `#kontaktvorm`.
-3. **AuctionTicker** — 4 viimast aktiivset `LotCard`: katastrinumber, pindala ha, `Countdown`, `StatusPill` (active `#2E9E5B`), link `oksjonid.eametsad.ee/<tüüp>/<id>`. Andmed build-ajal + kliendipoolne värskekus 60s (vt Data). Kui aktiivseid pole → tühi olek vt States.
+3. **AuctionTicker** — 4 viimast aktiivset `LotCard`: katastrinumber, pindala ha, `Countdown`, `StatusPill` (active `#2E9E5B`), link `oksjonid.erametsad.ee/<tüüp>/<id>`. Andmed build-ajal + kliendipoolne värskekus 60s (vt Data). Kui aktiivseid pole → tühi olek vt States.
 4. **Kollektiiv** — 4 `SpecialistCard` (foto, nimi, roll, "Kirjuta" link) → `/meist/metsaspetsialistid`.
 5. **Usaldusstatistika** — 3 numbrit `--primary-dark` taustal, valge Manrope 48px: "kontrollitud ostjat", "metsakinnistute ostjat", "kokku müüdud (€)" — reaalarvud andmebaasist.
 6. **Protsess 3 veergu** — `Card`id H3-ga Eeltöö / Oksjon / Tulemus, 3 lühipunkti; iga veeru pealkiri süvalingina `/teenused/raieoiguse-muuk#eeltöö|#oksjon|#tulemus`.
@@ -73,7 +73,7 @@ Metsaomanik, kes kaalub metsa müüki, peab 10 sekundiga aru saama, mida Eametsa
 - H1: "Sinu mets, õigem hind." (draft) · intro: "Müü raieõigus või metsakinnistu oksjonil, kus konkureerivad pakkumised tagavad turuhinna. Konsultatsioon on tasuta." · "Vaata aktiivseid oksjoneid" · "Oksjonite ajalugu" · "Plaanis metsa müük? Räägime läbi, ilma kohustusteta." · "Tasuta konsultatsioon" · "Soovid konsultatsiooni? Jäta meile enda andmed." · "Liitun uudiskirjaga" · "Vaata kõiki uudiseid".
 
 ## SEO & analytics
-- Title: "Eametsad — metsa ja raieõiguse müük oksjonil" (draft); description must include "metsa müük, raieõigus, metsaoksjon, metsakinnistu".
+- Title: "Erametsad — metsa ja raieõiguse müük oksjonil" (draft); description must include "metsa müük, raieõigus, metsaoksjon, metsakinnistu".
 - JSON-LD: `Organization` (nimi, aadress, kontakt, sameAs sotsiaalvõrgud).
 - Sündmused: `lead_form_submit_start/complete{form_name}`, `cta_click{hero_primary|hero_secondary}`, `newsletter_submit`, `ticker_card_click{lot_id}`, `article_card_click{slug}`, `process_column_click{column}`.
 
