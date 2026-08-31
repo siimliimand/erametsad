@@ -207,11 +207,14 @@ describe('transformNdjson', () => {
 })
 
 describe('table graph', () => {
-  it('covers all 30 D1 tables (28 + sessions + password_reset_tokens)', () => {
-    expect(tableNames()).toHaveLength(30)
+  it('covers all 33 D1 tables (28 + sessions + password_reset_tokens + consent_log + newsletter_subscribers + analytics_events)', () => {
+    expect(tableNames()).toHaveLength(33)
     expect(tableNames()).toContain('sessions')
     expect(tableNames()).toContain('rights_requests')
     expect(tableNames()).toContain('password_reset_tokens')
+    expect(tableNames()).toContain('consent_log')
+    expect(tableNames()).toContain('newsletter_subscribers')
+    expect(tableNames()).toContain('analytics_events')
   })
 
   it('inserts FK parents before children', () => {

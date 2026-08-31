@@ -116,12 +116,14 @@ The monorepo is under active implementation. `apps/platform` holds the core back
 |---|---|
 | **URL** | `eametsad.ee` |
 | **Audience** | Forest owners, buyers (public, no auth) |
-| **Stack** | Next.js 15 App Router, SSG/ISR |
+| **Stack** | Next.js 15 App Router `(marketing)` route group in the shared platform app. Static content pages use ISR (`revalidate = 3600`); CMS-backed pages render per request until build-time D1 seeding exists |
 | **Content** | Pages, articles, FAQ categories, specialists, testimonials, partner services — all from D1-backed CMS content tables |
-| **Dynamic elements** | Live auction ticker (client-side fetch + refresh), lead forms, newsletter subscription |
+| **Dynamic elements** | Live auction ticker (server render + 60s client refresh), lead forms, newsletter double opt-in, cookie consent with granular categories, consent-gated analytics events |
 | **Key routes** | `/`, `/teenused/*`, `/metsateatis`, `/kiiroksjon`, `/hindamisaktid`, `/kkk/*`, `/paringud/*`, `/meist/*`, `/artiklid/*`, `/lepingud`, `/kontakt` |
 
 All marketing-site content is managed via D1-backed CMS content tables. The site generates statically where possible and hydrates live data client-side.
+
+Host routing lives in `apps/platform/src/lib/routing/host-areas.ts` plus application middleware. The portal host serves the `(portal)` route group; the default host serves `(marketing)` plus `/admin` and `/styleguide`. On the default host, `/` rewrites to `/avaleht` and `/lepingud` to `/lepingud/dokumendid` (the portal keeps the real `/` and `/lepingud` routes on its host). Marketing-only paths 308 to the default host when requested on the portal host, portal paths 308 the reverse way, and `/metsateatise-juhend` 301s to `/metsateatis`. Support APIs `POST /api/v1/consent`, `/api/v1/newsletter` (double opt-in), and `/api/v1/events` (consent-gated) back the cookie banner, newsletter block, and analytics skeleton.
 
 ### 3.2 Auction Portal
 
@@ -129,7 +131,7 @@ All marketing-site content is managed via D1-backed CMS content tables. The site
 |---|---|
 | **URL** | `oksjonid.eametsad.ee` |
 | **Audience** | Bidders & sellers (public browse + authenticated customer area) |
-| **Stack** | Next.js 15 App Router `(portal)` route group in the shared platform app (owns `/`; marketing joins in phase 4) |
+| **Stack** | Next.js 15 App Router `(portal)` route group in the shared platform app (owns `/` and `/lepingud` on its host) |
 | **Key public pages** | Listing (`/`), lot detail open/sealed (`/oksjon/:id`), archive (`/ajalugu`), login, register, select-profile |
 | **Key authenticated pages** | My bids, my sales, notifications, profile, contract signing |
 | **Realtime** | Server-Sent Events (SSE) for bid/countdown updates |
@@ -207,7 +209,7 @@ Buyer submits bid
 
 | Store | Type | Purpose |
 |---|---|---|
-| Cloudflare D1 (SQLite) | Relational (primary) | All transactional data: users, profiles, auctions, bids, contracts, leads, CMS content, audit log, sessions. 28 tables defined via Drizzle ORM schema in `apps/platform/src/lib/data/schema/`. |
+| Cloudflare D1 (SQLite) | Relational (primary) | All transactional data: users, profiles, auctions, bids, contracts, leads, CMS content, audit log, sessions. 33 tables (28 + sessions, password-reset tokens, and the three phase-4 support tables `consent_log`, `newsletter_subscribers`, `analytics_events`) defined via Drizzle ORM schema in `apps/platform/src/lib/data/schema/`. |
 | Durable Objects | Stateful compute | `AuctionDO`: serialized bid admission, alarms, anti-snipe, end transitions, SSE event hub. `RateLimiterDO`: rate-limit counters. |
 | Cloudflare R2 | Object storage | Media uploads (images, documents) |
 | Cloudflare KV | Key-value cache | Ephemeral cache where needed |
@@ -243,7 +245,7 @@ Schema source: `apps/platform/src/lib/data/schema/`. The repository layer at `ap
 | **Runtime** | Cloudflare Workers (via OpenNext) | Serverless edge runtime for the Next.js app |
 | **Framework** | Next.js 15 (App Router) | SSG/ISR for marketing, API routes for backend |
 | **Database** | Cloudflare D1 (SQLite) | Primary store — Drizzle ORM for schema and queries |
-| **ORM** | Drizzle ORM | Schema definition, migrations, type-safe queries. 28 tables in `apps/platform/src/lib/data/schema/`. |
+| **ORM** | Drizzle ORM | Schema definition, migrations, type-safe queries. 33 tables in `apps/platform/src/lib/data/schema/`. |
 | **Bid serialization** | Durable Objects (`AuctionDO`) | Single-threaded per auction — owns bid admission, alarms, anti-snipe, end transitions, SSE hub |
 | **Rate limiting** | Durable Objects (`RateLimiterDO`) | Per-identifier rate-limit counters |
 | **Queue** | Cloudflare queues (`eametsad-jobs`) | Background jobs with DLQ (`eametsad-dlq`, max_retries 3). Cron sweep wakes evicted DOs. |
@@ -364,7 +366,7 @@ All suites run under `pnpm test`. Schema lint enforces data conventions (no REAL
 | **Monorepo (Turborepo/pnpm)** | Mirrors reference architecture proven for this exact product class; shared types and components across three sites |
 | **Cloudflare Workers via OpenNext** | All stateful components on one platform: D1, Durable Objects, queues, Email Service, R2, KV. No external database or cache vendor. |
 | **D1 (SQLite) over PostgreSQL** | Eliminates external Postgres dependency; D1 runs on the same edge as Workers. INTEGER cents, TEXT timestamps, TEXT UUIDs, TEXT-JSON columns. |
-| **Drizzle ORM** | Type-safe schema and queries over D1. Replaces Payload CMS collections. 28 tables with repository-layer access rules. |
+| **Drizzle ORM** | Type-safe schema and queries over D1. Replaces Payload CMS collections. 33 tables with repository-layer access rules. |
 | **Durable Objects for bid serialization** | `AuctionDO` is single-threaded per auction — replaces `SELECT ... FOR UPDATE` row locks that D1 cannot provide. |
 | **SSE over WebSockets** | Lower complexity for server-to-client bid/countdown updates; WebSocket overhead not justified until chat/multiplayer features added |
 | **Cloudflare queues over BullMQ** | Queue and DLQ run on the same platform. Cron sweep wakes evicted DOs. |

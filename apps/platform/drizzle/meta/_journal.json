@@ -43,6 +43,27 @@
       "when": 1788102148303,
       "tag": "0005_high_starbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788186283414,
+      "tag": "0006_closed_sister_grimm",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788186480419,
+      "tag": "0007_safe_zaladane",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788187267464,
+      "tag": "0008_lean_chat",
+      "breakpoints": true
     }
   ]
 }

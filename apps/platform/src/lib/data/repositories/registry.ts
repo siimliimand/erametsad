@@ -1,6 +1,7 @@
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 
 import type {
+  AnalyticsEvent,
   Article,
   Auction,
   AuctionRight,
@@ -9,6 +10,7 @@ import type {
   Autobidder,
   Bid,
   CompanyAccessRequest,
+  ConsentLog,
   Contract,
   ContractTemplate,
   County,
@@ -17,6 +19,7 @@ import type {
   Lead,
   LegalDocument,
   MediaAsset,
+  NewAnalyticsEvent,
   NewArticle,
   NewAuction,
   NewAuctionRight,
@@ -25,6 +28,7 @@ import type {
   NewAutobidder,
   NewBid,
   NewCompanyAccessRequest,
+  NewConsentLog,
   NewContract,
   NewContractTemplate,
   NewCounty,
@@ -33,6 +37,7 @@ import type {
   NewLead,
   NewLegalDocument,
   NewMediaAsset,
+  NewNewsletterSubscriber,
   NewNotification,
   NewPage,
   NewParish,
@@ -45,6 +50,7 @@ import type {
   NewStatisticsSnapshot,
   NewTestimonial,
   NewUser,
+  NewsletterSubscriber,
   NotificationRow,
   Page,
   Parish,
@@ -59,6 +65,7 @@ import type {
   User,
 } from '../schema'
 import {
+  analyticsEvents,
   articles,
   auctionRights,
   auctionSubscriptions,
@@ -67,6 +74,7 @@ import {
   autobidders,
   bids,
   companyAccessRequests,
+  consentLog,
   contractTemplates,
   contracts,
   counties,
@@ -75,6 +83,7 @@ import {
   leads,
   legalDocuments,
   media,
+  newsletterSubscribers,
   notifications,
   pages,
   parishes,
@@ -106,6 +115,9 @@ export type CoreCollectionSlug =
   | 'contract-templates'
   | 'notifications'
   | 'audit-entry'
+  | 'consent-log'
+  | 'analytics-events'
+  | 'newsletter-subscribers'
   | 'leads'
   | 'settings'
 
@@ -149,6 +161,8 @@ export const notificationsJsonFields = {
   recipientResults: 'json',
 } as const satisfies JsonFieldSpec
 export const auditEntriesJsonFields = { before: 'json', after: 'json' } as const satisfies JsonFieldSpec
+export const consentLogJsonFields = { categories: 'json' } as const satisfies JsonFieldSpec
+export const analyticsEventsJsonFields = { props: 'json' } as const satisfies JsonFieldSpec
 export const settingsJsonFields = { featureFlags: 'json' } as const satisfies JsonFieldSpec
 export const auctionSubscriptionsJsonFields = { filterJson: 'json' } as const satisfies JsonFieldSpec
 
@@ -174,6 +188,8 @@ export type AuctionDoc = JsonDoc<Auction, typeof auctionsJsonFields>
 export type ContractTemplateDoc = JsonDoc<ContractTemplate, typeof contractTemplatesJsonFields>
 export type NotificationDoc = JsonDoc<NotificationRow, typeof notificationsJsonFields>
 export type AuditEntryDoc = JsonDoc<AuditEntry, typeof auditEntriesJsonFields>
+export type ConsentLogDoc = JsonDoc<ConsentLog, typeof consentLogJsonFields>
+export type AnalyticsEventDoc = JsonDoc<AnalyticsEvent, typeof analyticsEventsJsonFields>
 export type SettingsDoc = JsonDoc<SettingsRow, typeof settingsJsonFields>
 export type AuctionSubscriptionDoc = JsonDoc<AuctionSubscription, typeof auctionSubscriptionsJsonFields>
 
@@ -182,6 +198,8 @@ export type AuctionCreateData = CreateData<NewAuction, typeof auctionsJsonFields
 export type ContractTemplateCreateData = CreateData<NewContractTemplate, typeof contractTemplatesJsonFields>
 export type NotificationCreateData = CreateData<NewNotification, typeof notificationsJsonFields>
 export type AuditEntryCreateData = CreateData<NewAuditEntry, typeof auditEntriesJsonFields>
+export type ConsentLogCreateData = CreateData<NewConsentLog, typeof consentLogJsonFields>
+export type AnalyticsEventCreateData = CreateData<NewAnalyticsEvent, typeof analyticsEventsJsonFields>
 export type SettingsCreateData = CreateData<NewSettings, typeof settingsJsonFields>
 export type AuctionSubscriptionCreateData = CreateData<
   NewAuctionSubscription,
@@ -210,6 +228,9 @@ export interface CoreCollectionDocs {
   'contract-templates': ContractTemplateDoc
   notifications: NotificationDoc
   'audit-entry': AuditEntryDoc
+  'consent-log': ConsentLogDoc
+  'analytics-events': AnalyticsEventDoc
+  'newsletter-subscribers': NewsletterSubscriber
   leads: Lead
   settings: SettingsDoc
 }
@@ -228,6 +249,9 @@ export interface CoreCollectionCreates {
   'contract-templates': ContractTemplateCreateData
   notifications: NotificationCreateData
   'audit-entry': AuditEntryCreateData
+  'consent-log': ConsentLogCreateData
+  'analytics-events': AnalyticsEventCreateData
+  'newsletter-subscribers': CreateData<NewNewsletterSubscriber>
   leads: CreateData<NewLead>
   settings: SettingsCreateData
 }
@@ -378,6 +402,27 @@ export const coreCollections: Readonly<Record<CoreCollectionSlug, RepositoryColl
     table: auditEntries,
     aliases: { actor: 'actorId' },
     jsonFields: auditEntriesJsonFields,
+    isikukood: false,
+    templateActivation: false,
+  },
+  'consent-log': {
+    table: consentLog,
+    aliases: {},
+    jsonFields: consentLogJsonFields,
+    isikukood: false,
+    templateActivation: false,
+  },
+  'analytics-events': {
+    table: analyticsEvents,
+    aliases: {},
+    jsonFields: analyticsEventsJsonFields,
+    isikukood: false,
+    templateActivation: false,
+  },
+  'newsletter-subscribers': {
+    table: newsletterSubscribers,
+    aliases: {},
+    jsonFields: {},
     isikukood: false,
     templateActivation: false,
   },

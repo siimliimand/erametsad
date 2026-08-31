@@ -1,10 +1,12 @@
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm'
 
+export * from './analytics-events'
 export * from './shared'
 export * from './users'
 export * from './sessions'
 export * from './profiles'
 export * from './company-access-requests'
+export * from './consent-log'
 export * from './auction-rights'
 export * from './rights-requests'
 export * from './auctions'
@@ -24,6 +26,7 @@ export * from './faq-categories'
 export * from './faq-items'
 export * from './legal-documents'
 export * from './media'
+export * from './newsletter-subscribers'
 export * from './pages'
 export * from './parishes'
 export * from './partner-services'
@@ -33,6 +36,7 @@ export * from './specialists'
 export * from './statistics-snapshots'
 export * from './testimonials'
 
+import type { analyticsEvents as analyticsEventsTable } from './analytics-events'
 import type { articles as articlesTable } from './articles'
 import type { auctionRights as auctionRightsTable } from './auction-rights'
 import type { auctionSubscriptions as auctionSubscriptionsTable } from './auction-subscriptions'
@@ -41,6 +45,7 @@ import type { auditEntries as auditEntriesTable } from './audit-entries'
 import type { autobidders as autobiddersTable } from './autobidders'
 import type { bids as bidsTable } from './bids'
 import type { companyAccessRequests as companyAccessRequestsTable } from './company-access-requests'
+import type { consentLog as consentLogTable } from './consent-log'
 import type { contractTemplates as contractTemplatesTable } from './contract-templates'
 import type { contracts as contractsTable } from './contracts'
 import type { counties as countiesTable } from './counties'
@@ -49,6 +54,7 @@ import type { faqItems as faqItemsTable } from './faq-items'
 import type { leads as leadsTable } from './leads'
 import type { legalDocuments as legalDocumentsTable } from './legal-documents'
 import type { media as mediaTable } from './media'
+import type { newsletterSubscribers as newsletterSubscribersTable } from './newsletter-subscribers'
 import type { notifications as notificationsTable } from './notifications'
 import type { pages as pagesTable } from './pages'
 import type { parishes as parishesTable } from './parishes'
@@ -88,10 +94,14 @@ export type NotificationRow = InferSelectModel<typeof notificationsTable>
 export type NewNotification = InferInsertModel<typeof notificationsTable>
 export type AuditEntry = InferSelectModel<typeof auditEntriesTable>
 export type NewAuditEntry = InferInsertModel<typeof auditEntriesTable>
+export type ConsentLog = InferSelectModel<typeof consentLogTable>
+export type NewConsentLog = InferInsertModel<typeof consentLogTable>
 export type Lead = InferSelectModel<typeof leadsTable>
 export type NewLead = InferInsertModel<typeof leadsTable>
 export type SettingsRow = InferSelectModel<typeof settingsTable>
 export type NewSettings = InferInsertModel<typeof settingsTable>
+export type AnalyticsEvent = InferSelectModel<typeof analyticsEventsTable>
+export type NewAnalyticsEvent = InferInsertModel<typeof analyticsEventsTable>
 export type Article = InferSelectModel<typeof articlesTable>
 export type NewArticle = InferInsertModel<typeof articlesTable>
 export type County = InferSelectModel<typeof countiesTable>
@@ -106,6 +116,8 @@ export type NewLegalDocument = InferInsertModel<typeof legalDocumentsTable>
 // sites (next/image, CSS media types), same reasoning as NotificationRow.
 export type MediaAsset = InferSelectModel<typeof mediaTable>
 export type NewMediaAsset = InferInsertModel<typeof mediaTable>
+export type NewsletterSubscriber = InferSelectModel<typeof newsletterSubscribersTable>
+export type NewNewsletterSubscriber = InferInsertModel<typeof newsletterSubscribersTable>
 export type Page = InferSelectModel<typeof pagesTable>
 export type NewPage = InferInsertModel<typeof pagesTable>
 export type Parish = InferSelectModel<typeof parishesTable>
