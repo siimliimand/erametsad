@@ -4,8 +4,10 @@ import {
   DEFAULT_HOSTNAME,
   PORTAL_HOSTNAME,
   normalizeHostname,
+  resolveDefaultHostRewrite,
   resolveHostArea,
   resolveHostRedirect,
+  resolveLegacyPathRedirect,
   resolvePathArea,
 } from '@/lib/routing/host-areas'
 
@@ -68,6 +70,29 @@ describe('resolvePathArea', () => {
     expect(resolvePathArea('/lepingud/raamleping')).toBe('portal')
     expect(resolvePathArea('/administrator')).toBe('portal')
   })
+
+  it('classifies marketing paths', () => {
+    expect(resolvePathArea('/teenused')).toBe('marketing')
+    expect(resolvePathArea('/teenused/hindamine')).toBe('marketing')
+    expect(resolvePathArea('/kkk')).toBe('marketing')
+    expect(resolvePathArea('/meist')).toBe('marketing')
+    expect(resolvePathArea('/artiklid/metsandus')).toBe('marketing')
+    expect(resolvePathArea('/metsateatis')).toBe('marketing')
+    expect(resolvePathArea('/hindamisaktid')).toBe('marketing')
+    expect(resolvePathArea('/kiiroksjon')).toBe('marketing')
+    expect(resolvePathArea('/kontakt')).toBe('marketing')
+    expect(resolvePathArea('/avaleht')).toBe('marketing')
+    expect(resolvePathArea('/lepingud/dokumendid')).toBe('marketing')
+    expect(resolvePathArea('/metsateatise-juhend')).toBe('marketing')
+  })
+
+  it('classifies unlisted paths by host', () => {
+    expect(resolvePathArea('/suvaline', 'default')).toBe('marketing')
+    expect(resolvePathArea('/', 'default')).toBe('marketing')
+    expect(resolvePathArea('/lepingud', 'default')).toBe('marketing')
+    expect(resolvePathArea('/suvaline', 'portal')).toBe('portal')
+    expect(resolvePathArea('/lepingud', 'portal')).toBe('portal')
+  })
 })
 
 describe('resolveHostRedirect', () => {
@@ -94,19 +119,74 @@ describe('resolveHostRedirect', () => {
     )
   })
 
+  it('redirects marketing paths from the portal host to the default host', () => {
+    expect(resolveHostRedirect(PORTAL_HOSTNAME, '/teenused/hindamine', '?kee=info')).toBe(
+      `https://${DEFAULT_HOSTNAME}/teenused/hindamine?kee=info`,
+    )
+    expect(resolveHostRedirect(PORTAL_HOSTNAME, '/kkk')).toBe(`https://${DEFAULT_HOSTNAME}/kkk`)
+  })
+
+  it('normalizes the rewrite targets on the portal host', () => {
+    expect(resolveHostRedirect(PORTAL_HOSTNAME, '/avaleht', '?kampaania=kevad')).toBe(
+      `https://${DEFAULT_HOSTNAME}/?kampaania=kevad`,
+    )
+    expect(resolveHostRedirect(PORTAL_HOSTNAME, '/lepingud/dokumendid', '?leht=2')).toBe(
+      `https://${DEFAULT_HOSTNAME}/lepingud?leht=2`,
+    )
+  })
+
   it('redirects portal paths from the default host, preserving path and query', () => {
-    expect(resolveHostRedirect(DEFAULT_HOSTNAME, '/')).toBe(`https://${PORTAL_HOSTNAME}/`)
     expect(resolveHostRedirect(DEFAULT_HOSTNAME, '/login')).toBe(
       `https://${PORTAL_HOSTNAME}/login`,
     )
     expect(resolveHostRedirect(DEFAULT_HOSTNAME, '/oksjon/9', '?ref=list&page=2')).toBe(
       `https://${PORTAL_HOSTNAME}/oksjon/9?ref=list&page=2`,
     )
+    expect(resolveHostRedirect(DEFAULT_HOSTNAME, '/lepingud/raamleping')).toBe(
+      `https://${PORTAL_HOSTNAME}/lepingud/raamleping`,
+    )
+  })
+
+  it('leaves the rewrite sources unredirected on the default host', () => {
+    expect(resolveHostRedirect(DEFAULT_HOSTNAME, '/')).toBeNull()
+    expect(resolveHostRedirect(DEFAULT_HOSTNAME, '/lepingud', '?sort=uus')).toBeNull()
   })
 
   it('no-ops for default-host app and shared paths', () => {
     expect(resolveHostRedirect(DEFAULT_HOSTNAME, '/admin')).toBeNull()
     expect(resolveHostRedirect(DEFAULT_HOSTNAME, '/api/v1/auth/login')).toBeNull()
     expect(resolveHostRedirect(DEFAULT_HOSTNAME, '/_next/static/chunk.js')).toBeNull()
+  })
+})
+
+describe('resolveLegacyPathRedirect', () => {
+  it('301s the legacy guide path to the canonical default-host path from both hosts', () => {
+    expect(resolveLegacyPathRedirect(DEFAULT_HOSTNAME, '/metsateatise-juhend', '?allikas=vana')).toBe(
+      `https://${DEFAULT_HOSTNAME}/metsateatis?allikas=vana`,
+    )
+    expect(resolveLegacyPathRedirect(PORTAL_HOSTNAME, '/metsateatise-juhend')).toBe(
+      `https://${DEFAULT_HOSTNAME}/metsateatis`,
+    )
+  })
+
+  it('no-ops for other paths and unmapped hosts', () => {
+    expect(resolveLegacyPathRedirect(DEFAULT_HOSTNAME, '/metsateatis')).toBeNull()
+    expect(resolveLegacyPathRedirect(null, '/metsateatise-juhend')).toBeNull()
+    expect(resolveLegacyPathRedirect('localhost', '/metsateatise-juhend')).toBeNull()
+  })
+})
+
+describe('resolveDefaultHostRewrite', () => {
+  it('maps / and /lepingud to the marketing routes on the default host', () => {
+    expect(resolveDefaultHostRewrite(DEFAULT_HOSTNAME, '/')).toBe('/avaleht')
+    expect(resolveDefaultHostRewrite(DEFAULT_HOSTNAME, '/lepingud')).toBe('/lepingud/dokumendid')
+  })
+
+  it('no-ops for other paths, other hosts, and unmapped hosts', () => {
+    expect(resolveDefaultHostRewrite(DEFAULT_HOSTNAME, '/avaleht')).toBeNull()
+    expect(resolveDefaultHostRewrite(DEFAULT_HOSTNAME, '/lepingud/dokumendid')).toBeNull()
+    expect(resolveDefaultHostRewrite(PORTAL_HOSTNAME, '/')).toBeNull()
+    expect(resolveDefaultHostRewrite(PORTAL_HOSTNAME, '/lepingud')).toBeNull()
+    expect(resolveDefaultHostRewrite(null, '/')).toBeNull()
   })
 })
