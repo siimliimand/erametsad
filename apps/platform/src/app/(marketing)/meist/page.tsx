@@ -5,7 +5,12 @@ import { buildMetadata } from '../_lib/seo'
 
 import { getRepositories } from '@/lib/data/runtime'
 
-export const revalidate = 3600
+// D7 asks for ISR (revalidate = 3600) on content pages, but CI and deploy
+// builds run `next build` without a seeded D1, so prerendering against the
+// CMS would fail the build or bake empty pages. Request-time rendering is
+// the repo-wide convention for DB-backed pages; drop `force-dynamic` and
+// add generateStaticParams once build-time D1 seeding exists.
+export const dynamic = 'force-dynamic'
 
 export const metadata = buildMetadata({
   title: 'Meist',

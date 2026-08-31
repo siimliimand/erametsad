@@ -167,6 +167,8 @@ describe('avaleht render smoke with seeded data', () => {
 
     const markers = [
       'Sinu mets, õigem hind.', // 1. hero
+      'Tasuta konsultatsioon', //  hero card (Card content slot)
+      'name="cadastre"', //        hero card embeds the lead form
       'Plaanis metsa müük?', // 2. band
       'Aktiivsed oksjonid', // 3. auction ticker
       '12345:678:9101', //    seeded lot card (cadastre headline)
@@ -174,6 +176,8 @@ describe('avaleht render smoke with seeded data', () => {
       'Mari Mets',
       'Müüdud oksjonit', //   5. trust statistics
       'Kuidas müük käib?', //  6. process
+      'Eeltöö', //            process card titles render via content slot
+      'Oksjon kestab 7–14 päeva.',
       'Viimased artiklid', //  7. articles
       'Metsa müügi ABC',
       'Uudiskiri', //          8. newsletter
@@ -240,10 +244,12 @@ describe('avaleht render smoke with seeded data', () => {
 
     const html = await renderPage()
 
-    // Static sections stay...
+    // Static sections stay (including the hero consultation card)...
     expect(html).toContain('Sinu mets, õigem hind.')
+    expect(html).toContain('Tasuta konsultatsioon')
     expect(html).toContain('Plaanis metsa müük?')
     expect(html).toContain('Kuidas müük käib?')
+    expect(html).toContain('Eeltöö')
     expect(html).toContain('Uudiskiri')
     expect(html).toContain('id="kontaktvorm"')
     // ...while the DB-backed ones hide or fall back.

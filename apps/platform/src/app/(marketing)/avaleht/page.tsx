@@ -335,15 +335,24 @@ export default async function AvalehtPage() {
               </a>
             </div>
           </div>
-          <Card hover={false} className="p-6">
-            <h2 className="font-heading text-h3 text-ink">Tasuta konsultatsioon</h2>
-            <p className="mt-2xs text-bodySm text-inkMuted">
-              Soovid konsultatsiooni? Jäta meile enda andmed.
-            </p>
-            <div className="mt-md">
-              <LeadForm slug="avaleht" />
-            </div>
-          </Card>
+          {/* Card renders only its image/content/actions slots, so the hero
+              form goes through `content` (which Card wraps in p-6). */}
+          <Card
+            hover={false}
+            content={
+              <>
+                <h2 className="font-heading text-h3 text-ink">
+                  Tasuta konsultatsioon
+                </h2>
+                <p className="mt-2xs text-bodySm text-inkMuted">
+                  Soovid konsultatsiooni? Jäta meile enda andmed.
+                </p>
+                <div className="mt-md">
+                  <LeadForm slug="avaleht" />
+                </div>
+              </>
+            }
+          />
         </div>
       </section>
 
@@ -415,22 +424,28 @@ export default async function AvalehtPage() {
         <h2 className={sectionHeadingClass}>Kuidas müük käib?</h2>
         <div className="mt-md grid gap-lg md:grid-cols-3">
           {PROCESS_STEPS.map(({ anchor, title, icon: Icon, points }) => (
-            <Card key={anchor} hover={false} className="p-6">
-              <Icon className="h-6 w-6 text-primary" aria-hidden="true" />
-              <h3 className="mt-xs">
-                <Link
-                  href={`/teenused/raieoiguse-muuk#${anchor}`}
-                  className="font-heading text-h4 text-ink underline-offset-4 hover:text-primary hover:underline"
-                >
-                  {title}
-                </Link>
-              </h3>
-              <ul className="mt-sm list-disc space-y-2 pl-5 text-bodySm text-inkMuted marker:text-primary">
-                {points.map((point) => (
-                  <li key={point}>{point}</li>
-                ))}
-              </ul>
-            </Card>
+            <Card
+              key={anchor}
+              hover={false}
+              content={
+                <>
+                  <Icon className="h-6 w-6 text-primary" aria-hidden="true" />
+                  <h3 className="mt-xs">
+                    <Link
+                      href={`/teenused/raieoiguse-muuk#${anchor}`}
+                      className="font-heading text-h4 text-ink underline-offset-4 hover:text-primary hover:underline"
+                    >
+                      {title}
+                    </Link>
+                  </h3>
+                  <ul className="mt-sm list-disc space-y-2 pl-5 text-bodySm text-inkMuted marker:text-primary">
+                    {points.map((point) => (
+                      <li key={point}>{point}</li>
+                    ))}
+                  </ul>
+                </>
+              }
+            />
           ))}
         </div>
       </section>

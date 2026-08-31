@@ -109,8 +109,10 @@ function auctionLinks(kind: 'active' | 'history'): FooterLink[] {
   }))
 }
 
+// No per-document detail page exists: legal_documents rows render on the
+// /lepingud/dokumendid list page, so both links point there.
 function legalLink(doc: LegalDocument | undefined, label: string): FooterLink | null {
-  return doc ? { label, href: `/lepingud/dokumendid/${doc.slug}` } : null
+  return doc ? { label, href: '/lepingud/dokumendid' } : null
 }
 
 function buildSections(
@@ -273,7 +275,7 @@ export async function MarketingFooter() {
           <nav aria-label="Juriidiline teave" className="flex items-center gap-md">
             {privacyResult.docs[0] !== undefined && (
               <Link
-                href={`/lepingud/dokumendid/${privacyResult.docs[0].slug}`}
+                href="/lepingud/dokumendid"
                 className="transition-colors duration-hover ease-hover hover:text-white"
               >
                 Privaatsuspoliitika

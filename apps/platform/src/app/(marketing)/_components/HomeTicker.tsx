@@ -114,6 +114,13 @@ export function HomeTicker({ initialLots }: { initialLots: TickerLotSummary[] })
     }
   }, []);
 
+  // Stable identity: AuctionTicker re-runs its 60s interval effect whenever
+  // the callback changes, so an inline arrow would restart the timer after
+  // every refresh.
+  const onRefresh = useCallback(() => {
+    void refresh();
+  }, [refresh]);
+
   // Spec (marketing-home): exact info card replaces the ticker.
   if (lots.length === 0) {
     return (
@@ -132,5 +139,5 @@ export function HomeTicker({ initialLots }: { initialLots: TickerLotSummary[] })
     );
   }
 
-  return <AuctionTicker lots={lots} onRefresh={() => { void refresh() }} />;
+  return <AuctionTicker lots={lots} onRefresh={onRefresh} />;
 }
