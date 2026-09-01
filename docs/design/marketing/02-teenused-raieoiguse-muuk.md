@@ -38,12 +38,12 @@ Metsaomanik, kellel on kehtiv metsamajanduskava ja/või metsateatis, saab aru t�
 **Mobiil:** hero CTAd virn; vorm täislaius; akordioneoni rühmad → üks vertikaalne nummerdatud nimekiri (sammud avanevad klõpsuga, numbritähist jäetakse alles); tasu/vastutus kaardid virna.
 
 ## Block-by-block spec
-1. **Hero** — foto + overlay, H1, intro (draft): "Raieõiguse oksjonil müük tekitab ostjate vahel konkurentsii ja tagab saagi tegeliku turuväärtuse." Kaks CTA-d → `oksjonid.eametsad.ee/raie` ja `/kinnistud`. Ilma vormita (vorm kohe all).
+1. **Hero** — foto + overlay, H1, intro (draft): "Raieõiguse oksjonil müük tekitab ostjate vahel konkurentsii ja tagab saagi tegeliku turuväärtuse." Kaks CTA-d → `oksjonid.erametsad.ee/raie` ja `/kinnistud`. Ilma vormita (vorm kohe all).
 2. **LeadForm #1** (`raieoiguse-muuk-1`, ankur `#kontaktvorm`) — vasakul veerulõik "Müü raieõigus mõistlikult" + 3 eelist (tasuta hindamine; tasu ainult eduka tehingu korral; hallatud kogu protsess).
 3. **9-sammuline akordioneon** — `Accordion` kolmes grupis; iga rida = number (ring `--primary`-iga) + pealkiri (nupp, `aria-expanded`); avanedes H3 + 2 lõiku. Algne olek: kõik suletud (deep-link `#eeltöö/#oksjon/#tulemus` avab vastava grupi ja scrollib).
    - **Eeltöö:** 1. "Vaatame sinu metsa üle" (tasuta välitöö, takseeri kontroll) · 2. "Paneme paika alghinna" (hinna kujunemine: puuliigid, maht, väljavedu, turg) · 3. "Valmistame dokumendid" (kava, metsateatis, lepingu eelkontroll).
    - **Oksjon:** 4. "Avalikustame oksjoni" (portaalis, foto+kaart+takseer) · 5. "Teavitame ostjate võrgustikku" (e-mail + SMS) · 6. "Pakkumised konkureerivad" (klassikaline tõusev oksjon, samm, autonoomne pakkumine, alapakkumise selgitus).
-   - **Tulemus:** 7. "Kinnitame tulemuse" (võiduteatis, tasu 3% + km võiduhinnast) · 8. "Sõlmime lepingu" (oksjonileping, makse- ja raietingimused) · 9. "Jälgime tööde õigsust" (raie- ja väljaveo tähtajad; Eametsad vastutab protsessi korrektsuse eest).
+   - **Tulemus:** 7. "Kinnitame tulemuse" (võiduteatis, tasu 3% + km võiduhinnast) · 8. "Sõlmime lepingu" (oksjonileping, makse- ja raietingimused) · 9. "Jälgime tööde õigsust" (raie- ja väljaveo tähtajad; Erametsad vastutab protsessi korrektsuse eest).
 4. **Tasu & vastutus** — 2 `Card`: (a) "Mis see maksab?" — teenustasu 3% + km lõpphinnast; **tasu 0 €, kui oksjon ei õnnestu** (piiramata korduskatsed); (b) "Meie vastutus" — vastutame korraldatavate tööde ja protsessi õigsuse eest; müüja ei pea kohale tulema.
 5. **Ostjate eelkontroll** — H2 "Kes sinu metsale pakkumist teeb?" — tekst: iga ostja läbib eelkontrolli (äriregistri kontroll, maksevõime, varasem tehingute ajalugu); personaalsed garantiid; kõik pakkumised anonüümsed. Numbriline foon: "N kontrollitud raieõiguse ostjat" (API statistikast).
 
@@ -65,7 +65,7 @@ Metsaomanik, kellel on kehtiv metsamajanduskava ja/või metsateatis, saab aru t�
 - H1: "Raieõiguse müük oksjonil" · "Tutvu raieõiguste oksjonitega" · "Tutvu kinnistute oksjonitega" · "Mis see maksab?" → "Teenustasu on 3% käibemaksuga lõpphinnast. Kui oksjon jääb müümata, ei maksa sa midagi." · "Konsultatsioon ja metsa ülevaatus on alati tasuta."
 
 ## SEO & analytics
-- Title: "Raieõiguse müük oksjonil | Eametsad" (draft); desc mainigu "raieõigus, metsa müük, oksjon, 3% teenustasu, tasuta hindamine".
+- Title: "Raieõiguse müük oksjonil | Erametsad" (draft); desc mainigu "raieõigus, metsa müük, oksjon, 3% teenustasu, tasuta hindamine".
 - JSON-LD: `Service` + `FAQPage`-väli pole (KKK eraldi); `BreadcrumbList` Teenused → Raieõigus.
 - Sündmused: `accordion_step_open{step_index, group}`, `hero_cta_click{target}`, `lead_form_submit_start/complete`, `outbound_click{raie|kinnistud}`.
 
