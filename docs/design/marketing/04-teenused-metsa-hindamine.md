@@ -8,7 +8,7 @@
 | **In nav** | "Metsa müümine" → 3. item |
 
 ## Purpose & user goals
-Otsingumootorist tulnud omanik ("metsa hind", "kui palju mu mets väärt on") saab pikaformaadilise hariva artikli ja väljub läbi kontaktvormi tasuta konsultatsioonile. Käesolev fail **defineerib ka taaskasutatava SEO-artikli malli**, mida kasutavad `/metsa-hinna-kalkulaator`, `/taksaator`, `/tehingukeskus`, `/metsa-ost`, `/lageraie` jt. ~20 pika sabaga lehte (vt EAMETSAD-PLAN §4.1).
+Otsingumootorist tulnud omanik ("metsa hind", "kui palju mu mets väärt on") saab pikaformaadilise hariva artikli ja väljub läbi kontaktvormi tasuta konsultatsioonile. Käesolev fail **defineerib ka taaskasutatava SEO-artikli malli**, mida kasutavad `/metsa-hinna-kalkulaator`, `/taksaator`, `/tehingukeskus`, `/metsa-ost`, `/lageraie` jt. ~20 pika sabaga lehte (vt ERAMETSAD-PLAN §4.1).
 
 ## Wireframe (desktop)
 
@@ -65,7 +65,7 @@ Otsingumootorist tulnud omanik ("metsa hind", "kui palju mu mets väärt on") sa
 - H1: "Metsa väärtuse hindamine" · sissejuhatus: "Metsa hind ei ole üks number — see on asukoha, puuliikide, mahu ja kulude summa. Selgitame lahti, mis sinu metsa hinda tõstab ja mida langetab." · CTA: "Konsultatsioon on tasuta".
 
 ## SEO & analytics
-- Title: "Metsa väärtuse hindamine — kuidas arvutada metsa hind | Eametsad"; desc + H2-d peavad katma vastavad otsingud ("metsa hind", "metsa hindamine", aastaarv pealkirjas kus asjakohane).
+- Title: "Metsa väärtuse hindamine — kuidas arvutada metsa hind | Erametsad"; desc + H2-d peavad katma vastavad otsingud ("metsa hind", "metsa hindamine", aastaarv pealkirjas kus asjakohane).
 - JSON-LD: `Article` + `BreadcrumbList`. Sitemap-canonical kõikidel instantsidel (vältida dubleeringuid malliga).
 - Sündmused: `toc_click{section}`, `read_progress{25|50|75|100}` (Plausible scroll-sündmus), `lead_form_submit_start/complete{form_name}`, `ticker_card_click{lot_id}`.
 
