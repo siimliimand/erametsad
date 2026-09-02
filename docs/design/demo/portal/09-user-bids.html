@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minu pakkumised | Erametsad Oksjonid</title>
+<meta name="description" content="Minu pakkumiste ülevaade Erametsa oksjonitel — käimasolevad pakkumised, lõppenud oksjonite tulemused ja automaatpakkuja seaded.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232E6B4F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z'/%3E%3Cpath d='M12 22v-3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<script>document.documentElement.classList.add('js')</script>
+<style>
+/* ---- Tokens ---- */
+:root{
+  --primary:#2E6B4F; --primary-hover:#25573F; --primary-dark:#16382A; --primary-light:#E9F0EC;
+  --accent:#58B368; --cta:#F2A93B; --cta-hover:#D98F1F;
+  --ink:#1B211D; --ink-muted:#6B7570; --ink-inverse:#FFFFFF;
+  --bg-page:#FFFFFF; --bg-mist:#F1F5F2; --border:#E3E7E4;
+  --danger:#B3261E; --danger-light:#FBEAE9; --info:#2D6FA8; --info-light:#E9F1F7;
+  --font-head:"Manrope",system-ui,sans-serif;
+  --font-body:"Inter",system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --container-max:1280px; --gutter:24px;
+  --r-card:14px; --r-btn:10px; --r-hero:16px; --r-pill:999px;
+  --shadow-card:0 2px 12px rgba(22,56,42,.08);
+  --shadow-hover:0 2px 8px rgba(22,56,42,.12),0 8px 24px rgba(22,56,42,.08);
+  --shadow-modal:0 4px 16px rgba(22,56,42,.12),0 16px 48px rgba(22,56,42,.10);
+  --header-h:72px;
+  --ease-reveal:cubic-bezier(.22,.61,.36,1);
+}
+
+/* ---- Base ---- */
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg-page); color:var(--ink);
+  font:400 1rem/1.6 var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+img,svg{display:block}
+h1,h2,h3,h4{font-family:var(--font-head); line-height:1.2; margin:0 0 .5em}
+h1{font-size:3rem; font-weight:800; line-height:1.15}
+h2{font-size:2.25rem; font-weight:700; line-height:1.2}
+h3{font-size:1.5rem; font-weight:700; line-height:1.25}
+h4{font-size:1.125rem; font-weight:700; letter-spacing:.02em}
+p{margin:0 0 1em}
+a{color:var(--primary)}
+a:hover{color:var(--primary-hover)}
+ul{margin:0; padding:0; list-style:none}
+button{font:inherit; cursor:pointer}
+input,select{font:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+::selection{background:var(--primary-light)}
+.mono{font-family:var(--font-mono); font-feature-settings:"tnum"}
+.skip-link{
+  position:absolute; left:-9999px; top:8px; z-index:200;
+  background:var(--primary-dark); color:#fff; padding:10px 16px; border-radius:var(--r-btn);
+}
+.skip-link:focus{left:8px; color:#fff}
+.icon{display:inline-flex; align-items:center; justify-content:center; width:1em; height:1em; flex:none; line-height:1; font-size:20px}
+
+/* ---- Layout ---- */
+.container{max-width:var(--container-max); margin-inline:auto; padding-inline:var(--gutter)}
+.section{padding-block:64px; scroll-margin-top:calc(var(--header-h) + 16px)}
+.bg-mist{background:var(--bg-mist)}
+
+/* ---- Buttons ---- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  min-height:48px; padding:12px 24px; border-radius:var(--r-btn); border:1px solid transparent;
+  font-weight:600; font-size:1rem; text-decoration:none; transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out, box-shadow .15s ease-out;
+}
+.btn-cta{background:var(--cta); color:var(--ink)}
+.btn-cta:hover{background:var(--cta-hover); color:var(--ink)}
+.btn-primary{background:var(--primary); color:#fff}
+.btn-primary:hover{background:var(--primary-hover); color:#fff}
+.btn-outline{background:transparent; border-color:var(--primary); color:var(--primary)}
+.btn-outline:hover{background:var(--primary-light); color:var(--primary-hover)}
+.btn-ghost{background:transparent; color:var(--ink-muted)}
+.btn-ghost:hover{color:var(--ink)}
+.btn-sm{min-height:32px; padding:6px 14px; font-size:.875rem}
+
+/* ---- Pills ---- */
+.pill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:3px 12px; border-radius:var(--r-pill);
+  font-size:.8125rem; font-weight:600; line-height:1.4;
+}
+.pill::before{content:""; width:7px; height:7px; border-radius:50%; background:currentColor}
+.pill-active{background:rgba(46,158,91,.12); color:#2E9E5B}
+.pill-soon{background:rgba(242,169,59,.14); color:var(--cta-hover)}
+.pill-muted{background:#EDEFEA; color:var(--ink-muted)}
+
+/* ---- Header ---- */
+.site-header{
+  position:sticky; top:0; z-index:100; background:#fff;
+  border-bottom:1px solid rgba(27,33,29,.08);
+  height:var(--header-h); transition:height .15s ease-out;
+}
+.site-header.scrolled{--header-h:60px; box-shadow:0 2px 12px rgba(22,56,42,.06)}
+.header-in{display:flex; align-items:center; gap:28px; height:100%}
+.logo{display:inline-flex; align-items:center; gap:10px; font-family:var(--font-head); font-weight:800; font-size:1.375rem; color:var(--primary-dark); text-decoration:none; letter-spacing:-.01em; white-space:nowrap}
+.logo .icon{font-size:26px; color:var(--primary)}
+.main-nav{display:flex; align-items:center; gap:4px; margin-right:auto}
+.nav-link{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:10px 12px; border-radius:8px; text-decoration:none;
+  color:var(--ink); font-weight:600; font-size:1rem; white-space:nowrap;
+  background:none; border:0;
+}
+.nav-link:hover{background:var(--bg-mist); color:var(--primary)}
+.nav-link[aria-current=page]{color:var(--primary); background:var(--primary-light)}
+.header-side{display:flex; align-items:center; gap:14px}
+.header-side .btn{min-height:40px; padding:8px 18px; white-space:nowrap}
+.menu-btn{display:none; background:none; border:0; padding:8px; color:var(--ink)}
+
+/* ---- Mobile drawer ---- */
+.drawer{
+  position:fixed; inset:0 0 0 auto; width:min(360px,92vw); z-index:150;
+  background:#fff; transform:translateX(100%); transition:transform .2s cubic-bezier(.4,0,.2,1);
+  display:flex; flex-direction:column; visibility:hidden;
+}
+body.drawer-open .drawer{transform:none; visibility:visible}
+body.drawer-open{overflow:hidden}
+.drawer-backdrop{position:fixed; inset:0; z-index:140; background:rgba(22,56,42,.4); opacity:0; visibility:hidden; transition:opacity .2s}
+body.drawer-open .drawer-backdrop{opacity:1; visibility:visible}
+.drawer-head{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); height:56px}
+.drawer-head .logo{font-size:1.25rem}
+.drawer-body{flex:1; overflow-y:auto; padding:8px}
+.drawer-body > a.drawer-direct{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 8px; border-bottom:1px solid var(--border); font-weight:600; color:var(--ink); text-decoration:none;
+}
+.drawer-body > a.drawer-direct:hover{color:var(--primary)}
+.drawer-body > a.drawer-direct[aria-current=page]{color:var(--primary)}
+.drawer-footer{padding:16px; border-top:1px solid var(--border); display:grid; gap:10px}
+
+/* ---- Page head + tabs ---- */
+.page-head{background:var(--bg-mist); padding-block:48px 40px; scroll-margin-top:var(--header-h)}
+.page-head h1{margin-bottom:10px}
+.page-summary{color:var(--ink-muted); font-size:1.125rem; max-width:52em; margin:0}
+.tabs-wrap{background:#fff; border-bottom:1px solid var(--border)}
+.tabs{display:flex; gap:8px; overflow-x:auto; padding-block:16px; scrollbar-width:thin}
+.tab{
+  display:inline-flex; align-items:center; gap:8px; flex:none;
+  padding:9px 16px; border:1px solid var(--border); border-radius:var(--r-pill);
+  background:#fff; color:var(--ink); font-weight:600; font-size:.9375rem;
+  transition:background-color .15s ease-out, color .15s ease-out, border-color .15s ease-out;
+  scroll-margin-top:calc(var(--header-h) + 16px);
+}
+.tab:hover{border-color:var(--primary); color:var(--primary)}
+.tab.active{background:var(--primary); border-color:var(--primary); color:#fff}
+.tab-count{background:var(--bg-mist); color:var(--ink-muted); border-radius:var(--r-pill); padding:1px 9px; font-size:.75rem; font-weight:500}
+.tab.active .tab-count{background:rgba(255,255,255,.2); color:#fff}
+
+/* ---- Listing layout ---- */
+.listing{padding-block:32px 64px}
+.listing-grid{display:grid; grid-template-columns:280px minmax(0,1fr); gap:32px; align-items:start}
+.listing-main{display:flex; flex-direction:column; gap:20px; min-width:0}
+
+/* ---- Toolbar ---- */
+.toolbar{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+.view-toggle{display:inline-flex; border:1px solid var(--border); border-radius:var(--r-btn); overflow:hidden}
+.view-btn{
+  display:inline-flex; align-items:center; gap:7px; border:0; background:#fff;
+  padding:9px 16px; font-weight:600; font-size:.9375rem; color:var(--ink-muted);
+}
+.view-btn .icon{font-size:15px}
+.view-btn[aria-pressed=true]{background:var(--primary); color:#fff}
+.sort-label{display:inline-flex; align-items:center; gap:8px; margin-left:auto; font-size:.875rem; font-weight:600; color:var(--ink-muted)}
+.sort-label select{
+  min-height:40px; padding:8px 12px; border:1px solid var(--border); border-radius:var(--r-btn);
+  background:#fff; color:var(--ink); font-weight:500;
+}
+.filters-toggle{display:none}
+
+/* ---- Filter sidebar ---- */
+.filters{
+  background:#fff; border:1px solid var(--border); border-radius:var(--r-card);
+  box-shadow:var(--shadow-card); padding:24px;
+  position:sticky; top:calc(var(--header-h) + 24px);
+  max-height:calc(100vh - var(--header-h) - 48px); overflow-y:auto;
+}
+.filters-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px}
+.filters-head h2{font-size:1.125rem; margin:0}
+.f-badge{background:var(--primary-light); color:var(--primary-hover); border-radius:var(--r-pill); padding:1px 9px; font-size:.8125rem; font-weight:500}
+.filters-close{display:none; background:none; border:0; padding:6px; color:var(--ink)}
+.field{margin-bottom:16px}
+.field label, .f-label{display:block; font-size:.8125rem; font-weight:600; margin-bottom:6px}
+.field select, .field input[type=number], .field input[type=email]{
+  width:100%; min-height:44px; padding:10px 14px;
+  border:1px solid var(--border); border-radius:var(--r-btn);
+  background:#fff; color:var(--ink); transition:border-color .15s ease-out;
+}
+.field select:disabled{background:var(--bg-mist); color:var(--ink-muted)}
+.field select:focus-visible,.field input:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.field .hint{font-size:.8125rem; color:var(--ink-muted); margin:5px 0 0}
+.range{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.f-group{margin-bottom:16px}
+.chips{display:flex; flex-wrap:wrap; gap:6px}
+.chip{
+  border:1px solid var(--border); background:#fff; color:var(--ink);
+  border-radius:var(--r-pill); padding:4px 12px;
+  font-size:.8125rem; font-weight:600;
+  transition:background-color .15s ease-out, color .15s ease-out, border-color .15s ease-out;
+}
+.chip:hover{border-color:var(--primary); color:var(--primary)}
+.chip[aria-pressed=true]{background:var(--primary); border-color:var(--primary); color:#fff}
+.filters-actions{display:grid; gap:10px; margin-top:20px; padding-top:18px; border-top:1px solid var(--border)}
+.filters-actions .btn{width:100%}
+.sub-form{margin-top:14px; padding:16px; background:var(--bg-mist); border-radius:var(--r-btn)}
+.sub-form .field:last-of-type{margin-bottom:12px}
+.consent{display:flex; gap:10px; align-items:flex-start}
+.consent input{width:18px; height:18px; margin-top:2px; accent-color:var(--primary); flex:none}
+.consent label{font-size:.8125rem; color:var(--ink-muted); line-height:1.5; font-weight:400; margin:0}
+
+/* ---- LotCard grid ---- */
+.lotgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:24px}
+.lotcard{
+  display:flex; flex-direction:column; background:#fff; border:1px solid var(--border);
+  border-radius:var(--r-card); overflow:hidden; text-decoration:none; color:var(--ink);
+  box-shadow:var(--shadow-card);
+  transition:transform .15s ease-out, box-shadow .15s ease-out;
+}
+.lotcard:hover{transform:translateY(-2px); box-shadow:var(--shadow-hover); color:var(--ink)}
+.lot-media{position:relative; aspect-ratio:16/10; background:var(--bg-mist); overflow:hidden}
+.lot-media img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+.lot-flag{
+  position:absolute; top:12px; left:12px; z-index:1;
+  display:inline-flex; align-items:center; gap:6px;
+  background:var(--cta); color:var(--ink);
+  border-radius:var(--r-pill); padding:3px 12px;
+  font-size:.8125rem; font-weight:600;
+}
+.lot-flag .icon{font-size:13px}
+.lot-body{display:flex; flex-direction:column; gap:8px; padding:20px 22px; flex:1}
+.lot-top{display:flex; align-items:center; justify-content:space-between; gap:10px}
+.lot-type{font-size:.75rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-muted)}
+.lot-name{font-size:1.125rem; line-height:1.35; margin:0}
+.lot-cad{font-size:.9375rem; color:var(--ink); font-weight:500}
+.lot-meta{display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.875rem; color:var(--ink-muted)}
+.lot-price{font-size:1.25rem; font-weight:500; color:var(--cta-hover); margin-top:auto; padding-top:6px}
+.lot-price small{display:block; font-family:var(--font-body); font-size:.75rem; font-weight:500; color:var(--ink-muted); letter-spacing:.02em; text-transform:uppercase}
+.countdown{display:flex; align-items:baseline; gap:8px; margin:0; padding-top:6px; border-top:1px solid var(--border)}
+.cd-label{font-size:.75rem; color:var(--ink-muted)}
+.cd-time{font-size:.9375rem; font-weight:500}
+.countdown.warn .cd-time{color:var(--cta-hover)}
+.countdown.warn .cd-label{color:var(--cta-hover)}
+.countdown.crit .cd-time{color:var(--danger); animation:cd-pulse 1s ease infinite}
+.countdown.crit .cd-label{color:var(--danger)}
+@keyframes cd-pulse{50%{opacity:.55}}
+
+/* ---- Empty states ---- */
+.empty-state{
+  display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center;
+  background:var(--primary-light); border-radius:var(--r-card); padding:48px 28px;
+}
+.empty-state .icon{font-size:32px; color:var(--primary)}
+.empty-state h2{font-size:1.375rem; margin:4px 0 0}
+.empty-state p{color:var(--ink-muted); margin:0 0 10px; max-width:34em}
+
+/* ---- Pagination ---- */
+.pagination{display:flex; align-items:center; gap:6px; justify-content:center; margin-top:8px}
+.page-btn{
+  min-width:40px; height:40px; padding:0 10px; border:1px solid var(--border); border-radius:var(--r-btn);
+  background:#fff; color:var(--ink); font-weight:600; font-size:.9375rem;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.page-btn .icon{font-size:14px}
+.page-btn:hover{border-color:var(--primary); color:var(--primary)}
+.page-btn.active{background:var(--primary); border-color:var(--primary); color:#fff}
+.page-ellipsis{color:var(--ink-muted); padding:0 2px}
+
+/* ---- Map view ---- */
+.map-section{display:none}
+.listing-main.map-on .map-section{display:block}
+.listing-main.map-on .lotgrid,
+.listing-main.map-on .pagination{display:none}
+.map-wrap{
+  position:relative; border:1px solid var(--border); border-radius:var(--r-hero);
+  overflow:hidden; background:#E9F1F7; box-shadow:var(--shadow-card);
+}
+.map-wrap > svg{width:100%; height:auto}
+.map-legend{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:12px 16px; border-top:1px solid var(--border); background:#fff;
+  font-size:.8125rem; color:var(--ink-muted);
+}
+.map-legend .icon{font-size:15px; color:var(--primary)}
+.pin{
+  position:absolute; width:32px; height:32px; margin:-28px 0 0 -16px;
+  background:none; border:0; padding:0; color:var(--primary);
+  filter:drop-shadow(0 2px 3px rgba(22,56,42,.35));
+  transition:transform .15s ease-out;
+}
+.pin .icon{font-size:30px}
+.pin:hover{transform:scale(1.15)}
+.pin.active{color:var(--cta)}
+.map-popup{
+  position:absolute; z-index:5; width:280px;
+  background:#fff; border-radius:var(--r-card); box-shadow:var(--shadow-modal);
+  padding:18px; display:none; transform:translate(-50%,-100%);
+}
+.map-popup.open{display:block}
+.map-popup.below{transform:translate(-50%,0)}
+.map-popup h3{font-size:1.0625rem; margin:0 24px 8px 0; line-height:1.35}
+.pop-list{margin:0 0 14px; display:grid; gap:5px}
+.pop-list > div{display:flex; justify-content:space-between; gap:12px; font-size:.875rem}
+.pop-list dt{color:var(--ink-muted)}
+.pop-list dd{margin:0; font-weight:600; text-align:right}
+.popup-close{
+  position:absolute; top:10px; right:10px; background:none; border:0;
+  padding:6px; color:var(--ink-muted);
+}
+.popup-close:hover{color:var(--ink)}
+
+/* ---- Footer ---- */
+.site-footer{background:var(--primary-dark); color:#fff; padding-block:64px 32px}
+.footer-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:32px; margin-bottom:48px}
+.footer-grid h4{color:#fff; margin-bottom:14px}
+.footer-grid a{display:block; color:rgba(255,255,255,.72); text-decoration:none; padding:5px 0; font-size:.9375rem}
+.footer-grid a:hover{color:#fff}
+.social-row{display:flex; gap:10px}
+.social-row a{
+  width:40px; height:40px; padding:0; border-radius:50%;
+  border:1px solid rgba(255,255,255,.25);
+  display:flex; align-items:center; justify-content:center;
+}
+.social-row a:hover{border-color:#fff; background:rgba(255,255,255,.08)}
+.social-row .icon{font-size:18px}
+.footer-bottom{
+  border-top:1px solid rgba(255,255,255,.14); padding-top:24px;
+  display:flex; flex-wrap:wrap; gap:8px 24px; align-items:center;
+  font-size:.875rem; color:rgba(255,255,255,.72);
+}
+.footer-bottom a{color:rgba(255,255,255,.72)}
+.footer-bottom a:hover{color:#fff}
+.footer-bottom .spacer{margin-left:auto}
+
+/* ---- Cookie banner ---- */
+.cookie{
+  position:fixed; z-index:130; left:16px; right:16px; bottom:16px;
+  margin-inline:auto; max-width:880px;
+  background:#fff; border-radius:var(--r-card); box-shadow:var(--shadow-modal);
+  padding:20px 24px; display:flex; gap:20px; align-items:center; flex-wrap:wrap;
+}
+.cookie p{margin:0; font-size:.875rem; color:var(--ink-muted); flex:1 1 320px}
+.cookie p b{color:var(--ink)}
+.cookie-actions{display:flex; gap:10px; flex-wrap:wrap}
+.cookie.hidden{display:none}
+
+/* ---- Toast ---- */
+.toast{
+  position:fixed; z-index:160; right:20px; bottom:20px; max-width:360px;
+  background:var(--primary-dark); color:#fff; border-radius:var(--r-btn);
+  box-shadow:var(--shadow-modal); padding:14px 18px;
+  display:flex; gap:10px; align-items:flex-start; font-size:.9375rem;
+  opacity:0; visibility:hidden; transform:translateY(12px);
+  transition:opacity .3s var(--ease-reveal), transform .3s var(--ease-reveal), visibility 0s .3s;
+}
+.toast.show{opacity:1; visibility:visible; transform:none; transition-delay:0s}
+.toast .icon{font-size:18px; color:var(--accent); margin-top:2px}
+
+/* ---- Reveal ---- */
+.js .reveal{opacity:0; transform:translateY(14px); transition:opacity .3s var(--ease-reveal), transform .3s var(--ease-reveal)}
+.js .reveal.in{opacity:1; transform:none}
+
+/* ---- Responsive ---- */
+@media (max-width:1080px){
+  .main-nav{display:none}
+  .menu-btn{display:inline-flex}
+  .header-side .btn-outline{display:none}
+}
+@media (max-width:768px){
+  h1{font-size:2.125rem}
+  h2{font-size:1.75rem}
+  h3{font-size:1.25rem}
+  .section{padding-block:40px}
+  .page-head{padding-block:32px 28px}
+  .page-summary{font-size:1rem}
+  .listing{padding-block:24px 48px}
+  .listing-grid{display:block}
+  .filters{
+    position:fixed; inset:0 0 0 auto; width:min(360px,92vw); z-index:150;
+    border-radius:0; max-height:none; overflow-y:auto;
+    transform:translateX(100%); transition:transform .2s cubic-bezier(.4,0,.2,1);
+  }
+  body.filters-open .filters{transform:none}
+  body.filters-open{overflow:hidden}
+  .filters-backdrop{position:fixed; inset:0; z-index:140; background:rgba(22,56,42,.4); opacity:0; visibility:hidden; transition:opacity .2s}
+  body.filters-open .filters-backdrop{opacity:1; visibility:visible}
+  .filters-close{display:inline-flex}
+  .filters-toggle{display:inline-flex}
+  .sort-label{margin-left:0; width:100%}
+  .sort-label select{flex:1}
+  .lotgrid{grid-template-columns:1fr; gap:14px}
+  .lot-body{padding:16px 18px}
+  .footer-grid{grid-template-columns:repeat(2,1fr)}
+  .cookie{flex-direction:column; align-items:stretch}
+  .cookie-actions .btn{flex:1 1 auto}
+  .map-popup{width:240px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important; transition-duration:.01ms!important; scroll-behavior:auto!important}
+}
+
+/* ---- Page: Minu pakkumised ---- */
+.crumbs{display:flex; align-items:center; gap:8px; font-size:.875rem; color:var(--ink-muted); margin-bottom:14px}
+.crumbs a{color:var(--ink-muted); text-decoration:none}
+.crumbs a:hover{color:var(--primary); text-decoration:underline}
+.crumbs .icon{font-size:11px}
+a.tab{text-decoration:none}
+
+/* Authed user menu (header) */
+.user-menu{position:relative}
+.user-btn{
+  display:inline-flex; align-items:center; gap:10px;
+  background:none; border:0; padding:6px 8px; border-radius:var(--r-btn); color:var(--ink);
+}
+.user-btn:hover{background:var(--bg-mist)}
+.avatar{
+  width:36px; height:36px; border-radius:50%; flex:none;
+  background:var(--primary); color:#fff;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-family:var(--font-head); font-weight:700; font-size:.8125rem; letter-spacing:.02em;
+}
+.user-name{font-weight:600; font-size:.9375rem; white-space:nowrap}
+.user-btn .icon{font-size:12px; color:var(--ink-muted); transition:transform .15s ease-out}
+.user-menu.open .user-btn .icon{transform:rotate(180deg)}
+.user-drop{
+  position:absolute; right:0; top:calc(100% + 8px); z-index:120; min-width:230px;
+  background:#fff; border:1px solid var(--border); border-radius:var(--r-card);
+  box-shadow:var(--shadow-modal); padding:8px; display:none;
+}
+.user-menu.open .user-drop{display:block}
+.user-drop a{
+  display:flex; align-items:center; gap:10px; padding:10px 12px;
+  border-radius:var(--r-btn); color:var(--ink); text-decoration:none;
+  font-size:.9375rem; font-weight:500;
+}
+.user-drop a:hover{background:var(--bg-mist); color:var(--primary)}
+.user-drop a[aria-current=page]{background:var(--primary-light); color:var(--primary-hover); font-weight:600}
+.user-drop a .icon{font-size:14px; color:var(--ink-muted); width:18px}
+.user-divider{border:0; border-top:1px solid var(--border); margin:6px 4px}
+.user-drop a.logout{color:var(--danger)}
+.user-drop a.logout:hover{background:var(--danger-light); color:var(--danger)}
+.user-drop a.logout .icon{color:var(--danger)}
+
+/* Bid list */
+.bid-wrap{max-width:1040px; margin-inline:auto; display:flex; flex-direction:column; gap:20px}
+.hint-banner{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  background:var(--info-light); border-radius:var(--r-card); padding:16px 20px;
+}
+.hint-banner .icon{font-size:20px; color:var(--info); flex:none}
+.hint-banner p{margin:0; flex:1 1 320px; font-size:.9375rem}
+.filters-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.filters-row .f-label{margin:0}
+.bid-list{display:flex; flex-direction:column; gap:16px}
+.bid-card{
+  display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:16px 32px;
+  background:#fff; border:1px solid var(--border); border-radius:var(--r-card);
+  box-shadow:var(--shadow-card); padding:22px 24px;
+  transition:box-shadow .15s ease-out;
+}
+.bid-card:hover{box-shadow:var(--shadow-hover)}
+.bid-card.lost{opacity:.72}
+.bid-card.lost .bid-name{color:var(--ink-muted)}
+.bid-title{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+.bid-name{font-family:var(--font-head); font-weight:700; font-size:1.125rem; line-height:1.3; color:var(--ink); text-decoration:none}
+.bid-name:hover{color:var(--primary)}
+.bid-id{color:var(--ink-muted); font-weight:500; font-size:.9375rem}
+.bid-sub{margin:6px 0 0; font-size:.875rem; color:var(--ink-muted)}
+.type-badge{
+  display:inline-flex; align-items:center; padding:2px 10px; border-radius:var(--r-pill);
+  font-size:.75rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+}
+.type-open{border:1px solid #2E9E5B; color:#2E9E5B; background:#fff}
+.type-sealed{background:var(--ink-muted); color:#fff; border:1px solid var(--ink-muted)}
+.bid-stats{display:flex; flex-wrap:wrap; gap:14px 36px; margin-top:16px; align-items:flex-end}
+.stat-label{display:block; font-size:.75rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-muted); margin-bottom:3px}
+.stat-value{font-size:1.125rem; font-weight:600}
+.stat-value.muted{color:var(--ink-muted); font-weight:500}
+.chip-note{
+  display:inline-flex; align-items:center; margin-left:8px;
+  background:var(--bg-mist); color:var(--ink-muted); border-radius:var(--r-pill);
+  padding:2px 10px; font-size:.75rem; font-weight:600;
+}
+.bid-side{
+  display:flex; flex-direction:column; align-items:flex-end; justify-content:space-between; gap:12px;
+  border-left:1px solid var(--border); padding-left:24px; min-width:0; text-align:right;
+}
+.bid-card .countdown{border-top:0; padding-top:0; margin:0}
+.bid-note{font-size:.8125rem; color:var(--ink-muted); margin:0; max-width:220px}
+.bid-actions{display:flex; flex-direction:column; align-items:flex-end; gap:10px}
+.autobid{display:flex; align-items:center; gap:10px}
+.autobid-label{font-size:.8125rem; font-weight:600; color:var(--ink-muted)}
+.autobid-label .mono{color:var(--ink); font-weight:500}
+.switch{
+  position:relative; width:44px; height:24px; flex:none; padding:0;
+  border:0; border-radius:var(--r-pill); background:#C6CFC9;
+  transition:background-color .15s ease-out;
+}
+.switch[aria-checked=true]{background:var(--primary)}
+.switch-knob{
+  position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 3px rgba(22,56,42,.25);
+  transition:transform .15s ease-out;
+}
+.switch[aria-checked=true] .switch-knob{transform:translateX(20px)}
+@media (max-width:820px){
+  .bid-card{grid-template-columns:1fr}
+  .bid-side{
+    border-left:0; padding-left:0; border-top:1px solid var(--border); padding-top:16px;
+    flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:space-between; text-align:left;
+  }
+  .bid-note{max-width:none}
+  .bid-actions{flex-direction:row; align-items:center; flex-wrap:wrap}
+  .bid-actions .btn{flex:1 1 auto}
+}
+@media (max-width:600px){
+  .user-name{display:none}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#sisu">Otse sisuni</a>
+
+<!-- ============ HEADER (authed variant) ============ -->
+<header class="site-header" id="header">
+  <div class="container header-in">
+    <a class="logo" href="01-listing.html" aria-label="Erametsad Oksjonid — avaleht">
+      <i class="icon fa-solid fa-tree" aria-hidden="true"></i>Erametsad Oksjonid
+    </a>
+    <nav class="main-nav" aria-label="Peamenüü">
+      <a class="nav-link" href="01-listing.html">Kõik oksjonid</a>
+      <a class="nav-link" href="01-listing.html#raieoigused">Raieõigused</a>
+      <a class="nav-link" href="01-listing.html#metskinnistud">Metskinnistud</a>
+      <a class="nav-link" href="04-ajalugu.html">Ajalugu</a>
+      <a class="nav-link" href="../marketing/kkk.html">KKK</a>
+      <a class="nav-link" href="../marketing/kontakt.html">Kontakt</a>
+    </nav>
+    <div class="header-side">
+      <div class="user-menu" id="userMenu">
+        <button class="user-btn" id="userMenuBtn" aria-expanded="false" aria-haspopup="true">
+          <span class="avatar" aria-hidden="true">TK</span>
+          <span class="user-name">Tõnis K.</span>
+          <i class="icon fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </button>
+        <div class="user-drop" role="menu" aria-label="Kasutaja menüü">
+          <a role="menuitem" href="09-user-bids.html" aria-current="page"><i class="icon fa-solid fa-gavel" aria-hidden="true"></i>Minu pakkumised</a>
+          <a role="menuitem" href="10-user-objects.html"><i class="icon fa-solid fa-tree" aria-hidden="true"></i>Minu objektid</a>
+          <a role="menuitem" href="11-user-notifications.html"><i class="icon fa-solid fa-bell" aria-hidden="true"></i>Teavitused</a>
+          <a role="menuitem" href="12-user-profile.html"><i class="icon fa-solid fa-user" aria-hidden="true"></i>Minu profiil</a>
+          <hr class="user-divider" role="separator">
+          <a class="logout" role="menuitem" href="01-listing.html"><i class="icon fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i>Logi välja</a>
+        </div>
+      </div>
+      <a class="btn btn-cta" href="../marketing/teenused-raieoiguse-muuk.html">Paku oma metsa</a>
+      <button class="menu-btn" id="menuOpen" aria-expanded="false" aria-controls="drawer" aria-label="Ava menüü">
+        <i class="icon fa-solid fa-bars" style="font-size:26px" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Mobile drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+<aside class="drawer" id="drawer" aria-label="Mobiilmenüü" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="logo"><i class="icon fa-solid fa-tree" aria-hidden="true"></i>Erametsad Oksjonid</span>
+    <button class="menu-btn" id="menuClose" style="display:inline-flex" aria-label="Sulge menüü">
+      <i class="icon fa-solid fa-xmark" style="font-size:24px" aria-hidden="true"></i>
+    </button>
+  </div>
+  <div class="drawer-body">
+    <a class="drawer-direct" href="01-listing.html">Kõik oksjonid <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="01-listing.html#raieoigused">Raieõigused <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="01-listing.html#metskinnistud">Metskinnistud <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="04-ajalugu.html">Ajalugu <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="../marketing/kkk.html">KKK <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="../marketing/kontakt.html">Kontakt <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+  </div>
+  <div class="drawer-footer">
+    <a class="btn btn-cta" href="../marketing/teenused-raieoiguse-muuk.html">Paku oma metsa</a>
+    <a class="btn btn-outline" href="09-user-bids.html">Minu pakkumised</a>
+  </div>
+</aside>
+
+<main id="sisu">
+
+<!-- ============ Page head ============ -->
+<section class="page-head" aria-labelledby="pageTitle">
+  <div class="container">
+    <nav class="crumbs" aria-label="Asukoht">
+      <a href="09-user-bids.html">Minu keskkond</a>
+      <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i>
+      <span aria-current="page">Minu pakkumised</span>
+    </nav>
+    <h1 id="pageTitle">Minu pakkumised</h1>
+    <p class="page-summary">Ülevaade sinu osalemisest oksjonitel — käimasolevad pakkumised, tulemused ja automaatpakkuja seaded.</p>
+  </div>
+</section>
+
+<!-- ============ User sub-nav ============ -->
+<div class="tabs-wrap">
+  <div class="container">
+    <nav class="tabs" aria-label="Minu keskkond">
+      <a class="tab active" href="09-user-bids.html" aria-current="page">Pakkumised</a>
+      <a class="tab" href="10-user-objects.html">Objektid</a>
+      <a class="tab" href="11-user-notifications.html">Teavitused</a>
+      <a class="tab" href="12-user-profile.html">Profiil</a>
+    </nav>
+  </div>
+</div>
+
+<!-- ============ Bid list ============ -->
+<section class="listing" id="bidsSection">
+  <div class="container">
+    <div class="bid-wrap">
+
+      <div class="hint-banner reveal">
+        <i class="icon fa-solid fa-bell" aria-hidden="true"></i>
+        <p>Lülita teavitused sisse, et mitte oksjoni lõppu magama jääda.</p>
+        <a class="btn btn-outline btn-sm" href="11-user-notifications.html">Ava teavitused</a>
+      </div>
+
+      <div class="filters-row" role="group" aria-label="Filtreeri pakkumisi">
+        <span class="f-label" id="filterLabel">Filtreeri:</span>
+        <div class="chips" aria-labelledby="filterLabel">
+          <button type="button" class="chip" data-filter="active" aria-pressed="false">Käimasolevad</button>
+          <button type="button" class="chip" data-filter="ended" aria-pressed="false">Lõppenud</button>
+          <button type="button" class="chip" data-filter="won" aria-pressed="false">Võidetud</button>
+          <button type="button" class="chip" data-filter="lost" aria-pressed="false">Kaotatud</button>
+        </div>
+      </div>
+
+      <div class="bid-list stagger" id="bidList">
+
+        <article class="bid-card" data-cats="active">
+          <div class="bid-info">
+            <div class="bid-title">
+              <a class="bid-name" href="02-lot-detail-open.html">Lepsi raieõigus <span class="bid-id mono">#4810</span></a>
+              <span class="type-badge type-open">Avatud</span>
+            </div>
+            <p class="bid-sub">Tartu maakond · 12 ha · Raieõigus</p>
+            <div class="bid-stats">
+              <div>
+                <span class="stat-label">Minu pakkumine</span>
+                <span class="stat-value mono">7 750 €</span>
+              </div>
+              <div>
+                <span class="stat-label">Hetkel juhtiv</span>
+                <span class="stat-value mono">7 750 €</span>
+              </div>
+              <div>
+                <span class="stat-label">Automaatpakkuja</span>
+                <div class="autobid">
+                  <span class="autobid-label">max <span class="mono">9 000 €</span></span>
+                  <button type="button" class="switch" id="autobidToggle" role="switch" aria-checked="true" aria-label="Automaatpakkuja sisse ja välja"><span class="switch-knob"></span></button>
+                  <button type="button" class="btn btn-ghost btn-sm" id="autobidEdit">Muuda</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="bid-side">
+            <span class="pill pill-active">Juhtiv pakkumine</span>
+            <p class="countdown" data-remain="872000" role="timer" aria-label="Aega oksjoni lõpuni">
+              <span class="cd-label">Aega jäänud</span>
+              <span class="cd-time mono">0p 00:14:32</span>
+            </p>
+            <a class="btn btn-primary btn-sm" href="02-lot-detail-open.html">Vaata oksjonit <i class="icon fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+          </div>
+        </article>
+
+        <article class="bid-card" data-cats="active">
+          <div class="bid-info">
+            <div class="bid-title">
+              <a class="bid-name" href="03-lot-detail-sealed.html">Ööviiuli kinnistu <span class="bid-id mono">#4812</span></a>
+              <span class="type-badge type-sealed">Suletud</span>
+            </div>
+            <p class="bid-sub">Saare maakond · 21 ha · Metsakinnistu</p>
+            <div class="bid-stats">
+              <div>
+                <span class="stat-label">Minu pakkumine</span>
+                <span class="stat-value mono">58 500 €</span>
+                <span class="chip-note">Pimepakkumine</span>
+              </div>
+              <div>
+                <span class="stat-label">Hetkel juhtiv</span>
+                <span class="stat-value muted" title="Suletud pakkumised avaldatakse pärast lõppemist">—</span>
+              </div>
+            </div>
+          </div>
+          <div class="bid-side">
+            <span class="pill pill-info">Ootel avamine</span>
+            <p class="bid-note">Kõik pakkumised avatakse korraga pärast oksjoni tähtaega.</p>
+            <a class="btn btn-primary btn-sm" href="03-lot-detail-sealed.html">Vaata oksjonit <i class="icon fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+          </div>
+        </article>
+
+        <article class="bid-card" data-cats="ended won">
+          <div class="bid-info">
+            <div class="bid-title">
+              <a class="bid-name" href="03-lot-detail-sealed.html">Kõpu pakett <span class="bid-id mono">#4815</span></a>
+            </div>
+            <p class="bid-sub">Hiiu maakond · 86 ha · Metsapakett</p>
+            <div class="bid-stats">
+              <div>
+                <span class="stat-label">Minu pakkumine</span>
+                <span class="stat-value mono">12 500 €</span>
+              </div>
+              <div>
+                <span class="stat-label">Lõpphind</span>
+                <span class="stat-value mono">12 500 €</span>
+              </div>
+            </div>
+          </div>
+          <div class="bid-side">
+            <span class="pill pill-active">Võitsid</span>
+            <span class="pill pill-soon">Leping allkirja ootel</span>
+            <a class="btn btn-cta btn-sm" href="13-contract-signing.html">Allkirjasta leping <i class="icon fa-solid fa-pen-nib" aria-hidden="true"></i></a>
+          </div>
+        </article>
+
+        <article class="bid-card lost" data-cats="ended lost">
+          <div class="bid-info">
+            <div class="bid-title">
+              <a class="bid-name" href="02-lot-detail-open.html">Kuuse harvendusraie Põltsamaal <span class="bid-id mono">#4809</span></a>
+            </div>
+            <p class="bid-sub">Jõgeva maakond · 7,9 ha · Raieõigus</p>
+            <div class="bid-stats">
+              <div>
+                <span class="stat-label">Minu pakkumine</span>
+                <span class="stat-value mono">14 000 €</span>
+              </div>
+              <div>
+                <span class="stat-label">Lõpphind</span>
+                <span class="stat-value mono">14 900 €</span>
+              </div>
+            </div>
+          </div>
+          <div class="bid-side">
+            <span class="pill pill-muted">Ei võitnud</span>
+            <a class="btn btn-outline btn-sm" href="02-lot-detail-open.html">Vaata tulemust</a>
+          </div>
+        </article>
+
+      </div>
+
+      <div class="empty-state" id="emptyBids" hidden>
+        <i class="icon fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
+        <h2>Filtritele ei vasta ükski pakkumine</h2>
+        <p>Muuda filtrit laiemaks või tühjenda need — kõik sinu pakkumised on siin loetletud.</p>
+        <button class="btn btn-outline" id="clearBidFilters">Tühjenda filtrid</button>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ Footer ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <h4>Oksjonid</h4>
+        <a href="01-listing.html#raieoigused">Raieõigused</a>
+        <a href="01-listing.html#metskinnistud">Metskinnistud</a>
+        <a href="01-listing.html#polumaad">Põllumaad</a>
+        <a href="01-listing.html#paketid">Paketid</a>
+        <a href="01-listing.html#kiiroksjonid">Kiiroksjonid</a>
+      </div>
+      <div>
+        <h4>Ajalugu</h4>
+        <a href="04-ajalugu.html">Lõppenud oksjonid</a>
+        <a href="04-ajalugu.html">Tulemused</a>
+      </div>
+      <div>
+        <h4>Erametsad</h4>
+        <a href="../marketing/home.html">Metsa müümine</a>
+        <a href="../marketing/hindamisaktid.html">Hindamisaktid</a>
+        <a href="../marketing/metsateatis.html">Metsateatis</a>
+        <a href="../marketing/meist-metsaspetsialistid.html">Metsaspetsialistid</a>
+        <a href="../marketing/kkk.html">KKK</a>
+      </div>
+      <div>
+        <h4>Jälgi meid</h4>
+        <div class="social-row">
+          <a href="https://facebook.com/erametsad" target="_blank" rel="noopener" aria-label="Facebook"><i class="icon fa-brands fa-facebook-f" aria-hidden="true"></i></a>
+          <a href="https://instagram.com/erametsad" target="_blank" rel="noopener" aria-label="Instagram"><i class="icon fa-brands fa-instagram" aria-hidden="true"></i></a>
+          <a href="https://youtube.com/@erametsad" target="_blank" rel="noopener" aria-label="YouTube"><i class="icon fa-brands fa-youtube" aria-hidden="true"></i></a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Erametsad OÜ</span>
+      <span class="spacer"></span>
+      <a href="#">Privaatsuspoliitika</a>
+      <a href="#" id="cookieSettingsLink">Küpsisesätted</a>
+    </div>
+  </div>
+</footer>
+
+<!-- Cookie banner -->
+<div class="cookie" id="cookie" role="region" aria-label="Küpsiste teavitus">
+  <p><b>Kasutame küpsiseid.</b> Vajalikud küpsised tagavad lehe toimimise, analüütika abil mõõdame liiklust. Vali, mida lubad.</p>
+  <div class="cookie-actions">
+    <button class="btn btn-cta btn-sm" data-cookie="all">Nõustun kõigiga</button>
+    <button class="btn btn-outline btn-sm" data-cookie="needed">Ainult vajalikud</button>
+    <button class="btn btn-ghost btn-sm" data-cookie="settings">Sätete muutmine</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <i class="icon fa-solid fa-circle-check" aria-hidden="true"></i>
+  <span></span>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+
+  /* Header shrink */
+  const header=$("#header");
+  const onScroll=()=>header.classList.toggle("scrolled",window.scrollY>8);
+  addEventListener("scroll",onScroll,{passive:true}); onScroll();
+
+  /* Mobile drawer */
+  const drawer=$("#drawer"), backdrop=$("#drawerBackdrop"),
+        openBtn=$("#menuOpen"), closeBtn=$("#menuClose");
+  const setDrawer=open=>{
+    document.body.classList.toggle("drawer-open",open);
+    drawer.setAttribute("aria-hidden",String(!open));
+    openBtn.setAttribute("aria-expanded",String(open));
+    backdrop.hidden=!open;
+  };
+  openBtn.addEventListener("click",()=>setDrawer(true));
+  closeBtn.addEventListener("click",()=>setDrawer(false));
+  backdrop.addEventListener("click",()=>setDrawer(false));
+
+  /* Scroll reveal */
+  $$(".stagger").forEach(g=>Array.from(g.children).slice(0,6).forEach((c,i)=>{
+    c.classList.add("reveal"); c.style.transitionDelay=(i*50)+"ms";
+  }));
+  const io=new IntersectionObserver(es=>es.forEach(e=>{
+    if(e.isIntersecting){e.target.classList.add("in"); io.unobserve(e.target);}
+  }),{threshold:.1,rootMargin:"0px 0px -40px"});
+  $$(".reveal").forEach(el=>io.observe(el));
+
+  /* Toast helper (pages call window.toast(msg)) */
+  const toast=$("#toast"); let toastTimer;
+  window.toast=function(msg){
+    $("span",toast).textContent=msg;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>toast.classList.remove("show"),5000);
+  };
+
+  /* Cookie banner (visual demo) */
+  const cookie=$("#cookie");
+  const hideCookie=()=>{cookie.classList.add("hidden"); try{sessionStorage.setItem("cookie","1")}catch(e){}};
+  try{if(sessionStorage.getItem("cookie"))cookie.classList.add("hidden")}catch(e){}
+  $$("[data-cookie]",cookie).forEach(b=>b.addEventListener("click",hideCookie));
+  $("#cookieSettingsLink").addEventListener("click",e=>{e.preventDefault(); cookie.classList.remove("hidden")});
+})();
+</script>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+  const REDUCED=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* Authed user menu */
+  const userMenu=$("#userMenu"), userBtn=$("#userMenuBtn");
+  const setUserMenu=open=>{
+    userMenu.classList.toggle("open",open);
+    userBtn.setAttribute("aria-expanded",String(open));
+  };
+  userBtn.addEventListener("click",()=>setUserMenu(!userMenu.classList.contains("open")));
+  document.addEventListener("click",e=>{
+    if(userMenu.classList.contains("open")&&!userMenu.contains(e.target))setUserMenu(false);
+  });
+
+  /* Bid filters (chips) */
+  const cards=$$(".bid-card");
+  function applyBidFilters(){
+    const pressed=new Set($$(".chip[data-filter][aria-pressed=true]").map(c=>c.dataset.filter));
+    let visible=0;
+    cards.forEach(c=>{
+      const ok=!pressed.size||c.dataset.cats.split(" ").some(x=>pressed.has(x));
+      c.style.display=ok?"":"none";
+      if(ok)visible++;
+    });
+    $("#emptyBids").hidden=visible>0;
+  }
+  $$(".chip[data-filter]").forEach(c=>c.addEventListener("click",()=>{
+    c.setAttribute("aria-pressed",String(c.getAttribute("aria-pressed")!=="true"));
+    applyBidFilters();
+  }));
+  $("#clearBidFilters").addEventListener("click",()=>{
+    $$(".chip[data-filter]").forEach(c=>c.setAttribute("aria-pressed","false"));
+    applyBidFilters();
+  });
+
+  /* Countdown (demo offset from load time) */
+  const pad=n=>String(n).padStart(2,"0");
+  const fmt=r=>{
+    const d=Math.floor(r/864e5), h=Math.floor(r%864e5/36e5),
+          m=Math.floor(r%36e5/6e4), s=Math.floor(r%6e4/1e3);
+    return d+"p "+pad(h)+":"+pad(m)+":"+pad(s);
+  };
+  const cds=$$(".countdown").map(cd=>{
+    cd.end=Date.now()+Number(cd.dataset.remain||0);
+    return cd;
+  });
+  function tick(){
+    const now=Date.now();
+    cds.forEach(cd=>{
+      const r=Math.max(0,cd.end-now);
+      $(".cd-time",cd).textContent=fmt(r);
+      cd.classList.toggle("warn",r>0&&r<36e5);
+      cd.classList.toggle("crit",r>0&&r<3e5&&!REDUCED);
+      if(r===0){
+        $(".cd-label",cd).textContent="Oksjon lõppenud";
+        cd.classList.remove("warn","crit");
+        const pill=cd.closest(".bid-card")?.querySelector(".pill");
+        if(pill){pill.textContent="Lõppenud"; pill.className="pill pill-muted";}
+      }
+    });
+  }
+  tick(); setInterval(tick,1000);
+
+  /* Autobid demo */
+  const abToggle=$("#autobidToggle");
+  abToggle.addEventListener("click",()=>{
+    const on=abToggle.getAttribute("aria-checked")!=="true";
+    abToggle.setAttribute("aria-checked",String(on));
+    window.toast(on
+      ?"Automaatpakkuja aktiveeritud — pakub sinu eest kuni 9 000 €."
+      :"Automaatpakkuja peatatud. Sinu pakkumine 7 750 € jääb kehtima.");
+  });
+  $("#autobidEdit").addEventListener("click",()=>{
+    window.toast("Demo: automaatpakkuja max piiri muutmine avaneb siin.");
+  });
+
+  /* Escape closes user menu */
+  addEventListener("keydown",e=>{
+    if(e.key==="Escape")setUserMenu(false);
+  });
+})();
+</script>
+</body>
+</html>

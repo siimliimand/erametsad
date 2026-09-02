@@ -1,0 +1,1184 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teenused metsaomanikule | Erametsad Metsaühistu</title>
+<meta name="description" content="Metsaühistu teenused metsaomanikule: istutamine, hooldusraied, metsataimede tellimine, nõustamine, taimekaitse, metsakavad, taimede hooldus ja maapinna ettevalmistus. Müü raieõigus oksjonil parima hinnaga.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232E6B4F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z'/%3E%3Cpath d='M12 22v-3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<script>document.documentElement.classList.add('js')</script>
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@graph":[
+    {
+      "@type":"Organization",
+      "name":"MTÜ Erametsad Metsaühistu",
+      "url":"https://metsauhistu.erametsad.ee/",
+      "email":"metsauhistu@erametsad.ee",
+      "telephone":"+372 XXX XXXX",
+      "description":"Erametsaomanike ühistu, mis aitab metsa majandada, toetusi taotleda ja puitu müüa.",
+      "sameAs":["https://erametsad.ee/","https://oksjonid.erametsad.ee/"]
+    },
+    {
+      "@type":"BreadcrumbList",
+      "itemListElement":[
+        {"@type":"ListItem","position":1,"name":"Avaleht","item":"https://metsauhistu.erametsad.ee/"},
+        {"@type":"ListItem","position":2,"name":"Teenused","item":"https://metsauhistu.erametsad.ee/teenused"}
+      ]
+    },
+    {
+      "@type":"ItemList",
+      "name":"Teenused metsaomanikule",
+      "itemListElement":[
+        {"@type":"ListItem","position":1,"item":{"@type":"Service","name":"Metsa istutamine ja uuendamine","url":"https://metsauhistu.erametsad.ee/teenused#istutamine"}},
+        {"@type":"ListItem","position":2,"item":{"@type":"Service","name":"Valgustus- ja harvendusraied","url":"https://metsauhistu.erametsad.ee/teenused#hooldusraied"}},
+        {"@type":"ListItem","position":3,"item":{"@type":"Service","name":"Metsataimede tellimine","url":"https://metsauhistu.erametsad.ee/teenused#taimede-tellimine"}},
+        {"@type":"ListItem","position":4,"item":{"@type":"Service","name":"Metsandusalane nõustamine","url":"https://metsauhistu.erametsad.ee/teenused#noustamine"}},
+        {"@type":"ListItem","position":5,"item":{"@type":"Service","name":"Taimekaitse ja ulukitõrjevahendid","url":"https://metsauhistu.erametsad.ee/teenused#taimekaitse"}},
+        {"@type":"ListItem","position":6,"item":{"@type":"Service","name":"Metsamajandamiskavad","url":"https://metsauhistu.erametsad.ee/teenused#kavad"}},
+        {"@type":"ListItem","position":7,"item":{"@type":"Service","name":"Noorendike hooldus ja rohimine","url":"https://metsauhistu.erametsad.ee/teenused#taimede-hooldus"}},
+        {"@type":"ListItem","position":8,"item":{"@type":"Service","name":"Maapinna ettevalmistus ketasadraga","url":"https://metsauhistu.erametsad.ee/teenused#maapind"}},
+        {"@type":"ListItem","position":9,"item":{"@type":"Service","name":"Raieõiguste ja kinnistute enampakkumised","url":"https://oksjonid.erametsad.ee"}}
+      ]
+    }
+  ]
+}
+</script>
+<style>
+/* ---- Tokens (UHISTU-DESIGN-SPEC.md §1.2) ---- */
+:root{
+  --primary:#012d1d; --primary-hover:#1b4332; --primary-dark:#16382A; --primary-light:#c1ecd4;
+  --accent:#58B368; --cta:#F2A93B; --cta-hover:#D98F1F;
+  --ink:#181a2e; --ink-muted:#414844; --ink-inverse:#fff;
+  --bg-page:#fbf8ff; --bg-mist:#f4f2ff; --border:#c1c8c2;
+  --danger:#B3261E; --danger-light:#FBEAE9; --info:#2D6FA8; --info-light:#E9F1F7;
+  --pill-open-bg:#E8F6ED; --pill-open-fg:#1B6338; --pill-open-dot:#2E9E5B;
+  --pill-soon-bg:#FEF5E7; --pill-soon-fg:#8F590A; --pill-soon-dot:#F2A93B;
+  --pill-closed-bg:#ECEEEB; --pill-closed-fg:#6B7570; --pill-closed-dot:#9E9E9E;
+  --pill-tbd-bg:#F4F2FF; --pill-tbd-fg:#414844; --pill-tbd-dot:#6B7570;
+  --font-heading:"Public Sans",system-ui,sans-serif;
+  --font-body:"Inter",system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --container-max:1200px; --gutter:24px;
+  --r-card:14px; --r-band:12px; --r-input:10px; --r-pill:999px;
+  --shadow-card:0 2px 12px rgba(22,56,42,.08);
+  --shadow-hover:0 2px 8px rgba(22,56,42,.12),0 8px 24px rgba(22,56,42,.08);
+  --shadow-modal:0 4px 16px rgba(22,56,42,.12),0 16px 48px rgba(22,56,42,.10);
+  --header-h:72px;
+  --ease-reveal:cubic-bezier(.22,.61,.36,1);
+}
+
+/* ---- Base ---- */
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg-page); color:var(--ink);
+  font:400 1rem/1.6 var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+img,svg{display:block}
+h1,h2,h3,h4{font-family:var(--font-heading); line-height:1.2; margin:0 0 .5em}
+h1{font-size:2.75rem; font-weight:700; line-height:1.15}
+h2{font-size:2.125rem; font-weight:700; line-height:1.2}
+h3{font-size:1.375rem; font-weight:600; line-height:1.25}
+h4{font-size:1rem; font-weight:600}
+p{margin:0 0 1em}
+a{color:var(--primary)}
+a:hover{color:var(--primary-hover)}
+ul{margin:0; padding:0; list-style:none}
+button{font:inherit; cursor:pointer}
+input,select{font:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+::selection{background:var(--primary-light)}
+.mono{font-family:var(--font-mono); font-feature-settings:"tnum"}
+.sr-only{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden}
+.skip-link{
+  position:absolute; left:-9999px; top:8px; z-index:200;
+  background:var(--primary-dark); color:#fff; padding:10px 16px; border-radius:var(--r-input);
+}
+.skip-link:focus{left:8px; color:#fff}
+.icon{display:inline-flex; align-items:center; justify-content:center; width:1em; height:1em; flex:none; line-height:1; font-size:20px}
+
+/* ---- Layout ---- */
+.container{max-width:var(--container-max); margin-inline:auto; padding-inline:var(--gutter)}
+.section{padding-block:64px; scroll-margin-top:calc(var(--header-h) + 16px)}
+.bg-mist{background:var(--bg-mist)}
+.section-head{display:flex; align-items:end; justify-content:space-between; gap:24px; margin-bottom:32px}
+.section-head p{margin:0; color:var(--ink-muted)}
+.sec-link{display:inline-flex; align-items:center; gap:6px; font-weight:600; white-space:nowrap}
+.sec-link .icon{font-size:15px}
+
+/* ---- Buttons (pill CTAs per spec) ---- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  min-height:48px; padding:12px 26px; border-radius:var(--r-pill); border:1px solid transparent;
+  font-family:var(--font-heading); font-weight:700; font-size:.9375rem; letter-spacing:.01em;
+  text-decoration:none; transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out, box-shadow .15s ease-out;
+}
+.btn .icon{font-size:15px}
+.btn-cta{background:var(--cta); color:var(--ink)}
+.btn-cta:hover{background:var(--cta-hover); color:var(--ink)}
+.btn-secondary{background:transparent; border-color:rgba(255,255,255,.55); color:#fff}
+.btn-secondary:hover{border-color:#fff; background:rgba(255,255,255,.1); color:#fff}
+.btn-outline{background:#fff; border-color:var(--primary); color:var(--primary)}
+.btn-outline:hover{background:var(--primary-light); color:var(--primary-hover)}
+.btn-ghost{background:transparent; color:var(--ink-muted)}
+.btn-ghost:hover{color:var(--ink)}
+.btn-sm{min-height:36px; padding:6px 16px; font-size:.875rem}
+
+/* ---- Status pills (§1.2 status badge colors) ---- */
+.pill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:3px 12px; border-radius:var(--r-pill);
+  font-size:.8125rem; font-weight:600; line-height:1.4;
+}
+.pill::before{content:""; width:7px; height:7px; border-radius:50%; flex:none}
+.pill-open{background:var(--pill-open-bg); color:var(--pill-open-fg)}
+.pill-open::before{background:var(--pill-open-dot)}
+.pill-soon{background:var(--pill-soon-bg); color:var(--pill-soon-fg)}
+.pill-soon::before{background:var(--pill-soon-dot)}
+.pill-closed{background:var(--pill-closed-bg); color:var(--pill-closed-fg)}
+.pill-closed::before{background:var(--pill-closed-dot)}
+.pill-tbd{background:var(--pill-tbd-bg); color:var(--pill-tbd-fg)}
+.pill-tbd::before{background:var(--pill-tbd-dot)}
+
+/* ---- Header (§1.3) ---- */
+.site-header{
+  position:sticky; top:0; z-index:100; background:#fff;
+  border-bottom:1px solid rgba(27,33,29,.08);
+  height:var(--header-h); transition:height .15s ease-out;
+}
+.site-header.scrolled{--header-h:60px; box-shadow:0 2px 12px rgba(22,56,42,.06)}
+.header-in{display:flex; align-items:center; gap:24px; height:100%}
+.logo{
+  display:inline-flex; align-items:center; gap:10px; text-decoration:none;
+  font-family:var(--font-heading); font-weight:700; font-size:1.125rem;
+  color:var(--primary-dark); white-space:nowrap;
+}
+.logo .icon{font-size:24px; color:var(--primary)}
+.main-nav{display:flex; align-items:center; gap:4px; margin-inline:auto}
+.nav-link{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:10px 14px; border-radius:8px; text-decoration:none;
+  color:var(--ink); font-weight:600; font-size:.9375rem; white-space:nowrap;
+  background:none; border:0;
+}
+.nav-link:hover{background:var(--bg-mist); color:var(--primary-hover)}
+.nav-link.active{color:var(--primary); border-radius:8px 8px 0 0; box-shadow:inset 0 -2px 0 var(--primary)}
+.header-side{display:flex; align-items:center; gap:16px; margin-left:auto}
+.ext-link{display:inline-flex; align-items:center; gap:5px; font-weight:600; text-decoration:none; color:var(--ink); white-space:nowrap; font-size:.9375rem}
+.ext-link .icon{font-size:13px}
+.ext-link:hover{color:var(--primary)}
+.header-side .btn{min-height:40px; padding:8px 20px; font-size:.875rem}
+.menu-btn{display:none; background:none; border:0; padding:8px; color:var(--ink)}
+
+/* ---- Mobile drawer ---- */
+.drawer{
+  position:fixed; inset:0 0 0 auto; width:min(360px,92vw); z-index:150;
+  background:#fff; transform:translateX(100%); transition:transform .2s cubic-bezier(.4,0,.2,1);
+  display:flex; flex-direction:column; visibility:hidden;
+}
+body.drawer-open .drawer{transform:none; visibility:visible}
+body.drawer-open{overflow:hidden}
+.drawer-backdrop{position:fixed; inset:0; z-index:140; background:rgba(22,56,42,.4); opacity:0; visibility:hidden; transition:opacity .2s}
+body.drawer-open .drawer-backdrop{opacity:1; visibility:visible}
+.drawer-head{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); height:56px}
+.drawer-head .logo{font-size:1rem}
+.drawer-body{flex:1; overflow-y:auto; padding:8px}
+.drawer-group{border-bottom:1px solid var(--border)}
+.drawer-group-toggle{
+  display:flex; width:100%; align-items:center; justify-content:space-between;
+  padding:14px 8px; background:none; border:0; font-weight:600; color:var(--ink); text-align:left;
+}
+.drawer-group-toggle .icon{transition:transform .2s cubic-bezier(.4,0,.2,1); color:var(--ink-muted)}
+.drawer-group.open .drawer-group-toggle .icon{transform:rotate(180deg)}
+.drawer-group-list{display:none; padding:0 8px 10px}
+.drawer-group.open .drawer-group-list{display:block}
+.drawer-group-list a{display:block; padding:9px 10px; text-decoration:none; color:var(--ink-muted); border-radius:8px}
+.drawer-group-list a:hover{background:var(--primary-light); color:var(--primary-hover)}
+.drawer-group-list a[aria-current=page]{color:var(--primary); font-weight:600}
+.drawer-body > a.drawer-direct{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:14px 8px; border-bottom:1px solid var(--border); font-weight:600; color:var(--ink); text-decoration:none}
+.drawer-footer{padding:16px; border-top:1px solid var(--border); display:grid; gap:10px}
+/* ---- Hero (Page 01 §2) ---- */
+.hero{position:relative; overflow:hidden; background:var(--primary-dark)}
+.hero-art{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+.hero-overlay{position:absolute; inset:0; background:linear-gradient(90deg, rgba(1,45,29,.92) 0%, rgba(22,56,42,.55) 55%, rgba(22,56,42,.3) 100%)}
+.hero-in{
+  position:relative; z-index:1; display:grid;
+  grid-template-columns:minmax(0,7fr) minmax(0,5fr);
+  gap:56px; align-items:center; padding-block:96px;
+}
+.hero-kicker{
+  font-family:var(--font-heading); font-weight:800; font-size:.8125rem;
+  letter-spacing:1px; text-transform:uppercase; color:var(--primary-light); margin:0 0 14px;
+}
+.hero h1{color:var(--ink-inverse); margin-bottom:16px}
+.hero-intro{color:rgba(255,255,255,.85); font-size:1.125rem; max-width:34em; margin-bottom:28px}
+.hero-ctas{display:flex; flex-wrap:wrap; gap:14px}
+
+/* ---- JoinCard ---- */
+.joincard{background:#fff; border-radius:var(--r-card); box-shadow:var(--shadow-modal); padding:24px; scroll-margin-top:calc(var(--header-h) + 16px)}
+.joincard h3{font-size:1.125rem; margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block; font-size:.8125rem; font-weight:600; margin-bottom:6px}
+.field input[type=text],.field input[type=tel],.field input[type=email]{
+  width:100%; min-height:44px; padding:10px 14px;
+  border:1px solid var(--border); border-radius:var(--r-input);
+  background:#fff; color:var(--ink); transition:border-color .15s ease-out;
+}
+.field input::placeholder{color:#A6ADA8}
+.field input:focus{border-color:var(--primary); outline:none}
+.field input:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.field-error{display:none; font-size:.8125rem; color:var(--danger); margin:5px 0 0}
+.field.invalid input{border-color:var(--danger); background:var(--danger-light)}
+.field.invalid .field-error{display:block}
+.consent{display:flex; gap:10px; align-items:flex-start; margin-bottom:16px}
+.consent input{width:18px; height:18px; margin-top:2px; accent-color:var(--primary); flex:none}
+.consent label{font-size:.8125rem; color:var(--ink-muted); line-height:1.5}
+.consent.invalid label{color:var(--danger)}
+.hp{position:absolute; left:-9999px; width:1px; height:1px; opacity:0}
+.joincard .btn{width:100%}
+
+/* ---- Subsidy table ---- */
+.table-wrap{background:#fff; border:1px solid var(--border); border-radius:var(--r-card); box-shadow:var(--shadow-card); overflow-x:auto}
+.table-wrap table{width:100%; border-collapse:collapse; min-width:760px}
+.table-wrap thead th{
+  font-family:var(--font-heading); font-weight:600; font-size:.75rem;
+  letter-spacing:.05em; text-transform:uppercase; color:var(--ink-muted);
+  text-align:left; padding:14px 20px; background:var(--bg-mist); border-bottom:1px solid var(--border); white-space:nowrap;
+}
+.table-wrap tbody td,.table-wrap tbody th[scope=row]{padding:16px 20px; border-bottom:1px solid var(--border); vertical-align:middle; font-size:.9375rem}
+.table-wrap tbody th[scope=row]{text-align:left; font-weight:600}
+.table-wrap tbody th[scope=row] a{text-decoration:none; color:var(--ink)}
+.table-wrap tbody th[scope=row] a:hover{color:var(--primary)}
+.table-wrap tbody tr:last-child td,.table-wrap tbody tr:last-child th{border-bottom:0}
+.table-wrap tbody tr:hover td,.table-wrap tbody tr:hover th{background:#faf9fe}
+.deadline{display:inline-flex; align-items:center; gap:10px; flex-wrap:wrap}
+.deadline .mono{font-size:.875rem; color:var(--ink)}
+.cell-rate{font-size:.875rem; font-weight:500; white-space:nowrap}
+.table-note{display:flex; align-items:center; gap:8px; color:var(--ink-muted); font-size:.875rem; margin:14px 0 0}
+.table-note .icon{font-size:16px; color:var(--info)}
+
+/* ---- Service chips band ---- */
+.chips{display:flex; flex-wrap:wrap; gap:12px}
+.chip{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 20px; border-radius:var(--r-pill);
+  background:#fff; border:1px solid var(--border);
+  font-weight:600; font-size:.9375rem; color:var(--ink); text-decoration:none;
+  transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out;
+}
+.chip .icon{font-size:14px}
+.chip:hover{border-color:var(--primary); background:var(--primary-light); color:var(--primary-hover)}
+.chip-ext{background:var(--primary); border-color:var(--primary); color:#fff}
+.chip-ext:hover{background:var(--primary-hover); border-color:var(--primary-hover); color:#fff}
+
+/* ---- Featured subsidy cards ---- */
+.grant-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:24px}
+.grant-card{
+  display:flex; flex-direction:column; gap:10px;
+  background:#fff; border:1px solid var(--border); border-radius:var(--r-card);
+  padding:24px; box-shadow:var(--shadow-card); text-decoration:none; color:var(--ink);
+  transition:transform .15s ease-out, box-shadow .15s ease-out;
+}
+.grant-card:hover{transform:translateY(-2px); box-shadow:var(--shadow-hover); color:var(--ink)}
+.grant-top{display:flex; align-items:center; flex-wrap:wrap; gap:10px}
+.grant-top .pill{text-transform:uppercase; font-size:.75rem; letter-spacing:.06em}
+.grant-when{font-size:.875rem; color:var(--ink-muted)}
+.grant-card h3{margin:0; font-size:1.25rem}
+.grant-desc{margin:0; color:var(--ink-muted); font-size:.9375rem}
+.grant-rate{margin:6px 0 0; font-size:1.5rem; font-weight:500; color:var(--primary-dark)}
+.grant-more{margin-top:auto; padding-top:10px; display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:.9375rem; color:var(--primary)}
+.grant-more .icon{font-size:14px}
+
+/* ---- ContactBand (§1.4) ---- */
+.contact-band{padding-block:56px}
+.contact-card{
+  background:var(--bg-mist); border-radius:var(--r-band); padding:40px;
+  display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-items:center;
+}
+.contact-card > a{display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:var(--r-input); text-decoration:none; color:var(--ink); font-weight:600}
+.contact-card > a:hover{background:var(--primary-light); color:var(--primary-hover)}
+.contact-card .icon{color:var(--primary); font-size:22px}
+.contact-card .btn{justify-self:center; min-height:48px}
+
+/* ---- Footer (§1.4) ---- */
+.site-footer{background:var(--primary-dark); color:#fff; padding-block:64px 32px}
+.footer-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:32px; margin-bottom:48px}
+.footer-grid h4{color:#fff; margin-bottom:14px}
+.footer-grid a{display:block; color:rgba(255,255,255,.75); text-decoration:none; padding:5px 0; font-size:.9375rem}
+.footer-grid a:hover{color:#fff}
+.footer-brand{display:flex; align-items:center; gap:10px; font-family:var(--font-heading); font-weight:700; color:#fff; margin:0 0 6px}
+.footer-brand .icon{font-size:18px; color:var(--accent)}
+.footer-reg{font-size:.8125rem; margin:0 0 12px}
+.footer-about{color:rgba(255,255,255,.75); font-size:.9375rem; margin:0 0 12px}
+.footer-bottom{
+  border-top:1px solid rgba(255,255,255,.14); padding-top:24px;
+  display:flex; flex-wrap:wrap; gap:8px 24px; align-items:center;
+  font-size:.875rem; color:rgba(255,255,255,.75);
+}
+.footer-bottom a{color:rgba(255,255,255,.75)}
+.footer-bottom a:hover{color:#fff}
+.footer-bottom .spacer{margin-left:auto}
+
+/* ---- Cookie banner ---- */
+.cookie{
+  position:fixed; z-index:130; left:16px; right:16px; bottom:16px;
+  margin-inline:auto; max-width:880px;
+  background:#fff; border-radius:var(--r-card); box-shadow:var(--shadow-modal);
+  padding:20px 24px; display:flex; gap:20px; align-items:center; flex-wrap:wrap;
+}
+.cookie p{margin:0; font-size:.875rem; color:var(--ink-muted); flex:1 1 320px}
+.cookie p b{color:var(--ink)}
+.cookie-actions{display:flex; gap:10px; flex-wrap:wrap}
+.cookie.hidden{display:none}
+
+/* ---- Toast ---- */
+.toast{
+  position:fixed; z-index:160; right:20px; bottom:20px; max-width:360px;
+  background:var(--primary-dark); color:#fff; border-radius:var(--r-input);
+  box-shadow:var(--shadow-modal); padding:14px 18px;
+  display:flex; gap:10px; align-items:flex-start; font-size:.9375rem;
+  opacity:0; visibility:hidden; transform:translateY(12px);
+  transition:opacity .3s var(--ease-reveal), transform .3s var(--ease-reveal), visibility 0s .3s;
+}
+.toast.show{opacity:1; visibility:visible; transform:none; transition-delay:0s}
+.toast .icon{font-size:18px; color:var(--accent); margin-top:2px}
+
+/* ---- Reveal ---- */
+.js .reveal{opacity:0; transform:translateY(14px); transition:opacity .3s var(--ease-reveal), transform .3s var(--ease-reveal)}
+.js .reveal.in{opacity:1; transform:none}
+
+/* ---- Responsive ---- */
+@media (max-width:1080px){
+  .main-nav{display:none}
+  .menu-btn{display:inline-flex}
+  .ext-link{display:none}
+}
+@media (max-width:768px){
+  h1{font-size:2.125rem}
+  h2{font-size:1.75rem}
+  h3{font-size:1.25rem}
+  .site-header,.site-header.scrolled{--header-h:56px}
+  .section{padding-block:40px}
+  .section-head{flex-direction:column; align-items:flex-start; gap:8px}
+  .hero-in{grid-template-columns:1fr; gap:32px; padding-block:56px}
+  .hero-intro{font-size:1rem}
+  .hero-ctas .btn{flex:1 1 100%}
+  .joincard{padding:20px}
+  .grant-grid{grid-template-columns:1fr; gap:14px}
+  .contact-card{grid-template-columns:1fr; padding:24px}
+  .contact-card .btn{justify-self:start}
+  .footer-grid{grid-template-columns:repeat(2,1fr)}
+  .cookie{flex-direction:column; align-items:stretch}
+  .cookie-actions .btn{flex:1 1 auto}
+}
+@media (max-width:480px){
+  .header-side .btn{display:none}
+  .footer-grid{grid-template-columns:1fr}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important; transition-duration:.01ms!important; scroll-behavior:auto!important}
+}
+
+/* ---- Page 02: Teenused — page-specific components ---- */
+/* Header band */
+.page-head{background:var(--bg-mist); padding-block:64px 56px}
+.page-head h1{margin-bottom:12px}
+.page-kicker{
+  font-family:var(--font-heading); font-weight:800; font-size:.8125rem;
+  letter-spacing:1px; text-transform:uppercase; color:var(--primary); margin:0 0 14px;
+}
+.page-intro{font-size:1.125rem; color:var(--ink-muted); max-width:44em; margin-bottom:24px}
+
+/* Sticky chip nav */
+.chipnav{
+  position:sticky; top:var(--header-h); z-index:90; background:#fff;
+  border-bottom:1px solid rgba(27,33,29,.08); box-shadow:0 2px 12px rgba(22,56,42,.05);
+}
+.site-header.scrolled ~ main .chipnav{top:60px}
+.chipnav-in{display:flex; gap:10px; padding-block:12px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none}
+.chipnav-in::-webkit-scrollbar{display:none}
+.chipnav .chip{white-space:nowrap; flex:none; padding:8px 18px}
+.chipnav .chip.active{border-color:var(--accent); background:var(--pill-open-bg); color:var(--primary)}
+.chipnav .chip.active:hover{background:var(--pill-open-bg); color:var(--primary-hover)}
+
+/* Service sections */
+.svc-section{scroll-margin-top:calc(var(--header-h) + 84px)}
+.svc-kicker{
+  font-family:var(--font-heading); font-weight:800; font-size:.8125rem;
+  letter-spacing:1px; text-transform:uppercase; color:var(--primary); margin:0 0 10px;
+}
+.svc-top{display:grid; grid-template-columns:minmax(0,7fr) minmax(0,5fr); gap:48px; align-items:center}
+.svc-intro p{color:var(--ink-muted); max-width:40em}
+.svc-photo{margin:0}
+.svc-photo img{width:100%; height:auto; aspect-ratio:4/3; object-fit:cover; border-radius:var(--r-card); box-shadow:var(--shadow-card)}
+.steps-title{margin:40px 0 16px}
+.steps{display:grid; grid-template-columns:repeat(3,1fr); gap:24px}
+.step{position:relative; background:#fff; border:1px solid var(--border); border-radius:var(--r-card); padding:24px; box-shadow:var(--shadow-card)}
+.step-num{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:36px; height:36px; border-radius:50%; background:var(--primary); color:#fff;
+  font-family:var(--font-mono); font-size:.9375rem; margin-bottom:14px;
+}
+.step h3{font-size:1.125rem; margin-bottom:6px}
+.step p{margin:0; color:var(--ink-muted); font-size:.9375rem}
+.step:not(:last-child)::after{
+  content:"\f061"; font-family:"Font Awesome 6 Free"; font-weight:900; font-size:14px;
+  position:absolute; top:35px; right:-19px; z-index:1; color:var(--accent);
+}
+.svc-actions{display:flex; flex-wrap:wrap; gap:14px; margin-top:32px}
+.svc-note{
+  display:flex; align-items:flex-start; gap:10px;
+  background:var(--info-light); border-radius:var(--r-input);
+  padding:14px 18px; margin:24px 0; font-size:.9375rem;
+}
+.svc-note .icon{font-size:16px; color:var(--info); margin-top:3px}
+.check-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px 24px}
+.check-grid li{
+  display:flex; align-items:flex-start; gap:10px;
+  background:#fff; border:1px solid var(--border); border-radius:var(--r-input);
+  padding:12px 16px; font-size:.9375rem; font-weight:500;
+}
+.check-grid .icon{font-size:15px; color:var(--accent); margin-top:3px; flex:none}
+.species-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin:24px 0 0}
+.species{
+  display:flex; flex-direction:column; align-items:flex-start; gap:8px;
+  background:#fff; border:1px solid var(--border); border-radius:var(--r-card); padding:18px 20px;
+}
+.species .icon{font-size:22px; color:var(--primary)}
+.species h3{margin:0; font-size:1.0625rem}
+.species p{margin:0; font-size:.875rem; color:var(--ink-muted)}
+.prod-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:24px}
+.prod-card{
+  display:flex; flex-direction:column; gap:10px;
+  background:#fff; border:1px solid var(--border); border-radius:var(--r-card);
+  padding:24px; box-shadow:var(--shadow-card);
+}
+.prod-card h3{margin:0}
+.prod-desc{margin:0; color:var(--ink-muted)}
+.prod-specs{margin:4px 0 8px; font-size:.875rem}
+.prod-card .btn{margin-top:auto; align-self:flex-start}
+
+/* Auction band */
+.auction-band{background:var(--primary-dark)}
+.auction-in{display:flex; align-items:center; justify-content:space-between; gap:32px; flex-wrap:wrap}
+.auction-kicker{
+  font-family:var(--font-heading); font-weight:800; font-size:.8125rem;
+  letter-spacing:1px; text-transform:uppercase; color:var(--primary-light); margin:0 0 12px;
+}
+.auction-band h2{color:#fff; max-width:26em; font-size:1.75rem; margin-bottom:0}
+
+/* Enquiry drawer */
+.enq{
+  position:fixed; inset:0 0 0 auto; width:min(480px,100vw); z-index:150;
+  background:#fff; transform:translateX(100%); transition:transform .2s cubic-bezier(.4,0,.2,1);
+  visibility:hidden; display:flex; flex-direction:column;
+  box-shadow:var(--shadow-modal);
+}
+body.enq-open .enq{transform:none; visibility:visible}
+body.enq-open{overflow:hidden}
+.enq-backdrop{position:fixed; inset:0; z-index:140; background:rgba(22,56,42,.4); opacity:0; visibility:hidden; transition:opacity .2s}
+body.enq-open .enq-backdrop{opacity:1; visibility:visible}
+.enq-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 20px; border-bottom:1px solid var(--border); min-height:56px}
+.enq-head h3{margin:0; font-size:1.125rem}
+.enq-body{flex:1; overflow-y:auto; padding:20px}
+.enq-body .btn{width:100%}
+.field select,.field textarea{
+  width:100%; min-height:44px; padding:10px 14px;
+  border:1px solid var(--border); border-radius:var(--r-input);
+  background:#fff; color:var(--ink); transition:border-color .15s ease-out;
+}
+.field textarea{min-height:96px; resize:vertical}
+.field select:focus,.field textarea:focus{border-color:var(--primary); outline:none}
+.field select:focus-visible,.field textarea:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.field .opt{color:var(--ink-muted); font-weight:400}
+
+@media (max-width:900px){
+  .svc-top{grid-template-columns:1fr; gap:28px}
+  .steps{grid-template-columns:1fr}
+  .step:not(:last-child)::after{content:"\f078"; top:auto; bottom:-19px; right:auto; left:50%; transform:translateX(-50%)}
+  .check-grid{grid-template-columns:1fr}
+  .species-grid{grid-template-columns:repeat(2,1fr)}
+  .prod-grid{grid-template-columns:1fr}
+  .auction-in{flex-direction:column; align-items:flex-start}
+}
+@media (max-width:768px){
+  .page-head{padding-block:40px}
+  .chipnav,.site-header.scrolled ~ main .chipnav{top:56px}
+  .svc-section{scroll-margin-top:calc(56px + 76px)}
+  .svc-actions .btn{flex:1 1 100%}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#sisu">Otse sisuni</a>
+
+<!-- ============ HEADER ============ -->
+<header class="site-header" id="header">
+  <div class="container header-in">
+    <a class="logo" href="01-home.html" aria-label="Erametsad Metsaühistu — avaleht">
+      <i class="icon fa-solid fa-tree" aria-hidden="true"></i>Erametsad Metsaühistu
+    </a>
+    <nav class="main-nav" aria-label="Peamenüü">
+      <a class="nav-link" href="01-home.html">Avaleht</a>
+      <a class="nav-link active" href="02-teenused.html" aria-current="page">Teenused</a>
+      <a class="nav-link" href="03-toetused-list.html">Toetused</a>
+      <a class="nav-link" href="05-sertifitseerimine.html">Sertifitseerimine</a>
+      <a class="nav-link" href="07-kontakt.html">Kontakt</a>
+    </nav>
+    <div class="header-side">
+      <a class="ext-link" href="https://oksjonid.erametsad.ee" target="_blank" rel="noopener">Oksjonikeskkond <i class="icon fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+      <a class="btn btn-cta" href="06-liitu.html">LIITU ÜHISTUGA</a>
+      <button class="menu-btn" id="menuOpen" aria-expanded="false" aria-controls="drawer" aria-label="Ava menüü">
+        <i class="icon fa-solid fa-bars" style="font-size:26px" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Mobile drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+<aside class="drawer" id="drawer" aria-label="Mobiilmenüü" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="logo"><i class="icon fa-solid fa-tree" aria-hidden="true"></i>Erametsad Metsaühistu</span>
+    <button class="menu-btn" id="menuClose" style="display:inline-flex" aria-label="Sulge menüü">
+      <i class="icon fa-solid fa-xmark" style="font-size:24px" aria-hidden="true"></i>
+    </button>
+  </div>
+  <div class="drawer-body">
+    <div class="drawer-group open">
+      <button class="drawer-group-toggle" aria-expanded="true">Leheküljed <i class="icon fa-solid fa-chevron-down" aria-hidden="true"></i></button>
+      <div class="drawer-group-list">
+        <a href="01-home.html">Avaleht</a>
+        <a href="02-teenused.html" aria-current="page">Teenused</a>
+        <a href="03-toetused-list.html">Toetused</a>
+        <a href="05-sertifitseerimine.html">Sertifitseerimine</a>
+        <a href="07-kontakt.html">Kontakt</a>
+      </div>
+    </div>
+    <a class="drawer-direct" href="https://oksjonid.erametsad.ee" target="_blank" rel="noopener">Oksjonikeskkond <i class="icon fa-solid fa-arrow-up-right-from-square" style="font-size:14px" aria-hidden="true"></i></a>
+  </div>
+  <div class="drawer-footer">
+    <a class="btn btn-cta" href="06-liitu.html">LIITU ÜHISTUGA</a>
+  </div>
+</aside>
+
+<main id="sisu">
+<!-- ============ HEADER BAND ============ -->
+<section class="page-head">
+  <div class="container">
+    <p class="page-kicker">Erametsad Metsaühistu</p>
+    <h1>Teenused metsaomanikule</h1>
+    <p class="page-intro">Teeme metsatööd algusest lõpuni — ja suur osa teenustest on toetustega kaetud.</p>
+    <a class="btn btn-outline" href="03-toetused-list.html"><i class="icon fa-solid fa-link" aria-hidden="true"></i> Vaata toetuste võimalusi</a>
+  </div>
+</section>
+
+<!-- ============ STICKY CHIP NAV ============ -->
+<nav class="chipnav" aria-label="Teenuste navigatsioon">
+  <div class="container chipnav-in">
+    <a class="chip active" href="#istutamine" data-spy="istutamine" aria-current="true">Istutamine</a>
+    <a class="chip" href="#hooldusraied" data-spy="hooldusraied">Hooldusraied</a>
+    <a class="chip" href="#taimede-tellimine" data-spy="taimede-tellimine">Taimede tellimine</a>
+    <a class="chip" href="#noustamine" data-spy="noustamine">Nõustamine</a>
+    <a class="chip" href="#taimekaitse" data-spy="taimekaitse">Taimekaitse</a>
+    <a class="chip" href="#kavad" data-spy="kavad">Metsakavad</a>
+    <a class="chip" href="#taimede-hooldus" data-spy="taimede-hooldus">Taimede hooldus</a>
+    <a class="chip" href="#maapind" data-spy="maapind">Maapind</a>
+    <a class="chip chip-ext" href="https://oksjonid.erametsad.ee" target="_blank" rel="noopener" data-spy="oksjonid">Oksjonikeskkond <i class="icon fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+  </div>
+</nav>
+
+<!-- ============ 1. ISTUTAMINE ============ -->
+<section class="section svc-section" id="istutamine" aria-labelledby="istutamine-h">
+  <div class="container">
+    <div class="svc-top">
+      <div class="svc-intro reveal">
+        <p class="svc-kicker">01 · Istutamine</p>
+        <h2 id="istutamine-h">Metsa istutamine ja uuendamine</h2>
+        <p>Korraldame kvaliteetse metsauuenduse alates taimede valikust kuni istutuseni. Võtame arvesse kasvukoha, mulla ja metsatüübi eripära, et tagada taimedele hea elujäävus. Vajadusel teeme ka maapinna ettevalmistuse ja tellime taimed ühistu hulgehinnaga.</p>
+      </div>
+      <figure class="svc-photo reveal">
+        <img src="https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=1200&q=70" alt="Noor kuusik istutatud metsalangil päikesepaistel" loading="lazy" decoding="async" width="1200" height="900">
+      </figure>
+    </div>
+    <h3 class="steps-title reveal">3-sammuline protsess</h3>
+    <div class="steps stagger reveal">
+      <div class="step">
+        <span class="step-num">1</span>
+        <h3>Maapinna ettevalmistus</h3>
+        <p>Ketasadraga töötlemine parandab mulla struktuuri ja vähendab rohu konkurentsi.</p>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <h3>Taimede tellimine</h3>
+        <p>Sobiva päritoluga taimed tunnustatud taimlatest ühistu hulgitellimusel.</p>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <h3>Istutustööd</h3>
+        <p>Korralik istutus õigel ajal — masinaga või käsitsi, sõltuvalt lannast.</p>
+      </div>
+    </div>
+    <div class="svc-actions reveal">
+      <button class="btn btn-cta" type="button" data-enq="Istutamine">Soovin päringut</button>
+      <a class="btn btn-outline" href="tel:+372XXXXXXX">Helista nõustajale <i class="icon fa-solid fa-phone" aria-hidden="true"></i></a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. HOOLDUSRAIED ============ -->
+<section class="section svc-section bg-mist" id="hooldusraied" aria-labelledby="hooldusraied-h">
+  <div class="container">
+    <div class="svc-intro reveal">
+      <p class="svc-kicker">02 · Hooldusraied</p>
+      <h2 id="hooldusraied-h">Valgustus- ja harvendusraied</h2>
+      <p>Hooldusraie on noore metsa kõige tähtsam investeering. Õigeaegne valgustus- või harvendusraie suurendab juurdekasvu ja hoiab puistu vastupidavana.</p>
+    </div>
+    <h3 class="steps-title reveal">Miks teha hooldusraiet?</h3>
+    <ul class="check-grid stagger reveal">
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Valgus juurdekasvuks — järele jäänud puud kasvavad kiiremini</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Puistu sanitaarne seisund — eemaldame kuivanud ja kahjustatud puud</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Valik paremate puude kasuks — aretuspuud säilitame</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Stabiilsem puistu — vähem lumenõksu ja tüvekahjustusi</li>
+    </ul>
+    <p class="svc-note reveal"><i class="icon fa-solid fa-circle-info" aria-hidden="true"></i> Hind sõltub asukohast, tihedusest ja mahust. Küsi meilt pakkumus oma metsa jaoks.</p>
+    <div class="svc-actions reveal">
+      <button class="btn btn-cta" type="button" data-enq="Hooldusraied">Soovin päringut</button>
+      <button class="btn btn-outline" type="button" data-enq="Metsandusalane nõustamine">Küsi nõu</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. TAIMEDE TELLIMINE ============ -->
+<section class="section svc-section" id="taimede-tellimine" aria-labelledby="taimede-tellimine-h">
+  <div class="container">
+    <div class="svc-intro reveal">
+      <p class="svc-kicker">03 · Taimede tellimine</p>
+      <h2 id="taimede-tellimine-h">Metsataimede tellimine</h2>
+      <p>Ühistu kaudu hulgitellimisel soodsamad lepinguhinnad tunnustatud taimlatest. Ühine tellimus vähendab transpordikulu ja kõik taimed tulevad päritolutunnistusega.</p>
+    </div>
+    <div class="species-grid stagger reveal">
+      <div class="species">
+        <i class="icon fa-solid fa-tree" aria-hidden="true"></i>
+        <h3>Kuusk</h3>
+        <p>potitaim / paljasjuurne</p>
+      </div>
+      <div class="species">
+        <i class="icon fa-solid fa-tree" aria-hidden="true"></i>
+        <h3>Mänd</h3>
+      </div>
+      <div class="species">
+        <i class="icon fa-solid fa-tree" aria-hidden="true"></i>
+        <h3>Kask</h3>
+      </div>
+      <div class="species">
+        <i class="icon fa-solid fa-tree" aria-hidden="true"></i>
+        <h3>Sanglepp</h3>
+      </div>
+    </div>
+    <div class="svc-actions reveal">
+      <button class="btn btn-cta" type="button" data-enq="Metsataimede tellimine">Soovin päringut</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. NÕUSTAMINE ============ -->
+<section class="section svc-section bg-mist" id="noustamine" aria-labelledby="noustamine-h">
+  <div class="container">
+    <div class="svc-intro reveal">
+      <p class="svc-kicker">04 · Nõustamine · 11 põhiteemat</p>
+      <h2 id="noustamine-h">Metsandusalane nõustamine</h2>
+      <p>Kutsetunnistusega metsakonsulent aitab sind metsa majandamise kõigis etappides — alates esimestest sammudest kuni tööde kvaliteedi kontrollini. Nõustamine toimub kohapeal metsas või meie kontoris.</p>
+    </div>
+    <ul class="check-grid stagger reveal">
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Alustav metsaomanik ja esimesed sammud</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Raieprintsiibid ja optimaalne aeg</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Dokumendid, load ja metsateatised</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Metsa- ja ulukikahjustuste hindamine</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Metsamajandamiskava ja takseerandmed</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Majanduslik tasuvus ja kalkulatsioonid</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Metsa uuendamise ja istutuse nõuded</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Riiklikud toetused ja PRIA reeglid</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Noorendike hooldamise parim praktika</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Natura 2000 erametsa piirangud</li>
+      <li><i class="icon fa-solid fa-check" aria-hidden="true"></i> Teostatud tööde kvaliteedi kontroll</li>
+    </ul>
+    <p class="svc-note reveal"><i class="icon fa-solid fa-certificate" aria-hidden="true"></i> Konsulendi kvalifikatsiooni saad kontrollida kutseregistrist: <a href="https://kutseregister.ee" target="_blank" rel="noopener">kutseregister.ee <i class="icon fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a></p>
+  </div>
+</section>
+
+<!-- ============ 5. TAIMEKAITSE ============ -->
+<section class="section svc-section" id="taimekaitse" aria-labelledby="taimekaitse-h">
+  <div class="container">
+    <div class="svc-intro reveal">
+      <p class="svc-kicker">05 · Taimekaitse</p>
+      <h2 id="taimekaitse-h">Taimekaitse ja ulukitõrjevahendid</h2>
+      <p>Kaitse oma noorendik ulukikahjustuste eest — telli tõrjevahendid ühistu kaudu hulgehinnaga.</p>
+    </div>
+    <div class="prod-grid stagger reveal">
+      <div class="prod-card">
+        <h3>TRICO</h3>
+        <p class="prod-desc">Looduslik lambarasval põhinev hirve- ja kitselõhnapeleti.</p>
+        <p class="prod-specs mono">Kulu: 6–10 l/ha · Mõju: 6 kuud</p>
+        <button class="btn btn-outline" type="button" data-enq="Taimekaitse ja ulukitõrje">Telli ühistu kaudu <i class="icon fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+      </div>
+      <div class="prod-card">
+        <h3>CERVACOL EXTRA</h3>
+        <p class="prod-desc">Valge määre latvade kaitseks põdrakahjustuste vastu.</p>
+        <p class="prod-specs mono">Kulu: 2–4 kg/1000 taime</p>
+        <button class="btn btn-outline" type="button" data-enq="Taimekaitse ja ulukitõrje">Telli ühistu kaudu <i class="icon fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6. KAVAD ============ -->
+<section class="section svc-section bg-mist" id="kavad" aria-labelledby="kavad-h">
+  <div class="container">
+    <div class="svc-top">
+      <div class="svc-intro reveal">
+        <p class="svc-kicker">06 · Metsakavad</p>
+        <h2 id="kavad-h">Metsamajandamiskavad</h2>
+        <p><strong>Metsa pass 10 aastaks.</strong> Metsamajandamiskava kirjeldab sinu metsa seisundit ja annab raiemahud, hooldus- ning taastamissoovitused järgnevaks kümneks aastaks. Kava on vajalik enamiku metsandustoetuste taotlemiseks, sealhulgas metsakava toetuse saamiseks.</p>
+        <div class="svc-actions">
+          <button class="btn btn-cta" type="button" data-enq="Metsamajandamiskava">Soovin päringut</button>
+        </div>
+      </div>
+      <figure class="svc-photo reveal">
+        <img src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=70" alt="Päikeseline metsatee läbi kuusiku metsakava koostamisel" loading="lazy" decoding="async" width="1200" height="900">
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7. TAIMEDE HOOLDUS ============ -->
+<section class="section svc-section" id="taimede-hooldus" aria-labelledby="taimede-hooldus-h">
+  <div class="container">
+    <div class="svc-intro reveal">
+      <p class="svc-kicker">07 · Taimede hooldus</p>
+      <h2 id="taimede-hooldus-h">Noorendike hooldus ja rohimine</h2>
+      <p>Noorendik vajab esimestel aastatel regulaarset hooldust. Eemaldame istikute ümber kasvava rohu ja konkureeriva aluskasvu, et noored puud saaksid valgust, vett ja kasvuruumi. Vajadusel teostame ka täiendusistutuse.</p>
+      <div class="svc-actions">
+        <button class="btn btn-cta" type="button" data-enq="Taimede hooldus">Soovin päringut</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 8. MAAPIND ============ -->
+<section class="section svc-section bg-mist" id="maapind" aria-labelledby="maapind-h">
+  <div class="container">
+    <div class="svc-intro reveal">
+      <p class="svc-kicker">08 · Maapind</p>
+      <h2 id="maapind-h">Maapinna ettevalmistus ketasadraga</h2>
+      <p>Ketasadraga ettevalmistatud lang parandab istutatud taimede elujäävust ja algkasvu olulisel määral. Teeme maapinna ettevalmistuse ära enne istutushooaega, et istutustööd saaksid alata õigel ajal.</p>
+      <div class="svc-actions">
+        <button class="btn btn-cta" type="button" data-enq="Maapinna ettevalmistus">Soovin päringut</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 9. OKSJONID ============ -->
+<section class="section svc-section auction-band" id="oksjonid" aria-labelledby="oksjonid-h">
+  <div class="container auction-in">
+    <div class="reveal">
+      <p class="auction-kicker">09 · Oksjonikeskkond · Raieõiguste ja kinnistute enampakkumised</p>
+      <h2 id="oksjonid-h">Müü oma raieõigus või kinnistu läbi Eesti juhtiva oksjonikeskkonna parima hinnaga.</h2>
+    </div>
+    <a class="btn btn-secondary reveal" href="https://oksjonid.erametsad.ee" target="_blank" rel="noopener">Ava oksjonikeskkond <i class="icon fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+  </div>
+</section>
+</main>
+
+<!-- ============ ContactBand ============ -->
+<section class="contact-band" aria-label="Kontakt">
+  <div class="container">
+    <div class="contact-card reveal">
+      <a href="tel:+372XXXXXXX"><i class="icon fa-solid fa-phone" aria-hidden="true"></i> +372 XXX XXXX</a>
+      <a href="mailto:metsauhistu@erametsad.ee"><i class="icon fa-solid fa-envelope" aria-hidden="true"></i> metsauhistu@erametsad.ee</a>
+      <button class="btn btn-cta" type="button" data-enq="Muu teenus / üldpäring">Jäta enda kontaktid <i class="icon fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Footer ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <h4>Metsaühistu</h4>
+        <p class="footer-brand"><i class="icon fa-solid fa-tree" aria-hidden="true"></i> MTÜ Erametsad Metsaühistu</p>
+        <p class="footer-reg">Reg. kood [registrikood]</p>
+        <p class="footer-about">Erametsaomanike ühistu, mis aitab metsa majandada, toetusi taotleda ja puitu parema hinnaga müüa.</p>
+        <a href="tel:+372XXXXXXX">+372 XXX XXXX</a>
+        <a href="mailto:metsauhistu@erametsad.ee">metsauhistu@erametsad.ee</a>
+      </div>
+      <div>
+        <h4>Teenused</h4>
+        <a href="02-teenused.html#istutamine">Istutamine</a>
+        <a href="02-teenused.html#hooldusraied">Hooldusraied</a>
+        <a href="02-teenused.html#kavad">Metsakavad</a>
+        <a href="02-teenused.html#noustamine">Nõustamine</a>
+        <a href="02-teenused.html#taimekaitse">Ulukitõrje</a>
+      </div>
+      <div>
+        <h4>Toetused &amp; Info</h4>
+        <a href="03-toetused-list.html">Käimasolevad toetused</a>
+        <a href="05-sertifitseerimine.html">PEFC sertifitseerimine</a>
+        <a href="#">Põhikiri (PDF)</a>
+        <a href="#">Kasutustingimused</a>
+      </div>
+      <div>
+        <h4>Oksjonid &amp; Partnerid</h4>
+        <a href="https://oksjonid.erametsad.ee" target="_blank" rel="noopener">Oksjonikeskkond</a>
+        <a href="../marketing/home.html">Erametsad pealeht</a>
+        <a href="../marketing/hindamisaktid.html">Hinnangud ja hindamisaktid</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© Erametsad Metsaühistu MTÜ</span>
+      <span>Kõik õigused kaitstud</span>
+      <span class="spacer"></span>
+      <a href="#">Privaatsuspoliitika</a>
+      <a href="#" id="cookieSettingsLink">Küpsiste seaded</a>
+    </div>
+  </div>
+</footer>
+
+<!-- Cookie banner -->
+<div class="cookie" id="cookie" role="region" aria-label="Küpsiste teavitus">
+  <p><b>Kasutame küpsiseid.</b> Vajalikud küpsised tagavad lehe toimimise, analüütika abil mõõdame liiklust. Vali, mida lubad.</p>
+  <div class="cookie-actions">
+    <button class="btn btn-cta btn-sm" data-cookie="all">Nõustun kõigiga</button>
+    <button class="btn btn-outline btn-sm" data-cookie="needed">Ainult vajalikud</button>
+    <button class="btn btn-ghost btn-sm" data-cookie="settings">Sätete muutmine</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <i class="icon fa-solid fa-circle-check" aria-hidden="true"></i>
+  <span></span>
+</div>
+
+<!-- ============ Enquiry drawer ============ -->
+<div class="enq-backdrop" id="enqBackdrop" hidden></div>
+<aside class="enq" id="enqDrawer" role="dialog" aria-modal="true" aria-labelledby="enq-title" aria-hidden="true">
+  <div class="enq-head">
+    <h3 id="enq-title">Teenusepäring: <span id="enqService">Istutamine</span></h3>
+    <button class="menu-btn" id="enqClose" style="display:inline-flex" aria-label="Sulge päring">
+      <i class="icon fa-solid fa-xmark" style="font-size:24px" aria-hidden="true"></i>
+    </button>
+  </div>
+  <form class="enq-body" id="enqForm" novalidate>
+    <div class="field">
+      <label for="enq-teenus">Teenuse valik</label>
+      <select id="enq-teenus" name="teenus">
+        <option>Istutamine</option>
+        <option>Hooldusraied</option>
+        <option>Metsataimede tellimine</option>
+        <option>Metsandusalane nõustamine</option>
+        <option>Taimekaitse ja ulukitõrje</option>
+        <option>Metsamajandamiskava</option>
+        <option>Taimede hooldus</option>
+        <option>Maapinna ettevalmistus</option>
+        <option>Muu teenus / üldpäring</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="enq-nimi">Nimi</label>
+      <input id="enq-nimi" name="nimi" type="text" autocomplete="name" placeholder="Ees- ja perekonnanimi" required>
+      <p class="field-error">Palun sisesta oma nimi.</p>
+    </div>
+    <div class="field">
+      <label for="enq-tel">Telefon</label>
+      <input id="enq-tel" name="telefon" type="tel" autocomplete="tel" placeholder="+372 5…" required>
+      <p class="field-error">Palun sisesta korrektne telefoninumber.</p>
+    </div>
+    <div class="field">
+      <label for="enq-epost">E-post</label>
+      <input id="enq-epost" name="epost" type="email" autocomplete="email" required>
+      <p class="field-error">Palun sisesta korrektne e-posti aadress.</p>
+    </div>
+    <div class="field">
+      <label for="enq-asukoht">Metsa asukoht / katastritunnus <span class="opt">(valikuline)</span></label>
+      <input id="enq-asukoht" name="asukoht" type="text" placeholder="nt Võru maakond, kvl 12345:678:9012">
+    </div>
+    <div class="field">
+      <label for="enq-komment">Kommentaar</label>
+      <textarea id="enq-komment" name="kommentaar" placeholder="Kirjelda lühidalt oma soovi ja metsa seisundit"></textarea>
+    </div>
+    <div class="consent">
+      <input id="enq-nous" name="nõusolek" type="checkbox" required>
+      <label for="enq-nous">Nõustun, et Erametsad Metsaühistu MTÜ töötleb mu andmeid päringu täitmiseks ja võtab ühendust.</label>
+    </div>
+    <input class="hp" type="text" name="ettevote" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <button class="btn btn-cta" type="submit">SAADA PÄRING</button>
+  </form>
+</aside>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(s,c){return (c||document).querySelector(s)};
+  var $$=function(s,c){return Array.from((c||document).querySelectorAll(s))};
+
+  /* Header shrink */
+  var header=$("#header");
+  var onScroll=function(){header.classList.toggle("scrolled",window.scrollY>8)};
+  addEventListener("scroll",onScroll,{passive:true}); onScroll();
+
+  /* Mobile drawer */
+  var drawer=$("#drawer"), backdrop=$("#drawerBackdrop"),
+        openBtn=$("#menuOpen"), closeBtn=$("#menuClose");
+  var setDrawer=function(open){
+    document.body.classList.toggle("drawer-open",open);
+    drawer.setAttribute("aria-hidden",String(!open));
+    openBtn.setAttribute("aria-expanded",String(open));
+    backdrop.hidden=!open;
+  };
+  openBtn.addEventListener("click",function(){setDrawer(true)});
+  closeBtn.addEventListener("click",function(){setDrawer(false)});
+  backdrop.addEventListener("click",function(){setDrawer(false)});
+  addEventListener("keydown",function(e){if(e.key==="Escape")setDrawer(false)});
+  $$(".drawer-group-toggle").forEach(function(t){t.addEventListener("click",function(){
+    var g=t.closest(".drawer-group"), open=t.getAttribute("aria-expanded")!=="true";
+    t.setAttribute("aria-expanded",String(open));
+    g.classList.toggle("open",open);
+  })});
+  $$("a",drawer).forEach(function(a){a.addEventListener("click",function(){setDrawer(false)})});
+
+  /* Scroll reveal */
+  $$(".stagger").forEach(function(g){Array.from(g.children).slice(0,6).forEach(function(c,i){
+    c.classList.add("reveal"); c.style.transitionDelay=(i*50)+"ms";
+  })});
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){
+    if(e.isIntersecting){e.target.classList.add("in"); io.unobserve(e.target);}
+  })},{threshold:.1,rootMargin:"0px 0px -40px"});
+  $$(".reveal").forEach(function(el){io.observe(el)});
+
+  /* Toast */
+  var toast=$("#toast"), toastTimer;
+  function showToast(msg){
+    $("span",toast).textContent=msg;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){toast.classList.remove("show")},5000);
+  }
+  /* Exposed for page-level demo scripts (join card below) */
+  window.demoToast=showToast;
+
+  /* Cookie banner (visual demo) */
+  var cookie=$("#cookie");
+  var hideCookie=function(){cookie.classList.add("hidden"); try{sessionStorage.setItem("cookie","1")}catch(e){}};
+  try{if(sessionStorage.getItem("cookie"))cookie.classList.add("hidden")}catch(e){}
+  $$("[data-cookie]",cookie).forEach(function(b){b.addEventListener("click",hideCookie)});
+  $("#cookieSettingsLink").addEventListener("click",function(e){e.preventDefault(); cookie.classList.remove("hidden")});
+})();
+</script>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(s,c){return (c||document).querySelector(s)};
+  var $$=function(s,c){return Array.from((c||document).querySelectorAll(s))};
+
+  /* Join card demo submit (Page 01 only; null-guarded on other pages) */
+  var form=$("#liitumine");
+  if(form){
+    var rules={
+      nimi:function(v){return v.trim().length>=2},
+      telefon:function(v){return /^[+0-9 ()\-]{7,}$/.test(v.trim())},
+      epost:function(v){return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.trim())}
+    };
+    form.addEventListener("submit",function(e){
+      e.preventDefault();
+      var ok=true;
+      $$("input[required]",form).forEach(function(inp){
+        if(inp.type==="checkbox"){
+          var bad=!inp.checked;
+          inp.closest(".consent").classList.toggle("invalid",bad);
+          if(bad)ok=false;
+          return;
+        }
+        var field=inp.closest(".field");
+        if(!field)return;
+        var check=rules[inp.name];
+        var valid=check?check(inp.value):true;
+        field.classList.toggle("invalid",!valid);
+        if(!valid)ok=false;
+      });
+      var hp=$(".hp",form);
+      if(hp&&hp.value){return}
+      if(!ok){return}
+      if(window.demoToast)window.demoToast("Aitäh! Võtame ühendust.");
+      form.reset();
+      $$(".invalid",form).forEach(function(f){f.classList.remove("invalid")});
+    });
+    form.addEventListener("input",function(e){
+      var field=e.target.closest(".field");
+      var check=rules[e.target.name];
+      if(field&&field.classList.contains("invalid")&&check&&check(e.target.value)){
+        field.classList.remove("invalid");
+      }
+    });
+    form.addEventListener("change",function(e){
+      if(e.target.type==="checkbox"){
+        e.target.closest(".consent").classList.remove("invalid");
+      }
+    });
+  }
+
+  /* Smooth in-page anchors (reduced-motion aware) */
+  var reduced=window.matchMedia("(prefers-reduced-motion: reduce)");
+  $$('a[href^="#"]').forEach(function(a){
+    a.addEventListener("click",function(e){
+      var id=a.getAttribute("href");
+      if(!id||id.length<2)return;
+      var target=$(id);
+      if(!target)return;
+      e.preventDefault();
+      target.scrollIntoView({behavior:reduced.matches?"auto":"smooth"});
+      history.replaceState(null,"",id);
+    });
+  });
+})();
+</script>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(s,c){return (c||document).querySelector(s)};
+  var $$=function(s,c){return Array.from((c||document).querySelectorAll(s))};
+  var reduced=window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  /* Chip nav scroll-spy: active chip follows the section in view */
+  var chips=$$(".chipnav .chip[data-spy]");
+  var spyIds=chips.map(function(c){return c.getAttribute("data-spy")});
+  var sections=spyIds.map(function(id){return document.getElementById(id)}).filter(Boolean);
+  var setActive=function(id){
+    chips.forEach(function(c){
+      var on=c.getAttribute("data-spy")===id;
+      c.classList.toggle("active",on);
+      if(on){
+        c.setAttribute("aria-current","true");
+        c.scrollIntoView({behavior:reduced.matches?"auto":"smooth",inline:"center",block:"nearest"});
+      }else{
+        c.removeAttribute("aria-current");
+      }
+    });
+  };
+  if(sections.length){
+    var spy=new IntersectionObserver(function(es){
+      es.forEach(function(e){if(e.isIntersecting)setActive(e.target.id)});
+    },{rootMargin:"-35% 0px -55% 0px",threshold:0});
+    sections.forEach(function(s){spy.observe(s)});
+    /* Page bottom: highlight the last chip (external auction band) */
+    addEventListener("scroll",function(){
+      if(window.innerHeight+window.scrollY>=document.documentElement.scrollHeight-8){
+        setActive(spyIds[spyIds.length-1]);
+      }
+    },{passive:true});
+  }
+
+  /* Enquiry drawer: open/close/preselect */
+  var enq=$("#enqDrawer"), enqBackdrop=$("#enqBackdrop"), enqClose=$("#enqClose"),
+      enqForm=$("#enqForm"), enqService=$("#enqService"), enqSelect=$("#enq-teenus");
+  var lastFocus=null;
+  function preselect(service){
+    if(!service||!enqSelect)return;
+    for(var i=0;i<enqSelect.options.length;i++){
+      if(enqSelect.options[i].text===service){enqSelect.selectedIndex=i;break}
+    }
+    if(enqService)enqService.textContent=enqSelect.options[enqSelect.selectedIndex].text;
+  }
+  function openEnq(service){
+    preselect(service);
+    lastFocus=document.activeElement;
+    document.body.classList.add("enq-open");
+    enq.setAttribute("aria-hidden","false");
+    enqBackdrop.hidden=false;
+    var first=$("input[name=nimi]",enqForm);
+    if(first){
+      if(reduced.matches){first.focus()}
+      else{setTimeout(function(){first.focus()},210)}
+    }
+  }
+  function closeEnq(){
+    if(lastFocus&&lastFocus.focus)lastFocus.focus();
+    document.body.classList.remove("enq-open");
+    enq.setAttribute("aria-hidden","true");
+    enqBackdrop.hidden=true;
+  }
+  $$("[data-enq]").forEach(function(b){
+    b.addEventListener("click",function(e){
+      e.preventDefault();
+      openEnq(b.getAttribute("data-enq")||null);
+    });
+  });
+  if(enqClose)enqClose.addEventListener("click",closeEnq);
+  if(enqBackdrop)enqBackdrop.addEventListener("click",closeEnq);
+  addEventListener("keydown",function(e){
+    if(e.key==="Escape"&&document.body.classList.contains("enq-open"))closeEnq();
+  });
+  if(enqSelect&&enqService){
+    enqSelect.addEventListener("change",function(){enqService.textContent=enqSelect.value});
+  }
+
+  /* Enquiry form demo submit: validate, toast, close */
+  var rules={
+    nimi:function(v){return v.trim().length>=2},
+    telefon:function(v){return /^[+0-9 ()\-]{7,}$/.test(v.trim())},
+    epost:function(v){return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.trim())}
+  };
+  enqForm.addEventListener("submit",function(e){
+    e.preventDefault();
+    var ok=true;
+    $$("input[required]",enqForm).forEach(function(inp){
+      if(inp.type==="checkbox"){
+        var bad=!inp.checked;
+        inp.closest(".consent").classList.toggle("invalid",bad);
+        if(bad)ok=false;
+        return;
+      }
+      var field=inp.closest(".field");
+      if(!field)return;
+      var check=rules[inp.name];
+      var valid=check?check(inp.value):true;
+      field.classList.toggle("invalid",!valid);
+      if(!valid)ok=false;
+    });
+    var hp=$(".hp",enqForm);
+    if(hp&&hp.value){return}
+    if(!ok){return}
+    if(window.demoToast)window.demoToast("Päring saadetud! Võtame ühendust 1 tööpäeva jooksul.");
+    closeEnq();
+    enqForm.reset();
+    if(enqService&&enqSelect)enqService.textContent=enqSelect.options[enqSelect.selectedIndex].text;
+    $$(".invalid",enqForm).forEach(function(f){f.classList.remove("invalid")});
+  });
+  enqForm.addEventListener("input",function(e){
+    var field=e.target.closest(".field");
+    var check=rules[e.target.name];
+    if(field&&field.classList.contains("invalid")&&check&&check(e.target.value)){
+      field.classList.remove("invalid");
+    }
+  });
+  enqForm.addEventListener("change",function(e){
+    if(e.target.type==="checkbox"){
+      e.target.closest(".consent").classList.remove("invalid");
+    }
+  });
+})();
+</script>
+</body>
+</html>

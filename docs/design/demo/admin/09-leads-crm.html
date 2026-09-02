@@ -1,0 +1,1496 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Juhtlõimed | Erametsad haldus</title>
+<meta name="description" content="Juhtlõimede CRM — Erametsad haldusplaadi demo prototüüp.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23012d1d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z'/%3E%3Cpath d='M12 22v-3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ---- Tokens (ADMIN-DESIGN-SPEC §1.2) ---- */
+:root{
+  --primary:#012d1d; --primary-hover:#1b4332; --primary-dark:#16382A; --primary-light:#c1ecd4;
+  --accent:#58B368; --cta:#F2A93B; --cta-hover:#D98F1F;
+  --ink:#181a2e; --ink-muted:#414844; --ink-inverse:#FFFFFF;
+  --bg-page:#fbf8ff; --bg-mist:#f4f2ff; --border:#c1c8c2;
+  --danger:#B3261E; --danger-light:#FBEAE9; --info:#2D6FA8; --info-light:#E9F1F7;
+  --st-draft-text:#414844; --st-draft-bg:#EBEBEB; --st-draft-dot:#6B7570;
+  --st-sched-text:#1F4E79; --st-sched-bg:#E9F1F7; --st-sched-dot:#2D6FA8;
+  --st-active-text:#1B6338; --st-active-bg:#E8F6ED; --st-active-dot:#2E9E5B;
+  --st-ending-text:#941E17; --st-ending-bg:#FBEAE9; --st-ending-dot:#B3261E;
+  --st-ended-text:#8F590A; --st-ended-bg:#FEF5E7; --st-ended-dot:#F2A93B;
+  --st-unsold:#B3261E;
+  --st-contract-text:#236B3B; --st-contract-bg:#EBF7F0; --st-contract-dot:#58B368;
+  --st-arch-text:#414844; --st-arch-bg:#ECEEEB; --st-arch-dot:#6B7570;
+  --font-heading:"Public Sans",system-ui,sans-serif;
+  --font-body:"Inter",system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --space-2xs:4px; --space-xs:8px; --space-sm:12px; --space-md:16px;
+  --space-lg:24px; --space-xl:32px; --space-2xl:40px; --space-3xl:48px; --space-4xl:64px;
+  --radius:8px; --radius-pill:999px;
+  --surface:#FFFFFF;
+  --shadow-card:0 1px 2px rgba(24,26,46,.04),0 2px 8px rgba(24,26,46,.05);
+  --shadow-hover:0 2px 8px rgba(24,26,46,.08),0 8px 24px rgba(24,26,46,.08);
+  --shadow-pop:0 8px 24px rgba(24,26,46,.14);
+  --tint-primary:rgba(1,45,29,.06);
+  --tint-primary-strong:rgba(1,45,29,.1);
+  --glow-active:rgba(46,158,91,.45);
+  --accent-soft:rgba(88,179,104,.28);
+  --overlay:rgba(24,26,46,.45);
+  --rail-w:56px; --topbar-h:64px;
+}
+
+/* ---- Base ---- */
+*,*::before,*::after{box-sizing:border-box}
+html{color-scheme:light; -webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg-page); color:var(--ink);
+  font:400 14px/20px var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--primary)}
+button{font:inherit; cursor:pointer}
+ul{margin:0; padding:0; list-style:none}
+svg{display:block}
+svg.lucide{flex:none}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+::selection{background:var(--primary-light)}
+.mono{font-family:var(--font-mono); font-feature-settings:"tnum"}
+.sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
+.skip-link{
+  position:absolute; left:-9999px; top:8px; z-index:200;
+  background:var(--primary); color:var(--ink-inverse); padding:10px 16px; border-radius:var(--radius);
+}
+.skip-link:focus{left:8px; color:var(--ink-inverse)}
+
+/* ---- Left icon rail (fixed 56px) ---- */
+.rail{
+  position:fixed; inset:0 auto 0 0; width:var(--rail-w); z-index:100;
+  display:flex; flex-direction:column; align-items:center;
+  background:var(--surface); border-right:1px solid var(--border); padding:12px 0;
+}
+.rail-logo{
+  display:grid; place-items:center; width:32px; height:32px; margin-bottom:16px;
+  border-radius:var(--radius); background:var(--bg-mist); color:var(--primary);
+}
+.rail-logo svg{width:20px; height:20px}
+.rail-nav{display:flex; flex-direction:column; align-items:center; gap:2px; width:100%}
+.rail-item{
+  position:relative; display:grid; place-items:center; width:40px; height:40px;
+  border-radius:var(--radius); color:var(--ink-muted); text-decoration:none;
+  transition:background-color .15s ease-out, color .15s ease-out;
+}
+.rail-item svg{width:20px; height:20px}
+.rail-item:hover{background:var(--tint-primary); color:var(--primary)}
+.rail-item.active{background:var(--tint-primary-strong); color:var(--primary)}
+.rail-item.active::before{content:""; position:absolute; left:-8px; top:6px; bottom:6px; width:3px; border-radius:0 2px 2px 0; background:var(--primary)}
+.rail-item::after{
+  content:attr(data-tip); position:absolute; left:calc(100% + 12px); top:50%; transform:translateY(-50%);
+  z-index:110; background:var(--ink); color:var(--ink-inverse);
+  font:500 12px/16px var(--font-body); padding:5px 9px; border-radius:6px; white-space:nowrap;
+  opacity:0; visibility:hidden; transition:opacity .12s ease-out .08s, visibility 0s .2s; pointer-events:none;
+}
+.rail-item:hover::after,.rail-item:focus-visible::after{opacity:1; visibility:visible; transition-delay:0s}
+.rail-flag{position:absolute; top:3px; right:2px; z-index:1}
+.rail-flag.dot{width:8px; height:8px; border-radius:var(--radius-pill)}
+.rail-flag.num{
+  min-width:14px; height:14px; padding:0 3px; border-radius:var(--radius-pill);
+  display:grid; place-items:center; font:700 9px/1 var(--font-body); color:var(--ink-inverse);
+  border:2px solid var(--surface);
+}
+.is-amber{background:var(--cta)}
+.is-red{background:var(--danger)}
+
+/* ---- Topbar (sticky 64px) ---- */
+.app{margin-left:var(--rail-w)}
+.topbar{
+  position:sticky; top:0; z-index:90; display:flex; align-items:center; gap:12px;
+  height:var(--topbar-h); padding:0 24px;
+  background:var(--surface); border-bottom:1px solid var(--border);
+}
+.menu-btn{display:none; place-items:center; width:36px; height:36px; margin-left:-8px; border:0; border-radius:var(--radius); background:transparent; color:var(--ink)}
+.menu-btn:hover{background:var(--bg-mist)}
+.topbar-brand{display:flex; align-items:center; gap:10px; flex:none}
+.env-badge{display:inline-flex; align-items:center; padding:3px 10px; border-radius:var(--radius-pill); font:700 11px/14px var(--font-heading); letter-spacing:.04em}
+.env-prod{background:var(--st-active-bg); color:var(--st-active-text)}
+.env-stage{background:var(--st-ended-bg); color:var(--st-ended-text)}
+.env-dev{background:var(--danger-light); color:var(--danger)}
+.topbar-title{font:600 15px/20px var(--font-heading); color:var(--ink)}
+.topbar-search{
+  position:relative; display:flex; align-items:center; gap:8px; flex:1; max-width:420px; height:36px;
+  margin-inline:auto; padding:0 10px; border-radius:var(--radius);
+  background:var(--bg-mist); border:1px solid transparent;
+  transition:border-color .15s ease-out, background-color .15s ease-out;
+}
+.topbar-search:focus-within{border-color:var(--primary); background:var(--surface)}
+.topbar-search svg{width:16px; height:16px; color:var(--ink-muted)}
+.topbar-search input{flex:1; min-width:0; border:0; background:transparent; outline:0; font:400 13px/18px var(--font-body); color:var(--ink)}
+.topbar-search input::placeholder{color:var(--ink-muted)}
+.search-kbd{flex:none; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1px 6px; font:500 11px/16px var(--font-mono); color:var(--ink-muted)}
+.topbar-user{display:flex; align-items:center; gap:8px; flex:none}
+.icon-btn{
+  position:relative; display:grid; place-items:center; width:36px; height:36px;
+  border:0; border-radius:var(--radius); background:transparent; color:var(--ink-muted);
+}
+.icon-btn:hover{background:var(--bg-mist); color:var(--primary)}
+.icon-btn svg{width:18px; height:18px}
+.bell-badge{
+  position:absolute; top:3px; right:3px; min-width:15px; height:15px; padding:0 3px;
+  border-radius:var(--radius-pill); background:var(--danger); color:var(--ink-inverse);
+  border:2px solid var(--surface); font:600 10px/1 var(--font-body);
+  display:grid; place-items:center;
+}
+.user-menu{
+  display:flex; align-items:center; gap:10px; padding:4px 6px 4px 4px;
+  border:0; border-radius:var(--radius); background:transparent;
+}
+.user-menu:hover{background:var(--bg-mist)}
+.avatar{
+  width:32px; height:32px; border-radius:50%;
+  background:var(--primary); color:var(--ink-inverse);
+  display:grid; place-items:center; font:600 12px/1 var(--font-heading); letter-spacing:.02em;
+}
+.user-meta{display:flex; align-items:center; gap:8px}
+.user-name{font:600 13px/16px var(--font-body); color:var(--ink)}
+.role-chip{padding:2px 8px; border-radius:var(--radius-pill); background:var(--primary-light); color:var(--primary); font:600 11px/14px var(--font-body)}
+.user-menu > svg{width:16px; height:16px; color:var(--ink-muted)}
+
+/* ---- Workspace ---- */
+.container{max-width:1400px; margin-inline:auto; padding:var(--space-lg)}
+.breadcrumb{display:flex; align-items:center; gap:6px; font:500 12px/16px var(--font-body); color:var(--ink-muted); margin-bottom:6px}
+.page-head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:var(--space-lg)}
+.page-title{margin:0; font:700 28px/34px var(--font-heading); color:var(--ink)}
+
+/* ---- Cards ---- */
+.card{
+  display:flex; flex-direction:column; overflow:hidden;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card);
+}
+.card-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 20px; border-bottom:1px solid var(--border)}
+.card-title{margin:0; font:600 16px/22px var(--font-heading); color:var(--ink)}
+.card-foot{margin-top:auto; padding:12px 20px; border-top:1px solid var(--border); text-align:right}
+.card-link{font:600 13px/18px var(--font-body); color:var(--primary); text-decoration:none}
+.card-link:hover{color:var(--primary-hover); text-decoration:underline}
+
+/* ---- KPI strip ---- */
+.kpi-grid{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--space-sm); margin-bottom:var(--space-lg)}
+.kpi-card{
+  display:flex; flex-direction:column; gap:2px; padding:var(--space-md);
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card); color:var(--ink); text-decoration:none;
+  transition:border-color .15s ease-out, box-shadow .15s ease-out, transform .15s ease-out;
+}
+.kpi-card:hover{border-color:var(--primary); box-shadow:var(--shadow-hover); transform:translateY(-1px)}
+.kpi-label{font:500 12px/16px var(--font-body); color:var(--ink-muted)}
+.kpi-value{font:700 28px/32px var(--font-mono); font-feature-settings:"tnum"; letter-spacing:-.01em}
+.kpi-value.is-danger{color:var(--danger)}
+.kpi-alert{
+  display:inline-grid; place-items:center; width:18px; height:18px; margin-left:8px; vertical-align:6px;
+  border-radius:var(--radius-pill); background:var(--cta); color:var(--ink);
+  font:700 12px/1 var(--font-body);
+}
+.kpi-sub{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.trend-up{color:var(--st-active-text); font-weight:500}
+.spark{width:100%; height:24px; margin:4px 0 2px}
+.info-dot{display:inline-grid; place-items:center; vertical-align:-2px; color:var(--ink-muted); cursor:help}
+.info-dot svg{width:12px; height:12px}
+
+/* ---- Dashboard grid (2/3 + 1/3) ---- */
+.dash-grid{display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:var(--space-lg); align-items:stretch}
+
+/* ---- Live table ---- */
+.live{display:inline-flex; align-items:center; gap:7px; font:600 12px/16px var(--font-body); color:var(--st-active-text)}
+.live-dot{width:8px; height:8px; border-radius:var(--radius-pill); background:var(--st-active-dot); animation:live-pulse 2s ease-out infinite}
+@keyframes live-pulse{0%{box-shadow:0 0 0 0 var(--glow-active)}70%,100%{box-shadow:0 0 0 6px transparent}}
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%; min-width:620px; border-collapse:collapse}
+.tbl th{padding:10px 16px; background:var(--bg-mist); font:500 12px/16px var(--font-body); color:var(--ink-muted); text-align:left; white-space:nowrap}
+.tbl td{padding:12px 16px; border-top:1px solid var(--border); font:400 13px/18px var(--font-body); vertical-align:middle}
+.tbl th:first-child,.tbl td:first-child{padding-left:20px}
+.tbl th:last-child,.tbl td:last-child{padding-right:20px}
+.tbl tbody tr{transition:background-color .15s ease-out}
+.tbl tbody tr:hover{background:var(--bg-mist)}
+.num{text-align:right}
+.lot-id{font:500 12px/16px var(--font-mono); color:var(--ink-muted)}
+.lot-name{color:var(--ink); font:500 13px/18px var(--font-body); text-decoration:none}
+.lot-name:hover{color:var(--primary); text-decoration:underline}
+td .cd{font:500 14px/18px var(--font-mono); font-feature-settings:"tnum"}
+.bid{font:500 13px/18px var(--font-mono); font-feature-settings:"tnum"}
+.bid-muted{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.type-chip{display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.type-chip svg{width:12px; height:12px}
+.type-raie{background:var(--st-active-bg); color:var(--st-active-text)}
+.type-kinnistu{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.type-pakett{background:var(--st-draft-bg); color:var(--st-draft-text)}
+.btn-outline{
+  display:inline-flex; align-items:center; gap:6px; padding:5px 12px;
+  border:1px solid var(--accent); border-radius:var(--radius); background:transparent;
+  color:var(--primary); font:600 12px/16px var(--font-body); text-decoration:none; white-space:nowrap;
+  transition:background-color .15s ease-out;
+}
+.btn-outline svg{width:11px; height:11px}
+.btn-outline:hover{background:var(--st-active-bg)}
+.cd-crit{color:var(--danger) !important; animation:cd-blink 1s step-end infinite}
+@keyframes cd-blink{50%{opacity:.45}}
+@keyframes row-flash{0%{background:var(--accent-soft)}100%{background:transparent}}
+tr.row-extend td{animation:row-flash .9s ease-out 2}
+
+/* ---- Süsteemi tervis ---- */
+.health-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 20px; border-top:1px solid var(--border)}
+.health-row:first-child{border-top:0}
+.health-name{font:400 13px/18px var(--font-body); color:var(--ink-muted)}
+.health-val{display:inline-flex; align-items:center; gap:8px; font:500 13px/18px var(--font-body); color:var(--ink)}
+.ok-text{font:600 12px/16px var(--font-body); color:var(--st-active-text)}
+.status-dot{width:8px; height:8px; border-radius:var(--radius-pill); flex:none}
+.status-dot.ok{background:var(--st-active-dot)}
+.status-dot.warn{background:var(--cta)}
+.status-dot.err{background:var(--danger)}
+.health-foot{
+  display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:auto; padding:10px 20px 14px;
+  border-top:1px solid var(--border);
+  font:400 11px/16px var(--font-body); color:var(--ink-muted);
+}
+.health-foot span{display:inline-flex; align-items:center; gap:6px}
+.mini-dot{width:6px; height:6px; border-radius:var(--radius-pill); background:var(--st-active-dot)}
+
+/* ---- Kiire tegevus ---- */
+.action-row{
+  display:flex; align-items:center; gap:12px; padding:13px 20px;
+  border-top:1px solid var(--border); color:var(--ink); text-decoration:none;
+  transition:background-color .15s ease-out;
+}
+.action-row:first-child{border-top:0}
+.action-row:hover{background:var(--bg-mist)}
+.action-ico{display:grid; place-items:center; width:36px; height:36px; flex:none; border-radius:var(--radius); background:var(--bg-mist); color:var(--primary)}
+.action-ico svg{width:18px; height:18px}
+.action-main{display:flex; flex-direction:column; gap:1px; flex:1; min-width:0}
+.action-title{font:500 13px/18px var(--font-body); color:var(--ink)}
+.action-note{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.action-note.warn{color:var(--st-ended-text)}
+.count-pill{flex:none; padding:2px 10px; border-radius:var(--radius-pill); background:var(--primary-light); color:var(--primary); font:700 12px/16px var(--font-body); white-space:nowrap}
+.action-go{
+  display:grid; place-items:center; width:28px; height:28px; flex:none;
+  border:1px solid transparent; border-radius:var(--radius-pill); color:var(--ink-muted);
+  transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out;
+}
+.action-go svg{width:14px; height:14px}
+.action-row:hover .action-go{border-color:var(--border); background:var(--surface); color:var(--primary)}
+
+/* ---- Viimased juhtlõimed ---- */
+.lead-row{display:flex; align-items:center; gap:10px; padding:13px 20px; border-top:1px solid var(--border)}
+.lead-row:first-child{border-top:0}
+.lead-time{font:500 12px/16px var(--font-mono); font-feature-settings:"tnum"; color:var(--ink-muted)}
+.chip{display:inline-flex; align-items:center; padding:2px 10px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.chip-name{background:var(--bg-mist); border:1px solid var(--border); color:var(--ink)}
+.lead-county{flex:1; min-width:0; font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.chip-src{font:600 11px/16px var(--font-body)}
+.src-kava{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.src-raie{background:var(--st-active-bg); color:var(--st-active-text)}
+.src-ost{background:var(--st-ended-bg); color:var(--st-ended-text)}
+
+/* ---- Mobile drawer (<768px) ---- */
+.drawer{
+  position:fixed; top:0; bottom:0; left:0; z-index:140; width:min(320px,86vw);
+  display:flex; flex-direction:column; visibility:hidden;
+  background:var(--surface); box-shadow:var(--shadow-pop);
+  transform:translateX(-102%); transition:transform .2s cubic-bezier(.4,0,.2,1), visibility 0s .2s;
+}
+body.drawer-open .drawer{transform:none; visibility:visible; transition-delay:0s}
+body.drawer-open{overflow:hidden}
+.drawer-head{display:flex; align-items:center; gap:10px; height:var(--topbar-h); padding:0 12px 0 16px; border-bottom:1px solid var(--border)}
+.drawer-head .rail-logo{margin:0}
+.drawer-head .topbar-title{flex:1}
+.drawer-nav{flex:1; overflow-y:auto; padding:8px}
+.drawer-link{
+  display:flex; align-items:center; gap:12px; padding:11px 12px; margin-bottom:2px;
+  border-radius:var(--radius); color:var(--ink); font:500 14px/20px var(--font-body); text-decoration:none;
+}
+.drawer-link:hover{background:var(--bg-mist)}
+.drawer-link.active{background:var(--tint-primary-strong); color:var(--primary); font-weight:600}
+.drawer-link svg{width:18px; height:18px; color:var(--ink-muted)}
+.drawer-link.active svg{color:var(--primary)}
+.drawer-flag{margin-left:auto; flex:none}
+.drawer-flag.dot{width:8px; height:8px; border-radius:var(--radius-pill)}
+.drawer-flag.num{min-width:14px; height:14px; padding:0 4px; border-radius:var(--radius-pill); display:grid; place-items:center; font:700 10px/1 var(--font-body); color:var(--ink-inverse)}
+.drawer-backdrop{
+  position:fixed; inset:0; z-index:130; background:var(--overlay);
+  opacity:0; visibility:hidden; transition:opacity .2s, visibility 0s .2s;
+}
+body.drawer-open .drawer-backdrop{opacity:1; visibility:visible; transition-delay:0s}
+
+/* ---- Responsive ---- */
+@media (max-width:1280px){.kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:1024px){.dash-grid{grid-template-columns:1fr}}
+@media (max-width:860px){.topbar-search{display:none}}
+@media (max-width:767px){
+  .rail{display:none}
+  .app{margin-left:0}
+  .menu-btn{display:grid}
+  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .topbar{padding:0 16px}
+  .container{padding:16px}
+}
+@media (max-width:640px){.user-meta{display:none}}
+@media (max-width:420px){.kpi-grid{grid-template-columns:1fr}}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important}
+}
+
+/* ---- Page 09: Juhtlõimed (toolbar, kanban board, lead cards, detail drawer) ---- */
+[hidden]{display:none !important}
+.breadcrumb svg{width:12px; height:12px}
+.breadcrumb a{color:inherit; text-decoration:none}
+.breadcrumb a:hover{color:var(--primary); text-decoration:underline}
+
+/* Toolbar: filters + search + actions */
+.crm-toolbar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:var(--space-md)}
+.filter-chip{
+  display:inline-flex; align-items:center; gap:7px; height:36px; padding:0 10px;
+  border:1px solid var(--border); border-radius:var(--radius); background:var(--surface);
+  font:500 13px/18px var(--font-body); color:var(--ink);
+}
+.filter-chip:focus{border-color:var(--primary); outline:0}
+.crm-search{
+  display:flex; align-items:center; gap:8px; flex:1; min-width:190px; max-width:280px; height:36px; padding:0 10px;
+  border:1px solid var(--border); border-radius:var(--radius); background:var(--surface);
+}
+.crm-search:focus-within{border-color:var(--primary)}
+.crm-search svg{width:15px; height:15px; color:var(--ink-muted); flex:none}
+.crm-search input{flex:1; min-width:0; border:0; outline:0; background:transparent; font:400 13px/18px var(--font-body); color:var(--ink)}
+.crm-search input::placeholder{color:var(--ink-muted)}
+.crm-actions{display:flex; gap:8px; margin-left:auto}
+.btn-primary,.btn-ghost{
+  display:inline-flex; align-items:center; gap:7px; padding:8px 16px;
+  border:1px solid transparent; border-radius:var(--radius-pill);
+  font:600 13px/18px var(--font-body);
+  transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out;
+}
+.btn-primary svg,.btn-ghost svg{width:14px; height:14px}
+.btn-primary{background:var(--primary); color:var(--ink-inverse)}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-ghost{background:transparent; border-color:var(--border); color:var(--ink-muted)}
+.btn-ghost:hover{border-color:var(--primary); color:var(--primary)}
+
+/* View toggle */
+.tabbar{display:flex; gap:4px; padding:4px; background:var(--bg-mist); border:1px solid var(--border); border-radius:var(--radius); flex:none}
+.tab{
+  display:inline-flex; align-items:center; gap:8px; padding:7px 14px;
+  border:0; border-radius:6px; background:transparent;
+  font:600 13px/18px var(--font-body); color:var(--ink-muted); white-space:nowrap;
+  transition:background-color .15s ease-out, color .15s ease-out, box-shadow .15s ease-out;
+}
+.tab:hover{color:var(--primary)}
+.tab.active{background:var(--surface); color:var(--primary); box-shadow:var(--shadow-card)}
+.tab svg{width:14px; height:14px}
+
+/* Kanban board */
+.kanban-scroll{overflow-x:auto; padding-bottom:var(--space-xs)}
+.kanban{display:grid; grid-template-columns:repeat(5,minmax(238px,1fr)); gap:var(--space-sm); min-width:1240px}
+.kcol{
+  display:flex; flex-direction:column; min-height:340px;
+  background:var(--surface); border:1px solid var(--border); border-top-width:3px;
+  border-radius:var(--radius); box-shadow:var(--shadow-card);
+}
+.kcol[data-stage="uus"]{border-top-color:var(--info)}
+.kcol[data-stage="voetud"]{border-top-color:var(--cta)}
+.kcol[data-stage="kvalif"]{border-top-color:var(--accent)}
+.kcol[data-stage="leping"]{border-top-color:var(--primary)}
+.kcol[data-stage="mitte"]{border-top-color:var(--danger)}
+.kcol-head{display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--border)}
+.kcol-title{margin:0; font:700 12px/16px var(--font-heading); letter-spacing:.05em; text-transform:uppercase; color:var(--ink); min-width:0}
+.kcol-count{
+  margin-left:auto; flex:none; min-width:24px; padding:1px 8px; text-align:center;
+  border-radius:var(--radius-pill); background:var(--bg-mist); color:var(--ink-muted);
+  font:700 12px/16px var(--font-body);
+}
+.kcol-body{display:flex; flex-direction:column; gap:8px; flex:1; padding:10px; min-height:120px; border-radius:0 0 var(--radius) var(--radius)}
+.kcol-body.drag-over{background:var(--tint-primary); outline:2px dashed var(--accent); outline-offset:-2px}
+
+/* Lead card */
+.lead-card{
+  display:flex; flex-direction:column; gap:7px; padding:10px 12px;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card); cursor:grab;
+  transition:border-color .15s ease-out, box-shadow .15s ease-out;
+}
+.lead-card:hover{border-color:var(--primary); box-shadow:var(--shadow-hover)}
+.lead-card.dragging{opacity:.45; cursor:grabbing}
+.lead-top{display:flex; align-items:flex-start; gap:6px}
+.lead-name{flex:1; min-width:0; font:600 13px/18px var(--font-body); color:var(--ink); overflow-wrap:anywhere}
+.lead-id{display:block; font:500 11px/14px var(--font-mono); color:var(--ink-muted)}
+.card-menu{
+  display:grid; place-items:center; width:26px; height:26px; flex:none; margin:-3px -5px 0 0;
+  border:0; border-radius:6px; background:transparent; color:var(--ink-muted);
+}
+.card-menu:hover{background:var(--bg-mist); color:var(--primary)}
+.card-menu svg{width:15px; height:15px}
+.lead-chips{display:flex; flex-wrap:wrap; gap:5px}
+.chip-src svg{width:11px; height:11px}
+.src-veeb,.src-tel,.src-meil,.src-neutral{background:var(--bg-mist); border:1px solid var(--border); color:var(--ink-muted)}
+.src-hind{background:var(--st-contract-bg); color:var(--st-contract-text)}
+.src-kinn{background:var(--st-draft-bg); color:var(--st-draft-text)}
+.lead-reason{margin:0; font:italic 400 12px/16px var(--font-body); color:var(--ink-muted)}
+.lead-meta{display:flex; flex-wrap:wrap; align-items:center; gap:5px 10px; margin-top:auto}
+.lead-age{display:inline-flex; align-items:center; gap:4px; font:500 11px/16px var(--font-mono); font-feature-settings:"tnum"; color:var(--ink-muted)}
+.lead-age svg{width:12px; height:12px}
+.lead-next{display:inline-flex; align-items:center; gap:4px; font:500 11px/16px var(--font-body); color:var(--ink-muted)}
+.lead-next svg{width:12px; height:12px}
+.sla-badge{display:inline-flex; align-items:center; gap:4px; padding:1px 7px; border-radius:var(--radius-pill); font:700 10px/14px var(--font-body); white-space:nowrap}
+.sla-badge svg{width:11px; height:11px}
+.sla-warn{background:var(--st-ended-bg); color:var(--st-ended-text)}
+.sla-crit{background:var(--danger-light); color:var(--danger)}
+.assignee{
+  width:24px; height:24px; margin-left:auto; border-radius:50%;
+  background:var(--primary-light); color:var(--primary);
+  display:grid; place-items:center; font:600 10px/1 var(--font-heading); letter-spacing:.02em;
+}
+.chip-unassigned{margin-left:auto; padding:2px 8px; border-radius:var(--radius-pill); background:var(--danger-light); color:var(--danger); font:600 11px/14px var(--font-body)}
+
+/* Keyboard fallback menu: Liiguta → */
+.move-menu{
+  position:fixed; z-index:170; min-width:210px; padding:6px;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-pop);
+}
+.move-menu-label{padding:5px 10px 4px; font:700 10px/14px var(--font-heading); letter-spacing:.06em; text-transform:uppercase; color:var(--ink-muted)}
+.move-menu button{
+  display:flex; align-items:center; gap:8px; width:100%; padding:8px 10px;
+  border:0; border-radius:6px; background:transparent; text-align:left;
+  font:500 13px/18px var(--font-body); color:var(--ink);
+}
+.move-menu button:hover{background:var(--bg-mist); color:var(--primary)}
+.move-menu button svg{width:14px; height:14px; color:var(--ink-muted)}
+
+/* Lead detail drawer (slide-over from right) */
+.lead-backdrop{
+  position:fixed; inset:0; z-index:145; background:var(--overlay);
+  opacity:0; visibility:hidden; transition:opacity .2s, visibility 0s .2s;
+}
+.lead-backdrop.open{opacity:1; visibility:visible; transition-delay:0s}
+body.lead-open{overflow:hidden}
+.lead-drawer{
+  position:fixed; top:0; bottom:0; right:0; z-index:150; width:min(460px,94vw);
+  display:flex; flex-direction:column; visibility:hidden;
+  background:var(--surface); box-shadow:var(--shadow-pop);
+  transform:translateX(103%); transition:transform .22s cubic-bezier(.4,0,.2,1), visibility 0s .22s;
+}
+.lead-drawer.open{transform:none; visibility:visible; transition-delay:0s}
+.lead-drawer-head{display:flex; align-items:center; gap:10px; min-height:var(--topbar-h); padding:10px 12px 10px 20px; border-bottom:1px solid var(--border)}
+.lead-drawer-heading{flex:1; min-width:0}
+.lead-drawer-title{margin:0; font:600 16px/22px var(--font-heading); color:var(--ink); overflow-wrap:anywhere}
+.lead-drawer-id{font:500 12px/16px var(--font-mono); color:var(--ink-muted)}
+.lead-drawer-body{flex:1; overflow-y:auto}
+.dsec{padding:14px 20px; border-bottom:1px solid var(--border)}
+.dsec-label{display:flex; align-items:center; gap:7px; margin:0 0 10px; font:700 11px/16px var(--font-heading); letter-spacing:.06em; text-transform:uppercase; color:var(--ink-muted)}
+.dsec-label svg{width:13px; height:13px}
+.data-row{display:grid; grid-template-columns:118px minmax(0,1fr); gap:12px; padding:6px 0; border-top:1px solid var(--border); font:400 13px/18px var(--font-body)}
+.data-row:first-of-type{border-top:0}
+.data-label{color:var(--ink-muted)}
+.data-value{color:var(--ink); min-width:0; overflow-wrap:anywhere}
+.data-value a{font-weight:500}
+.mini-btn{
+  display:inline-flex; align-items:center; gap:4px; padding:1px 8px; margin-left:8px; vertical-align:1px;
+  border:1px solid var(--border); border-radius:var(--radius-pill); background:var(--surface);
+  font:600 11px/16px var(--font-body); color:var(--primary); text-decoration:none;
+}
+.mini-btn:hover{background:var(--bg-mist)}
+.mini-btn svg{width:11px; height:11px}
+.consent-ok{color:var(--st-active-text); font-weight:700}
+.lead-msg{
+  margin:10px 0 0; padding:10px 14px; background:var(--bg-mist);
+  border-left:3px solid var(--primary-light); border-radius:0 var(--radius) var(--radius) 0;
+  font:italic 400 13px/19px var(--font-body); color:var(--ink);
+}
+.field-label{display:block; margin:0 0 5px; font:500 12px/16px var(--font-body); color:var(--ink-muted)}
+.select,.input{width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); font:400 13px/18px var(--font-body); color:var(--ink)}
+.select:focus,.input:focus{border-color:var(--primary); outline:0}
+.assign-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.assign-grid .field-full{grid-column:1 / -1}
+.note-item{padding:10px 0; border-top:1px solid var(--border)}
+.note-item:first-child{border-top:0}
+.note-meta{display:flex; align-items:baseline; gap:8px; margin-bottom:2px}
+.note-author{font:600 12px/16px var(--font-body); color:var(--ink)}
+.note-time{font:400 11px/16px var(--font-mono); color:var(--ink-muted)}
+.note-text{margin:0; font:400 13px/18px var(--font-body); color:var(--ink)}
+.note-form{display:flex; gap:8px; margin-top:12px}
+.note-form .input{flex:1; min-width:0}
+.act-item{display:flex; gap:10px; padding:8px 0; border-top:1px solid var(--border); font:400 12px/17px var(--font-body); color:var(--ink)}
+.act-item:first-child{border-top:0}
+.act-dot{width:8px; height:8px; flex:none; margin-top:5px; border-radius:50%; background:var(--st-active-dot)}
+.act-time{flex:none; font:500 11px/17px var(--font-mono); font-feature-settings:"tnum"; color:var(--ink-muted)}
+
+/* Nimekiri view */
+.tbl-leads{min-width:1000px}
+.tbl-spec{font:400 12px/16px var(--font-body); color:var(--ink-muted); margin-left:6px}
+.pill{display:inline-flex; align-items:center; padding:2px 10px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.st-uus{background:var(--info-light); color:var(--info)}
+.st-voetud{background:var(--st-ended-bg); color:var(--st-ended-text)}
+.st-kvalif{background:var(--st-active-bg); color:var(--st-active-text)}
+.st-leping{background:var(--st-contract-bg); color:var(--st-contract-text)}
+.st-mitte{background:var(--danger-light); color:var(--danger)}
+.tbl-contact a{text-decoration:none; color:var(--ink)}
+.tbl-contact a:hover{color:var(--primary); text-decoration:underline}
+.tbl-empty td{text-align:center; padding:28px 16px; color:var(--ink-muted)}
+
+/* Toast */
+.toast{
+  position:fixed; left:50%; bottom:24px; z-index:160; max-width:min(90vw,560px); padding:10px 18px;
+  border-radius:var(--radius-pill); background:var(--ink); color:var(--ink-inverse);
+  font:500 13px/18px var(--font-body); box-shadow:var(--shadow-pop);
+  opacity:0; visibility:hidden; transform:translate(-50%,12px);
+  transition:opacity .2s ease-out, transform .2s ease-out, visibility 0s .2s;
+}
+.toast.show{opacity:1; visibility:visible; transform:translate(-50%,0); transition-delay:0s}
+
+@media (max-width:1024px){
+  .crm-actions{margin-left:0; flex-basis:100%}
+}
+@media (max-width:767px){
+  .page-head{flex-wrap:wrap; align-items:flex-start}
+  .crm-search{max-width:none}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Liigu sisuni</a>
+
+<!-- Left icon rail -->
+<aside class="rail" aria-label="Peamenüü">
+  <a class="rail-logo" href="01-dashboard.html" data-tip="Erametsad haldus" aria-label="Erametsad haldus">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/></svg>
+  </a>
+  <nav class="rail-nav">
+    <a class="rail-item" href="01-dashboard.html" data-tip="Töölaud" aria-label="Töölaud"><i data-lucide="layout-dashboard"></i></a>
+    <a class="rail-item" href="02-auctions-list.html" data-tip="Oksjonid" aria-label="Oksjonid"><i data-lucide="gavel"></i></a>
+    <a class="rail-item" href="04-bids-monitoring.html" data-tip="Pakkumised" aria-label="Pakkumised"><i data-lucide="activity"></i></a>
+    <a class="rail-item" href="05-sealed-opening.html" data-tip="Sul. avamine" aria-label="Sul. avamine — ootel tseremoonia"><i data-lucide="key-round"></i><span class="rail-flag dot is-amber"></span></a>
+    <a class="rail-item" href="06-users.html" data-tip="Kasutajad" aria-label="Kasutajad"><i data-lucide="users"></i></a>
+    <a class="rail-item" href="07-company-approvals.html" data-tip="Ettevõtted" aria-label="Ettevõtted — 3 ootel"><i data-lucide="building-2"></i><span class="rail-flag num is-red">3</span></a>
+    <a class="rail-item" href="08-contracts.html" data-tip="Lepingud" aria-label="Lepingud"><i data-lucide="file-signature"></i></a>
+    <a class="rail-item active" href="09-leads-crm.html" data-tip="Juhtlõimed" aria-label="Juhtlõimed" aria-current="page"><i data-lucide="kanban"></i></a>
+    <a class="rail-item" href="10-service-requests.html" data-tip="Päringud" aria-label="Päringud"><i data-lucide="send-horizontal"></i></a>
+    <a class="rail-item" href="11-cms-content.html" data-tip="Sisuhaldus" aria-label="Sisuhaldus"><i data-lucide="file-pen"></i></a>
+    <a class="rail-item" href="12-statistics.html" data-tip="Statistika" aria-label="Statistika"><i data-lucide="chart-column"></i></a>
+    <a class="rail-item" href="13-settings.html" data-tip="Seaded" aria-label="Seaded"><i data-lucide="settings"></i></a>
+    <a class="rail-item" href="14-audit-log.html" data-tip="Auditlogi" aria-label="Auditlogi"><i data-lucide="shield-check"></i></a>
+  </nav>
+</aside>
+
+<div class="app">
+  <!-- Topbar -->
+  <header class="topbar">
+    <button class="menu-btn" id="menuOpen" type="button" aria-label="Ava menüü" aria-expanded="false" aria-controls="drawer"><i data-lucide="menu"></i></button>
+    <div class="topbar-brand">
+      <span class="env-badge env-stage" title="Staging keskkond">STAGE</span>
+      <span class="topbar-title">Erametsad haldus</span>
+    </div>
+    <div class="topbar-search">
+      <i data-lucide="search"></i>
+      <input id="globalSearch" type="search" placeholder="Otsi oksjoneid, kasutajaid, juhtlõimi... (⌘K)" aria-label="Globaalne otsing">
+      <kbd class="search-kbd">⌘K</kbd>
+    </div>
+    <div class="topbar-user">
+      <button class="icon-btn" type="button" aria-label="Teavitused — 3 lugemata"><i data-lucide="bell"></i><span class="bell-badge">3</span></button>
+      <button class="user-menu" type="button" aria-haspopup="menu" aria-label="Kasutajamenüü: Marit Vain">
+        <span class="avatar" aria-hidden="true">MV</span>
+        <span class="user-meta">
+          <span class="user-name">Marit Vain</span>
+          <span class="role-chip">Admin</span>
+        </span>
+        <i data-lucide="chevron-down"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Juhtlõimed (CRM) -->
+  <main id="main">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Asukoht">
+        <a href="01-dashboard.html">Töölaud</a>
+        <i data-lucide="chevron-right" aria-hidden="true"></i>
+        <span aria-current="page">Juhtlõimed</span>
+      </nav>
+      <header class="page-head">
+        <h1 class="page-title">Juhtlõimed (CRM)</h1>
+        <div class="tabbar" role="tablist" aria-label="Juhtlõimede vaated">
+          <button class="tab active" id="tab-kanban" type="button" role="tab" aria-selected="true" aria-controls="panel-kanban" data-tab="kanban"><i data-lucide="kanban" aria-hidden="true"></i>Kanban</button>
+          <button class="tab" id="tab-list" type="button" role="tab" aria-selected="false" aria-controls="panel-list" data-tab="list" tabindex="-1"><i data-lucide="list" aria-hidden="true"></i>Nimekiri</button>
+        </div>
+      </header>
+
+      <!-- Filtrid + tegevused -->
+      <div class="crm-toolbar">
+        <select class="filter-chip" id="fSrc" aria-label="Filtreeri allika järgi">
+          <option value="">Allikas: Kõik</option>
+          <option value="veeb">Veebivorm</option>
+          <option value="tel">Telefon</option>
+          <option value="meil">Meil</option>
+        </select>
+        <select class="filter-chip" id="fCounty" aria-label="Filtreeri maakonna järgi">
+          <option value="">Maakond: Kõik</option>
+          <option>Harju</option><option>Hiiu</option><option>Ida-Viru</option><option>Jõgeva</option>
+          <option>Lääne-Viru</option><option>Pärnu</option><option>Põlva</option><option>Rapla</option>
+          <option>Saare</option><option>Tartu</option><option>Valga</option><option>Viljandi</option>
+          <option>Võru</option>
+        </select>
+        <select class="filter-chip" id="fSpec" aria-label="Filtreeri spetsialisti järgi">
+          <option value="">Spetsialist: Kõik</option>
+          <option value="MV">Marit Vain</option>
+          <option value="KM">Kaire Mets</option>
+          <option value="TR">Tarmo Rätsep</option>
+          <option value="__none">Määramata</option>
+        </select>
+        <label class="crm-search">
+          <i data-lucide="search" aria-hidden="true"></i>
+          <input id="fSearch" type="search" placeholder="Otsi nime, ID, maakonna järgi..." aria-label="Otsi juhtlõimesid">
+        </label>
+        <div class="crm-actions">
+          <button class="btn-primary" id="newLeadBtn" type="button"><i data-lucide="plus" aria-hidden="true"></i>Uus juhtlõige</button>
+          <button class="btn-ghost" id="csvBtn" type="button"><i data-lucide="download" aria-hidden="true"></i>Ekspordi CSV</button>
+        </div>
+      </div>
+
+      <!-- Kanban tahvel -->
+      <section class="tabpanel" id="panel-kanban" role="tabpanel" aria-labelledby="tab-kanban" data-panel="kanban">
+        <div class="kanban-scroll">
+          <div class="kanban">
+            <div class="kcol" data-stage="uus">
+              <header class="kcol-head">
+                <h2 class="kcol-title">Uus</h2>
+                <span class="kcol-count">6</span>
+              </header>
+              <div class="kcol-body" data-stage="uus">
+                <article class="lead-card" draggable="true" data-id="5121" role="button" tabindex="0" aria-label="Juhtlõige #5121 Jaan Torn, Pärnu. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Jaan Torn<span class="lead-id">#5121</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5121"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-kava">Kava</span>
+                    <span class="chip chip-name">Pärnu</span>
+                    <span class="chip chip-src src-veeb"><i data-lucide="globe" aria-hidden="true"></i>Veebivorm</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>26 h</span>
+                    <span class="sla-badge sla-warn" title="Käsitlemata üle 24 h"><i data-lucide="clock" aria-hidden="true"></i>SLA &gt;24 h</span>
+                    <span class="lead-next"><i data-lucide="calendar" aria-hidden="true"></i><span data-next>30.08</span></span>
+                    <span data-assignee-slot><span class="chip chip-unassigned">määramata</span></span>
+                  </div>
+                </article>
+                <article class="lead-card" draggable="true" data-id="5124" role="button" tabindex="0" aria-label="Juhtlõige #5124 Mikk Tamm, Harju. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Mikk Tamm<span class="lead-id">#5124</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5124"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-kava">Kava</span>
+                    <span class="chip chip-name">Harju</span>
+                    <span class="chip chip-src src-veeb"><i data-lucide="globe" aria-hidden="true"></i>Veebivorm</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>2 h</span>
+                    <span class="lead-next" hidden><i data-lucide="calendar" aria-hidden="true"></i><span data-next></span></span>
+                    <span data-assignee-slot><span class="chip chip-unassigned">määramata</span></span>
+                  </div>
+                </article>
+                <article class="lead-card" draggable="true" data-id="5123" role="button" tabindex="0" aria-label="Juhtlõige #5123 Piret Kuusk, Pärnu. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Piret Kuusk<span class="lead-id">#5123</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5123"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-raie">Raieõigus</span>
+                    <span class="chip chip-name">Pärnu</span>
+                    <span class="chip chip-src src-tel"><i data-lucide="phone" aria-hidden="true"></i>Telefon</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>4 h</span>
+                    <span class="lead-next" hidden><i data-lucide="calendar" aria-hidden="true"></i><span data-next></span></span>
+                    <span data-assignee-slot><span class="chip chip-unassigned">määramata</span></span>
+                  </div>
+                </article>
+                <article class="lead-card" draggable="true" data-id="5122" role="button" tabindex="0" aria-label="Juhtlõige #5122 Jüri Raud, Võru. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Jüri Raud<span class="lead-id">#5122</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5122"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-ost">Ostusoov</span>
+                    <span class="chip chip-name">Võru</span>
+                    <span class="chip chip-src src-meil"><i data-lucide="mail" aria-hidden="true"></i>Meil</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>6 h</span>
+                    <span class="lead-next" hidden><i data-lucide="calendar" aria-hidden="true"></i><span data-next></span></span>
+                    <span data-assignee-slot><span class="chip chip-unassigned">määramata</span></span>
+                  </div>
+                </article>
+                <article class="lead-card" draggable="true" data-id="5119" role="button" tabindex="0" aria-label="Juhtlõige #5119 Tiit Mänd, Viljandi. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Tiit Mänd<span class="lead-id">#5119</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5119"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-raie">Raieõigus</span>
+                    <span class="chip chip-name">Viljandi</span>
+                    <span class="chip chip-src src-tel"><i data-lucide="phone" aria-hidden="true"></i>Telefon</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>51 h</span>
+                    <span class="sla-badge sla-crit" title="Käsitlemata üle 48 h"><i data-lucide="clock" aria-hidden="true"></i>SLA &gt;48 h</span>
+                    <span class="lead-next" hidden><i data-lucide="calendar" aria-hidden="true"></i><span data-next></span></span>
+                    <span data-assignee-slot><span class="chip chip-unassigned">määramata</span></span>
+                  </div>
+                </article>
+                <article class="lead-card" draggable="true" data-id="5118" role="button" tabindex="0" aria-label="Juhtlõige #5118 Anu Lepp, Lääne-Viru. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Anu Lepp<span class="lead-id">#5118</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5118"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-hind">Hindamine</span>
+                    <span class="chip chip-name">Lääne-Viru</span>
+                    <span class="chip chip-src src-veeb"><i data-lucide="globe" aria-hidden="true"></i>Veebivorm</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>30 h</span>
+                    <span class="sla-badge sla-warn" title="Käsitlemata üle 24 h"><i data-lucide="clock" aria-hidden="true"></i>SLA &gt;24 h</span>
+                    <span class="lead-next" hidden><i data-lucide="calendar" aria-hidden="true"></i><span data-next></span></span>
+                    <span data-assignee-slot><span class="chip chip-unassigned">määramata</span></span>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div class="kcol" data-stage="voetud">
+              <header class="kcol-head">
+                <h2 class="kcol-title">Võetud ühendust</h2>
+                <span class="kcol-count">3</span>
+              </header>
+              <div class="kcol-body" data-stage="voetud">
+                <article class="lead-card" draggable="true" data-id="5116" role="button" tabindex="0" aria-label="Juhtlõige #5116 Kadri Kask, Saare. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Kadri Kask<span class="lead-id">#5116</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5116"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-hind">Hindamine</span>
+                    <span class="chip chip-name">Saare</span>
+                    <span class="chip chip-src src-meil"><i data-lucide="mail" aria-hidden="true"></i>Meil</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>1 p</span>
+                    <span class="lead-next"><i data-lucide="calendar" aria-hidden="true"></i><span data-next>02.09</span></span>
+                    <span data-assignee-slot><span class="assignee" title="Tarmo Rätsep">TR</span></span>
+                  </div>
+                </article>
+                <article class="lead-card" draggable="true" data-id="5114" role="button" tabindex="0" aria-label="Juhtlõige #5114 Olev Põder, Jõgeva. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Olev Põder<span class="lead-id">#5114</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5114"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-kinn">Kinnistu</span>
+                    <span class="chip chip-name">Jõgeva</span>
+                    <span class="chip chip-src src-veeb"><i data-lucide="globe" aria-hidden="true"></i>Veebivorm</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>2 p</span>
+                    <span class="lead-next" hidden><i data-lucide="calendar" aria-hidden="true"></i><span data-next></span></span>
+                    <span data-assignee-slot><span class="chip chip-unassigned">määramata</span></span>
+                  </div>
+                </article>
+                <article class="lead-card" draggable="true" data-id="5112" role="button" tabindex="0" aria-label="Juhtlõige #5112 Maarja Oja, Tartu. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Maarja Oja<span class="lead-id">#5112</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5112"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-raie">Raieõigus</span>
+                    <span class="chip chip-name">Tartu</span>
+                    <span class="chip chip-src src-tel"><i data-lucide="phone" aria-hidden="true"></i>Telefon</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>3 p</span>
+                    <span class="lead-next"><i data-lucide="calendar" aria-hidden="true"></i><span data-next>03.09</span></span>
+                    <span data-assignee-slot><span class="assignee" title="Marit Vain">MV</span></span>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div class="kcol" data-stage="kvalif">
+              <header class="kcol-head">
+                <h2 class="kcol-title">Kvalifitseeritud</h2>
+                <span class="kcol-count">2</span>
+              </header>
+              <div class="kcol-body" data-stage="kvalif">
+                <article class="lead-card" draggable="true" data-id="5109" role="button" tabindex="0" aria-label="Juhtlõige #5109 Mare Laid, Harju. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Mare Laid<span class="lead-id">#5109</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5109"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-kinn">Kinnistu</span>
+                    <span class="chip chip-name">Harju</span>
+                    <span class="chip chip-src src-veeb"><i data-lucide="globe" aria-hidden="true"></i>Veebivorm</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>4 p</span>
+                    <span class="lead-next"><i data-lucide="calendar" aria-hidden="true"></i><span data-next>05.09</span></span>
+                    <span data-assignee-slot><span class="assignee" title="Kaire Mets">KM</span></span>
+                  </div>
+                </article>
+                <article class="lead-card" draggable="true" data-id="5108" role="button" tabindex="0" aria-label="Juhtlõige #5108 Kristjan Orav, Rapla. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Kristjan Orav<span class="lead-id">#5108</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5108"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-hind">Hindamine</span>
+                    <span class="chip chip-name">Rapla</span>
+                    <span class="chip chip-src src-meil"><i data-lucide="mail" aria-hidden="true"></i>Meil</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>5 p</span>
+                    <span class="lead-next" hidden><i data-lucide="calendar" aria-hidden="true"></i><span data-next></span></span>
+                    <span data-assignee-slot><span class="chip chip-unassigned">määramata</span></span>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div class="kcol" data-stage="leping">
+              <header class="kcol-head">
+                <h2 class="kcol-title">Leping</h2>
+                <span class="kcol-count">2</span>
+              </header>
+              <div class="kcol-body" data-stage="leping">
+                <article class="lead-card" draggable="true" data-id="5105" role="button" tabindex="0" aria-label="Juhtlõige #5105 Toomas Kurg, Saare. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Toomas Kurg<span class="lead-id">#5105</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5105"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-raie">Raieõigus</span>
+                    <span class="chip chip-name">Saare</span>
+                    <span class="chip chip-src src-tel"><i data-lucide="phone" aria-hidden="true"></i>Telefon</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>7 p</span>
+                    <span class="lead-next"><i data-lucide="calendar" aria-hidden="true"></i><span data-next>08.09</span></span>
+                    <span data-assignee-slot><span class="assignee" title="Tarmo Rätsep">TR</span></span>
+                  </div>
+                </article>
+                <article class="lead-card" draggable="true" data-id="5102" role="button" tabindex="0" aria-label="Juhtlõige #5102 Hillar Vaher, Põlva. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Hillar Vaher<span class="lead-id">#5102</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5102"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-kinn">Kinnistu</span>
+                    <span class="chip chip-name">Põlva</span>
+                    <span class="chip chip-src src-tel"><i data-lucide="phone" aria-hidden="true"></i>Telefon</span>
+                  </div>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>9 p</span>
+                    <span class="lead-next"><i data-lucide="calendar" aria-hidden="true"></i><span data-next>04.09</span></span>
+                    <span data-assignee-slot><span class="assignee" title="Marit Vain">MV</span></span>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div class="kcol" data-stage="mitte">
+              <header class="kcol-head">
+                <h2 class="kcol-title">Mittekvalifitseeritud</h2>
+                <span class="kcol-count">2</span>
+              </header>
+              <div class="kcol-body" data-stage="mitte">
+                <article class="lead-card" draggable="true" data-id="5101" role="button" tabindex="0" aria-label="Juhtlõige #5101 Oleg Vassiljev, Ida-Viru. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Oleg Vassiljev<span class="lead-id">#5101</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5101"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-kinn">Kinnistu</span>
+                    <span class="chip chip-name">Ida-Viru</span>
+                    <span class="chip chip-src src-meil"><i data-lucide="mail" aria-hidden="true"></i>Meil</span>
+                  </div>
+                  <p class="lead-reason">Ei soovi müüa</p>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>6 p</span>
+                    <span class="lead-next" hidden><i data-lucide="calendar" aria-hidden="true"></i><span data-next></span></span>
+                    <span data-assignee-slot><span class="chip chip-unassigned">määramata</span></span>
+                  </div>
+                </article>
+                <article class="lead-card" draggable="true" data-id="5095" role="button" tabindex="0" aria-label="Juhtlõige #5095 Silvi Tamm, Valga. Ava detailvaade.">
+                  <div class="lead-top">
+                    <span class="lead-name">Silvi Tamm<span class="lead-id">#5095</span></span>
+                    <button class="card-menu" type="button" aria-haspopup="menu" aria-label="Liiguta juhtlõiget #5095"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </div>
+                  <div class="lead-chips">
+                    <span class="chip chip-src src-raie">Raieõigus</span>
+                    <span class="chip chip-name">Valga</span>
+                    <span class="chip chip-src src-tel"><i data-lucide="phone" aria-hidden="true"></i>Telefon</span>
+                  </div>
+                  <p class="lead-reason">Vale number</p>
+                  <div class="lead-meta">
+                    <span class="lead-age" title="Laekumisest möödunud"><i data-lucide="clock" aria-hidden="true"></i>8 p</span>
+                    <span class="lead-next" hidden><i data-lucide="calendar" aria-hidden="true"></i><span data-next></span></span>
+                    <span data-assignee-slot><span class="chip chip-unassigned">määramata</span></span>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Nimekiri vaade -->
+      <section class="tabpanel" id="panel-list" role="tabpanel" aria-labelledby="tab-list" data-panel="list" hidden>
+        <div class="card">
+          <div class="tbl-wrap">
+            <table class="tbl tbl-leads">
+              <thead>
+                <tr>
+                  <th scope="col">Kuupäev</th>
+                  <th scope="col">Nimi</th>
+                  <th scope="col">Kontakt</th>
+                  <th scope="col">Allikas</th>
+                  <th scope="col">Teenus</th>
+                  <th scope="col">Maakond</th>
+                  <th scope="col">Spetsialist</th>
+                  <th scope="col">Olek</th>
+                  <th scope="col" class="num"><span class="sr-only">Tegevus</span></th>
+                </tr>
+              </thead>
+              <tbody id="leadsTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- Juhtlõime detailvaade (slide-over) -->
+<div class="lead-backdrop" id="leadBackdrop" aria-hidden="true"></div>
+<aside class="lead-drawer" id="leadDrawer" role="dialog" aria-modal="true" aria-labelledby="dName" aria-hidden="true">
+  <div class="lead-drawer-head">
+    <div class="lead-drawer-heading">
+      <h2 class="lead-drawer-title" id="dName">—</h2>
+      <span class="lead-drawer-id" id="dId">—</span>
+    </div>
+    <button class="icon-btn" id="dClose" type="button" aria-label="Sulge detailvaade"><i data-lucide="x"></i></button>
+  </div>
+  <div class="lead-drawer-body">
+    <div class="dsec">
+      <p class="dsec-label"><i data-lucide="user" aria-hidden="true"></i>Kliendi andmed</p>
+      <div class="data-row"><span class="data-label">Allikas</span><span class="data-value" id="dSrc">—</span></div>
+      <div class="data-row"><span class="data-label">Esitatud</span><span class="data-value"><span class="mono" id="dWhen">—</span></span></div>
+      <div class="data-row"><span class="data-label">Teenuse tüüp</span><span class="data-value" id="dService">—</span></div>
+      <div class="data-row"><span class="data-label">Asukoht</span><span class="data-value" id="dWhere">—</span></div>
+      <div class="data-row"><span class="data-label">Kataster</span><span class="data-value"><span class="mono" id="dKataster">—</span><a class="mini-btn" href="https://ky.kataster.ee" target="_blank" rel="noopener">Ava kaardil<i data-lucide="external-link" aria-hidden="true"></i></a></span></div>
+      <div class="data-row"><span class="data-label">Nõusolek</span><span class="data-value"><span id="dConsent">—</span> <span class="consent-ok" title="GDPR nõusolek antud">✓</span></span></div>
+    </div>
+    <div class="dsec">
+      <p class="dsec-label"><i data-lucide="phone" aria-hidden="true"></i>Kontakt</p>
+      <div class="data-row"><span class="data-label">Telefon</span><span class="data-value"><span id="dPhone">—</span><a class="mini-btn" id="dPhoneBtn" href="#">Helista<i data-lucide="phone" aria-hidden="true"></i></a></span></div>
+      <div class="data-row"><span class="data-label">E-post</span><span class="data-value"><a id="dEmail" href="#">—</a></span></div>
+      <blockquote class="lead-msg" id="dMsg">—</blockquote>
+    </div>
+    <div class="dsec">
+      <p class="dsec-label"><i data-lucide="users" aria-hidden="true"></i>Olek ja määramine</p>
+      <div class="assign-grid">
+        <div>
+          <label class="field-label" for="dStatus">Olek</label>
+          <select class="select" id="dStatus">
+            <option value="uus">Uus</option>
+            <option value="voetud">Võetud ühendust</option>
+            <option value="kvalif">Kvalifitseeritud</option>
+            <option value="leping">Leping</option>
+            <option value="mitte">Mittekvalifitseeritud</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="dNext">Järgmine tegevus</label>
+          <input class="input" id="dNext" type="date">
+        </div>
+        <div class="field-full">
+          <label class="field-label" for="dAssign">Vastutav spetsialist</label>
+          <select class="select" id="dAssign">
+            <option value="">Määramata</option>
+            <option value="MV">Marit Vain</option>
+            <option value="KM">Kaire Mets</option>
+            <option value="TR">Tarmo Rätsep</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="dsec">
+      <p class="dsec-label"><i data-lucide="check" aria-hidden="true"></i>Sisemärkmed</p>
+      <ul id="dNotes"></ul>
+      <div class="note-form">
+        <input class="input" id="dNoteInput" type="text" placeholder="+ Lisa uus märkus..." aria-label="Uus sisemärkus">
+        <button class="btn-primary" id="dNoteAdd" type="button">Salvesta</button>
+      </div>
+    </div>
+    <div class="dsec">
+      <p class="dsec-label"><i data-lucide="history" aria-hidden="true"></i>Tegevuslogi</p>
+      <ul id="dLog"></ul>
+    </div>
+  </div>
+</aside>
+
+<!-- Klaviatuuri menüü: Liiguta → -->
+<div class="move-menu" id="moveMenu" role="menu" aria-label="Liiguta juhtlõige teise etappi" hidden>
+  <p class="move-menu-label">Liiguta →</p>
+  <div class="move-menu-list"></div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<!-- Mobile drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true"></div>
+<aside class="drawer" id="drawer" aria-label="Peamenüü" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="rail-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/></svg>
+    </span>
+    <span class="topbar-title">Erametsad haldus</span>
+    <button class="icon-btn" id="menuClose" type="button" aria-label="Sulge menüü"><i data-lucide="x"></i></button>
+  </div>
+  <nav class="drawer-nav">
+    <a class="drawer-link" href="01-dashboard.html"><i data-lucide="layout-dashboard"></i>Töölaud</a>
+    <a class="drawer-link" href="02-auctions-list.html"><i data-lucide="gavel"></i>Oksjonid</a>
+    <a class="drawer-link" href="04-bids-monitoring.html"><i data-lucide="activity"></i>Pakkumised</a>
+    <a class="drawer-link" href="05-sealed-opening.html"><i data-lucide="key-round"></i>Sul. avamine<span class="drawer-flag dot is-amber"></span></a>
+    <a class="drawer-link" href="06-users.html"><i data-lucide="users"></i>Kasutajad</a>
+    <a class="drawer-link" href="07-company-approvals.html"><i data-lucide="building-2"></i>Ettevõtted<span class="drawer-flag num is-red">3</span></a>
+    <a class="drawer-link" href="08-contracts.html"><i data-lucide="file-signature"></i>Lepingud</a>
+    <a class="drawer-link active" href="09-leads-crm.html" aria-current="page"><i data-lucide="kanban"></i>Juhtlõimed</a>
+    <a class="drawer-link" href="10-service-requests.html"><i data-lucide="send-horizontal"></i>Päringud</a>
+    <a class="drawer-link" href="11-cms-content.html"><i data-lucide="file-pen"></i>Sisuhaldus</a>
+    <a class="drawer-link" href="12-statistics.html"><i data-lucide="chart-column"></i>Statistika</a>
+    <a class="drawer-link" href="13-settings.html"><i data-lucide="settings"></i>Seaded</a>
+    <a class="drawer-link" href="14-audit-log.html"><i data-lucide="shield-check"></i>Auditlogi</a>
+  </nav>
+</aside>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+
+  /* Lucide icons */
+  if(window.lucide)lucide.createIcons();
+
+  /* Mobile drawer */
+  const drawer=$("#drawer"), backdrop=$("#drawerBackdrop"),
+        openBtn=$("#menuOpen"), closeBtn=$("#menuClose");
+  const setDrawer=open=>{
+    document.body.classList.toggle("drawer-open",open);
+    drawer.setAttribute("aria-hidden",String(!open));
+    openBtn.setAttribute("aria-expanded",String(open));
+  };
+  openBtn.addEventListener("click",()=>setDrawer(true));
+  closeBtn.addEventListener("click",()=>setDrawer(false));
+  backdrop.addEventListener("click",()=>setDrawer(false));
+  addEventListener("keydown",e=>{if(e.key==="Escape")setDrawer(false)});
+
+  /* Global search: focus with Cmd/Ctrl+K */
+  const search=$("#globalSearch");
+  addEventListener("keydown",e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
+      e.preventDefault();
+      search.focus(); search.select();
+    }
+  });
+
+  /* Live countdowns (demo offsets in seconds from load) */
+  const pad=n=>String(n).padStart(2,"0");
+  const cds=$$("[data-countdown]").map(el=>({el,end:Date.now()+Number(el.dataset.countdown)*1000}));
+  function tick(){
+    const now=Date.now();
+    cds.forEach(c=>{
+      const r=Math.max(0,c.end-now);
+      if(r===0){c.el.textContent="Lõppenud"; c.el.classList.remove("cd-crit"); return;}
+      const h=Math.floor(r/36e5), m=Math.floor(r%36e5/6e4), s=Math.floor(r%6e4/1e3);
+      c.el.textContent=pad(h)+":"+pad(m)+":"+pad(s);
+      c.el.classList.toggle("cd-crit",r<3e5);
+    });
+  }
+  tick(); setInterval(tick,1000);
+})();
+</script>
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+
+  /* Pipeline stages (spec Page 09) + demo registry */
+  const STAGES=[
+    {key:"uus",label:"Uus"},
+    {key:"voetud",label:"Võetud ühendust"},
+    {key:"kvalif",label:"Kvalifitseeritud"},
+    {key:"leping",label:"Leping"},
+    {key:"mitte",label:"Mittekvalifitseeritud"}
+  ];
+  const stageLabel=k=>{const s=STAGES.find(x=>x.key===k);return s?s.label:k;};
+  const SPECS={MV:"Marit Vain",KM:"Kaire Mets",TR:"Tarmo Rätsep"};
+  const SVC_CLASS={kava:"src-kava",raie:"src-raie",ost:"src-ost",hindamine:"src-hind",kinnistu:"src-kinn"};
+  const ST_CLASS={uus:"st-uus",voetud:"st-voetud",kvalif:"st-kvalif",leping:"st-leping",mitte:"st-mitte"};
+
+  const LEADS={
+    "5121":{name:"Jaan Torn",stage:"uus",county:"Pärnu",service:"kava",serviceLabel:"Kava",src:"veeb",srcLabel:"Veebivorm",srcDetail:"/teenused/metsa-hindamine · vorm: hindamisakt-1",when:"26.08 09:12",phone:"+372 521 9876",email:"jaan@torn.ee",kataster:"34801:001:0217",asukoht:"Pärnumaa, Saarde vald",consent:"Turundusnõusolek antud 26.08 09:12",assignee:null,next:"2026-08-30",nextLabel:"30.08",msg:"Kava aegus 2024. Vajan uue metsamajanduskava koostamist 12,4 ha kinnistule.",notes:[{t:"27.08 10:15",a:"Marit Vain",x:"Helistasin kliendile, ei vastanud. Saatsin tutvustava e-kirja."}],activity:[{t:"26.08 09:12",x:"Juhtlõige laekus veebivormist. Automaatselt määratud piirkond: Pärnumaa."},{t:"27.08 10:15",x:"Kontaktkatse: telefon jäi vastamata."}]},
+    "5124":{name:"Mikk Tamm",stage:"uus",county:"Harju",service:"kava",serviceLabel:"Kava",src:"veeb",srcLabel:"Veebivorm",srcDetail:"/teenused/metsakava · vorm: metsakava-3",when:"01.09 11:40",phone:"+372 534 1122",email:"mikk.tamm@mail.ee",kataster:"78401:002:0305",asukoht:"Harjumaa, Kuusalu vald",consent:"Turundusnõusolek antud 01.09 11:40",assignee:null,next:"",nextLabel:"",msg:"Vajan metsamajanduskavat 8,2 ha kinnistule, eelistaks koostööd kohaliku spetsialistiga.",notes:[],activity:[{t:"01.09 11:40",x:"Juhtlõige laekus veebivormist. Automaatselt määratud piirkond: Harjumaa."}]},
+    "5123":{name:"Piret Kuusk",stage:"uus",county:"Pärnu",service:"raie",serviceLabel:"Raieõigus",src:"tel",srcLabel:"Telefon",srcDetail:"Telefonikõne · sissetulev",when:"01.09 10:15",phone:"+372 5566 8877",email:"piret.kuusk@mail.ee",kataster:"44801:003:0119",asukoht:"Pärnumaa, Audru vald",consent:"Turundusnõusolek antud 01.09 10:15",assignee:null,next:"",nextLabel:"",msg:"Soovin müüa raieõigust 6 ha metsalasil, küsis hindade kohta infot.",notes:[],activity:[{t:"01.09 10:15",x:"Juhtlõige laekus telefonitsi. Automaatselt määratud piirkond: Pärnumaa."}]},
+    "5122":{name:"Jüri Raud",stage:"uus",county:"Võru",service:"ost",serviceLabel:"Ostusoov",src:"meil",srcLabel:"Meil",srcDetail:"e-post · info@erametsad.ee",when:"01.09 09:02",phone:"+372 514 7788",email:"jyri.raud@mail.ee",kataster:"—",asukoht:"Võrumaa",consent:"Turundusnõusolek antud 01.09 09:02",assignee:null,next:"",nextLabel:"",msg:"Otsin ostuks 5–15 ha metsakinnistut Võru maakonnas, eelarve kuni 45 000 €.",notes:[],activity:[{t:"01.09 09:02",x:"Juhtlõige laekus e-kirjaga. Automaatselt määratud piirkond: Võrumaa."}]},
+    "5119":{name:"Tiit Mänd",stage:"uus",county:"Viljandi",service:"raie",serviceLabel:"Raieõigus",src:"tel",srcLabel:"Telefon",srcDetail:"Telefonikõne · sissetulev",when:"30.08 12:20",phone:"+372 530 4455",email:"tiit.mand@mail.ee",kataster:"68402:001:0455",asukoht:"Viljandimaa, Põhja-Sakala vald",consent:"Turundusnõusolek antud 30.08 12:20",assignee:null,next:"",nextLabel:"",msg:"Soovin lageraiet 11 ha lank, vaja hinnangut ja müügiabi.",notes:[],activity:[{t:"30.08 12:20",x:"Juhtlõige laekus telefonitsi. Automaatselt määratud piirkond: Viljandimaa."}]},
+    "5118":{name:"Anu Lepp",stage:"uus",county:"Lääne-Viru",service:"hindamine",serviceLabel:"Hindamine",src:"veeb",srcLabel:"Veebivorm",srcDetail:"/teenused/metsa-hindamine · vorm: hindamisakt-2",when:"30.08 19:05",phone:"+372 511 2233",email:"anu.lepp@mail.ee",kataster:"38401:004:0771",asukoht:"Lääne-Virumaa, Haljala vald",consent:"Turundusnõusolek antud 30.08 19:05",assignee:null,next:"",nextLabel:"",msg:"Vajan metsa hindamisaktit pärandijaotuseks, 17 ha.",notes:[],activity:[{t:"30.08 19:05",x:"Juhtlõige laekus veebivormist. Automaatselt määratud piirkond: Lääne-Virumaa."}]},
+    "5116":{name:"Kadri Kask",stage:"voetud",county:"Saare",service:"hindamine",serviceLabel:"Hindamine",src:"meil",srcLabel:"Meil",srcDetail:"e-post · info@erametsad.ee",when:"31.08 08:40",phone:"+372 522 9080",email:"kadri.kask@mail.ee",kataster:"58401:002:0903",asukoht:"Saaremaa vald",consent:"Turundusnõusolek antud 31.08 08:40",assignee:"TR",next:"2026-09-02",nextLabel:"02.09",msg:"Küsis hinnangut 24 ha tuulekahjustatud metsale.",notes:[{t:"31.08 13:20",a:"Tarmo Rätsep",x:"Klient saatis fotod. Hindamine kohapeal nädala lõpus."}],activity:[{t:"31.08 08:40",x:"Juhtlõige laekus e-kirjaga. Automaatselt määratud piirkond: Saaremaa."},{t:"31.08 09:05",x:"Võetud ühendust: vastati e-kirjale."}]},
+    "5114":{name:"Olev Põder",stage:"voetud",county:"Jõgeva",service:"kinnistu",serviceLabel:"Kinnistu",src:"veeb",srcLabel:"Veebivorm",srcDetail:"/teenused/kinnistu-muuk · vorm: kinnistu-1",when:"30.08 15:30",phone:"+372 516 3344",email:"olev.poder@mail.ee",kataster:"66401:001:0210",asukoht:"Jõgevamaa, Põltsamaa vald",consent:"Turundusnõusolek antud 30.08 15:30",assignee:null,next:"",nextLabel:"",msg:"Soovib müüa pärandikinnistut 32 ha, ootab hinnapakkumist.",notes:[],activity:[{t:"30.08 15:30",x:"Juhtlõige laekus veebivormist. Automaatselt määratud piirkond: Jõgevamaa."},{t:"30.08 17:12",x:"Kontaktitatud telefonitsi, täpsustas andmeid."}]},
+    "5112":{name:"Maarja Oja",stage:"voetud",county:"Tartu",service:"raie",serviceLabel:"Raieõigus",src:"tel",srcLabel:"Telefon",srcDetail:"Telefonikõne · sissetulev",when:"29.08 10:10",phone:"+372 518 9900",email:"maarja.oja@mail.ee",kataster:"78502:003:0614",asukoht:"Tartumaa, Kambja vald",consent:"Turundusnõusolek antud 29.08 10:10",assignee:"MV",next:"2026-09-03",nextLabel:"03.09",msg:"Harvendusraie 9 ha, küsis oksjoniprotsessi kohta.",notes:[],activity:[{t:"29.08 10:10",x:"Juhtlõige laekus telefonitsi. Automaatselt määratud piirkond: Tartumaa."},{t:"29.08 11:40",x:"Kontaktitatud, huvi kinnitatud."}]},
+    "5109":{name:"Mare Laid",stage:"kvalif",county:"Harju",service:"kinnistu",serviceLabel:"Kinnistu",src:"veeb",srcLabel:"Veebivorm",srcDetail:"/teenused/kinnistu-muuk · vorm: kinnistu-2",when:"28.08 09:45",phone:"+372 519 2211",email:"mare.laid@mail.ee",kataster:"78409:002:1188",asukoht:"Harjumaa, Anija vald",consent:"Turundusnõusolek antud 28.08 09:45",assignee:"KM",next:"2026-09-05",nextLabel:"05.09",msg:"Müüks metskinnistu 45 ha, soovib oksjonit septembris.",notes:[{t:"29.08 14:05",a:"Kaire Mets",x:"Kvalifitseeritud: omanik jahitasid, kinnisturaamat puhas."}],activity:[{t:"28.08 09:45",x:"Juhtlõige laekus veebivormist. Automaatselt määratud piirkond: Harjumaa."},{t:"29.08 14:05",x:"Kvalifitseeritud: müügisoov kinnitatud."}]},
+    "5108":{name:"Kristjan Orav",stage:"kvalif",county:"Rapla",service:"hindamine",serviceLabel:"Hindamine",src:"meil",srcLabel:"Meil",srcDetail:"e-post · info@erametsad.ee",when:"27.08 17:20",phone:"+372 513 6677",email:"kristjan.orav@mail.ee",kataster:"58403:001:0332",asukoht:"Raplamaa, Rapla vald",consent:"Turundusnõusolek antud 27.08 17:20",assignee:null,next:"",nextLabel:"",msg:"18 ha metsa ja 6 ha põldu, kaalub müüki — vajab hindajat külla.",notes:[],activity:[{t:"27.08 17:20",x:"Juhtlõige laekus e-kirjaga. Automaatselt määratud piirkond: Raplamaa."},{t:"28.08 10:02",x:"Kvalifitseeritud: reaalne müügisoov."}]},
+    "5105":{name:"Toomas Kurg",stage:"leping",county:"Saare",service:"raie",serviceLabel:"Raieõigus",src:"tel",srcLabel:"Telefon",srcDetail:"Telefonikõne · sissetulev",when:"25.08 14:00",phone:"+372 512 8844",email:"toomas.kurg@mail.ee",kataster:"58402:004:0907",asukoht:"Saaremaa vald",consent:"Turundusnõusolek antud 25.08 14:00",assignee:"TR",next:"2026-09-08",nextLabel:"08.09",msg:"Raieõigus 14 ha, nõustus tingimustega, oksjon ettevalmistamisel.",notes:[{t:"26.08 09:30",a:"Tarmo Rätsep",x:"Müügilepingu tingimused kokku lepitud."}],activity:[{t:"25.08 14:00",x:"Juhtlõige laekus telefonitsi. Automaatselt määratud piirkond: Saaremaa."},{t:"26.08 09:30",x:"Edastatud oksjoni ettevalmistusse."}]},
+    "5102":{name:"Hillar Vaher",stage:"leping",county:"Põlva",service:"kinnistu",serviceLabel:"Kinnistu",src:"tel",srcLabel:"Telefon",srcDetail:"Telefonikõne · sissetulev",when:"23.08 11:30",phone:"+372 517 5522",email:"hillar.vaher@mail.ee",kataster:"77401:002:0466",asukoht:"Põlvamaa, Põlva vald",consent:"Turundusnõusolek antud 23.08 11:30",assignee:"MV",next:"2026-09-04",nextLabel:"04.09",msg:"Metskinnistu 28 ha müük, lepingu allkirjastamine 04.09.",notes:[],activity:[{t:"23.08 11:30",x:"Juhtlõige laekus telefonitsi. Automaatselt määratud piirkond: Põlvamaa."},{t:"24.08 10:15",x:"Edastatud lepingu sõlmimisele."}]},
+    "5101":{name:"Oleg Vassiljev",stage:"mitte",county:"Ida-Viru",service:"kinnistu",serviceLabel:"Kinnistu",src:"meil",srcLabel:"Meil",srcDetail:"e-post · info@erametsad.ee",when:"26.08 13:25",phone:"+372 515 8899",email:"oleg.v@mail.ee",kataster:"—",asukoht:"Ida-Virumaa",consent:"Turundusnõusolek antud 26.08 13:25",assignee:null,next:"",nextLabel:"",msg:"Teatas e-kirjaga, et ei soovi enam müüa.",notes:[],activity:[{t:"26.08 13:25",x:"Juhtlõige laekus e-kirjaga. Automaatselt määratud piirkond: Ida-Virumaa."},{t:"26.08 18:40",x:"Märgitud mittekvalifitseerituks: ei soovi müüa."}]},
+    "5095":{name:"Silvi Tamm",stage:"mitte",county:"Valga",service:"raie",serviceLabel:"Raieõigus",src:"tel",srcLabel:"Telefon",srcDetail:"Telefonikõne · sissetulev",when:"24.08 16:40",phone:"+372 533 1100",email:"s.tamm@mail.ee",kataster:"89401:001:0125",asukoht:"Valgamaa, Tõrva vald",consent:"Turundusnõusolek antud 24.08 16:40",assignee:null,next:"",nextLabel:"",msg:"Klienditeenindaja: number ei vastanud, tõenäoliselt vale sisestus.",notes:[],activity:[{t:"24.08 16:40",x:"Juhtlõige laekus telefonitsi. Automaatselt määratud piirkond: Valgamaa."},{t:"25.08 09:15",x:"Märgitud mittekvalifitseerituks: vale number."}]}
+  };
+
+  /* Toast */
+  const toastEl=$("#toast"); let toastTimer=null;
+  function toast(msg){
+    if(!toastEl)return;
+    toastEl.textContent=msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>toastEl.classList.remove("show"),3200);
+  }
+
+  function nowLabel(){
+    const d=new Date(), p=n=>String(n).padStart(2,"0");
+    return p(d.getDate())+"."+p(d.getMonth()+1)+" "+p(d.getHours())+":"+p(d.getMinutes());
+  }
+
+  function logActivity(id,text){
+    const lead=LEADS[id];
+    if(lead)lead.activity.unshift({t:nowLabel(),x:text});
+  }
+
+  /* Column counts */
+  function recount(){
+    $$(".kcol").forEach(col=>{
+      const c=$(".kcol-count",col), body=$(".kcol-body",col);
+      if(c&&body)c.textContent=String($$(".lead-card",body).length);
+    });
+  }
+
+  /* Card assignee chip */
+  function renderAssignee(card,lead){
+    const slot=$("[data-assignee-slot]",card);
+    if(!slot)return;
+    slot.innerHTML=lead.assignee
+      ?'<span class="assignee" title="'+SPECS[lead.assignee]+'">'+lead.assignee+"</span>"
+      :'<span class="chip chip-unassigned">määramata</span>';
+  }
+
+  /* Filters (shared by kanban + table) */
+  function currentMatches(){
+    const fv=$("#fSrc").value, cv=$("#fCounty").value, sv=$("#fSpec").value;
+    const q=$("#fSearch").value.trim().toLowerCase();
+    const out=[];
+    Object.keys(LEADS).forEach(id=>{
+      const l=LEADS[id];
+      const ok=(!fv||l.src===fv)&&(!cv||l.county===cv)
+        &&(!sv||(sv==="__none"?l.assignee===null:l.assignee===sv))
+        &&(!q||(l.name+" #"+id+" "+l.county).toLowerCase().includes(q));
+      const card=$('.lead-card[data-id="'+id+'"]');
+      if(card)card.hidden=!ok;
+      if(ok)out.push(id);
+    });
+    return out;
+  }
+
+  /* Nimekiri view (rendered from the same registry) */
+  function renderTable(){
+    const tb=$("#leadsTbody");
+    if(!tb)return;
+    const ids=currentMatches();
+    if(!ids.length){
+      tb.innerHTML='<tr class="tbl-empty"><td colspan="9">Filtritele vastavaid juhtlõimesid ei leitud.</td></tr>';
+      return;
+    }
+    tb.innerHTML=ids.map(id=>{
+      const l=LEADS[id];
+      const spec=l.assignee
+        ?'<span class="assignee" title="'+SPECS[l.assignee]+'">'+l.assignee+'</span><span class="tbl-spec">'+SPECS[l.assignee]+"</span>"
+        :'<span class="chip chip-unassigned" style="margin-left:0">määramata</span>';
+      return "<tr>"+
+        '<td><span class="lot-id">'+l.when+"</span></td>"+
+        '<td><span class="lot-name" role="button" tabindex="0" data-open="'+id+'">'+l.name+'</span><br><span class="lot-id">#'+id+"</span></td>"+
+        '<td class="tbl-contact"><a href="tel:'+l.phone.replace(/\s/g,"")+'">'+l.phone+'</a><br><a href="mailto:'+l.email+'">'+l.email+"</a></td>"+
+        '<td><span class="chip chip-src src-neutral">'+l.srcLabel+"</span></td>"+
+        '<td><span class="chip chip-src '+SVC_CLASS[l.service]+'">'+l.serviceLabel+"</span></td>"+
+        "<td>"+l.county+"</td>"+
+        "<td>"+spec+"</td>"+
+        '<td><span class="pill '+ST_CLASS[l.stage]+'">'+stageLabel(l.stage)+"</span></td>"+
+        '<td class="num"><button class="btn-outline" type="button" data-open="'+id+'"><i data-lucide="external-link" aria-hidden="true"></i>Ava</button></td>'+
+        "</tr>";
+    }).join("");
+    if(window.lucide)lucide.createIcons();
+  }
+
+  /* Move card between columns */
+  function moveLead(id,stage){
+    const lead=LEADS[id];
+    if(!lead||!stage||lead.stage===stage)return false;
+    const card=$('.lead-card[data-id="'+id+'"]');
+    const body=$('.kcol-body[data-stage="'+stage+'"]');
+    if(!card||!body)return false;
+    lead.stage=stage;
+    body.appendChild(card);
+    $$(".sla-badge",card).forEach(b=>{b.hidden=stage!=="uus";});
+    recount(); renderTable();
+    logActivity(id,"Olek muudetud: "+stageLabel(stage));
+    if(drawerId===id)renderDrawerLog(id);
+    return true;
+  }
+
+  /* Lead detail drawer */
+  let drawerId=null, lastFocus=null;
+  function renderNotes(id){
+    const lead=LEADS[id], list=$("#dNotes");
+    if(!lead||!list)return;
+    list.innerHTML=lead.notes.length?lead.notes.map(n=>
+      '<li class="note-item"><div class="note-meta"><span class="note-author">'+n.a+'</span><span class="note-time">'+n.t+'</span></div><p class="note-text">'+n.x+"</p></li>"
+    ).join(""):'<li class="note-item"><p class="note-text">Märkmeid ei ole.</p></li>';
+  }
+  function renderDrawerLog(id){
+    const lead=LEADS[id], list=$("#dLog");
+    if(!lead||!list)return;
+    list.innerHTML=lead.activity.map(a=>
+      '<li class="act-item"><span class="act-dot" aria-hidden="true"></span><span class="act-time">'+a.t+'</span><span>'+a.x+"</span></li>"
+    ).join("");
+  }
+  function openLead(id){
+    const lead=LEADS[id], d=$("#leadDrawer");
+    if(!lead||!d)return;
+    drawerId=id; lastFocus=document.activeElement;
+    $("#dName").textContent=lead.name;
+    $("#dId").textContent="#"+id+" · juhtlõime";
+    $("#dSrc").textContent=lead.srcDetail;
+    $("#dWhen").textContent=lead.when;
+    $("#dService").textContent=lead.serviceLabel;
+    $("#dWhere").textContent=lead.asukoht;
+    $("#dKataster").textContent=lead.kataster;
+    $("#dConsent").textContent=lead.consent;
+    $("#dPhone").textContent=lead.phone;
+    $("#dPhoneBtn").href="tel:"+lead.phone.replace(/\s/g,"");
+    $("#dEmail").textContent=lead.email;
+    $("#dEmail").href="mailto:"+lead.email;
+    $("#dMsg").textContent=lead.msg;
+    $("#dStatus").value=lead.stage;
+    $("#dAssign").value=lead.assignee||"";
+    $("#dNext").value=lead.next||"";
+    renderNotes(id); renderDrawerLog(id);
+    $("#leadBackdrop").classList.add("open");
+    d.classList.add("open");
+    d.setAttribute("aria-hidden","false");
+    document.body.classList.add("lead-open");
+    $("#dClose").focus();
+  }
+  function closeLead(){
+    if(drawerId===null)return;
+    drawerId=null;
+    $("#leadBackdrop").classList.remove("open");
+    const d=$("#leadDrawer");
+    d.classList.remove("open");
+    d.setAttribute("aria-hidden","true");
+    document.body.classList.remove("lead-open");
+    if(lastFocus)lastFocus.focus();
+  }
+  $("#leadBackdrop").addEventListener("click",closeLead);
+  $("#dClose").addEventListener("click",closeLead);
+
+  /* Drawer demo actions */
+  $("#dStatus").addEventListener("change",e=>{
+    if(drawerId===null)return;
+    const id=drawerId, from=stageLabel(LEADS[id].stage);
+    if(moveLead(id,e.target.value))toast("Olek uuendatud: "+from+" → "+stageLabel(LEADS[id].stage)+" (demo)");
+    e.target.value=LEADS[id].stage;
+  });
+  $("#dAssign").addEventListener("change",e=>{
+    if(drawerId===null)return;
+    const id=drawerId, lead=LEADS[id], v=e.target.value||null;
+    lead.assignee=v;
+    renderAssignee($('.lead-card[data-id="'+id+'"]'),lead);
+    renderTable();
+    logActivity(id,v?("Spetsialist määratud: "+SPECS[v]):"Spetsialist eemaldatud");
+    renderDrawerLog(id);
+    toast(v?("Vastutav spetsialist: "+SPECS[v]+" (demo)"):"Spetsialist eemaldatud (demo)");
+  });
+  $("#dNext").addEventListener("change",e=>{
+    if(drawerId===null)return;
+    const lead=LEADS[drawerId];
+    lead.next=e.target.value||"";
+    const lab=$('.lead-card[data-id="'+drawerId+'"] [data-next]');
+    if(lab){
+      if(lead.next){
+        const parts=lead.next.split("-");
+        lab.textContent=parts[2]+"."+parts[1];
+        $(".lead-next",lab.closest(".lead-meta")).hidden=false;
+      }else{
+        $(".lead-next",lab.closest(".lead-meta")).hidden=true;
+      }
+    }
+  });
+  function addNote(){
+    const input=$("#dNoteInput"), v=input.value.trim();
+    if(drawerId===null||!v){input.focus();return;}
+    LEADS[drawerId].notes.unshift({t:nowLabel(),a:"Marit Vain (Admin)",x:v});
+    input.value="";
+    renderNotes(drawerId);
+    toast("Märkus lisatud (demo)");
+  }
+  $("#dNoteAdd").addEventListener("click",addNote);
+  $("#dNoteInput").addEventListener("keydown",e=>{if(e.key==="Enter")addNote();});
+
+  /* Card interactions: open drawer + drag & drop */
+  $$(".lead-card").forEach(card=>{
+    card.addEventListener("click",()=>openLead(card.dataset.id));
+    card.addEventListener("keydown",e=>{
+      if(e.key==="Enter"||e.key===" "){e.preventDefault();openLead(card.dataset.id);}
+    });
+    card.addEventListener("dragstart",e=>{
+      e.dataTransfer.setData("text/plain",card.dataset.id);
+      e.dataTransfer.effectAllowed="move";
+      card.classList.add("dragging");
+      closeMoveMenu();
+    });
+    card.addEventListener("dragend",()=>card.classList.remove("dragging"));
+  });
+  $$(".kcol").forEach(col=>{
+    col.addEventListener("dragover",e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect="move";
+      col.classList.add("drag-over");
+    });
+    col.addEventListener("dragleave",e=>{
+      if(!col.contains(e.relatedTarget))col.classList.remove("drag-over");
+    });
+    col.addEventListener("drop",e=>{
+      e.preventDefault();
+      col.classList.remove("drag-over");
+      const id=e.dataTransfer.getData("text/plain"), lead=LEADS[id];
+      if(!lead)return;
+      const target=$(".kcol-body",col).dataset.stage;
+      if(target===lead.stage)return;
+      const from=stageLabel(lead.stage);
+      if(moveLead(id,target))toast("Juhtlõige #"+id+" liigutatud: "+from+" → "+stageLabel(target)+" (demo)");
+    });
+  });
+
+  /* Keyboard fallback menu: Liiguta → */
+  const moveMenu=$("#moveMenu");
+  let menuCard=null;
+  function closeMoveMenu(){
+    if(moveMenu.hidden)return;
+    moveMenu.hidden=true;
+    menuCard=null;
+  }
+  function openMoveMenu(btn,card){
+    menuCard=card;
+    const lead=LEADS[card.dataset.id], list=$(".move-menu-list",moveMenu);
+    list.innerHTML=STAGES.filter(s=>s.key!==lead.stage).map(s=>
+      '<button type="button" role="menuitem" data-stage="'+s.key+'"><i data-lucide="arrow-right" aria-hidden="true"></i>'+s.label+"</button>"
+    ).join("");
+    $$("button",list).forEach(b=>b.addEventListener("click",()=>{
+      const id=menuCard?menuCard.dataset.id:null;
+      closeMoveMenu();
+      if(!id)return;
+      const from=stageLabel(LEADS[id].stage);
+      if(moveLead(id,b.dataset.stage))toast("Juhtlõige #"+id+" liigutatud: "+from+" → "+stageLabel(LEADS[id].stage)+" (demo)");
+    }));
+    moveMenu.hidden=false;
+    if(window.lucide)lucide.createIcons();
+    const r=btn.getBoundingClientRect();
+    moveMenu.style.top=(r.bottom+6)+"px";
+    moveMenu.style.left=Math.max(8,Math.min(r.left,window.innerWidth-moveMenu.offsetWidth-8))+"px";
+    const first=$("button",list);
+    if(first)first.focus();
+  }
+  $$(".lead-card .card-menu").forEach(btn=>{
+    btn.addEventListener("click",e=>{
+      e.stopPropagation();
+      const card=btn.closest(".lead-card");
+      if(!moveMenu.hidden&&menuCard===card){closeMoveMenu();return;}
+      openMoveMenu(btn,card);
+    });
+  });
+  document.addEventListener("click",e=>{
+    if(!moveMenu.hidden&&!moveMenu.contains(e.target))closeMoveMenu();
+  });
+  addEventListener("keydown",e=>{
+    if(e.key==="Escape"){closeMoveMenu();closeLead();}
+  });
+
+  /* View toggle: Kanban | Nimekiri */
+  const tabs=$$(".tab");
+  function showView(tab){
+    tabs.forEach(t=>{
+      const on=t===tab;
+      t.classList.toggle("active",on);
+      t.setAttribute("aria-selected",String(on));
+      t.tabIndex=on?0:-1;
+    });
+    $$(".tabpanel").forEach(p=>{p.hidden=p.dataset.panel!==tab.dataset.tab;});
+  }
+  tabs.forEach((t,i,arr)=>{
+    t.addEventListener("click",()=>showView(t));
+    t.addEventListener("keydown",e=>{
+      if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;
+      e.preventDefault();
+      const nx=arr[(i+(e.key==="ArrowRight"?1:arr.length-1))%arr.length];
+      showView(nx); nx.focus();
+    });
+  });
+
+  /* Filters */
+  ["#fSrc","#fCounty","#fSpec"].forEach(sel=>{
+    $(sel).addEventListener("change",renderTable);
+  });
+  $("#fSearch").addEventListener("input",renderTable);
+
+  /* Table row actions (delegated) */
+  $("#leadsTbody").addEventListener("click",e=>{
+    const b=e.target.closest("[data-open]");
+    if(b)openLead(b.dataset.open);
+  });
+  $("#leadsTbody").addEventListener("keydown",e=>{
+    if(e.key!=="Enter")return;
+    const b=e.target.closest("[data-open]");
+    if(b)openLead(b.dataset.open);
+  });
+
+  /* Toolbar demo actions */
+  $("#newLeadBtn").addEventListener("click",()=>toast("Uue juhtlõime vorm on demo versioonis keelatud"));
+  $("#csvBtn").addEventListener("click",()=>toast("CSV eksport on demo versioonis keelatud"));
+
+  /* Init */
+  recount();
+  renderTable();
+})();
+</script>
+</body>
+</html>

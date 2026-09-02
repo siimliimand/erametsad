@@ -1,0 +1,1057 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oksjonid | Erametsad haldus</title>
+<meta name="description" content="Erametsad haldusplaadi oksjonite nimekiri — demo prototüüp.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23012d1d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z'/%3E%3Cpath d='M12 22v-3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ---- Tokens (ADMIN-DESIGN-SPEC §1.2) ---- */
+:root{
+  --primary:#012d1d; --primary-hover:#1b4332; --primary-dark:#16382A; --primary-light:#c1ecd4;
+  --accent:#58B368; --cta:#F2A93B; --cta-hover:#D98F1F;
+  --ink:#181a2e; --ink-muted:#414844; --ink-inverse:#FFFFFF;
+  --bg-page:#fbf8ff; --bg-mist:#f4f2ff; --border:#c1c8c2;
+  --danger:#B3261E; --danger-light:#FBEAE9; --info:#2D6FA8; --info-light:#E9F1F7;
+  --st-draft-text:#414844; --st-draft-bg:#EBEBEB; --st-draft-dot:#6B7570;
+  --st-sched-text:#1F4E79; --st-sched-bg:#E9F1F7; --st-sched-dot:#2D6FA8;
+  --st-active-text:#1B6338; --st-active-bg:#E8F6ED; --st-active-dot:#2E9E5B;
+  --st-ending-text:#941E17; --st-ending-bg:#FBEAE9; --st-ending-dot:#B3261E;
+  --st-ended-text:#8F590A; --st-ended-bg:#FEF5E7; --st-ended-dot:#F2A93B;
+  --st-unsold:#B3261E;
+  --st-contract-text:#236B3B; --st-contract-bg:#EBF7F0; --st-contract-dot:#58B368;
+  --st-arch-text:#414844; --st-arch-bg:#ECEEEB; --st-arch-dot:#6B7570;
+  --font-heading:"Public Sans",system-ui,sans-serif;
+  --font-body:"Inter",system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --space-2xs:4px; --space-xs:8px; --space-sm:12px; --space-md:16px;
+  --space-lg:24px; --space-xl:32px; --space-2xl:40px; --space-3xl:48px; --space-4xl:64px;
+  --radius:8px; --radius-pill:999px;
+  --surface:#FFFFFF;
+  --shadow-card:0 1px 2px rgba(24,26,46,.04),0 2px 8px rgba(24,26,46,.05);
+  --shadow-hover:0 2px 8px rgba(24,26,46,.08),0 8px 24px rgba(24,26,46,.08);
+  --shadow-pop:0 8px 24px rgba(24,26,46,.14);
+  --tint-primary:rgba(1,45,29,.06);
+  --tint-primary-strong:rgba(1,45,29,.1);
+  --glow-active:rgba(46,158,91,.45);
+  --accent-soft:rgba(88,179,104,.28);
+  --overlay:rgba(24,26,46,.45);
+  --rail-w:56px; --topbar-h:64px;
+}
+
+/* ---- Base ---- */
+*,*::before,*::after{box-sizing:border-box}
+html{color-scheme:light; -webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg-page); color:var(--ink);
+  font:400 14px/20px var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--primary)}
+button{font:inherit; cursor:pointer}
+ul{margin:0; padding:0; list-style:none}
+svg{display:block}
+svg.lucide{flex:none}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+::selection{background:var(--primary-light)}
+.mono{font-family:var(--font-mono); font-feature-settings:"tnum"}
+.sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
+.skip-link{
+  position:absolute; left:-9999px; top:8px; z-index:200;
+  background:var(--primary); color:var(--ink-inverse); padding:10px 16px; border-radius:var(--radius);
+}
+.skip-link:focus{left:8px; color:var(--ink-inverse)}
+
+/* ---- Left icon rail (fixed 56px) ---- */
+.rail{
+  position:fixed; inset:0 auto 0 0; width:var(--rail-w); z-index:100;
+  display:flex; flex-direction:column; align-items:center;
+  background:var(--surface); border-right:1px solid var(--border); padding:12px 0;
+}
+.rail-logo{
+  display:grid; place-items:center; width:32px; height:32px; margin-bottom:16px;
+  border-radius:var(--radius); background:var(--bg-mist); color:var(--primary);
+}
+.rail-logo svg{width:20px; height:20px}
+.rail-nav{display:flex; flex-direction:column; align-items:center; gap:2px; width:100%}
+.rail-item{
+  position:relative; display:grid; place-items:center; width:40px; height:40px;
+  border-radius:var(--radius); color:var(--ink-muted); text-decoration:none;
+  transition:background-color .15s ease-out, color .15s ease-out;
+}
+.rail-item svg{width:20px; height:20px}
+.rail-item:hover{background:var(--tint-primary); color:var(--primary)}
+.rail-item.active{background:var(--tint-primary-strong); color:var(--primary)}
+.rail-item.active::before{content:""; position:absolute; left:-8px; top:6px; bottom:6px; width:3px; border-radius:0 2px 2px 0; background:var(--primary)}
+.rail-item::after{
+  content:attr(data-tip); position:absolute; left:calc(100% + 12px); top:50%; transform:translateY(-50%);
+  z-index:110; background:var(--ink); color:var(--ink-inverse);
+  font:500 12px/16px var(--font-body); padding:5px 9px; border-radius:6px; white-space:nowrap;
+  opacity:0; visibility:hidden; transition:opacity .12s ease-out .08s, visibility 0s .2s; pointer-events:none;
+}
+.rail-item:hover::after,.rail-item:focus-visible::after{opacity:1; visibility:visible; transition-delay:0s}
+.rail-flag{position:absolute; top:3px; right:2px; z-index:1}
+.rail-flag.dot{width:8px; height:8px; border-radius:var(--radius-pill)}
+.rail-flag.num{
+  min-width:14px; height:14px; padding:0 3px; border-radius:var(--radius-pill);
+  display:grid; place-items:center; font:700 9px/1 var(--font-body); color:var(--ink-inverse);
+  border:2px solid var(--surface);
+}
+.is-amber{background:var(--cta)}
+.is-red{background:var(--danger)}
+
+/* ---- Topbar (sticky 64px) ---- */
+.app{margin-left:var(--rail-w)}
+.topbar{
+  position:sticky; top:0; z-index:90; display:flex; align-items:center; gap:12px;
+  height:var(--topbar-h); padding:0 24px;
+  background:var(--surface); border-bottom:1px solid var(--border);
+}
+.menu-btn{display:none; place-items:center; width:36px; height:36px; margin-left:-8px; border:0; border-radius:var(--radius); background:transparent; color:var(--ink)}
+.menu-btn:hover{background:var(--bg-mist)}
+.topbar-brand{display:flex; align-items:center; gap:10px; flex:none}
+.env-badge{display:inline-flex; align-items:center; padding:3px 10px; border-radius:var(--radius-pill); font:700 11px/14px var(--font-heading); letter-spacing:.04em}
+.env-prod{background:var(--st-active-bg); color:var(--st-active-text)}
+.env-stage{background:var(--st-ended-bg); color:var(--st-ended-text)}
+.env-dev{background:var(--danger-light); color:var(--danger)}
+.topbar-title{font:600 15px/20px var(--font-heading); color:var(--ink)}
+.topbar-search{
+  position:relative; display:flex; align-items:center; gap:8px; flex:1; max-width:420px; height:36px;
+  margin-inline:auto; padding:0 10px; border-radius:var(--radius);
+  background:var(--bg-mist); border:1px solid transparent;
+  transition:border-color .15s ease-out, background-color .15s ease-out;
+}
+.topbar-search:focus-within{border-color:var(--primary); background:var(--surface)}
+.topbar-search svg{width:16px; height:16px; color:var(--ink-muted)}
+.topbar-search input{flex:1; min-width:0; border:0; background:transparent; outline:0; font:400 13px/18px var(--font-body); color:var(--ink)}
+.topbar-search input::placeholder{color:var(--ink-muted)}
+.search-kbd{flex:none; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1px 6px; font:500 11px/16px var(--font-mono); color:var(--ink-muted)}
+.topbar-user{display:flex; align-items:center; gap:8px; flex:none}
+.icon-btn{
+  position:relative; display:grid; place-items:center; width:36px; height:36px;
+  border:0; border-radius:var(--radius); background:transparent; color:var(--ink-muted);
+}
+.icon-btn:hover{background:var(--bg-mist); color:var(--primary)}
+.icon-btn svg{width:18px; height:18px}
+.bell-badge{
+  position:absolute; top:3px; right:3px; min-width:15px; height:15px; padding:0 3px;
+  border-radius:var(--radius-pill); background:var(--danger); color:var(--ink-inverse);
+  border:2px solid var(--surface); font:600 10px/1 var(--font-body);
+  display:grid; place-items:center;
+}
+.user-menu{
+  display:flex; align-items:center; gap:10px; padding:4px 6px 4px 4px;
+  border:0; border-radius:var(--radius); background:transparent;
+}
+.user-menu:hover{background:var(--bg-mist)}
+.avatar{
+  width:32px; height:32px; border-radius:50%;
+  background:var(--primary); color:var(--ink-inverse);
+  display:grid; place-items:center; font:600 12px/1 var(--font-heading); letter-spacing:.02em;
+}
+.user-meta{display:flex; align-items:center; gap:8px}
+.user-name{font:600 13px/16px var(--font-body); color:var(--ink)}
+.role-chip{padding:2px 8px; border-radius:var(--radius-pill); background:var(--primary-light); color:var(--primary); font:600 11px/14px var(--font-body)}
+.user-menu > svg{width:16px; height:16px; color:var(--ink-muted)}
+
+/* ---- Workspace ---- */
+.container{max-width:1400px; margin-inline:auto; padding:var(--space-lg)}
+.breadcrumb{display:flex; align-items:center; gap:6px; font:500 12px/16px var(--font-body); color:var(--ink-muted); margin-bottom:6px}
+.page-head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:var(--space-lg)}
+.page-title{margin:0; font:700 28px/34px var(--font-heading); color:var(--ink)}
+
+/* ---- Cards ---- */
+.card{
+  display:flex; flex-direction:column; overflow:hidden;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card);
+}
+.card-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 20px; border-bottom:1px solid var(--border)}
+.card-title{margin:0; font:600 16px/22px var(--font-heading); color:var(--ink)}
+.card-foot{margin-top:auto; padding:12px 20px; border-top:1px solid var(--border); text-align:right}
+.card-link{font:600 13px/18px var(--font-body); color:var(--primary); text-decoration:none}
+.card-link:hover{color:var(--primary-hover); text-decoration:underline}
+
+/* ---- KPI strip ---- */
+.kpi-grid{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--space-sm); margin-bottom:var(--space-lg)}
+.kpi-card{
+  display:flex; flex-direction:column; gap:2px; padding:var(--space-md);
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card); color:var(--ink); text-decoration:none;
+  transition:border-color .15s ease-out, box-shadow .15s ease-out, transform .15s ease-out;
+}
+.kpi-card:hover{border-color:var(--primary); box-shadow:var(--shadow-hover); transform:translateY(-1px)}
+.kpi-label{font:500 12px/16px var(--font-body); color:var(--ink-muted)}
+.kpi-value{font:700 28px/32px var(--font-mono); font-feature-settings:"tnum"; letter-spacing:-.01em}
+.kpi-value.is-danger{color:var(--danger)}
+.kpi-alert{
+  display:inline-grid; place-items:center; width:18px; height:18px; margin-left:8px; vertical-align:6px;
+  border-radius:var(--radius-pill); background:var(--cta); color:var(--ink);
+  font:700 12px/1 var(--font-body);
+}
+.kpi-sub{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.trend-up{color:var(--st-active-text); font-weight:500}
+.spark{width:100%; height:24px; margin:4px 0 2px}
+.info-dot{display:inline-grid; place-items:center; vertical-align:-2px; color:var(--ink-muted); cursor:help}
+.info-dot svg{width:12px; height:12px}
+
+/* ---- Dashboard grid (2/3 + 1/3) ---- */
+.dash-grid{display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:var(--space-lg); align-items:stretch}
+
+/* ---- Live table ---- */
+.live{display:inline-flex; align-items:center; gap:7px; font:600 12px/16px var(--font-body); color:var(--st-active-text)}
+.live-dot{width:8px; height:8px; border-radius:var(--radius-pill); background:var(--st-active-dot); animation:live-pulse 2s ease-out infinite}
+@keyframes live-pulse{0%{box-shadow:0 0 0 0 var(--glow-active)}70%,100%{box-shadow:0 0 0 6px transparent}}
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%; min-width:620px; border-collapse:collapse}
+.tbl th{padding:10px 16px; background:var(--bg-mist); font:500 12px/16px var(--font-body); color:var(--ink-muted); text-align:left; white-space:nowrap}
+.tbl td{padding:12px 16px; border-top:1px solid var(--border); font:400 13px/18px var(--font-body); vertical-align:middle}
+.tbl th:first-child,.tbl td:first-child{padding-left:20px}
+.tbl th:last-child,.tbl td:last-child{padding-right:20px}
+.tbl tbody tr{transition:background-color .15s ease-out}
+.tbl tbody tr:hover{background:var(--bg-mist)}
+.num{text-align:right}
+.lot-id{font:500 12px/16px var(--font-mono); color:var(--ink-muted)}
+.lot-name{color:var(--ink); font:500 13px/18px var(--font-body); text-decoration:none}
+.lot-name:hover{color:var(--primary); text-decoration:underline}
+td .cd{font:500 14px/18px var(--font-mono); font-feature-settings:"tnum"}
+.bid{font:500 13px/18px var(--font-mono); font-feature-settings:"tnum"}
+.bid-muted{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.type-chip{display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.type-chip svg{width:12px; height:12px}
+.type-raie{background:var(--st-active-bg); color:var(--st-active-text)}
+.type-kinnistu{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.type-pakett{background:var(--st-draft-bg); color:var(--st-draft-text)}
+.btn-outline{
+  display:inline-flex; align-items:center; gap:6px; padding:5px 12px;
+  border:1px solid var(--accent); border-radius:var(--radius); background:transparent;
+  color:var(--primary); font:600 12px/16px var(--font-body); text-decoration:none; white-space:nowrap;
+  transition:background-color .15s ease-out;
+}
+.btn-outline svg{width:11px; height:11px}
+.btn-outline:hover{background:var(--st-active-bg)}
+.cd-crit{color:var(--danger) !important; animation:cd-blink 1s step-end infinite}
+@keyframes cd-blink{50%{opacity:.45}}
+@keyframes row-flash{0%{background:var(--accent-soft)}100%{background:transparent}}
+tr.row-extend td{animation:row-flash .9s ease-out 2}
+
+/* ---- Süsteemi tervis ---- */
+.health-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 20px; border-top:1px solid var(--border)}
+.health-row:first-child{border-top:0}
+.health-name{font:400 13px/18px var(--font-body); color:var(--ink-muted)}
+.health-val{display:inline-flex; align-items:center; gap:8px; font:500 13px/18px var(--font-body); color:var(--ink)}
+.ok-text{font:600 12px/16px var(--font-body); color:var(--st-active-text)}
+.status-dot{width:8px; height:8px; border-radius:var(--radius-pill); flex:none}
+.status-dot.ok{background:var(--st-active-dot)}
+.status-dot.warn{background:var(--cta)}
+.status-dot.err{background:var(--danger)}
+.health-foot{
+  display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:auto; padding:10px 20px 14px;
+  border-top:1px solid var(--border);
+  font:400 11px/16px var(--font-body); color:var(--ink-muted);
+}
+.health-foot span{display:inline-flex; align-items:center; gap:6px}
+.mini-dot{width:6px; height:6px; border-radius:var(--radius-pill); background:var(--st-active-dot)}
+
+/* ---- Kiire tegevus ---- */
+.action-row{
+  display:flex; align-items:center; gap:12px; padding:13px 20px;
+  border-top:1px solid var(--border); color:var(--ink); text-decoration:none;
+  transition:background-color .15s ease-out;
+}
+.action-row:first-child{border-top:0}
+.action-row:hover{background:var(--bg-mist)}
+.action-ico{display:grid; place-items:center; width:36px; height:36px; flex:none; border-radius:var(--radius); background:var(--bg-mist); color:var(--primary)}
+.action-ico svg{width:18px; height:18px}
+.action-main{display:flex; flex-direction:column; gap:1px; flex:1; min-width:0}
+.action-title{font:500 13px/18px var(--font-body); color:var(--ink)}
+.action-note{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.action-note.warn{color:var(--st-ended-text)}
+.count-pill{flex:none; padding:2px 10px; border-radius:var(--radius-pill); background:var(--primary-light); color:var(--primary); font:700 12px/16px var(--font-body); white-space:nowrap}
+.action-go{
+  display:grid; place-items:center; width:28px; height:28px; flex:none;
+  border:1px solid transparent; border-radius:var(--radius-pill); color:var(--ink-muted);
+  transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out;
+}
+.action-go svg{width:14px; height:14px}
+.action-row:hover .action-go{border-color:var(--border); background:var(--surface); color:var(--primary)}
+
+/* ---- Viimased juhtlõimed ---- */
+.lead-row{display:flex; align-items:center; gap:10px; padding:13px 20px; border-top:1px solid var(--border)}
+.lead-row:first-child{border-top:0}
+.lead-time{font:500 12px/16px var(--font-mono); font-feature-settings:"tnum"; color:var(--ink-muted)}
+.chip{display:inline-flex; align-items:center; padding:2px 10px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.chip-name{background:var(--bg-mist); border:1px solid var(--border); color:var(--ink)}
+.lead-county{flex:1; min-width:0; font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.chip-src{font:600 11px/16px var(--font-body)}
+.src-kava{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.src-raie{background:var(--st-active-bg); color:var(--st-active-text)}
+.src-ost{background:var(--st-ended-bg); color:var(--st-ended-text)}
+
+/* ---- Mobile drawer (<768px) ---- */
+.drawer{
+  position:fixed; top:0; bottom:0; left:0; z-index:140; width:min(320px,86vw);
+  display:flex; flex-direction:column; visibility:hidden;
+  background:var(--surface); box-shadow:var(--shadow-pop);
+  transform:translateX(-102%); transition:transform .2s cubic-bezier(.4,0,.2,1), visibility 0s .2s;
+}
+body.drawer-open .drawer{transform:none; visibility:visible; transition-delay:0s}
+body.drawer-open{overflow:hidden}
+.drawer-head{display:flex; align-items:center; gap:10px; height:var(--topbar-h); padding:0 12px 0 16px; border-bottom:1px solid var(--border)}
+.drawer-head .rail-logo{margin:0}
+.drawer-head .topbar-title{flex:1}
+.drawer-nav{flex:1; overflow-y:auto; padding:8px}
+.drawer-link{
+  display:flex; align-items:center; gap:12px; padding:11px 12px; margin-bottom:2px;
+  border-radius:var(--radius); color:var(--ink); font:500 14px/20px var(--font-body); text-decoration:none;
+}
+.drawer-link:hover{background:var(--bg-mist)}
+.drawer-link.active{background:var(--tint-primary-strong); color:var(--primary); font-weight:600}
+.drawer-link svg{width:18px; height:18px; color:var(--ink-muted)}
+.drawer-link.active svg{color:var(--primary)}
+.drawer-flag{margin-left:auto; flex:none}
+.drawer-flag.dot{width:8px; height:8px; border-radius:var(--radius-pill)}
+.drawer-flag.num{min-width:14px; height:14px; padding:0 4px; border-radius:var(--radius-pill); display:grid; place-items:center; font:700 10px/1 var(--font-body); color:var(--ink-inverse)}
+.drawer-backdrop{
+  position:fixed; inset:0; z-index:130; background:var(--overlay);
+  opacity:0; visibility:hidden; transition:opacity .2s, visibility 0s .2s;
+}
+body.drawer-open .drawer-backdrop{opacity:1; visibility:visible; transition-delay:0s}
+
+/* ---- Responsive ---- */
+@media (max-width:1280px){.kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:1024px){.dash-grid{grid-template-columns:1fr}}
+@media (max-width:860px){.topbar-search{display:none}}
+@media (max-width:767px){
+  .rail{display:none}
+  .app{margin-left:0}
+  .menu-btn{display:grid}
+  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .topbar{padding:0 16px}
+  .container{padding:16px}
+}
+@media (max-width:640px){.user-meta{display:none}}
+@media (max-width:420px){.kpi-grid{grid-template-columns:1fr}}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important}
+}
+
+/* ---- Page 02: Oksjonid — tabs, filters, data table, bulk bar, modal ---- */
+.breadcrumb a{color:inherit; text-decoration:none}
+.breadcrumb a:hover{color:var(--primary); text-decoration:underline}
+.page-actions{display:flex; flex-wrap:wrap; gap:8px}
+.btn{display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border:1px solid transparent; border-radius:var(--radius); font:600 13px/18px var(--font-body); text-decoration:none; white-space:nowrap; transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out}
+.btn svg{width:15px; height:15px}
+.btn-primary{background:var(--primary); color:var(--ink-inverse)}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-ghost{background:var(--surface); border-color:var(--border); color:var(--ink)}
+.btn-ghost:hover{border-color:var(--primary); color:var(--primary); background:var(--bg-mist)}
+.btn-danger{background:var(--danger); color:var(--ink-inverse)}
+.btn-danger:hover{filter:brightness(.9)}
+.btn-kbd{margin-left:2px; padding:0 5px; border:1px solid rgba(255,255,255,.35); border-radius:5px; font:500 10px/16px var(--font-mono); color:rgba(255,255,255,.85)}
+.tabs{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:var(--space-md)}
+.tab{display:inline-flex; align-items:center; gap:8px; padding:6px 8px 6px 14px; border:1px solid var(--border); border-radius:var(--radius-pill); background:var(--surface); color:var(--ink); font:500 13px/18px var(--font-body)}
+.tab:hover{border-color:var(--primary); color:var(--primary)}
+.tab[aria-pressed="true"]{background:var(--primary); border-color:var(--primary); color:var(--ink-inverse); font-weight:600}
+.tab-count{padding:1px 8px; border-radius:var(--radius-pill); background:var(--bg-mist); font:500 11px/16px var(--font-mono); color:var(--ink-muted)}
+.tab[aria-pressed="true"] .tab-count{background:rgba(255,255,255,.18); color:var(--ink-inverse)}
+.tab-zap{width:13px; height:13px; color:var(--cta)}
+.filter-bar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:var(--space-md); padding:10px 12px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-card)}
+.filter-chip{display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 10px; border:1px solid var(--border); border-radius:var(--radius-pill); background:var(--surface); cursor:pointer}
+.filter-chip:focus-within{border-color:var(--primary)}
+.filter-chip > span{font:500 12px/16px var(--font-body); color:var(--ink-muted)}
+.filter-chip select{max-width:140px; border:0; background:transparent; outline:0; appearance:none; -webkit-appearance:none; font:500 12px/16px var(--font-body); color:var(--ink); cursor:pointer}
+.filter-chip .date-in{width:112px; border:0; background:transparent; outline:0; font:500 12px/16px var(--font-mono); color:var(--ink)}
+.filter-chip > svg{width:13px; height:13px; flex:none; color:var(--ink-muted); pointer-events:none}
+.filter-sep{color:var(--ink-muted)}
+.filter-search{position:relative; display:flex; align-items:center; gap:8px; flex:1; min-width:210px; height:34px; padding:0 12px; border:1px solid var(--border); border-radius:var(--radius-pill); background:var(--surface)}
+.filter-search:focus-within{border-color:var(--primary)}
+.filter-search > svg{width:14px; height:14px; flex:none; color:var(--ink-muted)}
+.filter-search input{flex:1; min-width:0; border:0; background:transparent; outline:0; font:400 13px/18px var(--font-body); color:var(--ink)}
+.filter-clear{display:inline-flex; align-items:center; gap:4px; padding:6px 8px; border:0; border-radius:var(--radius); background:transparent; color:var(--danger); font:500 12px/16px var(--font-body); white-space:nowrap}
+.filter-clear:hover{background:var(--danger-light)}
+.filter-clear svg{width:13px; height:13px}
+.tbl-auctions{min-width:1180px}
+.tbl-auctions th,.tbl-auctions td{padding:10px 12px}
+.tbl-auctions th:first-child,.tbl-auctions td:first-child{width:36px; padding-left:16px}
+.tbl-auctions th:last-child,.tbl-auctions td:last-child{padding-right:16px}
+.th-sort{display:inline-flex; align-items:center; gap:4px; padding:0; border:0; background:none; font:inherit; color:inherit; cursor:pointer}
+.th-sort svg{width:12px; height:12px; opacity:.5}
+.th-sort:hover{color:var(--primary)}
+th[aria-sort] .th-sort{color:var(--primary); font-weight:600}
+th[aria-sort] .th-sort svg{opacity:1}
+.check{width:15px; height:15px; accent-color:var(--primary); cursor:pointer}
+a.lot-id:hover{color:var(--primary); text-decoration:underline}
+.name-cell{display:flex; align-items:center; gap:6px; min-width:0}
+.name-zap{width:14px; height:14px; flex:none; color:var(--cta)}
+.type-pold{background:var(--st-ended-bg); color:var(--st-ended-text)}
+.type-letter{padding:1px 5px; border:1px solid var(--border); border-radius:5px; background:var(--surface); font:700 10px/13px var(--font-mono); color:var(--ink-muted)}
+.pill{display:inline-flex; align-items:center; gap:6px; padding:2px 10px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.pill-dot{width:6px; height:6px; border-radius:var(--radius-pill); flex:none}
+.pill-aktiivne{background:var(--st-active-bg); color:var(--st-active-text)}
+.pill-aktiivne .pill-dot{background:var(--st-active-dot)}
+.pill-mustand{background:var(--st-draft-bg); color:var(--st-draft-text)}
+.pill-mustand .pill-dot{background:var(--st-draft-dot)}
+.pill-ajastatud{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.pill-ajastatud .pill-dot{background:var(--st-sched-dot)}
+.pill-loppenud{background:var(--st-ended-bg); color:var(--st-ended-text)}
+.pill-loppenud .pill-dot{background:var(--st-ended-dot)}
+.pill-muumata{border:1px solid var(--st-unsold); color:var(--st-unsold); background:transparent}
+.pill-muumata .pill-dot{background:var(--st-unsold)}
+.pill-leping{background:var(--st-contract-bg); color:var(--st-contract-text)}
+.pill-leping .pill-dot{background:var(--st-contract-dot)}
+.pill-arhiivis{background:var(--st-arch-bg); color:var(--st-arch-text)}
+.pill-arhiivis .pill-dot{background:var(--st-arch-dot)}
+.under{color:var(--cta-hover); font:600 11px/16px var(--font-mono)}
+.sp-avatar{display:grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--primary-light); color:var(--primary); font:600 10px/1 var(--font-heading); letter-spacing:.02em}
+.row-actions{display:inline-flex; gap:4px; opacity:0; transition:opacity .12s ease-out}
+.tbl-auctions tr:hover .row-actions,.tbl-auctions tr:focus-within .row-actions{opacity:1}
+@media (hover:none){.row-actions{opacity:1}}
+.ra-btn{display:inline-flex; align-items:center; gap:4px; padding:4px 8px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--ink-muted); font:500 11px/14px var(--font-body); text-decoration:none; white-space:nowrap}
+.ra-btn:hover{border-color:var(--primary); color:var(--primary); background:var(--bg-mist)}
+.ra-btn svg{width:12px; height:12px}
+.ra-btn.is-danger:hover{border-color:var(--danger); color:var(--danger); background:var(--danger-light)}
+.tbl-auctions tr.is-selected td{background:var(--primary-light)}
+.bulk-bar{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:120; display:flex; align-items:center; flex-wrap:wrap; gap:10px; max-width:calc(100vw - 32px); padding:10px 12px 10px 20px; border-radius:var(--radius); background:var(--ink); color:var(--ink-inverse); box-shadow:var(--shadow-pop)}
+.bulk-bar[hidden]{display:none}
+.bulk-count{font:600 13px/18px var(--font-body); white-space:nowrap}
+.bulk-count b{font:500 13px/18px var(--font-mono)}
+.bulk-btn{display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border:1px solid rgba(255,255,255,.25); border-radius:var(--radius); background:transparent; color:var(--ink-inverse); font:600 12px/16px var(--font-body); white-space:nowrap}
+.bulk-btn:hover{background:rgba(255,255,255,.12)}
+.bulk-btn svg{width:13px; height:13px}
+.bulk-cancel{display:inline-flex; align-items:center; gap:4px; padding:6px 10px; border:0; background:transparent; color:rgba(255,255,255,.75); font:500 12px/16px var(--font-body)}
+.bulk-cancel:hover{color:var(--ink-inverse)}
+.bulk-cancel svg{width:13px; height:13px}
+.radio-group{display:flex; flex-direction:column; gap:8px; margin:0; padding:0; border:0}
+.radio-row{display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; transition:border-color .15s ease-out}
+.radio-row:hover{border-color:var(--primary)}
+.radio-row input{width:15px; height:15px; margin-top:3px; accent-color:var(--primary)}
+.radio-title{display:block; font:500 13px/18px var(--font-body); color:var(--ink)}
+.radio-sub{display:block; font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.modal-backdrop{position:fixed; inset:0; z-index:150; display:none; place-items:center; padding:16px; background:var(--overlay)}
+.modal-backdrop.is-open{display:grid}
+.modal{width:min(480px,100%); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-pop)}
+.modal-head{display:flex; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid var(--border)}
+.modal-ico{display:grid; place-items:center; width:36px; height:36px; flex:none; border-radius:var(--radius); background:var(--danger-light); color:var(--danger)}
+.modal-ico svg{width:18px; height:18px}
+.modal-title{flex:1; margin:0; font:600 16px/22px var(--font-heading); color:var(--ink)}
+.modal-body{display:flex; flex-direction:column; gap:12px; padding:16px 20px}
+.modal-warn{display:flex; gap:10px; margin:0; padding:10px 12px; border-radius:var(--radius); background:var(--danger-light); color:var(--danger); font:500 13px/18px var(--font-body)}
+.modal-warn svg{width:15px; height:15px; flex:none; margin-top:1px}
+.modal-info{margin:0; font:400 13px/20px var(--font-body); color:var(--ink-muted)}
+.modal-info b{color:var(--ink); font-weight:600}
+.modal-label{display:block; margin-bottom:4px; font:500 12px/16px var(--font-body); color:var(--ink-muted)}
+.modal-input{width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); font:400 13px/18px var(--font-body); color:var(--ink)}
+.modal-input:focus{border-color:var(--primary); outline:0}
+.modal-foot{display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid var(--border)}
+body.modal-open{overflow:hidden}
+@media (max-width:767px){.filter-search{min-width:100%}}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Liigu sisuni</a>
+
+<!-- Left icon rail -->
+<aside class="rail" aria-label="Peamenüü">
+  <a class="rail-logo" href="01-dashboard.html" data-tip="Erametsad haldus" aria-label="Erametsad haldus">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/></svg>
+  </a>
+  <nav class="rail-nav">
+    <a class="rail-item" href="01-dashboard.html" data-tip="Töölaud" aria-label="Töölaud"><i data-lucide="layout-dashboard"></i></a>
+    <a class="rail-item active" href="02-auctions-list.html" data-tip="Oksjonid" aria-label="Oksjonid" aria-current="page"><i data-lucide="gavel"></i></a>
+    <a class="rail-item" href="04-bids-monitoring.html" data-tip="Pakkumised" aria-label="Pakkumised"><i data-lucide="activity"></i></a>
+    <a class="rail-item" href="05-sealed-opening.html" data-tip="Sul. avamine" aria-label="Sul. avamine — ootel tseremoonia"><i data-lucide="key-round"></i><span class="rail-flag dot is-amber"></span></a>
+    <a class="rail-item" href="06-users.html" data-tip="Kasutajad" aria-label="Kasutajad"><i data-lucide="users"></i></a>
+    <a class="rail-item" href="07-company-approvals.html" data-tip="Ettevõtted" aria-label="Ettevõtted — 3 ootel"><i data-lucide="building-2"></i><span class="rail-flag num is-red">3</span></a>
+    <a class="rail-item" href="08-contracts.html" data-tip="Lepingud" aria-label="Lepingud"><i data-lucide="file-signature"></i></a>
+    <a class="rail-item" href="09-leads-crm.html" data-tip="Juhtlõimed" aria-label="Juhtlõimed"><i data-lucide="kanban"></i></a>
+    <a class="rail-item" href="10-service-requests.html" data-tip="Päringud" aria-label="Päringud"><i data-lucide="send-horizontal"></i></a>
+    <a class="rail-item" href="11-cms-content.html" data-tip="Sisuhaldus" aria-label="Sisuhaldus"><i data-lucide="file-pen"></i></a>
+    <a class="rail-item" href="12-statistics.html" data-tip="Statistika" aria-label="Statistika"><i data-lucide="chart-column"></i></a>
+    <a class="rail-item" href="13-settings.html" data-tip="Seaded" aria-label="Seaded"><i data-lucide="settings"></i></a>
+    <a class="rail-item" href="14-audit-log.html" data-tip="Auditlogi" aria-label="Auditlogi"><i data-lucide="shield-check"></i></a>
+  </nav>
+</aside>
+
+<div class="app">
+  <!-- Topbar -->
+  <header class="topbar">
+    <button class="menu-btn" id="menuOpen" type="button" aria-label="Ava menüü" aria-expanded="false" aria-controls="drawer"><i data-lucide="menu"></i></button>
+    <div class="topbar-brand">
+      <span class="env-badge env-stage" title="Staging keskkond">STAGE</span>
+      <span class="topbar-title">Erametsad haldus</span>
+    </div>
+    <div class="topbar-search">
+      <i data-lucide="search"></i>
+      <input id="globalSearch" type="search" placeholder="Otsi oksjoneid, kasutajaid, juhtlõimi... (⌘K)" aria-label="Globaalne otsing">
+      <kbd class="search-kbd">⌘K</kbd>
+    </div>
+    <div class="topbar-user">
+      <button class="icon-btn" type="button" aria-label="Teavitused — 3 lugemata"><i data-lucide="bell"></i><span class="bell-badge">3</span></button>
+      <button class="user-menu" type="button" aria-haspopup="menu" aria-label="Kasutajamenüü: Marit Vain">
+        <span class="avatar" aria-hidden="true">MV</span>
+        <span class="user-meta">
+          <span class="user-name">Marit Vain</span>
+          <span class="role-chip">Admin</span>
+        </span>
+        <i data-lucide="chevron-down"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Oksjonid -->
+  <main id="main">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Asukoht">
+        <a href="01-dashboard.html">Töölaud</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">Oksjonid</span>
+      </nav>
+      <header class="page-head">
+        <h1 class="page-title">Oksjonid</h1>
+        <div class="page-actions">
+          <a class="btn btn-primary" href="03-auction-editor.html" id="newAuction"><i data-lucide="plus" aria-hidden="true"></i>Uus oksjon<kbd class="btn-kbd" aria-hidden="true">⌘N</kbd></a>
+          <button class="btn btn-ghost" type="button"><i data-lucide="download" aria-hidden="true"></i>Ekspordi CSV</button>
+          <button class="btn btn-ghost" type="button"><i data-lucide="settings-2" aria-hidden="true"></i>Veerud</button>
+        </div>
+      </header>
+
+      <!-- Type tabs with count badges -->
+      <div class="tabs" role="group" aria-label="Filtreeri oksjonite tüübi järgi">
+        <button class="tab" type="button" aria-pressed="true">Kõik <span class="tab-count">4823</span></button>
+        <button class="tab" type="button" aria-pressed="false">Raieõigus <span class="tab-count">2401</span></button>
+        <button class="tab" type="button" aria-pressed="false">Kinnistud <span class="tab-count">1902</span></button>
+        <button class="tab" type="button" aria-pressed="false">Põllumaad <span class="tab-count">68</span></button>
+        <button class="tab" type="button" aria-pressed="false">Paketid <span class="tab-count">452</span></button>
+        <button class="tab" type="button" aria-pressed="false"><i data-lucide="zap" class="tab-zap" aria-hidden="true"></i>Kiiroksjonid <span class="tab-count">14</span></button>
+      </div>
+
+      <!-- Filter bar -->
+      <section class="filter-bar" aria-label="Filtrid">
+        <label class="filter-chip" for="fStatus">
+          <span>Olek</span>
+          <select id="fStatus">
+            <option>Kõik</option>
+            <option>Mustand</option>
+            <option>Ajastatud</option>
+            <option>Aktiivne</option>
+            <option>Lõppenud</option>
+            <option>Müümata</option>
+            <option>Lepingus</option>
+            <option>Arhiivis</option>
+          </select>
+          <i data-lucide="chevron-down" aria-hidden="true"></i>
+        </label>
+        <label class="filter-chip" for="fType">
+          <span>Tüüp</span>
+          <select id="fType">
+            <option>Kõik tüübid</option>
+            <option>Raieõigus</option>
+            <option>Kinnistu</option>
+            <option>Põllumaa</option>
+            <option>Pakett</option>
+          </select>
+          <i data-lucide="chevron-down" aria-hidden="true"></i>
+        </label>
+        <label class="filter-chip" for="fCounty">
+          <span>Maakond</span>
+          <select id="fCounty">
+            <option>Kõik maakonnad</option>
+            <option>Harju</option>
+            <option>Hiiu</option>
+            <option>Ida-Viru</option>
+            <option>Jõgeva</option>
+            <option>Järva</option>
+            <option>Lääne</option>
+            <option>Lääne-Viru</option>
+            <option>Põlva</option>
+            <option>Pärnu</option>
+            <option>Rapla</option>
+            <option>Saare</option>
+            <option>Tartu</option>
+            <option>Valga</option>
+            <option>Viljandi</option>
+            <option>Võru</option>
+          </select>
+          <i data-lucide="chevron-down" aria-hidden="true"></i>
+        </label>
+        <label class="filter-chip" for="fSpecialist">
+          <span>Spetsialist</span>
+          <select id="fSpecialist">
+            <option>Kõik spetsialistid</option>
+            <option>Marit Vain</option>
+            <option>Kaire Mets</option>
+            <option>Tõnis Kask</option>
+          </select>
+          <i data-lucide="chevron-down" aria-hidden="true"></i>
+        </label>
+        <span class="filter-chip">
+          <span id="fDateLabel">Kuupäev</span>
+          <input class="date-in" id="fFrom" type="date" aria-label="Alates" aria-describedby="fDateLabel">
+          <span class="filter-sep" aria-hidden="true">—</span>
+          <input class="date-in" id="fTo" type="date" aria-label="Kuni" aria-describedby="fDateLabel">
+        </span>
+        <div class="filter-search">
+          <i data-lucide="search" aria-hidden="true"></i>
+          <input id="fSearch" type="search" placeholder="Otsi nime, katastri, ID järgi..." aria-label="Otsi nime, katastritunnuse või ID järgi">
+        </div>
+        <button class="filter-clear" type="button" id="clearFilters"><i data-lucide="x" aria-hidden="true"></i>Tühjenda filtrid <span id="clearCount">(3 aktiivset)</span></button>
+      </section>
+
+      <!-- Auctions data table -->
+      <section class="card" aria-label="Oksjonite nimekiri">
+        <div class="tbl-wrap">
+          <table class="tbl tbl-auctions">
+            <thead>
+              <tr>
+                <th scope="col"><input type="checkbox" class="check" id="checkAll" aria-label="Vali kõik read"></th>
+                <th scope="col" aria-sort="ascending"><button type="button" class="th-sort" title="Sorteeri ID järgi">ID<i data-lucide="arrow-up" aria-hidden="true"></i></button></th>
+                <th scope="col"><button type="button" class="th-sort" title="Sorteeri nime järgi">Nimi<i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
+                <th scope="col" title="Ikoon + A avatud / S suletud">Tüüp</th>
+                <th scope="col">Olek</th>
+                <th scope="col"><button type="button" class="th-sort" title="Sorteeri maakonna järgi">Maakond<i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
+                <th scope="col" class="num" title="Pindala ha / raiemaht m³"><button type="button" class="th-sort" title="Sorteeri pindala järgi">ha / m³<i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
+                <th scope="col" class="num"><button type="button" class="th-sort" title="Sorteeri alghinna järgi">Alghind<i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
+                <th scope="col" class="num"><button type="button" class="th-sort" title="Sorteeri pakkumiste arvu järgi">Pakkumisi<i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
+                <th scope="col"><button type="button" class="th-sort" title="Sorteeri lõpuaja järgi">Lõpp<i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
+                <th scope="col">Spetsialist</th>
+                <th scope="col" class="num"><span class="sr-only">Tegevused</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><input type="checkbox" class="check row-check" aria-label="Vali oksjon #4810"></td>
+                <td><a class="lot-id" href="04-bids-monitoring.html" title="Ava pakkumiste vaade">#4810</a></td>
+                <td><span class="name-cell"><a class="lot-name" href="04-bids-monitoring.html">Lepsi kinnistu</a></span></td>
+                <td><span class="type-chip type-raie"><i data-lucide="tree-pine" aria-hidden="true"></i><span class="sr-only">Raieõigus</span><span class="type-letter" title="Avatud">A</span></span></td>
+                <td><span class="pill pill-aktiivne"><span class="pill-dot" aria-hidden="true"></span>Aktiivne</span></td>
+                <td>Tartu</td>
+                <td class="num mono">12 / 980</td>
+                <td class="num mono">3 000 €</td>
+                <td class="num mono">14</td>
+                <td><span class="cd" data-countdown="872">00:14:32</span></td>
+                <td><span class="sp-avatar" title="Marit Vain" aria-hidden="true">MV</span><span class="sr-only">Marit Vain</span></td>
+                <td class="num">
+                  <span class="row-actions">
+                    <a class="ra-btn" href="https://erametsad.ee" target="_blank" rel="noopener" title="Vaata portaalis"><i data-lucide="external-link" aria-hidden="true"></i>Vaata</a>
+                    <a class="ra-btn" href="03-auction-editor.html" title="Muuda oksjonit"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a>
+                    <button class="ra-btn" type="button" title="Duplikaat uueks mustandiks"><i data-lucide="copy" aria-hidden="true"></i>Dupl.</button>
+                    <button class="ra-btn is-danger" type="button" title="Rohkem: lõpeta käsitsi" aria-label="Lõpeta oksjon #4810 käsitsi" data-end data-end-id="4810" data-end-name="Lepsi kinnistu" data-end-info="hetke kõrgeim pakkumine &lt;b&gt;7 500 €&lt;/b&gt; (Pakkuja #14), pakkujaid &lt;b&gt;5&lt;/b&gt;"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="check row-check" aria-label="Vali oksjon #4812"></td>
+                <td><a class="lot-id" href="04-bids-monitoring.html" title="Ava pakkumiste vaade">#4812</a></td>
+                <td><span class="name-cell"><a class="lot-name" href="04-bids-monitoring.html">Ööviiuli kinnistu</a><i data-lucide="zap" class="name-zap" aria-hidden="true"></i><span class="sr-only">Kiiroksjon</span></span></td>
+                <td><span class="type-chip type-kinnistu"><i data-lucide="map-pin-house" aria-hidden="true"></i><span class="sr-only">Kinnistu</span><span class="type-letter" title="Suletud">S</span></span></td>
+                <td><span class="pill pill-aktiivne"><span class="pill-dot" aria-hidden="true"></span>Aktiivne</span></td>
+                <td>Saare</td>
+                <td class="num mono">21 / —</td>
+                <td class="num mono">45 000 €</td>
+                <td class="num mono">3 <span class="under" title="Ootel alapakkumisi">(p)</span><span class="sr-only">pakkumist, alapakkumisi ootel</span></td>
+                <td><span class="cd" data-countdown="9665">02:41:05</span></td>
+                <td><span class="sp-avatar" title="Kaire Mets" aria-hidden="true">KM</span><span class="sr-only">Kaire Mets</span></td>
+                <td class="num">
+                  <span class="row-actions">
+                    <a class="ra-btn" href="https://erametsad.ee" target="_blank" rel="noopener" title="Vaata portaalis"><i data-lucide="external-link" aria-hidden="true"></i>Vaata</a>
+                    <a class="ra-btn" href="03-auction-editor.html" title="Muuda oksjonit"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a>
+                    <button class="ra-btn" type="button" title="Duplikaat uueks mustandiks"><i data-lucide="copy" aria-hidden="true"></i>Dupl.</button>
+                    <button class="ra-btn is-danger" type="button" title="Rohkem: lõpeta käsitsi" aria-label="Lõpeta oksjon #4812 käsitsi" data-end data-end-id="4812" data-end-name="Ööviiuli kinnistu" data-end-info="suletud oksjon — &lt;b&gt;3 pakkumist&lt;/b&gt; avatakse pärast lõppu"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="check row-check" aria-label="Vali oksjon #4809"></td>
+                <td><a class="lot-id" href="04-bids-monitoring.html" title="Ava pakkumiste vaade">#4809</a></td>
+                <td><span class="name-cell"><a class="lot-name" href="04-bids-monitoring.html">Kõpu metsapakett</a></span></td>
+                <td><span class="type-chip type-pakett"><i data-lucide="package" aria-hidden="true"></i><span class="sr-only">Pakett</span><span class="type-letter" title="Suletud">S</span></span></td>
+                <td><span class="pill pill-mustand"><span class="pill-dot" aria-hidden="true"></span>Mustand</span></td>
+                <td>Hiiu</td>
+                <td class="num mono">86 / —</td>
+                <td class="num mono">—</td>
+                <td class="num mono">0</td>
+                <td><span class="lot-id">28.08</span></td>
+                <td><span class="sp-avatar" title="Marit Vain" aria-hidden="true">MV</span><span class="sr-only">Marit Vain</span></td>
+                <td class="num">
+                  <span class="row-actions">
+                    <a class="ra-btn" href="https://erametsad.ee" target="_blank" rel="noopener" title="Vaata portaalis"><i data-lucide="external-link" aria-hidden="true"></i>Vaata</a>
+                    <a class="ra-btn" href="03-auction-editor.html" title="Muuda oksjonit"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a>
+                    <button class="ra-btn" type="button" title="Duplikaat uueks mustandiks"><i data-lucide="copy" aria-hidden="true"></i>Dupl.</button>
+                    <button class="ra-btn" type="button" title="Rohkem tegevusi" aria-label="Rohkem tegevusi oksjonile #4809"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="check row-check" aria-label="Vali oksjon #4801"></td>
+                <td><a class="lot-id" href="04-bids-monitoring.html" title="Ava pakkumiste vaade">#4801</a></td>
+                <td><span class="name-cell"><a class="lot-name" href="04-bids-monitoring.html">Kuusiku lank</a></span></td>
+                <td><span class="type-chip type-raie"><i data-lucide="tree-pine" aria-hidden="true"></i><span class="sr-only">Raieõigus</span><span class="type-letter" title="Avatud">A</span></span></td>
+                <td><span class="pill pill-muumata"><span class="pill-dot" aria-hidden="true"></span>Müümata</span></td>
+                <td>Pärnu</td>
+                <td class="num mono">8 / 640</td>
+                <td class="num mono">12 000 €</td>
+                <td class="num mono">1</td>
+                <td><span class="bid-muted">Lõppenud</span></td>
+                <td><span class="sp-avatar" title="Tõnis Kask" aria-hidden="true">TK</span><span class="sr-only">Tõnis Kask</span></td>
+                <td class="num">
+                  <span class="row-actions">
+                    <a class="ra-btn" href="https://erametsad.ee" target="_blank" rel="noopener" title="Vaata portaalis"><i data-lucide="external-link" aria-hidden="true"></i>Vaata</a>
+                    <a class="ra-btn" href="03-auction-editor.html" title="Muuda oksjonit"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a>
+                    <button class="ra-btn" type="button" title="Duplikaat uueks mustandiks"><i data-lucide="copy" aria-hidden="true"></i>Dupl.</button>
+                    <button class="ra-btn" type="button" title="Rohkem tegevusi" aria-label="Rohkem tegevusi oksjonile #4801"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="check row-check" aria-label="Vali oksjon #4808"></td>
+                <td><a class="lot-id" href="04-bids-monitoring.html" title="Ava pakkumiste vaade">#4808</a></td>
+                <td><span class="name-cell"><a class="lot-name" href="04-bids-monitoring.html">Muhu rannikukinnistu</a></span></td>
+                <td><span class="type-chip type-kinnistu"><i data-lucide="map-pin-house" aria-hidden="true"></i><span class="sr-only">Kinnistu</span><span class="type-letter" title="Suletud">S</span></span></td>
+                <td><span class="pill pill-ajastatud"><span class="pill-dot" aria-hidden="true"></span>Ajastatud</span></td>
+                <td>Saare</td>
+                <td class="num mono">34 / —</td>
+                <td class="num mono">58 000 €</td>
+                <td class="num mono">0</td>
+                <td><span class="lot-id">02.09</span></td>
+                <td><span class="sp-avatar" title="Kaire Mets" aria-hidden="true">KM</span><span class="sr-only">Kaire Mets</span></td>
+                <td class="num">
+                  <span class="row-actions">
+                    <a class="ra-btn" href="https://erametsad.ee" target="_blank" rel="noopener" title="Vaata portaalis"><i data-lucide="external-link" aria-hidden="true"></i>Vaata</a>
+                    <a class="ra-btn" href="03-auction-editor.html" title="Muuda oksjonit"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a>
+                    <button class="ra-btn" type="button" title="Duplikaat uueks mustandiks"><i data-lucide="copy" aria-hidden="true"></i>Dupl.</button>
+                    <button class="ra-btn" type="button" title="Rohkem tegevusi" aria-label="Rohkem tegevusi oksjonile #4808"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="check row-check" aria-label="Vali oksjon #4805"></td>
+                <td><a class="lot-id" href="04-bids-monitoring.html" title="Ava pakkumiste vaade">#4805</a></td>
+                <td><span class="name-cell"><a class="lot-name" href="04-bids-monitoring.html">Emajõe lageraie</a></span></td>
+                <td><span class="type-chip type-raie"><i data-lucide="tree-pine" aria-hidden="true"></i><span class="sr-only">Raieõigus</span><span class="type-letter" title="Avatud">A</span></span></td>
+                <td><span class="pill pill-aktiivne"><span class="pill-dot" aria-hidden="true"></span>Aktiivne</span></td>
+                <td>Tartu</td>
+                <td class="num mono">17 / 1 420</td>
+                <td class="num mono">6 200 €</td>
+                <td class="num mono">9</td>
+                <td><span class="cd" data-countdown="11100">03:05:00</span></td>
+                <td><span class="sp-avatar" title="Tõnis Kask" aria-hidden="true">TK</span><span class="sr-only">Tõnis Kask</span></td>
+                <td class="num">
+                  <span class="row-actions">
+                    <a class="ra-btn" href="https://erametsad.ee" target="_blank" rel="noopener" title="Vaata portaalis"><i data-lucide="external-link" aria-hidden="true"></i>Vaata</a>
+                    <a class="ra-btn" href="03-auction-editor.html" title="Muuda oksjonit"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a>
+                    <button class="ra-btn" type="button" title="Duplikaat uueks mustandiks"><i data-lucide="copy" aria-hidden="true"></i>Dupl.</button>
+                    <button class="ra-btn is-danger" type="button" title="Rohkem: lõpeta käsitsi" aria-label="Lõpeta oksjon #4805 käsitsi" data-end data-end-id="4805" data-end-name="Emajõe lageraie" data-end-info="hetke kõrgeim pakkumine &lt;b&gt;7 900 €&lt;/b&gt; (Pakkuja #22), pakkujaid &lt;b&gt;4&lt;/b&gt;"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="check row-check" aria-label="Vali oksjon #4804"></td>
+                <td><a class="lot-id" href="04-bids-monitoring.html" title="Ava pakkumiste vaade">#4804</a></td>
+                <td><span class="name-cell"><a class="lot-name" href="04-bids-monitoring.html">Ahja metsapakett</a><i data-lucide="zap" class="name-zap" aria-hidden="true"></i><span class="sr-only">Kiiroksjon</span></span></td>
+                <td><span class="type-chip type-pakett"><i data-lucide="package" aria-hidden="true"></i><span class="sr-only">Pakett</span><span class="type-letter" title="Suletud">S</span></span></td>
+                <td><span class="pill pill-aktiivne"><span class="pill-dot" aria-hidden="true"></span>Aktiivne</span></td>
+                <td>Põlva</td>
+                <td class="num mono">44 / —</td>
+                <td class="num mono">9 500 €</td>
+                <td class="num mono">6 <span class="under" title="Ootel alapakkumisi">(p)</span><span class="sr-only">pakkumist, alapakkumisi ootel</span></td>
+                <td><span class="cd" data-countdown="2832">00:47:12</span></td>
+                <td><span class="sp-avatar" title="Kaire Mets" aria-hidden="true">KM</span><span class="sr-only">Kaire Mets</span></td>
+                <td class="num">
+                  <span class="row-actions">
+                    <a class="ra-btn" href="https://erametsad.ee" target="_blank" rel="noopener" title="Vaata portaalis"><i data-lucide="external-link" aria-hidden="true"></i>Vaata</a>
+                    <a class="ra-btn" href="03-auction-editor.html" title="Muuda oksjonit"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a>
+                    <button class="ra-btn" type="button" title="Duplikaat uueks mustandiks"><i data-lucide="copy" aria-hidden="true"></i>Dupl.</button>
+                    <button class="ra-btn is-danger" type="button" title="Rohkem: lõpeta käsitsi" aria-label="Lõpeta oksjon #4804 käsitsi" data-end data-end-id="4804" data-end-name="Ahja metsapakett" data-end-info="hetke kõrgeim pakkumine &lt;b&gt;11 200 €&lt;/b&gt; (Pakkuja #3), pakkujaid &lt;b&gt;8&lt;/b&gt;"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="check row-check" aria-label="Vali oksjon #4803"></td>
+                <td><a class="lot-id" href="04-bids-monitoring.html" title="Ava pakkumiste vaade">#4803</a></td>
+                <td><span class="name-cell"><a class="lot-name" href="04-bids-monitoring.html">Võru oru põllumaa</a></span></td>
+                <td><span class="type-chip type-pold"><i data-lucide="wheat" aria-hidden="true"></i><span class="sr-only">Põllumaa</span><span class="type-letter" title="Suletud">S</span></span></td>
+                <td><span class="pill pill-loppenud"><span class="pill-dot" aria-hidden="true"></span>Lõppenud</span></td>
+                <td>Võru</td>
+                <td class="num mono">22 / —</td>
+                <td class="num mono">4 800 €</td>
+                <td class="num mono">5</td>
+                <td><span class="lot-id">27.08</span></td>
+                <td><span class="sp-avatar" title="Tõnis Kask" aria-hidden="true">TK</span><span class="sr-only">Tõnis Kask</span></td>
+                <td class="num">
+                  <span class="row-actions">
+                    <a class="ra-btn" href="https://erametsad.ee" target="_blank" rel="noopener" title="Vaata portaalis"><i data-lucide="external-link" aria-hidden="true"></i>Vaata</a>
+                    <a class="ra-btn" href="03-auction-editor.html" title="Muuda oksjonit"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a>
+                    <button class="ra-btn" type="button" title="Duplikaat uueks mustandiks"><i data-lucide="copy" aria-hidden="true"></i>Dupl.</button>
+                    <button class="ra-btn" type="button" title="Rohkem tegevusi" aria-label="Rohkem tegevusi oksjonile #4803"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="check row-check" aria-label="Vali oksjon #4802"></td>
+                <td><a class="lot-id" href="04-bids-monitoring.html" title="Ava pakkumiste vaade">#4802</a></td>
+                <td><span class="name-cell"><a class="lot-name" href="04-bids-monitoring.html">Järva harvendusraie</a></span></td>
+                <td><span class="type-chip type-raie"><i data-lucide="tree-pine" aria-hidden="true"></i><span class="sr-only">Raieõigus</span><span class="type-letter" title="Avatud">A</span></span></td>
+                <td><span class="pill pill-leping"><span class="pill-dot" aria-hidden="true"></span>Lepingus</span></td>
+                <td>Järva</td>
+                <td class="num mono">6 / 210</td>
+                <td class="num mono">1 950 €</td>
+                <td class="num mono">2</td>
+                <td><span class="lot-id">26.08</span></td>
+                <td><span class="sp-avatar" title="Marit Vain" aria-hidden="true">MV</span><span class="sr-only">Marit Vain</span></td>
+                <td class="num">
+                  <span class="row-actions">
+                    <a class="ra-btn" href="https://erametsad.ee" target="_blank" rel="noopener" title="Vaata portaalis"><i data-lucide="external-link" aria-hidden="true"></i>Vaata</a>
+                    <a class="ra-btn" href="03-auction-editor.html" title="Muuda oksjonit"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a>
+                    <button class="ra-btn" type="button" title="Duplikaat uueks mustandiks"><i data-lucide="copy" aria-hidden="true"></i>Dupl.</button>
+                    <button class="ra-btn" type="button" title="Rohkem tegevusi" aria-label="Rohkem tegevusi oksjonile #4802"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="check row-check" aria-label="Vali oksjon #4796"></td>
+                <td><a class="lot-id" href="04-bids-monitoring.html" title="Ava pakkumiste vaade">#4796</a></td>
+                <td><span class="name-cell"><a class="lot-name" href="04-bids-monitoring.html">Suislepa põllumaa</a></span></td>
+                <td><span class="type-chip type-pold"><i data-lucide="wheat" aria-hidden="true"></i><span class="sr-only">Põllumaa</span><span class="type-letter" title="Suletud">S</span></span></td>
+                <td><span class="pill pill-arhiivis"><span class="pill-dot" aria-hidden="true"></span>Arhiivis</span></td>
+                <td>Viljandi</td>
+                <td class="num mono">31 / —</td>
+                <td class="num mono">15 000 €</td>
+                <td class="num mono">12</td>
+                <td><span class="lot-id">14.08</span></td>
+                <td><span class="sp-avatar" title="Tõnis Kask" aria-hidden="true">TK</span><span class="sr-only">Tõnis Kask</span></td>
+                <td class="num">
+                  <span class="row-actions">
+                    <a class="ra-btn" href="https://erametsad.ee" target="_blank" rel="noopener" title="Vaata portaalis"><i data-lucide="external-link" aria-hidden="true"></i>Vaata</a>
+                    <a class="ra-btn" href="03-auction-editor.html" title="Muuda oksjonit"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a>
+                    <button class="ra-btn" type="button" title="Duplikaat uueks mustandiks"><i data-lucide="copy" aria-hidden="true"></i>Dupl.</button>
+                    <button class="ra-btn" type="button" title="Rohkem tegevusi" aria-label="Rohkem tegevusi oksjonile #4796"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+<!-- Bulk action bar (visible when rows are selected) -->
+<div class="bulk-bar" id="bulkBar" hidden role="status">
+  <span class="bulk-count" id="bulkCount">Valitud <b>0</b> oksjonit</span>
+  <button class="bulk-btn" type="button"><i data-lucide="calendar-clock" aria-hidden="true"></i>Ajasta avaldamine</button>
+  <button class="bulk-btn" type="button"><i data-lucide="download" aria-hidden="true"></i>Ekspordi valitud</button>
+  <button class="bulk-cancel" type="button" id="bulkClear"><i data-lucide="x" aria-hidden="true"></i>Tühista</button>
+</div>
+
+<!-- Modal: Lõpeta käsitsi (destructive guarded) -->
+<div class="modal-backdrop" id="endModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="endModalTitle" aria-describedby="endModalWarn">
+    <div class="modal-head">
+      <span class="modal-ico" aria-hidden="true"><i data-lucide="triangle-alert"></i></span>
+      <h2 class="modal-title" id="endModalTitle">Lõpeta käsitsi</h2>
+      <button class="icon-btn" type="button" id="endClose" aria-label="Sulge"><i data-lucide="x"></i></button>
+    </div>
+    <form class="modal-body" id="endForm">
+      <p class="modal-warn" id="endModalWarn"><i data-lucide="triangle-alert" aria-hidden="true"></i>Lõpetamine on pöördumatu. Oksjon suletakse kohe ja otsust ei saa tühistada.</p>
+      <p class="modal-info" id="endModalInfo"></p>
+      <fieldset class="radio-group">
+        <legend class="sr-only">Tulemuse valik</legend>
+        <label class="radio-row">
+          <input type="radio" name="endResult" value="winner" required>
+          <span>
+            <span class="radio-title">Kuuluta praegune pakkumine võitjaks</span>
+            <span class="radio-sub">Võitjale saadetakse kohe lepingu allkirjastamise kutse.</span>
+          </span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="endResult" value="unsold" required>
+          <span>
+            <span class="radio-title">Märgi müümata</span>
+            <span class="radio-sub">Oksjon lõpeb tulemuseta; piirhind jäi saavutamata.</span>
+          </span>
+        </label>
+      </fieldset>
+      <div>
+        <label class="modal-label" for="endReason">Lõpetamise põhjus (min 5 tähemärki)</label>
+        <input class="modal-input" id="endReason" name="endReason" type="text" minlength="5" required placeholder="nt müüja taotlus 31.08">
+      </div>
+    </form>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" id="endCancel">Tühista</button>
+      <button class="btn btn-danger" type="button" id="endConfirm"><i data-lucide="triangle-alert" aria-hidden="true"></i>Kinnita lõpetamine</button>
+    </div>
+  </div>
+</div>
+    </div>
+  </main>
+</div>
+
+<!-- Mobile drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true"></div>
+<aside class="drawer" id="drawer" aria-label="Peamenüü" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="rail-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/></svg>
+    </span>
+    <span class="topbar-title">Erametsad haldus</span>
+    <button class="icon-btn" id="menuClose" type="button" aria-label="Sulge menüü"><i data-lucide="x"></i></button>
+  </div>
+  <nav class="drawer-nav">
+    <a class="drawer-link" href="01-dashboard.html"><i data-lucide="layout-dashboard"></i>Töölaud</a>
+    <a class="drawer-link active" href="02-auctions-list.html" aria-current="page"><i data-lucide="gavel"></i>Oksjonid</a>
+    <a class="drawer-link" href="04-bids-monitoring.html"><i data-lucide="activity"></i>Pakkumised</a>
+    <a class="drawer-link" href="05-sealed-opening.html"><i data-lucide="key-round"></i>Sul. avamine<span class="drawer-flag dot is-amber"></span></a>
+    <a class="drawer-link" href="06-users.html"><i data-lucide="users"></i>Kasutajad</a>
+    <a class="drawer-link" href="07-company-approvals.html"><i data-lucide="building-2"></i>Ettevõtted<span class="drawer-flag num is-red">3</span></a>
+    <a class="drawer-link" href="08-contracts.html"><i data-lucide="file-signature"></i>Lepingud</a>
+    <a class="drawer-link" href="09-leads-crm.html"><i data-lucide="kanban"></i>Juhtlõimed</a>
+    <a class="drawer-link" href="10-service-requests.html"><i data-lucide="send-horizontal"></i>Päringud</a>
+    <a class="drawer-link" href="11-cms-content.html"><i data-lucide="file-pen"></i>Sisuhaldus</a>
+    <a class="drawer-link" href="12-statistics.html"><i data-lucide="chart-column"></i>Statistika</a>
+    <a class="drawer-link" href="13-settings.html"><i data-lucide="settings"></i>Seaded</a>
+    <a class="drawer-link" href="14-audit-log.html"><i data-lucide="shield-check"></i>Auditlogi</a>
+  </nav>
+</aside>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+
+  /* Lucide icons */
+  if(window.lucide)lucide.createIcons();
+
+  /* Mobile drawer */
+  const drawer=$("#drawer"), backdrop=$("#drawerBackdrop"),
+        openBtn=$("#menuOpen"), closeBtn=$("#menuClose");
+  const setDrawer=open=>{
+    document.body.classList.toggle("drawer-open",open);
+    drawer.setAttribute("aria-hidden",String(!open));
+    openBtn.setAttribute("aria-expanded",String(open));
+  };
+  openBtn.addEventListener("click",()=>setDrawer(true));
+  closeBtn.addEventListener("click",()=>setDrawer(false));
+  backdrop.addEventListener("click",()=>setDrawer(false));
+  addEventListener("keydown",e=>{if(e.key==="Escape")setDrawer(false)});
+
+  /* Global search: focus with Cmd/Ctrl+K */
+  const search=$("#globalSearch");
+  addEventListener("keydown",e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
+      e.preventDefault();
+      search.focus(); search.select();
+    }
+  });
+
+  /* Live countdowns (demo offsets in seconds from load) */
+  const pad=n=>String(n).padStart(2,"0");
+  const cds=$$("[data-countdown]").map(el=>({el,end:Date.now()+Number(el.dataset.countdown)*1000}));
+  function tick(){
+    const now=Date.now();
+    cds.forEach(c=>{
+      const r=Math.max(0,c.end-now);
+      if(r===0){c.el.textContent="Lõppenud"; c.el.classList.remove("cd-crit"); return;}
+      const h=Math.floor(r/36e5), m=Math.floor(r%36e5/6e4), s=Math.floor(r%6e4/1e3);
+      c.el.textContent=pad(h)+":"+pad(m)+":"+pad(s);
+      c.el.classList.toggle("cd-crit",r<3e5);
+    });
+  }
+  tick(); setInterval(tick,1000);
+})();
+</script>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+
+  /* Type tabs: visual selection only (static demo) */
+  const tabs=$$(".tab");
+  tabs.forEach(tab=>tab.addEventListener("click",()=>{
+    tabs.forEach(t=>t.setAttribute("aria-pressed",String(t===tab)));
+  }));
+
+  /* Row selection <-> bulk bar */
+  const bulkBar=$("#bulkBar"), bulkCount=$("#bulkCount"),
+        checkAll=$("#checkAll"), rowChecks=$$(".row-check");
+  function syncBulk(){
+    const n=rowChecks.filter(c=>c.checked).length;
+    if(bulkBar){
+      bulkBar.hidden=n===0;
+      if(bulkCount)bulkCount.innerHTML="Valitud <b>"+n+"</b> "+(n===1?"oksjon":"oksjonit");
+    }
+    if(checkAll)checkAll.checked=n>0&&n===rowChecks.length;
+    rowChecks.forEach(c=>{const tr=c.closest("tr"); if(tr)tr.classList.toggle("is-selected",c.checked)});
+  }
+  rowChecks.forEach(c=>c.addEventListener("change",syncBulk));
+  if(checkAll)checkAll.addEventListener("change",()=>{
+    rowChecks.forEach(c=>{c.checked=checkAll.checked});
+    syncBulk();
+  });
+  const bulkClear=$("#bulkClear");
+  if(bulkClear)bulkClear.addEventListener("click",()=>{
+    rowChecks.forEach(c=>{c.checked=false});
+    if(checkAll)checkAll.checked=false;
+    syncBulk();
+  });
+
+  /* Clear filters */
+  const clearBtn=$("#clearFilters");
+  if(clearBtn)clearBtn.addEventListener("click",()=>{
+    $$(".filter-chip select").forEach(s=>{s.selectedIndex=0});
+    ["#fFrom","#fTo"].forEach(id=>{const el=$(id); if(el)el.value=""});
+    const q=$("#fSearch"); if(q)q.value="";
+    const n=$("#clearCount"); if(n)n.textContent="(0 aktiivset)";
+  });
+
+  /* Cmd/Ctrl+N -> auction editor */
+  addEventListener("keydown",e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="n"){
+      e.preventDefault();
+      location.href="03-auction-editor.html";
+    }
+  });
+
+  /* Manual end modal (destructive, guarded) */
+  const modal=$("#endModal");
+  if(modal){
+    const endForm=$("#endForm"), endInfo=$("#endModalInfo");
+    let lastFocus=null;
+    const openModal=btn=>{
+      lastFocus=btn;
+      if(endInfo)endInfo.innerHTML="Oksjon #"+btn.dataset.endId+" · "+btn.dataset.endName+" — "+btn.dataset.endInfo+".";
+      if(endForm)endForm.reset();
+      modal.classList.add("is-open");
+      document.body.classList.add("modal-open");
+      const first=$('input[name="endResult"]',modal);
+      if(first)first.focus();
+    };
+    const closeModal=()=>{
+      modal.classList.remove("is-open");
+      document.body.classList.remove("modal-open");
+      if(lastFocus)lastFocus.focus();
+    };
+    $$("[data-end]").forEach(btn=>btn.addEventListener("click",()=>openModal(btn)));
+    const endClose=$("#endClose"), endCancel=$("#endCancel"), endConfirm=$("#endConfirm");
+    if(endClose)endClose.addEventListener("click",closeModal);
+    if(endCancel)endCancel.addEventListener("click",closeModal);
+    if(endConfirm)endConfirm.addEventListener("click",()=>{
+      if(endForm&&!endForm.checkValidity()){endForm.reportValidity();return}
+      closeModal();
+    });
+    modal.addEventListener("mousedown",e=>{if(e.target===modal)closeModal()});
+    addEventListener("keydown",e=>{
+      if(e.key==="Escape"&&modal.classList.contains("is-open"))closeModal();
+    });
+  }
+})();
+</script>
+</body>
+</html>

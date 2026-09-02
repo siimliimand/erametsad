@@ -1,0 +1,1282 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raieõiguste oksjonid | Erametsad Oksjonid</title>
+<meta name="description" content="Osta raieõigust oksjonil üle Eesti — 18 aktiivset pakkumist. Filtreeri maakonna, puuliigi ja hinna järgi või vaata oksjoneid kaardil.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232E6B4F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z'/%3E%3Cpath d='M12 22v-3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<script>document.documentElement.classList.add('js')</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"ItemList","name":"Aktiivsed raieõiguste oksjonid","itemListElement":[
+{"@type":"ListItem","position":1,"name":"Kuuse ja männi raieõigus Valgemetsas","url":"https://oksjonid.erametsad.ee/raieoigus/2001"},
+{"@type":"ListItem","position":2,"name":"Segametsa raieõigus Moostel","url":"https://oksjonid.erametsad.ee/raieoigus/2002"},
+{"@type":"ListItem","position":3,"name":"Kuuse kasvandi raieõigus Kambjal","url":"https://oksjonid.erametsad.ee/raieoigus/2003"},
+{"@type":"ListItem","position":4,"name":"Männi raieõigus Olustveres","url":"https://oksjonid.erametsad.ee/raieoigus/2004"},
+{"@type":"ListItem","position":5,"name":"Haaviku raieõigus Haljalal","url":"https://oksjonid.erametsad.ee/raieoigus/2005"},
+{"@type":"ListItem","position":6,"name":"Rabamänniku harvendus Häädemeestel","url":"https://oksjonid.erametsad.ee/raieoigus/2006"},
+{"@type":"ListItem","position":7,"name":"Kuuse raieõigus Orissaarel","url":"https://oksjonid.erametsad.ee/raieoigus/2007"},
+{"@type":"ListItem","position":8,"name":"Segametsa raieõigus Rõuges","url":"https://oksjonid.erametsad.ee/raieoigus/2008"}
+]}
+</script>
+<style>
+/* ---- Tokens ---- */
+:root{
+  --primary:#2E6B4F; --primary-hover:#25573F; --primary-dark:#16382A; --primary-light:#E9F0EC;
+  --accent:#58B368; --cta:#F2A93B; --cta-hover:#D98F1F;
+  --ink:#1B211D; --ink-muted:#6B7570; --ink-inverse:#FFFFFF;
+  --bg-page:#FFFFFF; --bg-mist:#F1F5F2; --border:#E3E7E4;
+  --danger:#B3261E; --danger-light:#FBEAE9; --info:#2D6FA8; --info-light:#E9F1F7;
+  --font-head:"Manrope",system-ui,sans-serif;
+  --font-body:"Inter",system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --container-max:1280px; --gutter:24px;
+  --r-card:14px; --r-btn:10px; --r-hero:16px; --r-pill:999px;
+  --shadow-card:0 2px 12px rgba(22,56,42,.08);
+  --shadow-hover:0 2px 8px rgba(22,56,42,.12),0 8px 24px rgba(22,56,42,.08);
+  --shadow-modal:0 4px 16px rgba(22,56,42,.12),0 16px 48px rgba(22,56,42,.10);
+  --header-h:72px;
+  --ease-reveal:cubic-bezier(.22,.61,.36,1);
+}
+
+/* ---- Base ---- */
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg-page); color:var(--ink);
+  font:400 1rem/1.6 var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+img,svg{display:block}
+h1,h2,h3,h4{font-family:var(--font-head); line-height:1.2; margin:0 0 .5em}
+h1{font-size:3rem; font-weight:800; line-height:1.15}
+h2{font-size:2.25rem; font-weight:700; line-height:1.2}
+h3{font-size:1.5rem; font-weight:700; line-height:1.25}
+h4{font-size:1.125rem; font-weight:700; letter-spacing:.02em}
+p{margin:0 0 1em}
+a{color:var(--primary)}
+a:hover{color:var(--primary-hover)}
+ul{margin:0; padding:0; list-style:none}
+button{font:inherit; cursor:pointer}
+input,select{font:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+::selection{background:var(--primary-light)}
+.mono{font-family:var(--font-mono); font-feature-settings:"tnum"}
+.skip-link{
+  position:absolute; left:-9999px; top:8px; z-index:200;
+  background:var(--primary-dark); color:#fff; padding:10px 16px; border-radius:var(--r-btn);
+}
+.skip-link:focus{left:8px; color:#fff}
+.icon{display:inline-flex; align-items:center; justify-content:center; width:1em; height:1em; flex:none; line-height:1; font-size:20px}
+
+/* ---- Layout ---- */
+.container{max-width:var(--container-max); margin-inline:auto; padding-inline:var(--gutter)}
+.section{padding-block:64px; scroll-margin-top:calc(var(--header-h) + 16px)}
+.bg-mist{background:var(--bg-mist)}
+
+/* ---- Buttons ---- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  min-height:48px; padding:12px 24px; border-radius:var(--r-btn); border:1px solid transparent;
+  font-weight:600; font-size:1rem; text-decoration:none; transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out, box-shadow .15s ease-out;
+}
+.btn-cta{background:var(--cta); color:var(--ink)}
+.btn-cta:hover{background:var(--cta-hover); color:var(--ink)}
+.btn-primary{background:var(--primary); color:#fff}
+.btn-primary:hover{background:var(--primary-hover); color:#fff}
+.btn-outline{background:transparent; border-color:var(--primary); color:var(--primary)}
+.btn-outline:hover{background:var(--primary-light); color:var(--primary-hover)}
+.btn-ghost{background:transparent; color:var(--ink-muted)}
+.btn-ghost:hover{color:var(--ink)}
+.btn-sm{min-height:32px; padding:6px 14px; font-size:.875rem}
+
+/* ---- Pills ---- */
+.pill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:3px 12px; border-radius:var(--r-pill);
+  font-size:.8125rem; font-weight:600; line-height:1.4;
+}
+.pill::before{content:""; width:7px; height:7px; border-radius:50%; background:currentColor}
+.pill-active{background:rgba(46,158,91,.12); color:#2E9E5B}
+.pill-soon{background:rgba(242,169,59,.14); color:var(--cta-hover)}
+.pill-muted{background:#EDEFEA; color:var(--ink-muted)}
+
+/* ---- Header ---- */
+.site-header{
+  position:sticky; top:0; z-index:100; background:#fff;
+  border-bottom:1px solid rgba(27,33,29,.08);
+  height:var(--header-h); transition:height .15s ease-out;
+}
+.site-header.scrolled{--header-h:60px; box-shadow:0 2px 12px rgba(22,56,42,.06)}
+.header-in{display:flex; align-items:center; gap:28px; height:100%}
+.logo{display:inline-flex; align-items:center; gap:10px; font-family:var(--font-head); font-weight:800; font-size:1.375rem; color:var(--primary-dark); text-decoration:none; letter-spacing:-.01em; white-space:nowrap}
+.logo .icon{font-size:26px; color:var(--primary)}
+.main-nav{display:flex; align-items:center; gap:4px; margin-right:auto}
+.nav-link{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:10px 12px; border-radius:8px; text-decoration:none;
+  color:var(--ink); font-weight:600; font-size:1rem; white-space:nowrap;
+  background:none; border:0;
+}
+.nav-link:hover{background:var(--bg-mist); color:var(--primary)}
+.nav-link[aria-current=page]{color:var(--primary); background:var(--primary-light)}
+.header-side{display:flex; align-items:center; gap:14px}
+.header-side .btn{min-height:40px; padding:8px 18px; white-space:nowrap}
+.menu-btn{display:none; background:none; border:0; padding:8px; color:var(--ink)}
+
+/* ---- Mobile drawer ---- */
+.drawer{
+  position:fixed; inset:0 0 0 auto; width:min(360px,92vw); z-index:150;
+  background:#fff; transform:translateX(100%); transition:transform .2s cubic-bezier(.4,0,.2,1);
+  display:flex; flex-direction:column; visibility:hidden;
+}
+body.drawer-open .drawer{transform:none; visibility:visible}
+body.drawer-open{overflow:hidden}
+.drawer-backdrop{position:fixed; inset:0; z-index:140; background:rgba(22,56,42,.4); opacity:0; visibility:hidden; transition:opacity .2s}
+body.drawer-open .drawer-backdrop{opacity:1; visibility:visible}
+.drawer-head{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); height:56px}
+.drawer-head .logo{font-size:1.25rem}
+.drawer-body{flex:1; overflow-y:auto; padding:8px}
+.drawer-body > a.drawer-direct{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 8px; border-bottom:1px solid var(--border); font-weight:600; color:var(--ink); text-decoration:none;
+}
+.drawer-body > a.drawer-direct:hover{color:var(--primary)}
+.drawer-body > a.drawer-direct[aria-current=page]{color:var(--primary)}
+.drawer-footer{padding:16px; border-top:1px solid var(--border); display:grid; gap:10px}
+
+/* ---- Page head + tabs ---- */
+.page-head{background:var(--bg-mist); padding-block:48px 40px; scroll-margin-top:var(--header-h)}
+.page-head h1{margin-bottom:10px}
+.page-summary{color:var(--ink-muted); font-size:1.125rem; max-width:52em; margin:0}
+.tabs-wrap{background:#fff; border-bottom:1px solid var(--border)}
+.tabs{display:flex; gap:8px; overflow-x:auto; padding-block:16px; scrollbar-width:thin}
+.tab{
+  display:inline-flex; align-items:center; gap:8px; flex:none;
+  padding:9px 16px; border:1px solid var(--border); border-radius:var(--r-pill);
+  background:#fff; color:var(--ink); font-weight:600; font-size:.9375rem;
+  transition:background-color .15s ease-out, color .15s ease-out, border-color .15s ease-out;
+  scroll-margin-top:calc(var(--header-h) + 16px);
+}
+.tab:hover{border-color:var(--primary); color:var(--primary)}
+.tab.active{background:var(--primary); border-color:var(--primary); color:#fff}
+.tab-count{background:var(--bg-mist); color:var(--ink-muted); border-radius:var(--r-pill); padding:1px 9px; font-size:.75rem; font-weight:500}
+.tab.active .tab-count{background:rgba(255,255,255,.2); color:#fff}
+
+/* ---- Listing layout ---- */
+.listing{padding-block:32px 64px}
+.listing-grid{display:grid; grid-template-columns:280px minmax(0,1fr); gap:32px; align-items:start}
+.listing-main{display:flex; flex-direction:column; gap:20px; min-width:0}
+
+/* ---- Toolbar ---- */
+.toolbar{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+.view-toggle{display:inline-flex; border:1px solid var(--border); border-radius:var(--r-btn); overflow:hidden}
+.view-btn{
+  display:inline-flex; align-items:center; gap:7px; border:0; background:#fff;
+  padding:9px 16px; font-weight:600; font-size:.9375rem; color:var(--ink-muted);
+}
+.view-btn .icon{font-size:15px}
+.view-btn[aria-pressed=true]{background:var(--primary); color:#fff}
+.sort-label{display:inline-flex; align-items:center; gap:8px; margin-left:auto; font-size:.875rem; font-weight:600; color:var(--ink-muted)}
+.sort-label select{
+  min-height:40px; padding:8px 12px; border:1px solid var(--border); border-radius:var(--r-btn);
+  background:#fff; color:var(--ink); font-weight:500;
+}
+.filters-toggle{display:none}
+
+/* ---- Filter sidebar ---- */
+.filters{
+  background:#fff; border:1px solid var(--border); border-radius:var(--r-card);
+  box-shadow:var(--shadow-card); padding:24px;
+  position:sticky; top:calc(var(--header-h) + 24px);
+  max-height:calc(100vh - var(--header-h) - 48px); overflow-y:auto;
+}
+.filters-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px}
+.filters-head h2{font-size:1.125rem; margin:0}
+.f-badge{background:var(--primary-light); color:var(--primary-hover); border-radius:var(--r-pill); padding:1px 9px; font-size:.8125rem; font-weight:500}
+.filters-close{display:none; background:none; border:0; padding:6px; color:var(--ink)}
+.field{margin-bottom:16px}
+.field label, .f-label{display:block; font-size:.8125rem; font-weight:600; margin-bottom:6px}
+.field select, .field input[type=number], .field input[type=email]{
+  width:100%; min-height:44px; padding:10px 14px;
+  border:1px solid var(--border); border-radius:var(--r-btn);
+  background:#fff; color:var(--ink); transition:border-color .15s ease-out;
+}
+.field select:disabled{background:var(--bg-mist); color:var(--ink-muted)}
+.field select:focus-visible,.field input:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.field .hint{font-size:.8125rem; color:var(--ink-muted); margin:5px 0 0}
+.range{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.f-group{margin-bottom:16px}
+.chips{display:flex; flex-wrap:wrap; gap:6px}
+.chip{
+  border:1px solid var(--border); background:#fff; color:var(--ink);
+  border-radius:var(--r-pill); padding:4px 12px;
+  font-size:.8125rem; font-weight:600;
+  transition:background-color .15s ease-out, color .15s ease-out, border-color .15s ease-out;
+}
+.chip:hover{border-color:var(--primary); color:var(--primary)}
+.chip[aria-pressed=true]{background:var(--primary); border-color:var(--primary); color:#fff}
+.filters-actions{display:grid; gap:10px; margin-top:20px; padding-top:18px; border-top:1px solid var(--border)}
+.filters-actions .btn{width:100%}
+.sub-form{margin-top:14px; padding:16px; background:var(--bg-mist); border-radius:var(--r-btn)}
+.sub-form .field:last-of-type{margin-bottom:12px}
+.consent{display:flex; gap:10px; align-items:flex-start}
+.consent input{width:18px; height:18px; margin-top:2px; accent-color:var(--primary); flex:none}
+.consent label{font-size:.8125rem; color:var(--ink-muted); line-height:1.5; font-weight:400; margin:0}
+
+/* ---- LotCard grid ---- */
+.lotgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:24px}
+.lotcard{
+  display:flex; flex-direction:column; background:#fff; border:1px solid var(--border);
+  border-radius:var(--r-card); overflow:hidden; text-decoration:none; color:var(--ink);
+  box-shadow:var(--shadow-card);
+  transition:transform .15s ease-out, box-shadow .15s ease-out;
+}
+.lotcard:hover{transform:translateY(-2px); box-shadow:var(--shadow-hover); color:var(--ink)}
+.lot-media{position:relative; aspect-ratio:16/10; background:var(--bg-mist); overflow:hidden}
+.lot-media img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+.lot-flag{
+  position:absolute; top:12px; left:12px; z-index:1;
+  display:inline-flex; align-items:center; gap:6px;
+  background:var(--cta); color:var(--ink);
+  border-radius:var(--r-pill); padding:3px 12px;
+  font-size:.8125rem; font-weight:600;
+}
+.lot-flag .icon{font-size:13px}
+.lot-body{display:flex; flex-direction:column; gap:8px; padding:20px 22px; flex:1}
+.lot-top{display:flex; align-items:center; justify-content:space-between; gap:10px}
+.lot-type{font-size:.75rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-muted)}
+.lot-name{font-size:1.125rem; line-height:1.35; margin:0}
+.lot-cad{font-size:.9375rem; color:var(--ink); font-weight:500}
+.lot-meta{display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.875rem; color:var(--ink-muted)}
+.lot-price{font-size:1.25rem; font-weight:500; color:var(--cta-hover); margin-top:auto; padding-top:6px}
+.lot-price small{display:block; font-family:var(--font-body); font-size:.75rem; font-weight:500; color:var(--ink-muted); letter-spacing:.02em; text-transform:uppercase}
+.countdown{display:flex; align-items:baseline; gap:8px; margin:0; padding-top:6px; border-top:1px solid var(--border)}
+.cd-label{font-size:.75rem; color:var(--ink-muted)}
+.cd-time{font-size:.9375rem; font-weight:500}
+.countdown.warn .cd-time{color:var(--cta-hover)}
+.countdown.warn .cd-label{color:var(--cta-hover)}
+.countdown.crit .cd-time{color:var(--danger); animation:cd-pulse 1s ease infinite}
+.countdown.crit .cd-label{color:var(--danger)}
+@keyframes cd-pulse{50%{opacity:.55}}
+
+/* ---- Empty states ---- */
+.empty-state{
+  display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center;
+  background:var(--primary-light); border-radius:var(--r-card); padding:48px 28px;
+}
+.empty-state .icon{font-size:32px; color:var(--primary)}
+.empty-state h2{font-size:1.375rem; margin:4px 0 0}
+.empty-state p{color:var(--ink-muted); margin:0 0 10px; max-width:34em}
+
+/* ---- Pagination ---- */
+.pagination{display:flex; align-items:center; gap:6px; justify-content:center; margin-top:8px}
+.page-btn{
+  min-width:40px; height:40px; padding:0 10px; border:1px solid var(--border); border-radius:var(--r-btn);
+  background:#fff; color:var(--ink); font-weight:600; font-size:.9375rem;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.page-btn .icon{font-size:14px}
+.page-btn:hover{border-color:var(--primary); color:var(--primary)}
+.page-btn.active{background:var(--primary); border-color:var(--primary); color:#fff}
+.page-ellipsis{color:var(--ink-muted); padding:0 2px}
+
+/* ---- Map view ---- */
+.map-section{display:none}
+.listing-main.map-on .map-section{display:block}
+.listing-main.map-on .lotgrid,
+.listing-main.map-on .pagination{display:none}
+.map-wrap{
+  position:relative; border:1px solid var(--border); border-radius:var(--r-hero);
+  overflow:hidden; background:#E9F1F7; box-shadow:var(--shadow-card);
+}
+.map-wrap > svg{width:100%; height:auto}
+.map-legend{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:12px 16px; border-top:1px solid var(--border); background:#fff;
+  font-size:.8125rem; color:var(--ink-muted);
+}
+.map-legend .icon{font-size:15px; color:var(--primary)}
+.pin{
+  position:absolute; width:32px; height:32px; margin:-28px 0 0 -16px;
+  background:none; border:0; padding:0; color:var(--primary);
+  filter:drop-shadow(0 2px 3px rgba(22,56,42,.35));
+  transition:transform .15s ease-out;
+}
+.pin .icon{font-size:30px}
+.pin:hover{transform:scale(1.15)}
+.pin.active{color:var(--cta)}
+.map-popup{
+  position:absolute; z-index:5; width:280px;
+  background:#fff; border-radius:var(--r-card); box-shadow:var(--shadow-modal);
+  padding:18px; display:none; transform:translate(-50%,-100%);
+}
+.map-popup.open{display:block}
+.map-popup.below{transform:translate(-50%,0)}
+.map-popup h3{font-size:1.0625rem; margin:0 24px 8px 0; line-height:1.35}
+.pop-list{margin:0 0 14px; display:grid; gap:5px}
+.pop-list > div{display:flex; justify-content:space-between; gap:12px; font-size:.875rem}
+.pop-list dt{color:var(--ink-muted)}
+.pop-list dd{margin:0; font-weight:600; text-align:right}
+.popup-close{
+  position:absolute; top:10px; right:10px; background:none; border:0;
+  padding:6px; color:var(--ink-muted);
+}
+.popup-close:hover{color:var(--ink)}
+
+/* ---- Footer ---- */
+.site-footer{background:var(--primary-dark); color:#fff; padding-block:64px 32px}
+.footer-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:32px; margin-bottom:48px}
+.footer-grid h4{color:#fff; margin-bottom:14px}
+.footer-grid a{display:block; color:rgba(255,255,255,.72); text-decoration:none; padding:5px 0; font-size:.9375rem}
+.footer-grid a:hover{color:#fff}
+.social-row{display:flex; gap:10px}
+.social-row a{
+  width:40px; height:40px; padding:0; border-radius:50%;
+  border:1px solid rgba(255,255,255,.25);
+  display:flex; align-items:center; justify-content:center;
+}
+.social-row a:hover{border-color:#fff; background:rgba(255,255,255,.08)}
+.social-row .icon{font-size:18px}
+.footer-bottom{
+  border-top:1px solid rgba(255,255,255,.14); padding-top:24px;
+  display:flex; flex-wrap:wrap; gap:8px 24px; align-items:center;
+  font-size:.875rem; color:rgba(255,255,255,.72);
+}
+.footer-bottom a{color:rgba(255,255,255,.72)}
+.footer-bottom a:hover{color:#fff}
+.footer-bottom .spacer{margin-left:auto}
+
+/* ---- Cookie banner ---- */
+.cookie{
+  position:fixed; z-index:130; left:16px; right:16px; bottom:16px;
+  margin-inline:auto; max-width:880px;
+  background:#fff; border-radius:var(--r-card); box-shadow:var(--shadow-modal);
+  padding:20px 24px; display:flex; gap:20px; align-items:center; flex-wrap:wrap;
+}
+.cookie p{margin:0; font-size:.875rem; color:var(--ink-muted); flex:1 1 320px}
+.cookie p b{color:var(--ink)}
+.cookie-actions{display:flex; gap:10px; flex-wrap:wrap}
+.cookie.hidden{display:none}
+
+/* ---- Toast ---- */
+.toast{
+  position:fixed; z-index:160; right:20px; bottom:20px; max-width:360px;
+  background:var(--primary-dark); color:#fff; border-radius:var(--r-btn);
+  box-shadow:var(--shadow-modal); padding:14px 18px;
+  display:flex; gap:10px; align-items:flex-start; font-size:.9375rem;
+  opacity:0; visibility:hidden; transform:translateY(12px);
+  transition:opacity .3s var(--ease-reveal), transform .3s var(--ease-reveal), visibility 0s .3s;
+}
+.toast.show{opacity:1; visibility:visible; transform:none; transition-delay:0s}
+.toast .icon{font-size:18px; color:var(--accent); margin-top:2px}
+
+/* ---- Reveal ---- */
+.js .reveal{opacity:0; transform:translateY(14px); transition:opacity .3s var(--ease-reveal), transform .3s var(--ease-reveal)}
+.js .reveal.in{opacity:1; transform:none}
+
+/* ---- Responsive ---- */
+@media (max-width:1080px){
+  .main-nav{display:none}
+  .menu-btn{display:inline-flex}
+  .header-side .btn-outline{display:none}
+}
+@media (max-width:768px){
+  h1{font-size:2.125rem}
+  h2{font-size:1.75rem}
+  h3{font-size:1.25rem}
+  .section{padding-block:40px}
+  .page-head{padding-block:32px 28px}
+  .page-summary{font-size:1rem}
+  .listing{padding-block:24px 48px}
+  .listing-grid{display:block}
+  .filters{
+    position:fixed; inset:0 0 0 auto; width:min(360px,92vw); z-index:150;
+    border-radius:0; max-height:none; overflow-y:auto;
+    transform:translateX(100%); transition:transform .2s cubic-bezier(.4,0,.2,1);
+  }
+  body.filters-open .filters{transform:none}
+  body.filters-open{overflow:hidden}
+  .filters-backdrop{position:fixed; inset:0; z-index:140; background:rgba(22,56,42,.4); opacity:0; visibility:hidden; transition:opacity .2s}
+  body.filters-open .filters-backdrop{opacity:1; visibility:visible}
+  .filters-close{display:inline-flex}
+  .filters-toggle{display:inline-flex}
+  .sort-label{margin-left:0; width:100%}
+  .sort-label select{flex:1}
+  .lotgrid{grid-template-columns:1fr; gap:14px}
+  .lot-body{padding:16px 18px}
+  .footer-grid{grid-template-columns:repeat(2,1fr)}
+  .cookie{flex-direction:column; align-items:stretch}
+  .cookie-actions .btn{flex:1 1 auto}
+  .map-popup{width:240px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important; transition-duration:.01ms!important; scroll-behavior:auto!important}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#sisu">Otse sisuni</a>
+
+<!-- ============ HEADER ============ -->
+<header class="site-header" id="header">
+  <div class="container header-in">
+    <a class="logo" href="01-listing.html" aria-label="Erametsad Oksjonid — avaleht">
+      <i class="icon fa-solid fa-tree" aria-hidden="true"></i>Erametsad Oksjonid
+    </a>
+    <nav class="main-nav" aria-label="Peamenüü">
+      <a class="nav-link" href="01-listing.html" aria-current="page">Kõik oksjonid</a>
+      <a class="nav-link" href="01-listing.html#raieoigused">Raieõigused</a>
+      <a class="nav-link" href="01-listing.html#metskinnistud">Metskinnistud</a>
+      <a class="nav-link" href="04-ajalugu.html">Ajalugu</a>
+      <a class="nav-link" href="../marketing/kkk.html">KKK</a>
+      <a class="nav-link" href="../marketing/kontakt.html">Kontakt</a>
+    </nav>
+    <div class="header-side">
+      <a class="btn btn-outline" href="05-login.html">Logi sisse</a>
+      <a class="btn btn-cta" href="../marketing/teenused-raieoiguse-muuk.html">Paku oma metsa</a>
+      <button class="menu-btn" id="menuOpen" aria-expanded="false" aria-controls="drawer" aria-label="Ava menüü">
+        <i class="icon fa-solid fa-bars" style="font-size:26px" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Mobile drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+<aside class="drawer" id="drawer" aria-label="Mobiilmenüü" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="logo"><i class="icon fa-solid fa-tree" aria-hidden="true"></i>Erametsad Oksjonid</span>
+    <button class="menu-btn" id="menuClose" style="display:inline-flex" aria-label="Sulge menüü">
+      <i class="icon fa-solid fa-xmark" style="font-size:24px" aria-hidden="true"></i>
+    </button>
+  </div>
+  <div class="drawer-body">
+    <a class="drawer-direct" href="01-listing.html" aria-current="page">Kõik oksjonid <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="01-listing.html#raieoigused">Raieõigused <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="01-listing.html#metskinnistud">Metskinnistud <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="04-ajalugu.html">Ajalugu <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="../marketing/kkk.html">KKK <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="../marketing/kontakt.html">Kontakt <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+  </div>
+  <div class="drawer-footer">
+    <a class="btn btn-cta" href="../marketing/teenused-raieoiguse-muuk.html">Paku oma metsa</a>
+    <a class="btn btn-outline" href="05-login.html">Logi sisse</a>
+  </div>
+</aside>
+
+<main id="sisu">
+
+<!-- ============ Page head ============ -->
+<section class="page-head" aria-labelledby="pageTitle">
+  <div class="container">
+    <h1 id="pageTitle">Raieõiguste oksjonid</h1>
+    <p class="page-summary" id="pageSummary">Hetkel on aktiivseid raieõiguste oksjoneid 18, kokku 94 ha raiutavat mahtu 11 976 m³ ja 428 700 € väärtuses.</p>
+  </div>
+</section>
+
+<!-- ============ Tabs ============ -->
+<div class="tabs-wrap">
+  <div class="container">
+    <div class="tabs" role="tablist" aria-label="Oksjonide tüübid">
+      <button class="tab active" role="tab" id="raieoigused" data-tab="raieoigused" aria-selected="true">Raieõigused <span class="tab-count mono">156</span></button>
+      <button class="tab" role="tab" id="metskinnistud" data-tab="metskinnistud" aria-selected="false">Metskinnistud <span class="tab-count mono">24</span></button>
+      <button class="tab" role="tab" id="polumaad" data-tab="polumaad" aria-selected="false">Põllumaad <span class="tab-count mono">3</span></button>
+      <button class="tab" role="tab" id="paketid" data-tab="paketid" aria-selected="false">Paketid <span class="tab-count mono">1</span></button>
+      <button class="tab" role="tab" id="kiiroksjonid" data-tab="kiiroksjonid" aria-selected="false">Kiiroksjonid <span class="tab-count mono">0</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Listing ============ -->
+<section class="listing" id="listingSection">
+  <div class="container">
+    <div class="listing-grid">
+
+      <!-- Filter sidebar -->
+      <aside class="filters" id="filters" aria-label="Oksjonite filtrid">
+        <div class="filters-head">
+          <h2>Filtrid <span class="f-badge mono" id="filterCount">(3)</span></h2>
+          <button class="filters-close" id="filtersClose" aria-label="Sulge filtrid">
+            <i class="icon fa-solid fa-xmark" style="font-size:22px" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="field">
+          <label for="fMaakond">Maakond</label>
+          <select id="fMaakond">
+            <option value="">Kõik maakonnad</option>
+            <option>Harju maakond</option>
+            <option>Hiiu maakond</option>
+            <option>Ida-Viru maakond</option>
+            <option>Jõgeva maakond</option>
+            <option>Järva maakond</option>
+            <option>Lääne maakond</option>
+            <option>Lääne-Viru maakond</option>
+            <option>Põlva maakond</option>
+            <option>Pärnu maakond</option>
+            <option>Rapla maakond</option>
+            <option>Saare maakond</option>
+            <option>Tartu maakond</option>
+            <option>Valga maakond</option>
+            <option>Viljandi maakond</option>
+            <option>Võru maakond</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="fVald">Vald</label>
+          <select id="fVald" disabled>
+            <option value="">Kõik vallad</option>
+          </select>
+          <p class="hint">Vali kõigepealt maakond.</p>
+        </div>
+
+        <div class="f-group">
+          <span class="f-label" id="speciesLabel">Puuliigid</span>
+          <div class="chips" role="group" aria-labelledby="speciesLabel">
+            <button type="button" class="chip" data-group="species" data-value="MA" title="Mänd" aria-pressed="true">MA</button>
+            <button type="button" class="chip" data-group="species" data-value="KU" title="Kuusk" aria-pressed="true">KU</button>
+            <button type="button" class="chip" data-group="species" data-value="KS" title="Kask" aria-pressed="false">KS</button>
+            <button type="button" class="chip" data-group="species" data-value="HB" title="Haab" aria-pressed="false">HB</button>
+            <button type="button" class="chip" data-group="species" data-value="LM" title="Lehis" aria-pressed="false">LM</button>
+            <button type="button" class="chip" data-group="species" data-value="SA" title="Saar" aria-pressed="false">SA</button>
+          </div>
+        </div>
+
+        <div class="f-group">
+          <span class="f-label" id="cutLabel">Raieliigid</span>
+          <div class="chips" role="group" aria-labelledby="cutLabel">
+            <button type="button" class="chip" data-group="cut" data-value="VR" title="Raieliik VR" aria-pressed="false">VR</button>
+            <button type="button" class="chip" data-group="cut" data-value="HR" title="Harvendusraie" aria-pressed="false">HR</button>
+            <button type="button" class="chip" data-group="cut" data-value="SR" title="Sanitaarraie" aria-pressed="false">SR</button>
+            <button type="button" class="chip" data-group="cut" data-value="LR" title="Lageraie" aria-pressed="false">LR</button>
+            <button type="button" class="chip" data-group="cut" data-value="RD" title="Rekonstruktsiooniraie" aria-pressed="false">RD</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="fAreaMin">Pindala (ha)</label>
+          <div class="range">
+            <input type="number" id="fAreaMin" min="0" placeholder="min" aria-label="Pindala miinimum">
+            <input type="number" id="fAreaMax" min="0" placeholder="max" aria-label="Pindala maksimum">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="fPriceMin">Hind (€)</label>
+          <div class="range">
+            <input type="number" id="fPriceMin" min="0" step="100" placeholder="min" aria-label="Hinna miinimum">
+            <input type="number" id="fPriceMax" min="0" step="100" placeholder="max" aria-label="Hinna maksimum">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="fAasta">Raietähtaeg (aasta)</label>
+          <select id="fAasta">
+            <option value="">Kõik</option>
+            <option value="2026" selected>2026</option>
+            <option value="2027">2027</option>
+            <option value="2028">2028</option>
+          </select>
+        </div>
+
+        <div class="filters-actions">
+          <button type="button" class="btn btn-outline" id="clearFilters"><i class="icon fa-solid fa-rotate-left" aria-hidden="true"></i> Tühjenda</button>
+          <button type="button" class="btn btn-primary" id="subToggle" aria-expanded="false" aria-controls="subForm"><i class="icon fa-solid fa-bell" aria-hidden="true"></i> Telli teavitus</button>
+        </div>
+
+        <div class="sub-form" id="subForm" hidden>
+          <div class="field">
+            <label for="subEmail">E-post</label>
+            <input type="email" id="subEmail" autocomplete="email" placeholder="sinu@email.ee">
+          </div>
+          <div class="field consent">
+            <input type="checkbox" id="subConsent">
+            <label for="subConsent">Nõustun, et Erametsad töötleb mu isikuandmeid sobivate oksjonite teavitamiseks.</label>
+          </div>
+          <button class="btn btn-cta" type="button" id="subSubmit">Telli teavitus</button>
+        </div>
+      </aside>
+
+      <!-- Results -->
+      <div class="listing-main" id="listingMain">
+
+        <div class="toolbar reveal">
+          <div class="view-toggle" role="group" aria-label="Vaade">
+            <button class="view-btn" data-view="map" aria-pressed="false"><i class="icon fa-solid fa-map" aria-hidden="true"></i> Kaardivaade</button>
+            <button class="view-btn" data-view="list" aria-pressed="true"><i class="icon fa-solid fa-list" aria-hidden="true"></i> Loendivaade</button>
+          </div>
+          <button class="btn btn-outline filters-toggle" id="filtersOpen" aria-expanded="false" aria-controls="filters">Filtrid <span class="f-badge mono" id="filterCountM">(3)</span></button>
+          <label class="sort-label" for="sortSelect">Sorteeri
+            <select id="sortSelect">
+              <option value="endAsc" selected>Varem lõppevad eespool</option>
+              <option value="endDesc">Hiljem lõppevad eespool</option>
+              <option value="priceAsc">Alghind kasvavalt</option>
+              <option value="priceDesc">Alghind kahanevalt</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="map-section">
+          <div class="map-wrap" id="mapWrap">
+            <svg viewBox="0 0 640 380" role="img" aria-label="Eesti kaart oksjonite asukohtadega">
+              <path fill="#DCE7DF" stroke="#B9CCC0" stroke-width="1.5" d="M118 86 L170 74 L230 66 L300 60 L356 54 L398 50 L416 70 L420 96 L404 150 L396 190 L418 238 L428 262 L398 282 L352 290 L310 280 L268 288 L224 278 L186 284 L158 268 L150 246 L128 238 L108 222 L96 196 L100 168 L86 142 L96 116 L110 98 Z"/>
+              <path fill="#DCE7DF" stroke="#B9CCC0" stroke-width="1.5" d="M28 150 L60 140 L78 158 L70 186 L44 198 L24 180 Z"/>
+              <path fill="#DCE7DF" stroke="#B9CCC0" stroke-width="1.5" d="M58 96 L84 92 L92 112 L66 122 Z"/>
+              <ellipse cx="88" cy="152" rx="8" ry="5" fill="#DCE7DF" stroke="#B9CCC0"/>
+              <ellipse cx="104" cy="122" rx="6" ry="4" fill="#DCE7DF" stroke="#B9CCC0"/>
+              <g fill="#8FA89A">
+                <circle cx="250" cy="64" r="3"/><circle cx="322" cy="72" r="3"/><circle cx="388" cy="74" r="3"/>
+                <circle cx="352" cy="168" r="3"/><circle cx="150" cy="226" r="3"/><circle cx="246" cy="190" r="3"/>
+                <circle cx="208" cy="120" r="3"/><circle cx="252" cy="120" r="3"/><circle cx="120" cy="118" r="3"/>
+                <circle cx="398" cy="240" r="3"/><circle cx="52" cy="168" r="3"/>
+              </g>
+              <g fill="#6B7570" font-size="11" font-family="Inter,system-ui,sans-serif" text-anchor="middle">
+                <text x="250" y="52">Tallinn</text>
+                <text x="352" y="156">Tartu</text>
+                <text x="150" y="244">Pärnu</text>
+              </g>
+            </svg>
+            <button class="pin" style="left:42.5%;top:24%" data-lot="0" aria-label="Kuuse ja männi raieõigus Valgemetsas — ava teave"><i class="icon fa-solid fa-location-dot" aria-hidden="true"></i></button>
+            <button class="pin" style="left:64%;top:61%" data-lot="1" aria-label="Segametsa raieõigus Moostel — ava teave"><i class="icon fa-solid fa-location-dot" aria-hidden="true"></i></button>
+            <button class="pin" style="left:55.6%;top:48%" data-lot="2" aria-label="Kuuse kasvandi raieõigus Kambjal — ava teave"><i class="icon fa-solid fa-location-dot" aria-hidden="true"></i></button>
+            <button class="pin" style="left:39%;top:52%" data-lot="3" aria-label="Männi raieõigus Olustveres — ava teave"><i class="icon fa-solid fa-location-dot" aria-hidden="true"></i></button>
+            <button class="pin" style="left:49.7%;top:22%" data-lot="4" aria-label="Haaviku raieõigus Haljalal — ava teave"><i class="icon fa-solid fa-location-dot" aria-hidden="true"></i></button>
+            <button class="pin" style="left:22.8%;top:66%" data-lot="5" aria-label="Rabamänniku harvendus Häädemeestel — ava teave"><i class="icon fa-solid fa-location-dot" aria-hidden="true"></i></button>
+            <button class="pin" style="left:9%;top:44%" data-lot="6" aria-label="Kuuse raieõigus Orissaarel — ava teave"><i class="icon fa-solid fa-location-dot" aria-hidden="true"></i></button>
+            <button class="pin" style="left:63%;top:67%" data-lot="7" aria-label="Segametsa raieõigus Rõuges — ava teave"><i class="icon fa-solid fa-location-dot" aria-hidden="true"></i></button>
+
+            <div class="map-popup" id="mapPopup" role="dialog" aria-label="Oksjoni andmed kaardil">
+              <button class="popup-close" id="popupClose" aria-label="Sulge teave"><i class="icon fa-solid fa-xmark" aria-hidden="true"></i></button>
+              <h3 id="popName"></h3>
+              <dl class="pop-list">
+                <div><dt>Pindala</dt><dd id="popArea"></dd></div>
+                <div><dt>Alghind</dt><dd id="popPrice" class="mono"></dd></div>
+                <div><dt>Katastritunnus</dt><dd id="popCad" class="mono"></dd></div>
+                <div><dt>Aega jäänud</dt><dd id="popTime" class="mono"></dd></div>
+              </dl>
+              <a class="btn btn-primary btn-sm" id="popLink" href="02-lot-detail-open.html">Vaata <i class="icon fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+            </div>
+          </div>
+          <p class="map-legend"><i class="icon fa-solid fa-circle-info" aria-hidden="true"></i> Stiliseeritud demo kaart — asukohad on näitlikud. Tootmises Leaflet + Maa-amet ortofoto.</p>
+        </div>
+
+        <div class="lotgrid stagger" id="lotGrid">
+
+          <a class="lotcard" href="02-lot-detail-open.html"
+             data-county="Harju maakond" data-vald="Kuusalu vald" data-species="MA,KU" data-cut="VR"
+             data-area="12.4" data-price="18000" data-year="2026" data-end="187920000">
+            <div class="lot-media">
+              <img src="https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?auto=format&fit=crop&w=800&q=70" alt="Kuuse ja männi noorem mets päikesepaistel" loading="lazy">
+            </div>
+            <div class="lot-body">
+              <div class="lot-top">
+                <span class="lot-type">Raieõigus</span>
+                <span class="pill pill-active">Aktiivne</span>
+              </div>
+              <h3 class="lot-name">Kuuse ja männi raieõigus Valgemetsas</h3>
+              <span class="lot-cad mono">77901:003:0410</span>
+              <div class="lot-meta"><span>12,4 ha</span><span>4 120 m³</span><span>Harju maakond</span></div>
+              <p class="lot-price mono"><small>Alghind</small>18 000 €</p>
+              <p class="countdown" data-remain="187920000" role="timer" aria-label="Aega jäänud">
+                <span class="cd-label">Aega jäänud</span>
+                <span class="cd-time mono">2p 04:12:00</span>
+              </p>
+            </div>
+          </a>
+
+          <a class="lotcard" href="02-lot-detail-open.html"
+             data-county="Põlva maakond" data-vald="Mooste vald" data-species="KS,KU" data-cut="HR"
+             data-area="23.1" data-price="15500" data-year="2026" data-end="872000">
+            <div class="lot-media">
+              <img src="https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=800&q=70" alt="Sügisene segamets rikkaliku alustaimestikuga" loading="lazy">
+            </div>
+            <div class="lot-body">
+              <div class="lot-top">
+                <span class="lot-type">Raieõigus</span>
+                <span class="pill pill-active">Aktiivne</span>
+              </div>
+              <h3 class="lot-name">Segametsa raieõigus Moostel</h3>
+              <span class="lot-cad mono">78512:004:0233</span>
+              <div class="lot-meta"><span>23,1 ha</span><span>3 480 m³</span><span>Põlva maakond</span></div>
+              <p class="lot-price mono"><small>Alghind</small>15 500 €</p>
+              <p class="countdown" data-remain="872000" role="timer" aria-label="Aega jäänud">
+                <span class="cd-label">Aega jäänud</span>
+                <span class="cd-time mono">0p 00:14:32</span>
+              </p>
+            </div>
+          </a>
+
+          <a class="lotcard" href="03-lot-detail-sealed.html"
+             data-county="Tartu maakond" data-vald="Kambja vald" data-species="KU" data-cut="SR"
+             data-area="9.8" data-price="11000" data-year="2026" data-end="108000000">
+            <div class="lot-media">
+              <img src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=800&q=70" alt="Uduine kuusemets varahommikul" loading="lazy">
+            </div>
+            <div class="lot-body">
+              <div class="lot-top">
+                <span class="lot-type">Raieõigus</span>
+                <span class="pill pill-active">Aktiivne</span>
+              </div>
+              <h3 class="lot-name">Kuuse kasvandi raieõigus Kambjal</h3>
+              <span class="lot-cad mono">70804:002:0117</span>
+              <div class="lot-meta"><span>9,8 ha</span><span>2 890 m³</span><span>Tartu maakond</span></div>
+              <p class="lot-price mono"><small>Alghind</small>11 000 €</p>
+              <p class="countdown" data-remain="108000000" role="timer" aria-label="Aega jäänud">
+                <span class="cd-label">Aega jäänud</span>
+                <span class="cd-time mono">1p 06:00:00</span>
+              </p>
+            </div>
+          </a>
+
+          <a class="lotcard" href="02-lot-detail-open.html"
+             data-county="Viljandi maakond" data-vald="Põhja-Sakala vald" data-species="MA" data-cut="VR"
+             data-area="17.2" data-price="24000" data-year="2026" data-end="290400000">
+            <div class="lot-media">
+              <img src="https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=800&q=70" alt="Sirgete tüvedega männik" loading="lazy">
+            </div>
+            <div class="lot-body">
+              <div class="lot-top">
+                <span class="lot-type">Raieõigus</span>
+                <span class="pill pill-active">Aktiivne</span>
+              </div>
+              <h3 class="lot-name">Männi raieõigus Olustveres</h3>
+              <span class="lot-cad mono">66503:001:0455</span>
+              <div class="lot-meta"><span>17,2 ha</span><span>5 240 m³</span><span>Viljandi maakond</span></div>
+              <p class="lot-price mono"><small>Alghind</small>24 000 €</p>
+              <p class="countdown" data-remain="290400000" role="timer" aria-label="Aega jäänud">
+                <span class="cd-label">Aega jäänud</span>
+                <span class="cd-time mono">3p 08:20:00</span>
+              </p>
+            </div>
+          </a>
+
+          <a class="lotcard" href="02-lot-detail-open.html"
+             data-county="Lääne-Viru maakond" data-vald="Haljala vald" data-species="HB,MA" data-cut="HR"
+             data-area="6.5" data-price="6200" data-year="2026" data-end="180000">
+            <div class="lot-media">
+              <span class="lot-flag"><i class="icon fa-solid fa-bolt" aria-hidden="true"></i>Kiiroksjon</span>
+              <img src="https://images.unsplash.com/photo-1425913397330-cf8af2ff40a1?auto=format&fit=crop&w=800&q=70" alt="Haavik kollaste sügislehtedega" loading="lazy">
+            </div>
+            <div class="lot-body">
+              <div class="lot-top">
+                <span class="lot-type">Raieõigus</span>
+                <span class="pill pill-active">Aktiivne</span>
+              </div>
+              <h3 class="lot-name">Haaviku raieõigus Haljalal</h3>
+              <span class="lot-cad mono">48201:005:0302</span>
+              <div class="lot-meta"><span>6,5 ha</span><span>1 850 m³</span><span>Lääne-Viru maakond</span></div>
+              <p class="lot-price mono"><small>Alghind</small>6 200 €</p>
+              <p class="countdown" data-remain="180000" role="timer" aria-label="Aega jäänud">
+                <span class="cd-label">Aega jäänud</span>
+                <span class="cd-time mono">0p 00:03:00</span>
+              </p>
+            </div>
+          </a>
+
+          <a class="lotcard" href="02-lot-detail-open.html"
+             data-county="Pärnu maakond" data-vald="Häädemeeste vald" data-species="MA" data-cut="HR"
+             data-area="14.8" data-price="9800" data-year="2026" data-end="444710000">
+            <div class="lot-media">
+              <img src="https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?auto=format&fit=crop&w=800&q=70" alt="Rabamännik laialdasel sool" loading="lazy">
+            </div>
+            <div class="lot-body">
+              <div class="lot-top">
+                <span class="lot-type">Raieõigus</span>
+                <span class="pill pill-active">Aktiivne</span>
+              </div>
+              <h3 class="lot-name">Rabamänniku harvendus Häädemeestel</h3>
+              <span class="lot-cad mono">51807:003:0198</span>
+              <div class="lot-meta"><span>14,8 ha</span><span>2 610 m³</span><span>Pärnu maakond</span></div>
+              <p class="lot-price mono"><small>Alghind</small>9 800 €</p>
+              <p class="countdown" data-remain="444710000" role="timer" aria-label="Aega jäänud">
+                <span class="cd-label">Aega jäänud</span>
+                <span class="cd-time mono">5p 02:45:10</span>
+              </p>
+            </div>
+          </a>
+
+          <a class="lotcard" href="02-lot-detail-open.html"
+             data-county="Saare maakond" data-vald="Saaremaa vald" data-species="KU" data-cut="SR"
+             data-area="8.3" data-price="12400" data-year="2026" data-end="3500000">
+            <div class="lot-media">
+              <img src="https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=800&q=70" alt="Kuusemets saarerannikul" loading="lazy">
+            </div>
+            <div class="lot-body">
+              <div class="lot-top">
+                <span class="lot-type">Raieõigus</span>
+                <span class="pill pill-active">Aktiivne</span>
+              </div>
+              <h3 class="lot-name">Kuuse raieõigus Orissaarel</h3>
+              <span class="lot-cad mono">35301:002:0187</span>
+              <div class="lot-meta"><span>8,3 ha</span><span>2 340 m³</span><span>Saare maakond</span></div>
+              <p class="lot-price mono"><small>Alghind</small>12 400 €</p>
+              <p class="countdown" data-remain="3500000" role="timer" aria-label="Aega jäänud">
+                <span class="cd-label">Aega jäänud</span>
+                <span class="cd-time mono">0p 00:58:20</span>
+              </p>
+            </div>
+          </a>
+
+          <a class="lotcard" href="02-lot-detail-open.html"
+             data-county="Võru maakond" data-vald="Rõuge vald" data-species="MA,KU,KS" data-cut="VR"
+             data-area="19.6" data-price="20500" data-year="2026" data-end="561600000">
+            <div class="lot-media">
+              <img src="https://images.unsplash.com/photo-1476231682828-37e571bc172f?auto=format&fit=crop&w=800&q=70" alt="Lai vaade segametsale" loading="lazy">
+            </div>
+            <div class="lot-body">
+              <div class="lot-top">
+                <span class="lot-type">Raieõigus</span>
+                <span class="pill pill-active">Aktiivne</span>
+              </div>
+              <h3 class="lot-name">Segametsa raieõigus Rõuges</h3>
+              <span class="lot-cad mono">99402:001:0661</span>
+              <div class="lot-meta"><span>19,6 ha</span><span>4 730 m³</span><span>Võru maakond</span></div>
+              <p class="lot-price mono"><small>Alghind</small>20 500 €</p>
+              <p class="countdown" data-remain="561600000" role="timer" aria-label="Aega jäänud">
+                <span class="cd-label">Aega jäänud</span>
+                <span class="cd-time mono">6p 11:30:00</span>
+              </p>
+            </div>
+          </a>
+
+        </div>
+
+        <div class="empty-state" id="emptyFilters" hidden>
+          <i class="icon fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
+          <h2>Filtritele ei vasta ükski oksjon</h2>
+          <p>Muuda filtreid laiemaks või tühjenda need — uusi oksjoneid lisandub iga nädal.</p>
+          <button class="btn btn-outline" id="clearFilters2">Tühjenda filtrid</button>
+        </div>
+
+        <nav class="pagination" aria-label="Leheküljed">
+          <button class="page-btn" data-page="prev" aria-label="Eelmine leht"><i class="icon fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+          <button class="page-btn active" aria-current="page">1</button>
+          <button class="page-btn">2</button>
+          <button class="page-btn">3</button>
+          <span class="page-ellipsis">…</span>
+          <button class="page-btn">8</button>
+          <button class="page-btn" data-page="next" aria-label="Järgmine leht"><i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+        </nav>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Kiiroksjonid empty state ============ -->
+<section class="section" id="kiiroEmpty" hidden aria-labelledby="kiiroEmpty-h">
+  <div class="container">
+    <div class="empty-state">
+      <i class="icon fa-solid fa-bolt" aria-hidden="true"></i>
+      <h2 id="kiiroEmpty-h">Hetkel ei ole käimasolevaid kiiroksjoneid.</h2>
+      <p>Kiiroksjon on lühikese tähtajaga oksjon — sageli vaid 24 tundi. Jälgi lehte või loe, kuidas kiiroksjon toimib.</p>
+      <a class="btn btn-primary" href="../marketing/kiiroksjon.html">Kuidas kiiroksjon toimib</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ Footer ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <h4>Oksjonid</h4>
+        <a href="01-listing.html#raieoigused">Raieõigused</a>
+        <a href="01-listing.html#metskinnistud">Metskinnistud</a>
+        <a href="01-listing.html#polumaad">Põllumaad</a>
+        <a href="01-listing.html#paketid">Paketid</a>
+        <a href="01-listing.html#kiiroksjonid">Kiiroksjonid</a>
+      </div>
+      <div>
+        <h4>Ajalugu</h4>
+        <a href="04-ajalugu.html">Lõppenud oksjonid</a>
+        <a href="04-ajalugu.html">Tulemused</a>
+      </div>
+      <div>
+        <h4>Erametsad</h4>
+        <a href="../marketing/home.html">Metsa müümine</a>
+        <a href="../marketing/hindamisaktid.html">Hindamisaktid</a>
+        <a href="../marketing/metsateatis.html">Metsateatis</a>
+        <a href="../marketing/meist-metsaspetsialistid.html">Metsaspetsialistid</a>
+        <a href="../marketing/kkk.html">KKK</a>
+      </div>
+      <div>
+        <h4>Jälgi meid</h4>
+        <div class="social-row">
+          <a href="https://facebook.com/erametsad" target="_blank" rel="noopener" aria-label="Facebook"><i class="icon fa-brands fa-facebook-f" aria-hidden="true"></i></a>
+          <a href="https://instagram.com/erametsad" target="_blank" rel="noopener" aria-label="Instagram"><i class="icon fa-brands fa-instagram" aria-hidden="true"></i></a>
+          <a href="https://youtube.com/@erametsad" target="_blank" rel="noopener" aria-label="YouTube"><i class="icon fa-brands fa-youtube" aria-hidden="true"></i></a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Erametsad OÜ</span>
+      <span class="spacer"></span>
+      <a href="#">Privaatsuspoliitika</a>
+      <a href="#" id="cookieSettingsLink">Küpsisesätted</a>
+    </div>
+  </div>
+</footer>
+
+<!-- Filters drawer backdrop (mobile) -->
+<div class="filters-backdrop" id="filtersBackdrop" hidden></div>
+
+<!-- Cookie banner -->
+<div class="cookie" id="cookie" role="region" aria-label="Küpsiste teavitus">
+  <p><b>Kasutame küpsiseid.</b> Vajalikud küpsised tagavad lehe toimimise, analüütika abil mõõdame liiklust. Vali, mida lubad.</p>
+  <div class="cookie-actions">
+    <button class="btn btn-cta btn-sm" data-cookie="all">Nõustun kõigiga</button>
+    <button class="btn btn-outline btn-sm" data-cookie="needed">Ainult vajalikud</button>
+    <button class="btn btn-ghost btn-sm" data-cookie="settings">Sätete muutmine</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <i class="icon fa-solid fa-circle-check" aria-hidden="true"></i>
+  <span></span>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+
+  /* Header shrink */
+  const header=$("#header");
+  const onScroll=()=>header.classList.toggle("scrolled",window.scrollY>8);
+  addEventListener("scroll",onScroll,{passive:true}); onScroll();
+
+  /* Mobile drawer */
+  const drawer=$("#drawer"), backdrop=$("#drawerBackdrop"),
+        openBtn=$("#menuOpen"), closeBtn=$("#menuClose");
+  const setDrawer=open=>{
+    document.body.classList.toggle("drawer-open",open);
+    drawer.setAttribute("aria-hidden",String(!open));
+    openBtn.setAttribute("aria-expanded",String(open));
+    backdrop.hidden=!open;
+  };
+  openBtn.addEventListener("click",()=>setDrawer(true));
+  closeBtn.addEventListener("click",()=>setDrawer(false));
+  backdrop.addEventListener("click",()=>setDrawer(false));
+
+  /* Scroll reveal */
+  $$(".stagger").forEach(g=>Array.from(g.children).slice(0,6).forEach((c,i)=>{
+    c.classList.add("reveal"); c.style.transitionDelay=(i*50)+"ms";
+  }));
+  const io=new IntersectionObserver(es=>es.forEach(e=>{
+    if(e.isIntersecting){e.target.classList.add("in"); io.unobserve(e.target);}
+  }),{threshold:.1,rootMargin:"0px 0px -40px"});
+  $$(".reveal").forEach(el=>io.observe(el));
+
+  /* Toast helper (pages call window.toast(msg)) */
+  const toast=$("#toast"); let toastTimer;
+  window.toast=function(msg){
+    $("span",toast).textContent=msg;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>toast.classList.remove("show"),5000);
+  };
+
+  /* Cookie banner (visual demo) */
+  const cookie=$("#cookie");
+  const hideCookie=()=>{cookie.classList.add("hidden"); try{sessionStorage.setItem("cookie","1")}catch(e){}};
+  try{if(sessionStorage.getItem("cookie"))cookie.classList.add("hidden")}catch(e){}
+  $$("[data-cookie]",cookie).forEach(b=>b.addEventListener("click",hideCookie));
+  $("#cookieSettingsLink").addEventListener("click",e=>{e.preventDefault(); cookie.classList.remove("hidden")});
+})();
+</script>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+  const loadTime=Date.now();
+
+  /* ---- Tabs ---- */
+  const TABS={
+    raieoigused:{h1:"Raieõiguste oksjonid",summary:"Hetkel on aktiivseid raieõiguste oksjoneid 18, kokku 94 ha raiutavat mahtu 11 976 m³ ja 428 700 € väärtuses."},
+    metskinnistud:{h1:"Metskinnistute oksjonid",summary:"Hetkel on aktiivseid metskinnistute oksjoneid 6, kokku 212 ha ja 1 060 000 € väärtuses."},
+    polumaad:{h1:"Põllumaade oksjonid",summary:"Hetkel on aktiivseid põllumaade oksjoneid 3, kokku 87 ha ja 210 000 € väärtuses."},
+    paketid:{h1:"Kinnistute paketid",summary:"Hetkel on aktiivseid pakettide oksjoneid 1, kokku 340 ha ja 1 700 000 € väärtuses."},
+    kiiroksjonid:{h1:"Kiiroksjonid",summary:"Kiiroksjon on lühikese, sageli 24-tunnise tähtajaga oksjon."}
+  };
+  const pageTitle=$("#pageTitle"), pageSummary=$("#pageSummary"),
+        listingSection=$("#listingSection"), kiiroEmpty=$("#kiiroEmpty");
+  function setTab(key){
+    if(!TABS[key])key="raieoigused";
+    $$(".tab").forEach(t=>{
+      const on=t.dataset.tab===key;
+      t.classList.toggle("active",on);
+      t.setAttribute("aria-selected",String(on));
+    });
+    pageTitle.textContent=TABS[key].h1;
+    pageSummary.textContent=TABS[key].summary;
+    document.title=TABS[key].h1+" | Erametsad Oksjonid";
+    const quick=key==="kiiroksjonid";
+    listingSection.hidden=quick;
+    kiiroEmpty.hidden=!quick;
+    history.replaceState(null,"","#"+key);
+  }
+  $$(".tab").forEach(t=>t.addEventListener("click",()=>setTab(t.dataset.tab)));
+  const initial=location.hash.slice(1);
+  if(initial)setTab(initial);
+
+  /* ---- Countdowns (demo offsets from load time) ---- */
+  const pad=n=>String(n).padStart(2,"0");
+  function fmt(r){
+    const d=Math.floor(r/864e5), h=Math.floor(r%864e5/36e5),
+          m=Math.floor(r%36e5/6e4), s=Math.floor(r%6e4/1e3);
+    return d+"p "+pad(h)+":"+pad(m)+":"+pad(s);
+  }
+  const cds=$$(".countdown").map(cd=>{
+    cd.end=Date.now()+Number(cd.dataset.remain||0);
+    return cd;
+  });
+  function tick(){
+    const now=Date.now();
+    cds.forEach(cd=>{
+      const r=Math.max(0,cd.end-now);
+      $(".cd-time",cd).textContent=fmt(r);
+      cd.classList.toggle("warn",r>0&&r<36e5);
+      cd.classList.toggle("crit",r>0&&r<3e5);
+      const pill=cd.closest(".lotcard")?.querySelector(".pill");
+      if(pill&&r>0&&r<36e5){
+        pill.textContent="Lõpeb varsti";
+        pill.classList.replace("pill-active","pill-soon");
+      }
+      if(r===0){
+        $(".cd-label",cd).textContent="Oksjon lõppenud";
+        cd.classList.remove("warn","crit");
+        const p=cd.closest(".lotcard")?.querySelector(".pill");
+        if(p){p.textContent="Lõppenud"; p.className="pill pill-muted";}
+      }
+    });
+  }
+  tick(); setInterval(tick,1000);
+
+  /* ---- View toggle ---- */
+  const listingMain=$("#listingMain");
+  $$(".view-btn").forEach(b=>b.addEventListener("click",()=>{
+    const map=b.dataset.view==="map";
+    listingMain.classList.toggle("map-on",map);
+    $$(".view-btn").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+    closePopup();
+  }));
+
+  /* ---- Sorting ---- */
+  const grid=$("#lotGrid");
+  const sorters={
+    endAsc:(a,b)=>+a.dataset.end-+b.dataset.end,
+    endDesc:(a,b)=>+b.dataset.end-+a.dataset.end,
+    priceAsc:(a,b)=>+a.dataset.price-+b.dataset.price,
+    priceDesc:(a,b)=>+b.dataset.price-+a.dataset.price
+  };
+  $("#sortSelect").addEventListener("change",e=>{
+    Array.from(grid.children)
+      .sort(sorters[e.target.value])
+      .forEach(c=>grid.appendChild(c));
+  });
+
+  /* ---- Filters (demo) ---- */
+  const fMaakond=$("#fMaakond"), fVald=$("#fVald"), fAasta=$("#fAasta"),
+        fAreaMin=$("#fAreaMin"), fAreaMax=$("#fAreaMax"),
+        fPriceMin=$("#fPriceMin"), fPriceMax=$("#fPriceMax");
+  const VALD={
+    "Harju maakond":["Kuusalu vald","Raasiku vald","Anija vald","Harku vald"],
+    "Põlva maakond":["Mooste vald","Põlva vald","Kanepi vald"],
+    "Tartu maakond":["Kambja vald","Tartu vald","Peipsiääre vald"],
+    "Viljandi maakond":["Põhja-Sakala vald","Viljandi vald"],
+    "Lääne-Viru maakond":["Haljala vald","Rakvere vald","Tapa vald"],
+    "Pärnu maakond":["Häädemeeste vald","Põhja-Pärnumaa vald"],
+    "Saare maakond":["Saaremaa vald","Muhu vald"],
+    "Võru maakond":["Rõuge vald","Võru vald"]
+  };
+  function fillVald(county){
+    fVald.innerHTML="";
+    const opt0=document.createElement("option");
+    opt0.value=""; opt0.textContent="Kõik vallad";
+    fVald.appendChild(opt0);
+    (VALD[county]||[]).forEach(v=>{
+      const o=document.createElement("option");
+      o.value=v; o.textContent=v;
+      fVald.appendChild(o);
+    });
+    fVald.disabled=!county;
+  }
+  fMaakond.addEventListener("change",()=>{fillVald(fMaakond.value); applyFilters();});
+
+  const chipGroups={};
+  function pressedValues(group){
+    return new Set(
+      $$('.chip[data-group="'+group+'"][aria-pressed=true]').map(c=>c.dataset.value)
+    );
+  }
+  $$(".chip").forEach(c=>{
+    c.addEventListener("click",()=>{
+      c.setAttribute("aria-pressed",String(c.getAttribute("aria-pressed")!=="true"));
+      applyFilters();
+    });
+  });
+
+  function activeFilterCount(){
+    let n=0;
+    n+=pressedValues("species").size;
+    n+=pressedValues("cut").size;
+    if(fMaakond.value)n++;
+    if(fVald.value)n++;
+    if(fAreaMin.value||fAreaMax.value)n++;
+    if(fPriceMin.value||fPriceMax.value)n++;
+    if(fAasta.value)n++;
+    return n;
+  }
+  function updateBadge(){
+    const n=activeFilterCount();
+    $("#filterCount").textContent="("+n+")";
+    $("#filterCountM").textContent="("+n+")";
+  }
+  function applyFilters(){
+    const county=fMaakond.value, vald=fVald.value, year=fAasta.value,
+          species=pressedValues("species"), cut=pressedValues("cut"),
+          aMin=fAreaMin.value?+fAreaMin.value:null, aMax=fAreaMax.value?+fAreaMax.value:null,
+          pMin=fPriceMin.value?+fPriceMin.value:null, pMax=fPriceMax.value?+fPriceMax.value:null;
+    let visible=0;
+    $$(".lotcard",grid).forEach(c=>{
+      const ok=
+        (!county||c.dataset.county===county)&&
+        (!vald||c.dataset.vald===vald)&&
+        (!species.size||c.dataset.species.split(",").some(s=>species.has(s)))&&
+        (!cut.size||c.dataset.cut.split(",").some(s=>cut.has(s)))&&
+        (aMin===null||+c.dataset.area>=aMin)&&
+        (aMax===null||+c.dataset.area<=aMax)&&
+        (pMin===null||+c.dataset.price>=pMin)&&
+        (pMax===null||+c.dataset.price<=pMax)&&
+        (!year||c.dataset.year===year);
+      c.style.display=ok?"":"none";
+      if(ok)visible++;
+    });
+    $("#emptyFilters").hidden=visible>0;
+    updateBadge();
+  }
+  function resetFilters(){
+    $$(".chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+    fMaakond.value="";
+    fillVald("");
+    fAasta.value="";
+    fAreaMin.value=""; fAreaMax.value="";
+    fPriceMin.value=""; fPriceMax.value="";
+    applyFilters();
+  }
+  $("#clearFilters").addEventListener("click",resetFilters);
+  $("#clearFilters2").addEventListener("click",resetFilters);
+  let debTimer;
+  [fAreaMin,fAreaMax,fPriceMin,fPriceMax].forEach(i=>i.addEventListener("input",()=>{
+    clearTimeout(debTimer);
+    debTimer=setTimeout(applyFilters,300);
+  }));
+  [fVald,fAasta].forEach(s=>s.addEventListener("change",applyFilters));
+  updateBadge();
+
+  /* ---- Filters drawer (mobile) ---- */
+  const filters=$("#filters"), filtersBackdrop=$("#filtersBackdrop"),
+        filtersOpen=$("#filtersOpen"), filtersClose=$("#filtersClose");
+  function setFiltersDrawer(open){
+    document.body.classList.toggle("filters-open",open);
+    filtersOpen.setAttribute("aria-expanded",String(open));
+    filtersBackdrop.hidden=!open;
+  }
+  filtersOpen.addEventListener("click",()=>setFiltersDrawer(true));
+  filtersClose.addEventListener("click",()=>setFiltersDrawer(false));
+  filtersBackdrop.addEventListener("click",()=>setFiltersDrawer(false));
+
+  /* ---- Subscription form (demo) ---- */
+  const subToggle=$("#subToggle"), subForm=$("#subForm");
+  subToggle.addEventListener("click",()=>{
+    const open=subForm.hidden;
+    subForm.hidden=!open;
+    subToggle.setAttribute("aria-expanded",String(open));
+  });
+  $("#subSubmit").addEventListener("click",()=>{
+    const email=$("#subEmail").value.trim(),
+          okEmail=/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email),
+          okConsent=$("#subConsent").checked;
+    if(!okEmail){window.toast("Palun sisesta korrektne e-posti aadress."); return}
+    if(!okConsent){window.toast("Palun anna nõusolek andmete töötlemiseks."); return}
+    window.toast("Teavitus tellitud — saadame sõnumi, kui lisandub sobiv oksjon.");
+    subForm.hidden=true;
+    subToggle.setAttribute("aria-expanded","false");
+    $("#subEmail").value=""; $("#subConsent").checked=false;
+  });
+
+  /* ---- Map pins + popup ---- */
+  const LOTS=[
+    {name:"Kuuse ja männi raieõigus Valgemetsas",area:"12,4 ha",price:"18 000 €",cad:"77901:003:0410",remain:187920000,href:"02-lot-detail-open.html"},
+    {name:"Segametsa raieõigus Moostel",area:"23,1 ha",price:"15 500 €",cad:"78512:004:0233",remain:872000,href:"02-lot-detail-open.html"},
+    {name:"Kuuse kasvandi raieõigus Kambjal",area:"9,8 ha",price:"11 000 €",cad:"70804:002:0117",remain:108000000,href:"03-lot-detail-sealed.html"},
+    {name:"Männi raieõigus Olustveres",area:"17,2 ha",price:"24 000 €",cad:"66503:001:0455",remain:290400000,href:"02-lot-detail-open.html"},
+    {name:"Haaviku raieõigus Haljalal",area:"6,5 ha",price:"6 200 €",cad:"48201:005:0302",remain:180000,href:"02-lot-detail-open.html"},
+    {name:"Rabamänniku harvendus Häädemeestel",area:"14,8 ha",price:"9 800 €",cad:"51807:003:0198",remain:444710000,href:"02-lot-detail-open.html"},
+    {name:"Kuuse raieõigus Orissaarel",area:"8,3 ha",price:"12 400 €",cad:"35301:002:0187",remain:3500000,href:"02-lot-detail-open.html"},
+    {name:"Segametsa raieõigus Rõuges",area:"19,6 ha",price:"20 500 €",cad:"99402:001:0661",remain:561600000,href:"02-lot-detail-open.html"}
+  ];
+  const mapWrap=$("#mapWrap"), popup=$("#mapPopup");
+  function closePopup(){
+    popup.classList.remove("open");
+    $$(".pin",mapWrap).forEach(p=>p.classList.remove("active"));
+  }
+  $$(".pin",mapWrap).forEach(pin=>pin.addEventListener("click",e=>{
+    e.stopPropagation();
+    const lot=LOTS[+pin.dataset.lot];
+    if(!lot)return;
+    const already=pin.classList.contains("active");
+    closePopup();
+    if(already)return;
+    pin.classList.add("active");
+    $("#popName").textContent=lot.name;
+    $("#popArea").textContent=lot.area;
+    $("#popPrice").textContent=lot.price;
+    $("#popCad").textContent=lot.cad;
+    $("#popTime").textContent=fmt(Math.max(0,lot.remain-(Date.now()-loadTime)));
+    $("#popLink").href=lot.href;
+    const wrapW=mapWrap.clientWidth,
+          x=Math.min(Math.max(pin.offsetLeft+pin.offsetWidth/2,160),wrapW-160),
+          y=pin.offsetTop,
+          below=y<250;
+    popup.style.left=x+"px";
+    popup.style.top=(below?y+30:y-16)+"px";
+    popup.classList.toggle("below",below);
+    popup.classList.add("open");
+  }));
+  $("#popupClose").addEventListener("click",closePopup);
+  document.addEventListener("click",e=>{
+    if(popup.classList.contains("open")&&!popup.contains(e.target))closePopup();
+  });
+
+  /* ---- Pagination (visual demo) ---- */
+  $$(".page-btn").forEach(b=>b.addEventListener("click",()=>{
+    if(b.dataset.page){window.toast("Demo: näidatud on ainult esimene leht."); return}
+    $$(".page-btn").forEach(x=>{x.classList.remove("active"); x.removeAttribute("aria-current")});
+    b.classList.add("active");
+    b.setAttribute("aria-current","page");
+    listingSection.scrollIntoView({behavior:"smooth",block:"start"});
+  }));
+
+  /* ---- Escape closes overlays ---- */
+  addEventListener("keydown",e=>{
+    if(e.key==="Escape"){closePopup(); setFiltersDrawer(false);}
+  });
+})();
+</script>
+</body>
+</html>

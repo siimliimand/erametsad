@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seaded | Erametsad haldus</title>
+<meta name="description" content="Erametsad haldusplaadi seaded — demo prototüüp.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23012d1d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z'/%3E%3Cpath d='M12 22v-3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ---- Tokens (ADMIN-DESIGN-SPEC §1.2) ---- */
+:root{
+  --primary:#012d1d; --primary-hover:#1b4332; --primary-dark:#16382A; --primary-light:#c1ecd4;
+  --accent:#58B368; --cta:#F2A93B; --cta-hover:#D98F1F;
+  --ink:#181a2e; --ink-muted:#414844; --ink-inverse:#FFFFFF;
+  --bg-page:#fbf8ff; --bg-mist:#f4f2ff; --border:#c1c8c2;
+  --danger:#B3261E; --danger-light:#FBEAE9; --info:#2D6FA8; --info-light:#E9F1F7;
+  --st-draft-text:#414844; --st-draft-bg:#EBEBEB; --st-draft-dot:#6B7570;
+  --st-sched-text:#1F4E79; --st-sched-bg:#E9F1F7; --st-sched-dot:#2D6FA8;
+  --st-active-text:#1B6338; --st-active-bg:#E8F6ED; --st-active-dot:#2E9E5B;
+  --st-ending-text:#941E17; --st-ending-bg:#FBEAE9; --st-ending-dot:#B3261E;
+  --st-ended-text:#8F590A; --st-ended-bg:#FEF5E7; --st-ended-dot:#F2A93B;
+  --st-unsold:#B3261E;
+  --st-contract-text:#236B3B; --st-contract-bg:#EBF7F0; --st-contract-dot:#58B368;
+  --st-arch-text:#414844; --st-arch-bg:#ECEEEB; --st-arch-dot:#6B7570;
+  --font-heading:"Public Sans",system-ui,sans-serif;
+  --font-body:"Inter",system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --space-2xs:4px; --space-xs:8px; --space-sm:12px; --space-md:16px;
+  --space-lg:24px; --space-xl:32px; --space-2xl:40px; --space-3xl:48px; --space-4xl:64px;
+  --radius:8px; --radius-pill:999px;
+  --surface:#FFFFFF;
+  --shadow-card:0 1px 2px rgba(24,26,46,.04),0 2px 8px rgba(24,26,46,.05);
+  --shadow-hover:0 2px 8px rgba(24,26,46,.08),0 8px 24px rgba(24,26,46,.08);
+  --shadow-pop:0 8px 24px rgba(24,26,46,.14);
+  --tint-primary:rgba(1,45,29,.06);
+  --tint-primary-strong:rgba(1,45,29,.1);
+  --glow-active:rgba(46,158,91,.45);
+  --accent-soft:rgba(88,179,104,.28);
+  --overlay:rgba(24,26,46,.45);
+  --rail-w:56px; --topbar-h:64px;
+}
+
+/* ---- Base ---- */
+*,*::before,*::after{box-sizing:border-box}
+html{color-scheme:light; -webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg-page); color:var(--ink);
+  font:400 14px/20px var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--primary)}
+button{font:inherit; cursor:pointer}
+ul{margin:0; padding:0; list-style:none}
+svg{display:block}
+svg.lucide{flex:none}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+::selection{background:var(--primary-light)}
+.mono{font-family:var(--font-mono); font-feature-settings:"tnum"}
+.sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
+.skip-link{
+  position:absolute; left:-9999px; top:8px; z-index:200;
+  background:var(--primary); color:var(--ink-inverse); padding:10px 16px; border-radius:var(--radius);
+}
+.skip-link:focus{left:8px; color:var(--ink-inverse)}
+
+/* ---- Left icon rail (fixed 56px) ---- */
+.rail{
+  position:fixed; inset:0 auto 0 0; width:var(--rail-w); z-index:100;
+  display:flex; flex-direction:column; align-items:center;
+  background:var(--surface); border-right:1px solid var(--border); padding:12px 0;
+}
+.rail-logo{
+  display:grid; place-items:center; width:32px; height:32px; margin-bottom:16px;
+  border-radius:var(--radius); background:var(--bg-mist); color:var(--primary);
+}
+.rail-logo svg{width:20px; height:20px}
+.rail-nav{display:flex; flex-direction:column; align-items:center; gap:2px; width:100%}
+.rail-item{
+  position:relative; display:grid; place-items:center; width:40px; height:40px;
+  border-radius:var(--radius); color:var(--ink-muted); text-decoration:none;
+  transition:background-color .15s ease-out, color .15s ease-out;
+}
+.rail-item svg{width:20px; height:20px}
+.rail-item:hover{background:var(--tint-primary); color:var(--primary)}
+.rail-item.active{background:var(--tint-primary-strong); color:var(--primary)}
+.rail-item.active::before{content:""; position:absolute; left:-8px; top:6px; bottom:6px; width:3px; border-radius:0 2px 2px 0; background:var(--primary)}
+.rail-item::after{
+  content:attr(data-tip); position:absolute; left:calc(100% + 12px); top:50%; transform:translateY(-50%);
+  z-index:110; background:var(--ink); color:var(--ink-inverse);
+  font:500 12px/16px var(--font-body); padding:5px 9px; border-radius:6px; white-space:nowrap;
+  opacity:0; visibility:hidden; transition:opacity .12s ease-out .08s, visibility 0s .2s; pointer-events:none;
+}
+.rail-item:hover::after,.rail-item:focus-visible::after{opacity:1; visibility:visible; transition-delay:0s}
+.rail-flag{position:absolute; top:3px; right:2px; z-index:1}
+.rail-flag.dot{width:8px; height:8px; border-radius:var(--radius-pill)}
+.rail-flag.num{
+  min-width:14px; height:14px; padding:0 3px; border-radius:var(--radius-pill);
+  display:grid; place-items:center; font:700 9px/1 var(--font-body); color:var(--ink-inverse);
+  border:2px solid var(--surface);
+}
+.is-amber{background:var(--cta)}
+.is-red{background:var(--danger)}
+
+/* ---- Topbar (sticky 64px) ---- */
+.app{margin-left:var(--rail-w)}
+.topbar{
+  position:sticky; top:0; z-index:90; display:flex; align-items:center; gap:12px;
+  height:var(--topbar-h); padding:0 24px;
+  background:var(--surface); border-bottom:1px solid var(--border);
+}
+.menu-btn{display:none; place-items:center; width:36px; height:36px; margin-left:-8px; border:0; border-radius:var(--radius); background:transparent; color:var(--ink)}
+.menu-btn:hover{background:var(--bg-mist)}
+.topbar-brand{display:flex; align-items:center; gap:10px; flex:none}
+.env-badge{display:inline-flex; align-items:center; padding:3px 10px; border-radius:var(--radius-pill); font:700 11px/14px var(--font-heading); letter-spacing:.04em}
+.env-prod{background:var(--st-active-bg); color:var(--st-active-text)}
+.env-stage{background:var(--st-ended-bg); color:var(--st-ended-text)}
+.env-dev{background:var(--danger-light); color:var(--danger)}
+.topbar-title{font:600 15px/20px var(--font-heading); color:var(--ink)}
+.topbar-search{
+  position:relative; display:flex; align-items:center; gap:8px; flex:1; max-width:420px; height:36px;
+  margin-inline:auto; padding:0 10px; border-radius:var(--radius);
+  background:var(--bg-mist); border:1px solid transparent;
+  transition:border-color .15s ease-out, background-color .15s ease-out;
+}
+.topbar-search:focus-within{border-color:var(--primary); background:var(--surface)}
+.topbar-search svg{width:16px; height:16px; color:var(--ink-muted)}
+.topbar-search input{flex:1; min-width:0; border:0; background:transparent; outline:0; font:400 13px/18px var(--font-body); color:var(--ink)}
+.topbar-search input::placeholder{color:var(--ink-muted)}
+.search-kbd{flex:none; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1px 6px; font:500 11px/16px var(--font-mono); color:var(--ink-muted)}
+.topbar-user{display:flex; align-items:center; gap:8px; flex:none}
+.icon-btn{
+  position:relative; display:grid; place-items:center; width:36px; height:36px;
+  border:0; border-radius:var(--radius); background:transparent; color:var(--ink-muted);
+}
+.icon-btn:hover{background:var(--bg-mist); color:var(--primary)}
+.icon-btn svg{width:18px; height:18px}
+.bell-badge{
+  position:absolute; top:3px; right:3px; min-width:15px; height:15px; padding:0 3px;
+  border-radius:var(--radius-pill); background:var(--danger); color:var(--ink-inverse);
+  border:2px solid var(--surface); font:600 10px/1 var(--font-body);
+  display:grid; place-items:center;
+}
+.user-menu{
+  display:flex; align-items:center; gap:10px; padding:4px 6px 4px 4px;
+  border:0; border-radius:var(--radius); background:transparent;
+}
+.user-menu:hover{background:var(--bg-mist)}
+.avatar{
+  width:32px; height:32px; border-radius:50%;
+  background:var(--primary); color:var(--ink-inverse);
+  display:grid; place-items:center; font:600 12px/1 var(--font-heading); letter-spacing:.02em;
+}
+.user-meta{display:flex; align-items:center; gap:8px}
+.user-name{font:600 13px/16px var(--font-body); color:var(--ink)}
+.role-chip{padding:2px 8px; border-radius:var(--radius-pill); background:var(--primary-light); color:var(--primary); font:600 11px/14px var(--font-body)}
+.user-menu > svg{width:16px; height:16px; color:var(--ink-muted)}
+
+/* ---- Workspace ---- */
+.container{max-width:1400px; margin-inline:auto; padding:var(--space-lg)}
+.breadcrumb{display:flex; align-items:center; gap:6px; font:500 12px/16px var(--font-body); color:var(--ink-muted); margin-bottom:6px}
+.page-head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:var(--space-lg)}
+.page-title{margin:0; font:700 28px/34px var(--font-heading); color:var(--ink)}
+
+/* ---- Cards ---- */
+.card{
+  display:flex; flex-direction:column; overflow:hidden;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card);
+}
+.card-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 20px; border-bottom:1px solid var(--border)}
+.card-title{margin:0; font:600 16px/22px var(--font-heading); color:var(--ink)}
+.card-foot{margin-top:auto; padding:12px 20px; border-top:1px solid var(--border); text-align:right}
+.card-link{font:600 13px/18px var(--font-body); color:var(--primary); text-decoration:none}
+.card-link:hover{color:var(--primary-hover); text-decoration:underline}
+
+/* ---- KPI strip ---- */
+.kpi-grid{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--space-sm); margin-bottom:var(--space-lg)}
+.kpi-card{
+  display:flex; flex-direction:column; gap:2px; padding:var(--space-md);
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card); color:var(--ink); text-decoration:none;
+  transition:border-color .15s ease-out, box-shadow .15s ease-out, transform .15s ease-out;
+}
+.kpi-card:hover{border-color:var(--primary); box-shadow:var(--shadow-hover); transform:translateY(-1px)}
+.kpi-label{font:500 12px/16px var(--font-body); color:var(--ink-muted)}
+.kpi-value{font:700 28px/32px var(--font-mono); font-feature-settings:"tnum"; letter-spacing:-.01em}
+.kpi-value.is-danger{color:var(--danger)}
+.kpi-alert{
+  display:inline-grid; place-items:center; width:18px; height:18px; margin-left:8px; vertical-align:6px;
+  border-radius:var(--radius-pill); background:var(--cta); color:var(--ink);
+  font:700 12px/1 var(--font-body);
+}
+.kpi-sub{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.trend-up{color:var(--st-active-text); font-weight:500}
+.spark{width:100%; height:24px; margin:4px 0 2px}
+.info-dot{display:inline-grid; place-items:center; vertical-align:-2px; color:var(--ink-muted); cursor:help}
+.info-dot svg{width:12px; height:12px}
+
+/* ---- Dashboard grid (2/3 + 1/3) ---- */
+.dash-grid{display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:var(--space-lg); align-items:stretch}
+
+/* ---- Live table ---- */
+.live{display:inline-flex; align-items:center; gap:7px; font:600 12px/16px var(--font-body); color:var(--st-active-text)}
+.live-dot{width:8px; height:8px; border-radius:var(--radius-pill); background:var(--st-active-dot); animation:live-pulse 2s ease-out infinite}
+@keyframes live-pulse{0%{box-shadow:0 0 0 0 var(--glow-active)}70%,100%{box-shadow:0 0 0 6px transparent}}
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%; min-width:620px; border-collapse:collapse}
+.tbl th{padding:10px 16px; background:var(--bg-mist); font:500 12px/16px var(--font-body); color:var(--ink-muted); text-align:left; white-space:nowrap}
+.tbl td{padding:12px 16px; border-top:1px solid var(--border); font:400 13px/18px var(--font-body); vertical-align:middle}
+.tbl th:first-child,.tbl td:first-child{padding-left:20px}
+.tbl th:last-child,.tbl td:last-child{padding-right:20px}
+.tbl tbody tr{transition:background-color .15s ease-out}
+.tbl tbody tr:hover{background:var(--bg-mist)}
+.num{text-align:right}
+.lot-id{font:500 12px/16px var(--font-mono); color:var(--ink-muted)}
+.lot-name{color:var(--ink); font:500 13px/18px var(--font-body); text-decoration:none}
+.lot-name:hover{color:var(--primary); text-decoration:underline}
+td .cd{font:500 14px/18px var(--font-mono); font-feature-settings:"tnum"}
+.bid{font:500 13px/18px var(--font-mono); font-feature-settings:"tnum"}
+.bid-muted{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.type-chip{display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.type-chip svg{width:12px; height:12px}
+.type-raie{background:var(--st-active-bg); color:var(--st-active-text)}
+.type-kinnistu{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.type-pakett{background:var(--st-draft-bg); color:var(--st-draft-text)}
+.btn-outline{
+  display:inline-flex; align-items:center; gap:6px; padding:5px 12px;
+  border:1px solid var(--accent); border-radius:var(--radius); background:transparent;
+  color:var(--primary); font:600 12px/16px var(--font-body); text-decoration:none; white-space:nowrap;
+  transition:background-color .15s ease-out;
+}
+.btn-outline svg{width:11px; height:11px}
+.btn-outline:hover{background:var(--st-active-bg)}
+.cd-crit{color:var(--danger) !important; animation:cd-blink 1s step-end infinite}
+@keyframes cd-blink{50%{opacity:.45}}
+@keyframes row-flash{0%{background:var(--accent-soft)}100%{background:transparent}}
+tr.row-extend td{animation:row-flash .9s ease-out 2}
+
+/* ---- Süsteemi tervis ---- */
+.health-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 20px; border-top:1px solid var(--border)}
+.health-row:first-child{border-top:0}
+.health-name{font:400 13px/18px var(--font-body); color:var(--ink-muted)}
+.health-val{display:inline-flex; align-items:center; gap:8px; font:500 13px/18px var(--font-body); color:var(--ink)}
+.ok-text{font:600 12px/16px var(--font-body); color:var(--st-active-text)}
+.status-dot{width:8px; height:8px; border-radius:var(--radius-pill); flex:none}
+.status-dot.ok{background:var(--st-active-dot)}
+.status-dot.warn{background:var(--cta)}
+.status-dot.err{background:var(--danger)}
+.health-foot{
+  display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:auto; padding:10px 20px 14px;
+  border-top:1px solid var(--border);
+  font:400 11px/16px var(--font-body); color:var(--ink-muted);
+}
+.health-foot span{display:inline-flex; align-items:center; gap:6px}
+.mini-dot{width:6px; height:6px; border-radius:var(--radius-pill); background:var(--st-active-dot)}
+
+/* ---- Kiire tegevus ---- */
+.action-row{
+  display:flex; align-items:center; gap:12px; padding:13px 20px;
+  border-top:1px solid var(--border); color:var(--ink); text-decoration:none;
+  transition:background-color .15s ease-out;
+}
+.action-row:first-child{border-top:0}
+.action-row:hover{background:var(--bg-mist)}
+.action-ico{display:grid; place-items:center; width:36px; height:36px; flex:none; border-radius:var(--radius); background:var(--bg-mist); color:var(--primary)}
+.action-ico svg{width:18px; height:18px}
+.action-main{display:flex; flex-direction:column; gap:1px; flex:1; min-width:0}
+.action-title{font:500 13px/18px var(--font-body); color:var(--ink)}
+.action-note{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.action-note.warn{color:var(--st-ended-text)}
+.count-pill{flex:none; padding:2px 10px; border-radius:var(--radius-pill); background:var(--primary-light); color:var(--primary); font:700 12px/16px var(--font-body); white-space:nowrap}
+.action-go{
+  display:grid; place-items:center; width:28px; height:28px; flex:none;
+  border:1px solid transparent; border-radius:var(--radius-pill); color:var(--ink-muted);
+  transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out;
+}
+.action-go svg{width:14px; height:14px}
+.action-row:hover .action-go{border-color:var(--border); background:var(--surface); color:var(--primary)}
+
+/* ---- Viimased juhtlõimed ---- */
+.lead-row{display:flex; align-items:center; gap:10px; padding:13px 20px; border-top:1px solid var(--border)}
+.lead-row:first-child{border-top:0}
+.lead-time{font:500 12px/16px var(--font-mono); font-feature-settings:"tnum"; color:var(--ink-muted)}
+.chip{display:inline-flex; align-items:center; padding:2px 10px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.chip-name{background:var(--bg-mist); border:1px solid var(--border); color:var(--ink)}
+.lead-county{flex:1; min-width:0; font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.chip-src{font:600 11px/16px var(--font-body)}
+.src-kava{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.src-raie{background:var(--st-active-bg); color:var(--st-active-text)}
+.src-ost{background:var(--st-ended-bg); color:var(--st-ended-text)}
+
+/* ---- Mobile drawer (<768px) ---- */
+.drawer{
+  position:fixed; top:0; bottom:0; left:0; z-index:140; width:min(320px,86vw);
+  display:flex; flex-direction:column; visibility:hidden;
+  background:var(--surface); box-shadow:var(--shadow-pop);
+  transform:translateX(-102%); transition:transform .2s cubic-bezier(.4,0,.2,1), visibility 0s .2s;
+}
+body.drawer-open .drawer{transform:none; visibility:visible; transition-delay:0s}
+body.drawer-open{overflow:hidden}
+.drawer-head{display:flex; align-items:center; gap:10px; height:var(--topbar-h); padding:0 12px 0 16px; border-bottom:1px solid var(--border)}
+.drawer-head .rail-logo{margin:0}
+.drawer-head .topbar-title{flex:1}
+.drawer-nav{flex:1; overflow-y:auto; padding:8px}
+.drawer-link{
+  display:flex; align-items:center; gap:12px; padding:11px 12px; margin-bottom:2px;
+  border-radius:var(--radius); color:var(--ink); font:500 14px/20px var(--font-body); text-decoration:none;
+}
+.drawer-link:hover{background:var(--bg-mist)}
+.drawer-link.active{background:var(--tint-primary-strong); color:var(--primary); font-weight:600}
+.drawer-link svg{width:18px; height:18px; color:var(--ink-muted)}
+.drawer-link.active svg{color:var(--primary)}
+.drawer-flag{margin-left:auto; flex:none}
+.drawer-flag.dot{width:8px; height:8px; border-radius:var(--radius-pill)}
+.drawer-flag.num{min-width:14px; height:14px; padding:0 4px; border-radius:var(--radius-pill); display:grid; place-items:center; font:700 10px/1 var(--font-body); color:var(--ink-inverse)}
+.drawer-backdrop{
+  position:fixed; inset:0; z-index:130; background:var(--overlay);
+  opacity:0; visibility:hidden; transition:opacity .2s, visibility 0s .2s;
+}
+body.drawer-open .drawer-backdrop{opacity:1; visibility:visible; transition-delay:0s}
+
+/* ---- Responsive ---- */
+@media (max-width:1280px){.kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:1024px){.dash-grid{grid-template-columns:1fr}}
+@media (max-width:860px){.topbar-search{display:none}}
+@media (max-width:767px){
+  .rail{display:none}
+  .app{margin-left:0}
+  .menu-btn{display:grid}
+  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .topbar{padding:0 16px}
+  .container{padding:16px}
+}
+@media (max-width:640px){.user-meta{display:none}}
+@media (max-width:420px){.kpi-grid{grid-template-columns:1fr}}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important}
+}
+
+/* ---- Page 13: Seaded ---- */
+.settings-note{display:flex;align-items:center;gap:10px;margin-bottom:var(--space-lg);padding:10px 14px;border-radius:var(--radius);background:var(--info-light);color:var(--info);font:500 13px/18px var(--font-body)}
+.settings-note svg{width:16px;height:16px;flex:none}
+.settings-grid{display:grid;grid-template-columns:220px minmax(0,1fr);gap:var(--space-lg);align-items:start}
+.settings-sections{display:flex;flex-direction:column;gap:var(--space-lg)}
+.settings-nav{position:sticky;top:calc(var(--topbar-h) + var(--space-lg));display:flex;flex-direction:column;gap:2px}
+.settings-nav a{padding:8px 12px;border-left:3px solid transparent;border-radius:var(--radius);font:500 13px/18px var(--font-body);color:var(--ink-muted);text-decoration:none;transition:background-color .15s ease-out,color .15s ease-out}
+.settings-nav a:hover{background:var(--bg-mist);color:var(--primary)}
+section[id]{scroll-margin-top:calc(var(--topbar-h) + var(--space-md))}
+.settings-body{padding:4px 20px 12px}
+.form-row{display:grid;grid-template-columns:minmax(170px,250px) minmax(0,1fr);gap:4px var(--space-lg);align-items:center;padding:12px 0}
+.form-row + .form-row,.form-row + .check-row{border-top:1px solid var(--border)}
+.form-label{font:500 13px/18px var(--font-body);color:var(--ink)}
+.form-help{grid-column:2;font:400 12px/16px var(--font-body);color:var(--ink-muted)}
+.text-input,.select-input{width:100%;max-width:360px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font:400 13px/18px var(--font-body);color:var(--ink);transition:border-color .15s ease-out}
+.text-input:focus,.select-input:focus{outline:0;border-color:var(--primary)}
+.text-input[readonly]{background:var(--bg-mist);color:var(--ink-muted)}
+.check-row{display:flex;align-items:center;gap:10px;padding:12px 0;font:400 13px/18px var(--font-body);color:var(--ink)}
+.check-row input,.tbl input[type="checkbox"]{width:15px;height:15px;accent-color:var(--primary)}
+.tbl input[type="checkbox"]:disabled{opacity:.45}
+.warn-note{display:flex;align-items:flex-start;gap:8px;margin:12px 0 6px;padding:10px 12px;border-radius:var(--radius);background:var(--danger-light);color:var(--danger);font:500 12px/16px var(--font-body)}
+.warn-note svg{width:14px;height:14px;flex:none;margin-top:1px}
+.switch{position:relative;display:inline-block;width:40px;height:22px;flex:none}
+.switch input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.switch-ui{position:absolute;inset:0;border-radius:var(--radius-pill);background:var(--border);pointer-events:none;transition:background-color .15s ease-out}
+.switch-ui::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--surface);box-shadow:0 1px 2px rgba(24,26,46,.25);transition:transform .15s ease-out}
+.switch input:checked + .switch-ui{background:var(--accent)}
+.switch input:checked + .switch-ui::after{transform:translateX(18px)}
+.switch input:focus-visible + .switch-ui{outline:2px solid var(--accent);outline-offset:2px}
+.key-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.key-val{font:500 13px/18px var(--font-mono);font-feature-settings:"tnum"}
+.btn-primary{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border:0;border-radius:var(--radius-pill);background:var(--primary);color:var(--ink-inverse);font:600 13px/18px var(--font-body);transition:background-color .15s ease-out}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-danger{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border:0;border-radius:var(--radius-pill);background:var(--danger);color:var(--ink-inverse);font:600 13px/18px var(--font-body);transition:background-color .15s ease-out}
+.btn-danger:hover{background:var(--st-ending-text)}
+.btn-danger:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--ink);font:600 13px/18px var(--font-body);transition:border-color .15s ease-out,color .15s ease-out}
+.btn-ghost:hover{border-color:var(--primary);color:var(--primary)}
+.save-hint{float:left;display:inline-flex;align-items:center;gap:6px;font:400 12px/18px var(--font-body);color:var(--ink-muted)}
+.save-hint svg{width:12px;height:12px}
+.partner-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.partner-row .text-input{max-width:340px}
+.row-remove{display:grid;place-items:center;width:28px;height:28px;flex:none;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--ink-muted);transition:border-color .15s ease-out,color .15s ease-out,background-color .15s ease-out}
+.row-remove:hover{border-color:var(--danger);background:var(--danger-light);color:var(--danger)}
+.tbl .check{text-align:center}
+.tbl .col-locked{background:var(--bg-mist)}
+.lock-ico{display:inline-flex;vertical-align:-2px;margin-right:4px;color:var(--ink-muted)}
+.lock-ico svg{width:12px;height:12px}
+.roles-tbl td:first-child{font-weight:500}
+.matrix-note{margin:0;padding:12px 20px;border-top:1px solid var(--border);font:400 12px/17px var(--font-body);color:var(--ink-muted)}
+.modal-backdrop{position:fixed;inset:0;z-index:150;display:grid;place-items:center;padding:16px;background:var(--overlay);opacity:0;visibility:hidden;transition:opacity .2s ease-out,visibility 0s .2s}
+.modal-backdrop.open{opacity:1;visibility:visible;transition-delay:0s}
+.modal{width:min(480px,100%);padding:var(--space-lg);border-radius:16px;background:var(--surface);box-shadow:var(--shadow-pop);transform:translateY(8px);transition:transform .2s ease-out}
+.modal-backdrop.open .modal{transform:none}
+.modal-ico{display:grid;place-items:center;width:44px;height:44px;margin-bottom:12px;border-radius:50%;background:var(--danger-light);color:var(--danger)}
+.modal-ico svg{width:22px;height:22px}
+.modal-title{margin:0 0 6px;font:600 18px/24px var(--font-heading);color:var(--ink)}
+.modal-text{margin:0 0 14px;font:400 13px/19px var(--font-body);color:var(--ink-muted)}
+.modal .form-label{display:block;margin-bottom:6px}
+.modal .text-input{max-width:none}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+.toast{position:fixed;left:50%;bottom:24px;z-index:160;display:flex;align-items:flex-start;gap:10px;max-width:min(420px,calc(100vw - 32px));padding:12px 16px;border-radius:var(--radius);background:var(--ink);color:var(--ink-inverse);box-shadow:var(--shadow-pop);opacity:0;visibility:hidden;transform:translate(-50%,8px);transition:opacity .2s ease-out,transform .2s ease-out,visibility 0s .2s}
+.toast.show{opacity:1;visibility:visible;transform:translate(-50%,0);transition-delay:0s}
+.toast > svg{width:16px;height:16px;flex:none;margin-top:2px;color:var(--accent)}
+.toast-body{display:flex;flex-direction:column;gap:1px}
+.toast-main{font:600 13px/18px var(--font-body)}
+.toast-sub{font:400 12px/16px var(--font-body);color:var(--primary-light)}
+@media (max-width:900px){
+  .settings-grid{grid-template-columns:1fr}
+  .settings-nav{position:static;flex-direction:row;flex-wrap:wrap;gap:6px}
+  .settings-nav a{border-left:0;border:1px solid var(--border)}
+}
+@media (max-width:640px){
+  .form-row{grid-template-columns:1fr}
+  .form-help{grid-column:1}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Liigu sisuni</a>
+
+<!-- Left icon rail -->
+<aside class="rail" aria-label="Peamenüü">
+  <a class="rail-logo" href="01-dashboard.html" data-tip="Erametsad haldus" aria-label="Erametsad haldus">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/></svg>
+  </a>
+  <nav class="rail-nav">
+    <a class="rail-item" href="01-dashboard.html" data-tip="Töölaud" aria-label="Töölaud"><i data-lucide="layout-dashboard"></i></a>
+    <a class="rail-item" href="02-auctions-list.html" data-tip="Oksjonid" aria-label="Oksjonid"><i data-lucide="gavel"></i></a>
+    <a class="rail-item" href="04-bids-monitoring.html" data-tip="Pakkumised" aria-label="Pakkumised"><i data-lucide="activity"></i></a>
+    <a class="rail-item" href="05-sealed-opening.html" data-tip="Sul. avamine" aria-label="Sul. avamine — ootel tseremoonia"><i data-lucide="key-round"></i><span class="rail-flag dot is-amber"></span></a>
+    <a class="rail-item" href="06-users.html" data-tip="Kasutajad" aria-label="Kasutajad"><i data-lucide="users"></i></a>
+    <a class="rail-item" href="07-company-approvals.html" data-tip="Ettevõtted" aria-label="Ettevõtted — 3 ootel"><i data-lucide="building-2"></i><span class="rail-flag num is-red">3</span></a>
+    <a class="rail-item" href="08-contracts.html" data-tip="Lepingud" aria-label="Lepingud"><i data-lucide="file-signature"></i></a>
+    <a class="rail-item" href="09-leads-crm.html" data-tip="Juhtlõimed" aria-label="Juhtlõimed"><i data-lucide="kanban"></i></a>
+    <a class="rail-item" href="10-service-requests.html" data-tip="Päringud" aria-label="Päringud"><i data-lucide="send-horizontal"></i></a>
+    <a class="rail-item" href="11-cms-content.html" data-tip="Sisuhaldus" aria-label="Sisuhaldus"><i data-lucide="file-pen"></i></a>
+    <a class="rail-item" href="12-statistics.html" data-tip="Statistika" aria-label="Statistika"><i data-lucide="chart-column"></i></a>
+    <a class="rail-item active" href="13-settings.html" data-tip="Seaded" aria-label="Seaded" aria-current="page"><i data-lucide="settings"></i></a>
+    <a class="rail-item" href="14-audit-log.html" data-tip="Auditlogi" aria-label="Auditlogi"><i data-lucide="shield-check"></i></a>
+  </nav>
+</aside>
+
+<div class="app">
+  <!-- Topbar -->
+  <header class="topbar">
+    <button class="menu-btn" id="menuOpen" type="button" aria-label="Ava menüü" aria-expanded="false" aria-controls="drawer"><i data-lucide="menu"></i></button>
+    <div class="topbar-brand">
+      <span class="env-badge env-stage" title="Staging keskkond">STAGE</span>
+      <span class="topbar-title">Erametsad haldus</span>
+    </div>
+    <div class="topbar-search">
+      <i data-lucide="search"></i>
+      <input id="globalSearch" type="search" placeholder="Otsi oksjoneid, kasutajaid, juhtlõimi... (⌘K)" aria-label="Globaalne otsing">
+      <kbd class="search-kbd">⌘K</kbd>
+    </div>
+    <div class="topbar-user">
+      <button class="icon-btn" type="button" aria-label="Teavitused — 3 lugemata"><i data-lucide="bell"></i><span class="bell-badge">3</span></button>
+      <button class="user-menu" type="button" aria-haspopup="menu" aria-label="Kasutajamenüü: Marit Vain">
+        <span class="avatar" aria-hidden="true">MV</span>
+        <span class="user-meta">
+          <span class="user-name">Marit Vain</span>
+          <span class="role-chip">Admin</span>
+        </span>
+        <i data-lucide="chevron-down"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Seaded -->
+  <main id="main">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Asukoht"><span aria-current="page">Seaded</span></nav>
+      <header class="page-head">
+        <h1 class="page-title">Seaded</h1>
+        <span class="count-pill">Superadmin</span>
+      </header>
+
+      <div class="settings-note">
+        <i data-lucide="triangle-alert" aria-hidden="true"></i>
+        <span>Kõik muudatused jõustuvad kohe ja logitakse auditilogisse.</span>
+      </div>
+
+      <div class="settings-grid">
+        <nav class="settings-nav" aria-label="Seadete rubriigid">
+          <a href="#sec-platvorm">Platvorm</a>
+          <a href="#sec-reeglid">Oksjonite reeglid</a>
+          <a href="#sec-tasud">Teenustasud</a>
+          <a href="#sec-paringud">Teenuse päringud</a>
+          <a href="#sec-integratsioon">Integratsioonid</a>
+          <a href="#sec-rollid">Rollid ja õigused</a>
+        </nav>
+
+        <div class="settings-sections">
+          <!-- Section 1: Platform -->
+          <section class="card" id="sec-platvorm" aria-labelledby="h-sec-platvorm">
+            <div class="card-head"><h2 class="card-title" id="h-sec-platvorm">Platvorm</h2></div>
+            <div class="settings-body">
+              <div class="form-row">
+                <label class="form-label" for="f-platvormi-nimi">Platvormi nimi</label>
+                <input class="text-input" id="f-platvormi-nimi" type="text" value="Erametsad">
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="f-toe-post">Klienditoe e-post</label>
+                <input class="text-input" id="f-toe-post" type="email" value="support@erametsad.ee">
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="f-lokaal">Vaikelokaal</label>
+                <select class="select-input" id="f-lokaal">
+                  <option selected>Eesti (et)</option>
+                  <option>Inglise (en)</option>
+                </select>
+                <span class="form-help">Kasutatakse portaali lehtedel ja süsteemi e-kirjades.</span>
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="maintToggle">Hooldusrežiim</label>
+                <span class="switch">
+                  <input type="checkbox" id="maintToggle">
+                  <span class="switch-ui" aria-hidden="true"></span>
+                </span>
+              </div>
+              <div class="warn-note">
+                <i data-lucide="triangle-alert" aria-hidden="true"></i>
+                <span>Hooldusrežiim sulgeb avaliku portaali külastajatele. Sisselülitamiseks tuleb trükkida kinnitussõna.</span>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span class="save-hint"><i data-lucide="shield-check" aria-hidden="true"></i>Muudatused logitakse auditilogisse</span>
+              <button class="btn-primary" type="button" data-save>Salvesta</button>
+            </div>
+          </section>
+
+          <!-- Section 2: Auction rules -->
+          <section class="card" id="sec-reeglid" aria-labelledby="h-sec-reeglid">
+            <div class="card-head"><h2 class="card-title" id="h-sec-reeglid">Oksjonite reeglid</h2></div>
+            <div class="settings-body">
+              <div class="form-row">
+                <label class="form-label" for="f-antisnipe">Anti-snipe pikendus (min)</label>
+                <input class="text-input" id="f-antisnipe" type="number" min="1" max="30" value="5">
+                <span class="form-help">Uus pakkumine pikendab lõpuaega selle summaga (1–30 min).</span>
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="f-minkestus">Minimaalne kestus (tundi)</label>
+                <input class="text-input" id="f-minkestus" type="number" min="1" value="1">
+                <span class="form-help">Oksjoni lõppuaeg ei tohi olla lähemal kui üks tund.</span>
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="f-samm">Vaikimisi pakkumise samm (€)</label>
+                <input class="text-input" id="f-samm" type="number" min="1" value="250">
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="f-viik">Viigureegel (suletud pakkumine)</label>
+                <input class="text-input" id="f-viik" type="text" value="Varasem esitus võidab" readonly>
+                <span class="form-help">Viigi korral võidab ajaliselt varem esitatud pakkumine.</span>
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="f-kiiroksjon">Kiiroksjoni kestus (tundi)</label>
+                <input class="text-input" id="f-kiiroksjon" type="number" min="1" value="48">
+                <span class="form-help">Kiiroksjon algab avaldamisel ja kestab täpselt 48 tundi.</span>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span class="save-hint"><i data-lucide="shield-check" aria-hidden="true"></i>Muudatused logitakse auditilogisse</span>
+              <button class="btn-primary" type="button" data-save>Salvesta</button>
+            </div>
+          </section>
+
+          <!-- Section 3: Fees -->
+          <section class="card" id="sec-tasud" aria-labelledby="h-sec-tasud">
+            <div class="card-head"><h2 class="card-title" id="h-sec-tasud">Teenustasud</h2></div>
+            <div class="settings-body">
+              <div class="form-row">
+                <label class="form-label" for="f-fee">Vaikimisi teenustasu (%)</label>
+                <input class="text-input" id="f-fee" type="number" min="0" step="0.1" value="3.0">
+                <span class="form-help">Teenustasule lisandub käibemaks 22%.</span>
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="f-fee-quick">Kiiroksjoni teenustasu (%)</label>
+                <input class="text-input" id="f-fee-quick" type="number" min="0" step="0.1" value="3.0">
+                <span class="form-help">Erisus vaikemäärale; tühi väli kasutab vaikimisi teenustasu.</span>
+              </div>
+              <div class="check-row">
+                <input type="checkbox" id="f-fee-hide" checked>
+                <label for="f-fee-hide">Ära kunagi kuva teenustasu aktiivsetel oksjonitel</label>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span class="save-hint"><i data-lucide="shield-check" aria-hidden="true"></i>Muudatused logitakse auditilogisse</span>
+              <button class="btn-primary" type="button" data-save>Salvesta</button>
+            </div>
+          </section>
+
+          <!-- Section 4: Service requests -->
+          <section class="card" id="sec-paringud" aria-labelledby="h-sec-paringud">
+            <div class="card-head"><h2 class="card-title" id="h-sec-paringud">Teenuse päringud</h2></div>
+            <div class="settings-body">
+              <div class="form-row">
+                <label class="form-label" for="f-vastus">Vastamise tähtaeg (päeva)</label>
+                <input class="text-input" id="f-vastus" type="number" min="1" value="7">
+                <span class="form-help">Partner peab päringule selle aja jooksul vastama.</span>
+              </div>
+              <div class="form-row">
+                <span class="form-label">Partnerettevõtted</span>
+                <div>
+                  <div id="partnerList">
+                    <div class="partner-row">
+                      <input class="text-input" type="text" value="Metsakava OÜ" aria-label="Partneri nimi">
+                      <button class="row-remove" type="button" aria-label="Eemalda Metsakava OÜ">✕</button>
+                    </div>
+                    <div class="partner-row">
+                      <input class="text-input" type="text" value="Pärnu Metsabüroo" aria-label="Partneri nimi">
+                      <button class="row-remove" type="button" aria-label="Eemalda Pärnu Metsabüroo">✕</button>
+                    </div>
+                    <div class="partner-row">
+                      <input class="text-input" type="text" value="Tartu Kavad OÜ" aria-label="Partneri nimi">
+                      <button class="row-remove" type="button" aria-label="Eemalda Tartu Kavad OÜ">✕</button>
+                    </div>
+                  </div>
+                  <button class="btn-ghost" id="addPartner" type="button">+ Lisa partner</button>
+                </div>
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="f-forward">Automaatne edastamine</label>
+                <span class="switch">
+                  <input type="checkbox" id="f-forward" checked>
+                  <span class="switch-ui" aria-hidden="true"></span>
+                </span>
+                <span class="form-help">Uus päring edastatakse kohe piirkonna partneritele.</span>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span class="save-hint"><i data-lucide="shield-check" aria-hidden="true"></i>Muudatused logitakse auditilogisse</span>
+              <button class="btn-primary" type="button" data-save>Salvesta</button>
+            </div>
+          </section>
+
+          <!-- Section 5: Integrations -->
+          <section class="card" id="sec-integratsioon" aria-labelledby="h-sec-integratsioon">
+            <div class="card-head"><h2 class="card-title" id="h-sec-integratsioon">Integratsioonid</h2></div>
+            <div class="settings-body">
+              <div class="form-row">
+                <span class="form-label">eID Easy API võti</span>
+                <div class="key-actions">
+                  <span class="key-val" id="key-eid" data-masked="sk-live-••••••••4f2a" data-value="sk-live-9f3e88c1d2a44f2a">sk-live-••••••••4f2a</span>
+                  <button class="btn-ghost" type="button" data-reveal aria-pressed="false" aria-controls="key-eid">Näita</button>
+                  <span class="status-dot ok" role="img" aria-label="Ühendus OK"></span>
+                </div>
+                <span class="form-help">Iga võtme paljastamine logitakse auditilogisse (settings.key_reveal).</span>
+              </div>
+              <div class="form-row">
+                <span class="form-label">Äriregister API võti</span>
+                <div class="key-actions">
+                  <span class="key-val" id="key-arireg" data-masked="ar-live-••••••••b21c" data-value="ar-live-5c2f81aa9d3eb21c">ar-live-••••••••b21c</span>
+                  <button class="btn-ghost" type="button" data-reveal aria-pressed="false" aria-controls="key-arireg">Näita</button>
+                  <span class="status-dot ok" role="img" aria-label="Ühendus OK"></span>
+                </div>
+              </div>
+              <div class="form-row">
+                <span class="form-label">SMS lüüsi võti (Messente)</span>
+                <div class="key-actions">
+                  <span class="key-val" id="key-sms" data-masked="mn-live-••••••••e05d" data-value="mn-live-2f8c44b1e05d">mn-live-••••••••e05d</span>
+                  <button class="btn-ghost" type="button" data-reveal aria-pressed="false" aria-controls="key-sms">Näita</button>
+                  <span class="status-dot ok" role="img" aria-label="Ühendus OK"></span>
+                </div>
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="f-mail">E-posti saatja</label>
+                <select class="select-input" id="f-mail">
+                  <option selected>Cloudflare Email</option>
+                  <option>SMTP (varulülitus)</option>
+                </select>
+                <span class="form-help">Kui Cloudflare Email pole saadaval, kasutatakse SMTP varulülitust.</span>
+              </div>
+              <div class="form-row">
+                <label class="form-label" for="f-wms">Maa-ameti WMS URL</label>
+                <input class="text-input" id="f-wms" type="url" value="https://kaart.maaamet.ee/ows/wms">
+              </div>
+            </div>
+            <div class="card-foot">
+              <span class="save-hint"><i data-lucide="shield-check" aria-hidden="true"></i>Muudatused logitakse auditilogisse</span>
+              <button class="btn-primary" type="button" data-save>Salvesta</button>
+            </div>
+          </section>
+
+          <!-- Section 6: Roles and rights matrix -->
+          <section class="card" id="sec-rollid" aria-labelledby="h-sec-rollid">
+            <div class="card-head"><h2 class="card-title" id="h-sec-rollid">Rollid ja õigused</h2></div>
+            <div class="tbl-wrap">
+              <table class="tbl roles-tbl">
+                <thead>
+                  <tr>
+                    <th scope="col">Õigus</th>
+                    <th scope="col" class="check">Spetsialist</th>
+                    <th scope="col" class="check">Müüja</th>
+                    <th scope="col" class="check">Admin</th>
+                    <th scope="col" class="check col-locked"><span class="lock-ico"><i data-lucide="lock" aria-hidden="true"></i></span>Superadmin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Oksjonite haldus</td>
+                    <td class="check"><input type="checkbox" checked aria-label="Spetsialist: oksjonite haldus"></td>
+                    <td class="check"><input type="checkbox" checked aria-label="Müüja: oksjonite haldus"></td>
+                    <td class="check"><input type="checkbox" checked aria-label="Admin: oksjonite haldus"></td>
+                    <td class="check col-locked"><input type="checkbox" checked disabled aria-label="Superadmin: oksjonite haldus (alati lubatud)"></td>
+                  </tr>
+                  <tr>
+                    <td>Pakkumiste jälgimine</td>
+                    <td class="check"><input type="checkbox" checked aria-label="Spetsialist: pakkumiste jälgimine"></td>
+                    <td class="check"><input type="checkbox" checked aria-label="Müüja: pakkumiste jälgimine"></td>
+                    <td class="check"><input type="checkbox" checked aria-label="Admin: pakkumiste jälgimine"></td>
+                    <td class="check col-locked"><input type="checkbox" checked disabled aria-label="Superadmin: pakkumiste jälgimine (alati lubatud)"></td>
+                  </tr>
+                  <tr>
+                    <td>Kasutajate haldus</td>
+                    <td class="check"><input type="checkbox" aria-label="Spetsialist: kasutajate haldus"></td>
+                    <td class="check"><input type="checkbox" aria-label="Müüja: kasutajate haldus"></td>
+                    <td class="check"><input type="checkbox" checked aria-label="Admin: kasutajate haldus"></td>
+                    <td class="check col-locked"><input type="checkbox" checked disabled aria-label="Superadmin: kasutajate haldus (alati lubatud)"></td>
+                  </tr>
+                  <tr>
+                    <td>Seaded</td>
+                    <td class="check"><input type="checkbox" aria-label="Spetsialist: seaded"></td>
+                    <td class="check"><input type="checkbox" aria-label="Müüja: seaded"></td>
+                    <td class="check"><input type="checkbox" checked aria-label="Admin: seaded"></td>
+                    <td class="check col-locked"><input type="checkbox" checked disabled aria-label="Superadmin: seaded (alati lubatud)"></td>
+                  </tr>
+                  <tr>
+                    <td>Auditlogi</td>
+                    <td class="check"><input type="checkbox" aria-label="Spetsialist: auditlogi"></td>
+                    <td class="check"><input type="checkbox" aria-label="Müüja: auditlogi"></td>
+                    <td class="check"><input type="checkbox" checked aria-label="Admin: auditlogi"></td>
+                    <td class="check col-locked"><input type="checkbox" checked disabled aria-label="Superadmin: auditlogi (alati lubatud)"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="matrix-note">Adminil on seadetest ainult teavituste mallid ja vaatamine ning auditlogist ainult enda tegevused. Superadmini veerg on lukustatud.</p>
+            <div class="card-foot">
+              <span class="save-hint"><i data-lucide="shield-check" aria-hidden="true"></i>Muudatused logitakse auditilogisse</span>
+              <button class="btn-primary" type="button" data-save>Salvesta</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Mobile drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true"></div>
+<aside class="drawer" id="drawer" aria-label="Peamenüü" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="rail-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/></svg>
+    </span>
+    <span class="topbar-title">Erametsad haldus</span>
+    <button class="icon-btn" id="menuClose" type="button" aria-label="Sulge menüü"><i data-lucide="x"></i></button>
+  </div>
+  <nav class="drawer-nav">
+    <a class="drawer-link" href="01-dashboard.html"><i data-lucide="layout-dashboard"></i>Töölaud</a>
+    <a class="drawer-link" href="02-auctions-list.html"><i data-lucide="gavel"></i>Oksjonid</a>
+    <a class="drawer-link" href="04-bids-monitoring.html"><i data-lucide="activity"></i>Pakkumised</a>
+    <a class="drawer-link" href="05-sealed-opening.html"><i data-lucide="key-round"></i>Sul. avamine<span class="drawer-flag dot is-amber"></span></a>
+    <a class="drawer-link" href="06-users.html"><i data-lucide="users"></i>Kasutajad</a>
+    <a class="drawer-link" href="07-company-approvals.html"><i data-lucide="building-2"></i>Ettevõtted<span class="drawer-flag num is-red">3</span></a>
+    <a class="drawer-link" href="08-contracts.html"><i data-lucide="file-signature"></i>Lepingud</a>
+    <a class="drawer-link" href="09-leads-crm.html"><i data-lucide="kanban"></i>Juhtlõimed</a>
+    <a class="drawer-link" href="10-service-requests.html"><i data-lucide="send-horizontal"></i>Päringud</a>
+    <a class="drawer-link" href="11-cms-content.html"><i data-lucide="file-pen"></i>Sisuhaldus</a>
+    <a class="drawer-link" href="12-statistics.html"><i data-lucide="chart-column"></i>Statistika</a>
+    <a class="drawer-link active" href="13-settings.html" aria-current="page"><i data-lucide="settings"></i>Seaded</a>
+    <a class="drawer-link" href="14-audit-log.html"><i data-lucide="shield-check"></i>Auditlogi</a>
+  </nav>
+</aside>
+
+<!-- Maintenance mode confirmation modal -->
+<div class="modal-backdrop" id="maintModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="maintTitle" aria-describedby="maintDesc">
+    <div class="modal-ico"><i data-lucide="triangle-alert" aria-hidden="true"></i></div>
+    <h2 class="modal-title" id="maintTitle">Lülita hooldusrežiim sisse?</h2>
+    <p class="modal-text" id="maintDesc">Avalik portaal sulgub külastajatele kohe. Käimasolevad oksjonid jätkuvad, kuid uusi pakkumisi ei võeta vastu. Tegevus logitakse auditilogisse.</p>
+    <label class="form-label" for="maintConfirm">Trüki kinnitussõna: HOOLDUS</label>
+    <input class="text-input" id="maintConfirm" type="text" autocomplete="off" spellcheck="false">
+    <div class="modal-actions">
+      <button class="btn-ghost" id="maintCancelBtn" type="button">Tühista</button>
+      <button class="btn-danger" id="maintConfirmBtn" type="button" disabled>Lülita sisse</button>
+    </div>
+  </div>
+</div>
+
+<!-- Demo toast -->
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <i data-lucide="shield-check" aria-hidden="true"></i>
+  <span class="toast-body">
+    <span class="toast-main">Seaded salvestatud</span>
+    <span class="toast-sub" hidden></span>
+  </span>
+</div>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+
+  /* Lucide icons */
+  if(window.lucide)lucide.createIcons();
+
+  /* Mobile drawer */
+  const drawer=$("#drawer"), backdrop=$("#drawerBackdrop"),
+        openBtn=$("#menuOpen"), closeBtn=$("#menuClose");
+  const setDrawer=open=>{
+    document.body.classList.toggle("drawer-open",open);
+    drawer.setAttribute("aria-hidden",String(!open));
+    openBtn.setAttribute("aria-expanded",String(open));
+  };
+  openBtn.addEventListener("click",()=>setDrawer(true));
+  closeBtn.addEventListener("click",()=>setDrawer(false));
+  backdrop.addEventListener("click",()=>setDrawer(false));
+  addEventListener("keydown",e=>{if(e.key==="Escape")setDrawer(false)});
+
+  /* Global search: focus with Cmd/Ctrl+K */
+  const search=$("#globalSearch");
+  addEventListener("keydown",e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
+      e.preventDefault();
+      search.focus(); search.select();
+    }
+  });
+
+  /* Live countdowns (demo offsets in seconds from load) */
+  const pad=n=>String(n).padStart(2,"0");
+  const cds=$$("[data-countdown]").map(el=>({el,end:Date.now()+Number(el.dataset.countdown)*1000}));
+  function tick(){
+    const now=Date.now();
+    cds.forEach(c=>{
+      const r=Math.max(0,c.end-now);
+      if(r===0){c.el.textContent="Lõppenud"; c.el.classList.remove("cd-crit"); return;}
+      const h=Math.floor(r/36e5), m=Math.floor(r%36e5/6e4), s=Math.floor(r%6e4/1e3);
+      c.el.textContent=pad(h)+":"+pad(m)+":"+pad(s);
+      c.el.classList.toggle("cd-crit",r<3e5);
+    });
+  }
+  tick(); setInterval(tick,1000);
+})();
+</script>
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+
+  /* Demo toast with audit note */
+  const toast=$("#toast"), toastMain=toast?toast.querySelector(".toast-main"):null,
+        toastSub=toast?toast.querySelector(".toast-sub"):null;
+  let toastTimer=null;
+  function showToast(main,sub){
+    if(!toast||!toastMain)return;
+    toastMain.textContent=main;
+    if(toastSub){toastSub.textContent=sub||""; toastSub.hidden=!sub;}
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>toast.classList.remove("show"),3600);
+  }
+
+  /* Section save buttons */
+  $$("[data-save]").forEach(btn=>{
+    btn.addEventListener("click",()=>showToast("Seaded salvestatud","Logitud auditilogisse: settings.change · Marit Vain"));
+  });
+
+  /* Masked integration keys: every reveal is logged (demo) */
+  $$("[data-reveal]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const wrap=btn.closest(".key-actions"), val=wrap?wrap.querySelector(".key-val"):null;
+      if(!val)return;
+      if(btn.getAttribute("aria-pressed")==="true"){
+        val.textContent=val.dataset.masked;
+        btn.textContent="Näita";
+        btn.setAttribute("aria-pressed","false");
+      }else{
+        val.textContent=val.dataset.value;
+        btn.textContent="Peida";
+        btn.setAttribute("aria-pressed","true");
+        showToast("API võti paljastatud","Logitud auditilogisse: settings.key_reveal");
+      }
+    });
+  });
+
+  /* Maintenance mode: destructive enable needs typed confirm word */
+  const maint=$("#maintToggle"), modal=$("#maintModal"), word=$("#maintConfirm"),
+        ok=$("#maintConfirmBtn"), cancel=$("#maintCancelBtn");
+  if(maint&&modal&&word&&ok&&cancel){
+    const openModal=()=>{
+      word.value=""; ok.disabled=true;
+      modal.classList.add("open"); modal.setAttribute("aria-hidden","false");
+      word.focus();
+    };
+    const closeModal=revert=>{
+      modal.classList.remove("open"); modal.setAttribute("aria-hidden","true");
+      if(revert)maint.checked=false;
+      maint.focus();
+    };
+    maint.addEventListener("change",()=>{
+      if(maint.checked){openModal();}
+      else{showToast("Hooldusrežiim välja lülitatud","Logitud auditilogisse: maintenance.end");}
+    });
+    cancel.addEventListener("click",()=>closeModal(true));
+    modal.addEventListener("click",e=>{if(e.target===modal)closeModal(true)});
+    addEventListener("keydown",e=>{
+      if(e.key==="Escape"&&modal.classList.contains("open"))closeModal(true);
+    });
+    word.addEventListener("input",()=>{ok.disabled=word.value.trim().toUpperCase()!=="HOOLDUS"});
+    ok.addEventListener("click",()=>{
+      closeModal(false);
+      showToast("Hooldusrežiim sisse lülitatud","Logitud auditilogisse: maintenance.start");
+    });
+  }
+
+  /* Partner provider list: add/remove rows */
+  const list=$("#partnerList"), addBtn=$("#addPartner");
+  if(list&&addBtn){
+    list.addEventListener("click",e=>{
+      const rm=e.target.closest(".row-remove");
+      if(rm)rm.closest(".partner-row").remove();
+    });
+    addBtn.addEventListener("click",()=>{
+      const row=document.createElement("div");
+      row.className="partner-row";
+      const input=document.createElement("input");
+      input.className="text-input"; input.type="text";
+      input.placeholder="Partneri nimi";
+      input.setAttribute("aria-label","Partneri nimi");
+      const rm=document.createElement("button");
+      rm.type="button"; rm.className="row-remove";
+      rm.textContent="✕";
+      rm.setAttribute("aria-label","Eemalda partner");
+      row.append(input,rm);
+      list.append(row);
+      input.focus();
+    });
+  }
+})();
+</script>
+</body>
+</html>

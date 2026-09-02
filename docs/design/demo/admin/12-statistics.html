@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Statistika | Erametsad haldus</title>
+<meta name="description" content="Erametsad haldusplaadi statistika ja ärinäitajad — demo prototüüp.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23012d1d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z'/%3E%3Cpath d='M12 22v-3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ---- Tokens (ADMIN-DESIGN-SPEC §1.2) ---- */
+:root{
+  --primary:#012d1d; --primary-hover:#1b4332; --primary-dark:#16382A; --primary-light:#c1ecd4;
+  --accent:#58B368; --cta:#F2A93B; --cta-hover:#D98F1F;
+  --ink:#181a2e; --ink-muted:#414844; --ink-inverse:#FFFFFF;
+  --bg-page:#fbf8ff; --bg-mist:#f4f2ff; --border:#c1c8c2;
+  --danger:#B3261E; --danger-light:#FBEAE9; --info:#2D6FA8; --info-light:#E9F1F7;
+  --st-draft-text:#414844; --st-draft-bg:#EBEBEB; --st-draft-dot:#6B7570;
+  --st-sched-text:#1F4E79; --st-sched-bg:#E9F1F7; --st-sched-dot:#2D6FA8;
+  --st-active-text:#1B6338; --st-active-bg:#E8F6ED; --st-active-dot:#2E9E5B;
+  --st-ending-text:#941E17; --st-ending-bg:#FBEAE9; --st-ending-dot:#B3261E;
+  --st-ended-text:#8F590A; --st-ended-bg:#FEF5E7; --st-ended-dot:#F2A93B;
+  --st-unsold:#B3261E;
+  --st-contract-text:#236B3B; --st-contract-bg:#EBF7F0; --st-contract-dot:#58B368;
+  --st-arch-text:#414844; --st-arch-bg:#ECEEEB; --st-arch-dot:#6B7570;
+  --font-heading:"Public Sans",system-ui,sans-serif;
+  --font-body:"Inter",system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --space-2xs:4px; --space-xs:8px; --space-sm:12px; --space-md:16px;
+  --space-lg:24px; --space-xl:32px; --space-2xl:40px; --space-3xl:48px; --space-4xl:64px;
+  --radius:8px; --radius-pill:999px;
+  --surface:#FFFFFF;
+  --shadow-card:0 1px 2px rgba(24,26,46,.04),0 2px 8px rgba(24,26,46,.05);
+  --shadow-hover:0 2px 8px rgba(24,26,46,.08),0 8px 24px rgba(24,26,46,.08);
+  --shadow-pop:0 8px 24px rgba(24,26,46,.14);
+  --tint-primary:rgba(1,45,29,.06);
+  --tint-primary-strong:rgba(1,45,29,.1);
+  --glow-active:rgba(46,158,91,.45);
+  --accent-soft:rgba(88,179,104,.28);
+  --overlay:rgba(24,26,46,.45);
+  --rail-w:56px; --topbar-h:64px;
+}
+
+/* ---- Base ---- */
+*,*::before,*::after{box-sizing:border-box}
+html{color-scheme:light; -webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg-page); color:var(--ink);
+  font:400 14px/20px var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--primary)}
+button{font:inherit; cursor:pointer}
+ul{margin:0; padding:0; list-style:none}
+svg{display:block}
+svg.lucide{flex:none}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+::selection{background:var(--primary-light)}
+.mono{font-family:var(--font-mono); font-feature-settings:"tnum"}
+.sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
+.skip-link{
+  position:absolute; left:-9999px; top:8px; z-index:200;
+  background:var(--primary); color:var(--ink-inverse); padding:10px 16px; border-radius:var(--radius);
+}
+.skip-link:focus{left:8px; color:var(--ink-inverse)}
+
+/* ---- Left icon rail (fixed 56px) ---- */
+.rail{
+  position:fixed; inset:0 auto 0 0; width:var(--rail-w); z-index:100;
+  display:flex; flex-direction:column; align-items:center;
+  background:var(--surface); border-right:1px solid var(--border); padding:12px 0;
+}
+.rail-logo{
+  display:grid; place-items:center; width:32px; height:32px; margin-bottom:16px;
+  border-radius:var(--radius); background:var(--bg-mist); color:var(--primary);
+}
+.rail-logo svg{width:20px; height:20px}
+.rail-nav{display:flex; flex-direction:column; align-items:center; gap:2px; width:100%}
+.rail-item{
+  position:relative; display:grid; place-items:center; width:40px; height:40px;
+  border-radius:var(--radius); color:var(--ink-muted); text-decoration:none;
+  transition:background-color .15s ease-out, color .15s ease-out;
+}
+.rail-item svg{width:20px; height:20px}
+.rail-item:hover{background:var(--tint-primary); color:var(--primary)}
+.rail-item.active{background:var(--tint-primary-strong); color:var(--primary)}
+.rail-item.active::before{content:""; position:absolute; left:-8px; top:6px; bottom:6px; width:3px; border-radius:0 2px 2px 0; background:var(--primary)}
+.rail-item::after{
+  content:attr(data-tip); position:absolute; left:calc(100% + 12px); top:50%; transform:translateY(-50%);
+  z-index:110; background:var(--ink); color:var(--ink-inverse);
+  font:500 12px/16px var(--font-body); padding:5px 9px; border-radius:6px; white-space:nowrap;
+  opacity:0; visibility:hidden; transition:opacity .12s ease-out .08s, visibility 0s .2s; pointer-events:none;
+}
+.rail-item:hover::after,.rail-item:focus-visible::after{opacity:1; visibility:visible; transition-delay:0s}
+.rail-flag{position:absolute; top:3px; right:2px; z-index:1}
+.rail-flag.dot{width:8px; height:8px; border-radius:var(--radius-pill)}
+.rail-flag.num{
+  min-width:14px; height:14px; padding:0 3px; border-radius:var(--radius-pill);
+  display:grid; place-items:center; font:700 9px/1 var(--font-body); color:var(--ink-inverse);
+  border:2px solid var(--surface);
+}
+.is-amber{background:var(--cta)}
+.is-red{background:var(--danger)}
+
+/* ---- Topbar (sticky 64px) ---- */
+.app{margin-left:var(--rail-w)}
+.topbar{
+  position:sticky; top:0; z-index:90; display:flex; align-items:center; gap:12px;
+  height:var(--topbar-h); padding:0 24px;
+  background:var(--surface); border-bottom:1px solid var(--border);
+}
+.menu-btn{display:none; place-items:center; width:36px; height:36px; margin-left:-8px; border:0; border-radius:var(--radius); background:transparent; color:var(--ink)}
+.menu-btn:hover{background:var(--bg-mist)}
+.topbar-brand{display:flex; align-items:center; gap:10px; flex:none}
+.env-badge{display:inline-flex; align-items:center; padding:3px 10px; border-radius:var(--radius-pill); font:700 11px/14px var(--font-heading); letter-spacing:.04em}
+.env-prod{background:var(--st-active-bg); color:var(--st-active-text)}
+.env-stage{background:var(--st-ended-bg); color:var(--st-ended-text)}
+.env-dev{background:var(--danger-light); color:var(--danger)}
+.topbar-title{font:600 15px/20px var(--font-heading); color:var(--ink)}
+.topbar-search{
+  position:relative; display:flex; align-items:center; gap:8px; flex:1; max-width:420px; height:36px;
+  margin-inline:auto; padding:0 10px; border-radius:var(--radius);
+  background:var(--bg-mist); border:1px solid transparent;
+  transition:border-color .15s ease-out, background-color .15s ease-out;
+}
+.topbar-search:focus-within{border-color:var(--primary); background:var(--surface)}
+.topbar-search svg{width:16px; height:16px; color:var(--ink-muted)}
+.topbar-search input{flex:1; min-width:0; border:0; background:transparent; outline:0; font:400 13px/18px var(--font-body); color:var(--ink)}
+.topbar-search input::placeholder{color:var(--ink-muted)}
+.search-kbd{flex:none; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1px 6px; font:500 11px/16px var(--font-mono); color:var(--ink-muted)}
+.topbar-user{display:flex; align-items:center; gap:8px; flex:none}
+.icon-btn{
+  position:relative; display:grid; place-items:center; width:36px; height:36px;
+  border:0; border-radius:var(--radius); background:transparent; color:var(--ink-muted);
+}
+.icon-btn:hover{background:var(--bg-mist); color:var(--primary)}
+.icon-btn svg{width:18px; height:18px}
+.bell-badge{
+  position:absolute; top:3px; right:3px; min-width:15px; height:15px; padding:0 3px;
+  border-radius:var(--radius-pill); background:var(--danger); color:var(--ink-inverse);
+  border:2px solid var(--surface); font:600 10px/1 var(--font-body);
+  display:grid; place-items:center;
+}
+.user-menu{
+  display:flex; align-items:center; gap:10px; padding:4px 6px 4px 4px;
+  border:0; border-radius:var(--radius); background:transparent;
+}
+.user-menu:hover{background:var(--bg-mist)}
+.avatar{
+  width:32px; height:32px; border-radius:50%;
+  background:var(--primary); color:var(--ink-inverse);
+  display:grid; place-items:center; font:600 12px/1 var(--font-heading); letter-spacing:.02em;
+}
+.user-meta{display:flex; align-items:center; gap:8px}
+.user-name{font:600 13px/16px var(--font-body); color:var(--ink)}
+.role-chip{padding:2px 8px; border-radius:var(--radius-pill); background:var(--primary-light); color:var(--primary); font:600 11px/14px var(--font-body)}
+.user-menu > svg{width:16px; height:16px; color:var(--ink-muted)}
+
+/* ---- Workspace ---- */
+.container{max-width:1400px; margin-inline:auto; padding:var(--space-lg)}
+.breadcrumb{display:flex; align-items:center; gap:6px; font:500 12px/16px var(--font-body); color:var(--ink-muted); margin-bottom:6px}
+.page-head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:var(--space-lg)}
+.page-title{margin:0; font:700 28px/34px var(--font-heading); color:var(--ink)}
+
+/* ---- Cards ---- */
+.card{
+  display:flex; flex-direction:column; overflow:hidden;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card);
+}
+.card-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 20px; border-bottom:1px solid var(--border)}
+.card-title{margin:0; font:600 16px/22px var(--font-heading); color:var(--ink)}
+.card-foot{margin-top:auto; padding:12px 20px; border-top:1px solid var(--border); text-align:right}
+.card-link{font:600 13px/18px var(--font-body); color:var(--primary); text-decoration:none}
+.card-link:hover{color:var(--primary-hover); text-decoration:underline}
+
+/* ---- KPI strip ---- */
+.kpi-grid{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--space-sm); margin-bottom:var(--space-lg)}
+.kpi-card{
+  display:flex; flex-direction:column; gap:2px; padding:var(--space-md);
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card); color:var(--ink); text-decoration:none;
+  transition:border-color .15s ease-out, box-shadow .15s ease-out, transform .15s ease-out;
+}
+.kpi-card:hover{border-color:var(--primary); box-shadow:var(--shadow-hover); transform:translateY(-1px)}
+.kpi-label{font:500 12px/16px var(--font-body); color:var(--ink-muted)}
+.kpi-value{font:700 28px/32px var(--font-mono); font-feature-settings:"tnum"; letter-spacing:-.01em}
+.kpi-value.is-danger{color:var(--danger)}
+.kpi-alert{
+  display:inline-grid; place-items:center; width:18px; height:18px; margin-left:8px; vertical-align:6px;
+  border-radius:var(--radius-pill); background:var(--cta); color:var(--ink);
+  font:700 12px/1 var(--font-body);
+}
+.kpi-sub{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.trend-up{color:var(--st-active-text); font-weight:500}
+.spark{width:100%; height:24px; margin:4px 0 2px}
+.info-dot{display:inline-grid; place-items:center; vertical-align:-2px; color:var(--ink-muted); cursor:help}
+.info-dot svg{width:12px; height:12px}
+
+/* ---- Dashboard grid (2/3 + 1/3) ---- */
+.dash-grid{display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:var(--space-lg); align-items:stretch}
+
+/* ---- Live table ---- */
+.live{display:inline-flex; align-items:center; gap:7px; font:600 12px/16px var(--font-body); color:var(--st-active-text)}
+.live-dot{width:8px; height:8px; border-radius:var(--radius-pill); background:var(--st-active-dot); animation:live-pulse 2s ease-out infinite}
+@keyframes live-pulse{0%{box-shadow:0 0 0 0 var(--glow-active)}70%,100%{box-shadow:0 0 0 6px transparent}}
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%; min-width:620px; border-collapse:collapse}
+.tbl th{padding:10px 16px; background:var(--bg-mist); font:500 12px/16px var(--font-body); color:var(--ink-muted); text-align:left; white-space:nowrap}
+.tbl td{padding:12px 16px; border-top:1px solid var(--border); font:400 13px/18px var(--font-body); vertical-align:middle}
+.tbl th:first-child,.tbl td:first-child{padding-left:20px}
+.tbl th:last-child,.tbl td:last-child{padding-right:20px}
+.tbl tbody tr{transition:background-color .15s ease-out}
+.tbl tbody tr:hover{background:var(--bg-mist)}
+.num{text-align:right}
+.lot-id{font:500 12px/16px var(--font-mono); color:var(--ink-muted)}
+.lot-name{color:var(--ink); font:500 13px/18px var(--font-body); text-decoration:none}
+.lot-name:hover{color:var(--primary); text-decoration:underline}
+td .cd{font:500 14px/18px var(--font-mono); font-feature-settings:"tnum"}
+.bid{font:500 13px/18px var(--font-mono); font-feature-settings:"tnum"}
+.bid-muted{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.type-chip{display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.type-chip svg{width:12px; height:12px}
+.type-raie{background:var(--st-active-bg); color:var(--st-active-text)}
+.type-kinnistu{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.type-pakett{background:var(--st-draft-bg); color:var(--st-draft-text)}
+.btn-outline{
+  display:inline-flex; align-items:center; gap:6px; padding:5px 12px;
+  border:1px solid var(--accent); border-radius:var(--radius); background:transparent;
+  color:var(--primary); font:600 12px/16px var(--font-body); text-decoration:none; white-space:nowrap;
+  transition:background-color .15s ease-out;
+}
+.btn-outline svg{width:11px; height:11px}
+.btn-outline:hover{background:var(--st-active-bg)}
+.cd-crit{color:var(--danger) !important; animation:cd-blink 1s step-end infinite}
+@keyframes cd-blink{50%{opacity:.45}}
+@keyframes row-flash{0%{background:var(--accent-soft)}100%{background:transparent}}
+tr.row-extend td{animation:row-flash .9s ease-out 2}
+
+/* ---- Süsteemi tervis ---- */
+.health-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 20px; border-top:1px solid var(--border)}
+.health-row:first-child{border-top:0}
+.health-name{font:400 13px/18px var(--font-body); color:var(--ink-muted)}
+.health-val{display:inline-flex; align-items:center; gap:8px; font:500 13px/18px var(--font-body); color:var(--ink)}
+.ok-text{font:600 12px/16px var(--font-body); color:var(--st-active-text)}
+.status-dot{width:8px; height:8px; border-radius:var(--radius-pill); flex:none}
+.status-dot.ok{background:var(--st-active-dot)}
+.status-dot.warn{background:var(--cta)}
+.status-dot.err{background:var(--danger)}
+.health-foot{
+  display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:auto; padding:10px 20px 14px;
+  border-top:1px solid var(--border);
+  font:400 11px/16px var(--font-body); color:var(--ink-muted);
+}
+.health-foot span{display:inline-flex; align-items:center; gap:6px}
+.mini-dot{width:6px; height:6px; border-radius:var(--radius-pill); background:var(--st-active-dot)}
+
+/* ---- Kiire tegevus ---- */
+.action-row{
+  display:flex; align-items:center; gap:12px; padding:13px 20px;
+  border-top:1px solid var(--border); color:var(--ink); text-decoration:none;
+  transition:background-color .15s ease-out;
+}
+.action-row:first-child{border-top:0}
+.action-row:hover{background:var(--bg-mist)}
+.action-ico{display:grid; place-items:center; width:36px; height:36px; flex:none; border-radius:var(--radius); background:var(--bg-mist); color:var(--primary)}
+.action-ico svg{width:18px; height:18px}
+.action-main{display:flex; flex-direction:column; gap:1px; flex:1; min-width:0}
+.action-title{font:500 13px/18px var(--font-body); color:var(--ink)}
+.action-note{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.action-note.warn{color:var(--st-ended-text)}
+.count-pill{flex:none; padding:2px 10px; border-radius:var(--radius-pill); background:var(--primary-light); color:var(--primary); font:700 12px/16px var(--font-body); white-space:nowrap}
+.action-go{
+  display:grid; place-items:center; width:28px; height:28px; flex:none;
+  border:1px solid transparent; border-radius:var(--radius-pill); color:var(--ink-muted);
+  transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out;
+}
+.action-go svg{width:14px; height:14px}
+.action-row:hover .action-go{border-color:var(--border); background:var(--surface); color:var(--primary)}
+
+/* ---- Viimased juhtlõimed ---- */
+.lead-row{display:flex; align-items:center; gap:10px; padding:13px 20px; border-top:1px solid var(--border)}
+.lead-row:first-child{border-top:0}
+.lead-time{font:500 12px/16px var(--font-mono); font-feature-settings:"tnum"; color:var(--ink-muted)}
+.chip{display:inline-flex; align-items:center; padding:2px 10px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.chip-name{background:var(--bg-mist); border:1px solid var(--border); color:var(--ink)}
+.lead-county{flex:1; min-width:0; font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.chip-src{font:600 11px/16px var(--font-body)}
+.src-kava{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.src-raie{background:var(--st-active-bg); color:var(--st-active-text)}
+.src-ost{background:var(--st-ended-bg); color:var(--st-ended-text)}
+
+/* ---- Mobile drawer (<768px) ---- */
+.drawer{
+  position:fixed; top:0; bottom:0; left:0; z-index:140; width:min(320px,86vw);
+  display:flex; flex-direction:column; visibility:hidden;
+  background:var(--surface); box-shadow:var(--shadow-pop);
+  transform:translateX(-102%); transition:transform .2s cubic-bezier(.4,0,.2,1), visibility 0s .2s;
+}
+body.drawer-open .drawer{transform:none; visibility:visible; transition-delay:0s}
+body.drawer-open{overflow:hidden}
+.drawer-head{display:flex; align-items:center; gap:10px; height:var(--topbar-h); padding:0 12px 0 16px; border-bottom:1px solid var(--border)}
+.drawer-head .rail-logo{margin:0}
+.drawer-head .topbar-title{flex:1}
+.drawer-nav{flex:1; overflow-y:auto; padding:8px}
+.drawer-link{
+  display:flex; align-items:center; gap:12px; padding:11px 12px; margin-bottom:2px;
+  border-radius:var(--radius); color:var(--ink); font:500 14px/20px var(--font-body); text-decoration:none;
+}
+.drawer-link:hover{background:var(--bg-mist)}
+.drawer-link.active{background:var(--tint-primary-strong); color:var(--primary); font-weight:600}
+.drawer-link svg{width:18px; height:18px; color:var(--ink-muted)}
+.drawer-link.active svg{color:var(--primary)}
+.drawer-flag{margin-left:auto; flex:none}
+.drawer-flag.dot{width:8px; height:8px; border-radius:var(--radius-pill)}
+.drawer-flag.num{min-width:14px; height:14px; padding:0 4px; border-radius:var(--radius-pill); display:grid; place-items:center; font:700 10px/1 var(--font-body); color:var(--ink-inverse)}
+.drawer-backdrop{
+  position:fixed; inset:0; z-index:130; background:var(--overlay);
+  opacity:0; visibility:hidden; transition:opacity .2s, visibility 0s .2s;
+}
+body.drawer-open .drawer-backdrop{opacity:1; visibility:visible; transition-delay:0s}
+
+/* ---- Responsive ---- */
+@media (max-width:1280px){.kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:1024px){.dash-grid{grid-template-columns:1fr}}
+@media (max-width:860px){.topbar-search{display:none}}
+@media (max-width:767px){
+  .rail{display:none}
+  .app{margin-left:0}
+  .menu-btn{display:grid}
+  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .topbar{padding:0 16px}
+  .container{padding:16px}
+}
+@media (max-width:640px){.user-meta{display:none}}
+@media (max-width:420px){.kpi-grid{grid-template-columns:1fr}}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important}
+}
+/* ---- Page 12: Statistika — KPI cards, inline SVG charts, county tables ---- */
+.breadcrumb a{color:inherit; text-decoration:none}
+.breadcrumb a:hover{color:var(--primary); text-decoration:underline}
+.breadcrumb .sep{color:var(--ink-muted)}
+.kpi-6{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:var(--space-sm); margin-bottom:var(--space-lg)}
+.stats-toolbar{display:flex; align-items:center; gap:var(--space-sm); flex-wrap:wrap}
+.select-input{
+  height:36px; padding:0 34px 0 12px; appearance:none; cursor:pointer;
+  border:1px solid var(--border); border-radius:var(--radius); color:var(--ink);
+  background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23414484' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center/14px;
+  font:500 13px/18px var(--font-body);
+  transition:border-color .15s ease-out;
+}
+.select-input:hover{border-color:var(--primary)}
+.btn-ghost{
+  display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 14px;
+  border:1px solid var(--border); border-radius:var(--radius); background:var(--surface);
+  color:var(--ink); font:600 13px/18px var(--font-body); white-space:nowrap;
+  transition:border-color .15s ease-out, background-color .15s ease-out, color .15s ease-out;
+}
+.btn-ghost:hover{border-color:var(--primary); color:var(--primary); background:var(--tint-primary)}
+.btn-ghost svg{width:14px; height:14px}
+.stats-stack{display:flex; flex-direction:column; gap:var(--space-lg)}
+.chart-body{padding:var(--space-md) 20px 8px}
+.chart-svg{width:100%; height:auto}
+.chart-note{margin:0; padding:10px 20px 14px; font:400 11px/16px var(--font-body); color:var(--ink-muted)}
+.legend{display:flex; align-items:center; gap:16px; flex-wrap:wrap}
+.legend-item{display:inline-flex; align-items:center; gap:7px; font:500 12px/16px var(--font-body); color:var(--ink-muted)}
+.legend-swatch{width:12px; height:12px; border-radius:3px; flex:none}
+.legend-val{font-family:var(--font-mono); font-feature-settings:"tnum"; color:var(--ink)}
+.donut-wrap{display:flex; align-items:center; gap:var(--space-lg); padding:var(--space-md) 20px; flex-wrap:wrap}
+.donut-svg{width:180px; height:180px; flex:none}
+.donut-legend{flex:1; min-width:190px; display:flex; flex-direction:column; gap:10px}
+.axis-txt{font:500 10px/12px var(--font-mono); font-feature-settings:"tnum"; fill:var(--ink-muted)}
+.axis-title{font:500 10px/12px var(--font-body); fill:var(--ink-muted)}
+.grid-line{stroke:var(--border); stroke-width:1}
+.chart-fade{animation:stat-fade .35s ease-out}
+@keyframes stat-fade{from{opacity:0}to{opacity:1}}
+.type-poll{background:var(--st-ended-bg); color:var(--st-ended-text)}
+@media (max-width:1280px){.kpi-6{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:1024px){.donut-wrap{justify-content:flex-start}}
+@media (max-width:767px){.kpi-6{grid-template-columns:repeat(2,minmax(0,1fr))}.stats-toolbar{width:100%}}
+@media (max-width:420px){.kpi-6{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Liigu sisuni</a>
+
+<!-- Left icon rail -->
+<aside class="rail" aria-label="Peamenüü">
+  <a class="rail-logo" href="01-dashboard.html" data-tip="Erametsad haldus" aria-label="Erametsad haldus">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/></svg>
+  </a>
+  <nav class="rail-nav">
+    <a class="rail-item" href="01-dashboard.html" data-tip="Töölaud" aria-label="Töölaud"><i data-lucide="layout-dashboard"></i></a>
+    <a class="rail-item" href="02-auctions-list.html" data-tip="Oksjonid" aria-label="Oksjonid"><i data-lucide="gavel"></i></a>
+    <a class="rail-item" href="04-bids-monitoring.html" data-tip="Pakkumised" aria-label="Pakkumised"><i data-lucide="activity"></i></a>
+    <a class="rail-item" href="05-sealed-opening.html" data-tip="Sul. avamine" aria-label="Sul. avamine — ootel tseremoonia"><i data-lucide="key-round"></i><span class="rail-flag dot is-amber"></span></a>
+    <a class="rail-item" href="06-users.html" data-tip="Kasutajad" aria-label="Kasutajad"><i data-lucide="users"></i></a>
+    <a class="rail-item" href="07-company-approvals.html" data-tip="Ettevõtted" aria-label="Ettevõtted — 3 ootel"><i data-lucide="building-2"></i><span class="rail-flag num is-red">3</span></a>
+    <a class="rail-item" href="08-contracts.html" data-tip="Lepingud" aria-label="Lepingud"><i data-lucide="file-signature"></i></a>
+    <a class="rail-item" href="09-leads-crm.html" data-tip="Juhtlõimed" aria-label="Juhtlõimed"><i data-lucide="kanban"></i></a>
+    <a class="rail-item" href="10-service-requests.html" data-tip="Päringud" aria-label="Päringud"><i data-lucide="send-horizontal"></i></a>
+    <a class="rail-item" href="11-cms-content.html" data-tip="Sisuhaldus" aria-label="Sisuhaldus"><i data-lucide="file-pen"></i></a>
+    <a class="rail-item active" href="12-statistics.html" data-tip="Statistika" aria-label="Statistika" aria-current="page"><i data-lucide="chart-column"></i></a>
+    <a class="rail-item" href="13-settings.html" data-tip="Seaded" aria-label="Seaded"><i data-lucide="settings"></i></a>
+    <a class="rail-item" href="14-audit-log.html" data-tip="Auditlogi" aria-label="Auditlogi"><i data-lucide="shield-check"></i></a>
+  </nav>
+</aside>
+
+<div class="app">
+  <!-- Topbar -->
+  <header class="topbar">
+    <button class="menu-btn" id="menuOpen" type="button" aria-label="Ava menüü" aria-expanded="false" aria-controls="drawer"><i data-lucide="menu"></i></button>
+    <div class="topbar-brand">
+      <span class="env-badge env-stage" title="Staging keskkond">STAGE</span>
+      <span class="topbar-title">Erametsad haldus</span>
+    </div>
+    <div class="topbar-search">
+      <i data-lucide="search"></i>
+      <input id="globalSearch" type="search" placeholder="Otsi oksjoneid, kasutajaid, juhtlõimi... (⌘K)" aria-label="Globaalne otsing">
+      <kbd class="search-kbd">⌘K</kbd>
+    </div>
+    <div class="topbar-user">
+      <button class="icon-btn" type="button" aria-label="Teavitused — 3 lugemata"><i data-lucide="bell"></i><span class="bell-badge">3</span></button>
+      <button class="user-menu" type="button" aria-haspopup="menu" aria-label="Kasutajamenüü: Marit Vain">
+        <span class="avatar" aria-hidden="true">MV</span>
+        <span class="user-meta">
+          <span class="user-name">Marit Vain</span>
+          <span class="role-chip">Admin</span>
+        </span>
+        <i data-lucide="chevron-down"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Töölaud -->
+  <main id="main">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Asukoht">
+        <a href="01-dashboard.html">Töölaud</a>
+        <span class="sep" aria-hidden="true">/</span>
+        <span aria-current="page">Statistika</span>
+      </nav>
+      <header class="page-head">
+        <h1 class="page-title">Statistika</h1>
+        <div class="stats-toolbar">
+          <label class="sr-only" for="periodSel">Ajavahemik</label>
+          <select class="select-input" id="periodSel">
+            <option value="30" selected>Viimased 30 päeva</option>
+            <option value="90">Viimased 90 päeva</option>
+            <option value="365">Aasta</option>
+          </select>
+          <button class="btn-ghost" type="button"><i data-lucide="download"></i>Ekspordi CSV</button>
+        </div>
+      </header>
+
+      <!-- KPI strip -->
+      <section class="kpi-6" aria-label="Statistika näitajad">
+        <article class="kpi-card">
+          <span class="kpi-label">Oksjonite koguarv</span>
+          <span class="kpi-value" data-kpi="total">34</span>
+          <span class="kpi-sub"><span class="trend-up">▲ +12%</span> <span data-kpisub="total">viimase 30 päeva jooksul</span></span>
+        </article>
+        <article class="kpi-card">
+          <span class="kpi-label">Müüdud %</span>
+          <span class="kpi-value" data-kpi="sold">79.4%</span>
+          <span class="kpi-sub"><span class="trend-up">▲ +1.8%</span> <span data-kpisub="sold">27 müüdud oksjonit</span></span>
+        </article>
+        <article class="kpi-card">
+          <span class="kpi-label">Keskmine ülepakkumine %</span>
+          <span class="kpi-value" data-kpi="uplift">15.2%</span>
+          <span class="kpi-sub"><span class="trend-up">▲ +0.6%</span> <span data-kpisub="uplift">lõpphind alghinnast</span></span>
+        </article>
+        <article class="kpi-card">
+          <span class="kpi-label">Teenustasu kuu jooksul (€)</span>
+          <span class="kpi-value" data-kpi="fee">12 480 €</span>
+          <span class="kpi-sub"><span class="trend-up">▲ +9%</span> <span data-kpisub="fee">prognoos kuu lõpu seisuga</span><span class="info-dot" title="Teenustasu perioodi kokku"><i data-lucide="info"></i><span class="sr-only">Teenustasu perioodi kokku</span></span></span>
+        </article>
+        <article class="kpi-card">
+          <span class="kpi-label">Uued kasutajad</span>
+          <span class="kpi-value" data-kpi="users">58</span>
+          <span class="kpi-sub"><span class="trend-up">▲ +14%</span> <span data-kpisub="users">uut registreerumist</span></span>
+        </article>
+        <article class="kpi-card">
+          <span class="kpi-label">Konversioon kuulutus→pakkumine</span>
+          <span class="kpi-value" data-kpi="conv">9.8%</span>
+          <span class="kpi-sub">▼ -0.4% <span data-kpisub="conv">kuulutusest pakkumiseks</span></span>
+        </article>
+      </section>
+
+      <div class="stats-stack">
+        <!-- Graafikud: kuutulemused + tüüpjaotus -->
+        <div class="dash-grid">
+          <section class="card" aria-labelledby="h-monthly">
+            <div class="card-head">
+              <h2 class="card-title" id="h-monthly">Oksjonite tulemused kuupõhiselt</h2>
+              <div class="legend">
+                <span class="legend-item"><span class="legend-swatch" style="background:var(--primary)"></span>Alghind</span>
+                <span class="legend-item"><span class="legend-swatch" style="background:var(--accent)"></span>Lõpphind</span>
+              </div>
+            </div>
+            <div class="chart-body">
+              <svg id="barChart" class="chart-svg" viewBox="0 0 720 300" role="img" aria-label="Tulpdiagramm: oksjonite alghind ja lõpphind kuude lõikes, tuhat eurot"></svg>
+            </div>
+            <p class="chart-note">Kuude lõikes · summad tuhandetes eurotes (t€)</p>
+          </section>
+          <section class="card" aria-labelledby="h-donut">
+            <div class="card-head">
+              <h2 class="card-title" id="h-donut">Oksjonite tüüpjaotus</h2>
+            </div>
+            <div class="donut-wrap">
+              <svg id="donutChart" class="donut-svg" viewBox="0 0 180 180" role="img" aria-label="Sõõrdiagramm: oksjonite tüüpjaotus"></svg>
+              <ul class="donut-legend" id="donutLegend"></ul>
+            </div>
+          </section>
+        </div>
+
+        <!-- Pakkumiste trend -->
+        <section class="card" aria-labelledby="h-trend">
+          <div class="card-head">
+            <h2 class="card-title" id="h-trend">Pakkumiste arv</h2>
+            <span class="kpi-sub">päevane arv · viimased 30 päeva</span>
+          </div>
+          <div class="chart-body">
+            <svg id="trendChart" class="chart-svg" viewBox="0 0 720 220" role="img" aria-label="Joondiagramm: pakkumiste arv päevaste andmepunktidega viimased 30 päeva"></svg>
+          </div>
+        </section>
+
+        <!-- Tabelid -->
+        <div class="dash-grid">
+          <section class="card" aria-labelledby="h-top">
+            <div class="card-head">
+              <h2 class="card-title" id="h-top">Top 5 edukat oksjonit</h2>
+              <span class="kpi-sub">ülepakkumise % järgi</span>
+            </div>
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead>
+                  <tr>
+                    <th scope="col">Objekt</th>
+                    <th scope="col">Tüüp</th>
+                    <th scope="col" class="num">Alghind</th>
+                    <th scope="col" class="num">Lõpphind</th>
+                    <th scope="col" class="num">Ülepakkumine</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="lot-id">#4798</span> <a class="lot-name" href="02-auctions-list.html">Väike-Maarja mets</a></td>
+                    <td><span class="type-chip type-raie"><i data-lucide="tree-pine"></i>Raieõigus</span></td>
+                    <td class="num bid">18 000 €</td>
+                    <td class="num bid">29 500 €</td>
+                    <td class="num"><span class="bid trend-up">▲ +63.9%</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="lot-id">#4751</span> <a class="lot-name" href="02-auctions-list.html">Saare rannakinnistu</a></td>
+                    <td><span class="type-chip type-kinnistu"><i data-lucide="map-pin-house"></i>Kinnistu</span></td>
+                    <td class="num bid">62 000 €</td>
+                    <td class="num bid">96 000 €</td>
+                    <td class="num"><span class="bid trend-up">▲ +54.8%</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="lot-id">#4782</span> <a class="lot-name" href="02-auctions-list.html">Põlva metsapakett</a></td>
+                    <td><span class="type-chip type-pakett"><i data-lucide="package"></i>Pakett</span></td>
+                    <td class="num bid">120 000 €</td>
+                    <td class="num bid">171 000 €</td>
+                    <td class="num"><span class="bid trend-up">▲ +42.5%</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="lot-id">#4764</span> <a class="lot-name" href="02-auctions-list.html">Võru kuusik</a></td>
+                    <td><span class="type-chip type-raie"><i data-lucide="tree-pine"></i>Raieõigus</span></td>
+                    <td class="num bid">9 500 €</td>
+                    <td class="num bid">13 200 €</td>
+                    <td class="num"><span class="bid trend-up">▲ +38.9%</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="lot-id">#4802</span> <a class="lot-name" href="02-auctions-list.html">Viljandi põllumaa</a></td>
+                    <td><span class="type-chip type-poll"><i data-lucide="wheat"></i>Põllumaa</span></td>
+                    <td class="num bid">21 000 €</td>
+                    <td class="num bid">27 300 €</td>
+                    <td class="num"><span class="bid trend-up">▲ +30.0%</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card-foot"><a class="card-link" href="02-auctions-list.html">Vaata kõiki oksjoneid →</a></div>
+          </section>
+
+          <section class="card" aria-labelledby="h-county">
+            <div class="card-head">
+              <h2 class="card-title" id="h-county">Maakondade ülevaade</h2>
+            </div>
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead>
+                  <tr>
+                    <th scope="col">Maakond</th>
+                    <th scope="col" class="num">Oksjonid</th>
+                    <th scope="col" class="num">Müüdud</th>
+                    <th scope="col" class="num">Keskmine hind</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>Harju</td><td class="num bid">86</td><td class="num bid">68</td><td class="num bid">2 910 €</td></tr>
+                  <tr><td>Tartu</td><td class="num bid">54</td><td class="num bid">41</td><td class="num bid">2 450 €</td></tr>
+                  <tr><td>Pärnu</td><td class="num bid">47</td><td class="num bid">35</td><td class="num bid">2 120 €</td></tr>
+                  <tr><td>Lääne-Viru</td><td class="num bid">38</td><td class="num bid">28</td><td class="num bid">2 240 €</td></tr>
+                  <tr><td>Saare</td><td class="num bid">31</td><td class="num bid">24</td><td class="num bid">1 980 €</td></tr>
+                  <tr><td>Võru</td><td class="num bid">29</td><td class="num bid">20</td><td class="num bid">2 050 €</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Mobile drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true"></div>
+<aside class="drawer" id="drawer" aria-label="Peamenüü" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="rail-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/></svg>
+    </span>
+    <span class="topbar-title">Erametsad haldus</span>
+    <button class="icon-btn" id="menuClose" type="button" aria-label="Sulge menüü"><i data-lucide="x"></i></button>
+  </div>
+  <nav class="drawer-nav">
+    <a class="drawer-link" href="01-dashboard.html"><i data-lucide="layout-dashboard"></i>Töölaud</a>
+    <a class="drawer-link" href="02-auctions-list.html"><i data-lucide="gavel"></i>Oksjonid</a>
+    <a class="drawer-link" href="04-bids-monitoring.html"><i data-lucide="activity"></i>Pakkumised</a>
+    <a class="drawer-link" href="05-sealed-opening.html"><i data-lucide="key-round"></i>Sul. avamine<span class="drawer-flag dot is-amber"></span></a>
+    <a class="drawer-link" href="06-users.html"><i data-lucide="users"></i>Kasutajad</a>
+    <a class="drawer-link" href="07-company-approvals.html"><i data-lucide="building-2"></i>Ettevõtted<span class="drawer-flag num is-red">3</span></a>
+    <a class="drawer-link" href="08-contracts.html"><i data-lucide="file-signature"></i>Lepingud</a>
+    <a class="drawer-link" href="09-leads-crm.html"><i data-lucide="kanban"></i>Juhtlõimed</a>
+    <a class="drawer-link" href="10-service-requests.html"><i data-lucide="send-horizontal"></i>Päringud</a>
+    <a class="drawer-link" href="11-cms-content.html"><i data-lucide="file-pen"></i>Sisuhaldus</a>
+    <a class="drawer-link active" href="12-statistics.html" aria-current="page"><i data-lucide="chart-column"></i>Statistika</a>
+    <a class="drawer-link" href="13-settings.html"><i data-lucide="settings"></i>Seaded</a>
+    <a class="drawer-link" href="14-audit-log.html"><i data-lucide="shield-check"></i>Auditlogi</a>
+  </nav>
+</aside>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+
+  /* Lucide icons */
+  if(window.lucide)lucide.createIcons();
+
+  /* Mobile drawer */
+  const drawer=$("#drawer"), backdrop=$("#drawerBackdrop"),
+        openBtn=$("#menuOpen"), closeBtn=$("#menuClose");
+  const setDrawer=open=>{
+    document.body.classList.toggle("drawer-open",open);
+    drawer.setAttribute("aria-hidden",String(!open));
+    openBtn.setAttribute("aria-expanded",String(open));
+  };
+  openBtn.addEventListener("click",()=>setDrawer(true));
+  closeBtn.addEventListener("click",()=>setDrawer(false));
+  backdrop.addEventListener("click",()=>setDrawer(false));
+  addEventListener("keydown",e=>{if(e.key==="Escape")setDrawer(false)});
+
+  /* Global search: focus with Cmd/Ctrl+K */
+  const search=$("#globalSearch");
+  addEventListener("keydown",e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
+      e.preventDefault();
+      search.focus(); search.select();
+    }
+  });
+
+  /* Live countdowns (demo offsets in seconds from load) */
+  const pad=n=>String(n).padStart(2,"0");
+  const cds=$$("[data-countdown]").map(el=>({el,end:Date.now()+Number(el.dataset.countdown)*1000}));
+  function tick(){
+    const now=Date.now();
+    cds.forEach(c=>{
+      const r=Math.max(0,c.end-now);
+      if(r===0){c.el.textContent="Lõppenud"; c.el.classList.remove("cd-crit"); return;}
+      const h=Math.floor(r/36e5), m=Math.floor(r%36e5/6e4), s=Math.floor(r%6e4/1e3);
+      c.el.textContent=pad(h)+":"+pad(m)+":"+pad(s);
+      c.el.classList.toggle("cd-crit",r<3e5);
+    });
+  }
+  tick(); setInterval(tick,1000);
+})();
+</script>
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const NS="http://www.w3.org/2000/svg";
+  const MONTHS=["Jaan","Veebr","Märts","Apr","Mai","Juuni","Juuli","Aug","Sept","Okt","Nov","Dets"];
+  const fmt=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g," ");
+  const reduce=typeof matchMedia==="function"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* Two hardcoded demo datasets: 30-day snapshot vs full calendar year */
+  const DATA_30D={
+    kpis:{
+      total:{v:"34",sub:"viimase 30 päeva jooksul"},
+      sold:{v:"79.4%",sub:"27 müüdud oksjonit"},
+      uplift:{v:"15.2%",sub:"lõpphind alghinnast"},
+      fee:{v:"12 480 €",sub:"prognoos kuu lõpu seisuga"},
+      users:{v:"58",sub:"uut registreerumist"},
+      conv:{v:"9.8%",sub:"kuulutusest pakkumiseks"}
+    },
+    alg:[184000,176500,198000,210500,205000,221000,236500,242000,232000,249500,238000,241000],
+    lopp:[226000,208500,241000,259500,246000,272500,288000,293500,276000,301500,284000,292000],
+    labels:["03.08","04.08","05.08","06.08","07.08","08.08","09.08","10.08","11.08","12.08","13.08","14.08","15.08","16.08","17.08","18.08","19.08","20.08","21.08","22.08","23.08","24.08","25.08","26.08","27.08","28.08","29.08","30.08","31.08","01.09"],
+    bids:[64,71,58,49,77,88,52,69,74,61,55,83,95,58,72,78,66,59,88,102,63,79,84,71,62,91,108,68,84,89],
+    donut:[
+      {n:"Raieõigus",v:16,c:"var(--primary)"},
+      {n:"Kinnistud",v:11,c:"var(--accent)"},
+      {n:"Põllumaad",v:3,c:"var(--cta)"},
+      {n:"Paketid",v:4,c:"var(--info)"}
+    ],
+    total:34
+  };
+  const DATA_YEAR={
+    kpis:{
+      total:{v:"412",sub:"2026. aasta jooksul"},
+      sold:{v:"77.2%",sub:"318 müüdud oksjonit"},
+      uplift:{v:"13.6%",sub:"lõpphind alghinnast"},
+      fee:{v:"73 500 €",sub:"2026. aasta kokku"},
+      users:{v:"214",sub:"uut registreerumist"},
+      conv:{v:"8.7%",sub:"kuulutusest pakkumiseks"}
+    },
+    alg:[142000,131000,152000,166000,158000,171000,182000,178000,190000,196000,186000,203000],
+    lopp:[168000,154000,182000,196000,187000,201000,214000,209000,222000,229000,218000,236000],
+    labels:["02.12","03.12","04.12","05.12","06.12","07.12","08.12","09.12","10.12","11.12","12.12","13.12","14.12","15.12","16.12","17.12","18.12","19.12","20.12","21.12","22.12","23.12","24.12","25.12","26.12","27.12","28.12","29.12","30.12","31.12"],
+    bids:[72,81,66,58,93,105,63,78,85,70,62,97,112,68,84,90,75,66,102,118,73,89,95,80,70,106,124,77,94,101],
+    donut:[
+      {n:"Raieõigus",v:198,c:"var(--primary)"},
+      {n:"Kinnistud",v:142,c:"var(--accent)"},
+      {n:"Põllumaad",v:26,c:"var(--cta)"},
+      {n:"Paketid",v:46,c:"var(--info)"}
+    ],
+    total:412
+  };
+  const VIEWS={"30":DATA_30D,"90":DATA_YEAR,"365":DATA_YEAR};
+
+  const mk=t=>document.createElementNS(NS,t);
+  const clearSvg=svg=>{while(svg.firstChild)svg.removeChild(svg.firstChild)};
+
+  function drawAxes(svg,L,R,T,ph,ymax,step,axisTitle){
+    const g=mk("g"),steps=Math.round(ymax/step);
+    for(let i=0;i<=steps;i++){
+      const v=step*i,yy=T+ph*(1-v/ymax);
+      const ln=mk("line");
+      ln.setAttribute("x1",L);ln.setAttribute("x2",R);
+      ln.setAttribute("y1",yy);ln.setAttribute("y2",yy);
+      ln.setAttribute("class","grid-line");
+      const tx=mk("text");
+      tx.setAttribute("x",L-8);tx.setAttribute("y",yy+3);
+      tx.setAttribute("text-anchor","end");tx.setAttribute("class","axis-txt");
+      tx.textContent=ymax>=100000?v/1000:v;
+      g.append(ln,tx);
+    }
+    const at=mk("text");
+    at.setAttribute("class","axis-title");
+    at.setAttribute("text-anchor","middle");
+    at.setAttribute("transform","translate(12 "+(T+ph/2)+") rotate(-90)");
+    at.textContent=axisTitle;
+    g.append(at);
+    svg.append(g);
+  }
+
+  function renderBars(svg,d){
+    clearSvg(svg);
+    const W=720,H=300,L=48,R=10,T=14,B=30,pw=W-L-R,ph=H-T-B;
+    const ymax=Math.ceil(Math.max.apply(null,d.alg.concat(d.lopp))/50000)*50000;
+    drawAxes(svg,L,W-R,T,ph,ymax,50000,"tuhat €");
+    const g=mk("g"),gw=pw/12,bw=17,pair=2*bw+4,base=T+ph;
+    for(let i=0;i<12;i++){
+      const x0=L+i*gw+(gw-pair)/2;
+      const bar=(x,v,color,label)=>{
+        const h=Math.max(1,ph*v/ymax),r=mk("rect");
+        r.setAttribute("x",x);r.setAttribute("y",base-h);
+        r.setAttribute("width",bw);r.setAttribute("height",h);
+        r.setAttribute("rx",2);r.setAttribute("fill",color);
+        const t=mk("title");
+        t.textContent=MONTHS[i]+" · "+label+" "+fmt(v)+" €";
+        r.append(t);
+        return r;
+      };
+      g.append(bar(x0,d.alg[i],"var(--primary)","alghind"));
+      g.append(bar(x0+bw+4,d.lopp[i],"var(--accent)","lõpphind"));
+      const mx=mk("text");
+      mx.setAttribute("x",x0+pair/2);mx.setAttribute("y",H-10);
+      mx.setAttribute("text-anchor","middle");mx.setAttribute("class","axis-txt");
+      mx.textContent=MONTHS[i];
+      g.append(mx);
+    }
+    if(!reduce)g.setAttribute("class","chart-fade");
+    svg.append(g);
+  }
+
+  function renderTrend(svg,d){
+    clearSvg(svg);
+    const W=720,H=220,L=48,R=12,T=14,B=26,pw=W-L-R,ph=H-T-B,n=d.bids.length;
+    const ymax=Math.ceil(Math.max.apply(null,d.bids)/20)*20;
+    drawAxes(svg,L,W-R,T,ph,ymax,20,"pakkumisi / päev");
+    const g=mk("g");
+    const pts=d.bids.map((v,i)=>[+(L+pw*i/(n-1)).toFixed(1),+(T+ph*(1-v/ymax)).toFixed(1)]);
+    const linePath="M "+pts.map(p=>p[0]+" "+p[1]).join(" L ");
+    const area=mk("path");
+    area.setAttribute("d",linePath+" L "+pts[n-1][0]+" "+(T+ph)+" L "+pts[0][0]+" "+(T+ph)+" Z");
+    area.setAttribute("fill","var(--accent-soft)");
+    const lp=mk("path");
+    lp.setAttribute("d",linePath);
+    lp.setAttribute("fill","none");lp.setAttribute("stroke","var(--primary)");
+    lp.setAttribute("stroke-width",2);
+    lp.setAttribute("stroke-linejoin","round");lp.setAttribute("stroke-linecap","round");
+    g.append(area,lp);
+    d.bids.forEach((v,i)=>{
+      const c=mk("circle");
+      c.setAttribute("cx",pts[i][0]);c.setAttribute("cy",pts[i][1]);c.setAttribute("r",2.5);
+      c.setAttribute("fill","var(--primary)");
+      const t=mk("title");t.textContent=d.labels[i]+" · "+v+" pakkumist";
+      c.append(t);g.append(c);
+    });
+    [0,7,14,21,n-1].forEach(i=>{
+      const tx=mk("text");
+      tx.setAttribute("x",pts[i][0]);tx.setAttribute("y",H-8);
+      tx.setAttribute("text-anchor",i===n-1?"end":"middle");
+      tx.setAttribute("class","axis-txt");
+      tx.textContent=d.labels[i];
+      g.append(tx);
+    });
+    if(!reduce)g.setAttribute("class","chart-fade");
+    svg.append(g);
+  }
+
+  function renderDonut(svg,legend,d){
+    clearSvg(svg);legend.textContent="";
+    const c=90,r=64,circ=2*Math.PI*r;
+    let acc=0;
+    d.donut.forEach(s=>{
+      const len=circ*s.v/d.total,seg=mk("circle");
+      seg.setAttribute("cx",c);seg.setAttribute("cy",c);seg.setAttribute("r",r);
+      seg.setAttribute("fill","none");seg.setAttribute("stroke",s.c);
+      seg.setAttribute("stroke-width",24);
+      seg.setAttribute("stroke-dasharray",len+" "+(circ-len));
+      seg.setAttribute("stroke-dashoffset",-acc);
+      seg.setAttribute("transform","rotate(-90 "+c+" "+c+")");
+      const t=mk("title");
+      t.textContent=s.n+" — "+s.v+" tükki ("+(100*s.v/d.total).toFixed(1)+"%)";
+      seg.append(t);svg.append(seg);
+      acc+=len;
+      const li=document.createElement("li");li.className="legend-item";
+      const sw=document.createElement("span");sw.className="legend-swatch";sw.style.background=s.c;
+      const nm=document.createElement("span");nm.textContent=s.n;
+      const val=document.createElement("span");val.className="legend-val";
+      val.textContent=s.v+" · "+(100*s.v/d.total).toFixed(1)+"%";
+      li.append(sw,nm,val);legend.append(li);
+    });
+    const big=mk("text");
+    big.setAttribute("x",c);big.setAttribute("y",88);
+    big.setAttribute("text-anchor","middle");
+    big.setAttribute("style","font:700 26px/1 var(--font-mono);fill:var(--ink)");
+    big.textContent=String(d.total);
+    const cap=mk("text");
+    cap.setAttribute("x",c);cap.setAttribute("y",108);
+    cap.setAttribute("text-anchor","middle");
+    cap.setAttribute("style","font:500 12px/1 var(--font-body);fill:var(--ink-muted)");
+    cap.textContent="oksjonit";
+    svg.append(big,cap);
+  }
+
+  function apply(key){
+    const d=VIEWS[key]||DATA_30D;
+    Object.keys(d.kpis).forEach(k=>{
+      const v=document.querySelector('[data-kpi="'+k+'"]');
+      const s=document.querySelector('[data-kpisub="'+k+'"]');
+      if(v)v.textContent=d.kpis[k].v;
+      if(s)s.textContent=d.kpis[k].sub;
+    });
+    const bar=$("#barChart"),trend=$("#trendChart"),donut=$("#donutChart"),legend=$("#donutLegend");
+    if(bar)renderBars(bar,d);
+    if(trend)renderTrend(trend,d);
+    if(donut&&legend)renderDonut(donut,legend,d);
+  }
+
+  const sel=$("#periodSel");
+  if(sel){
+    sel.addEventListener("change",()=>apply(sel.value));
+    apply(sel.value);
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1044 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lepingu allkirjastamine | Erametsad Oksjonid</title>
+<meta name="description" content="Oksjonilepingu allkirjastamine — tutvu võidetud oksjoni lepinguga, kontrolli andmeid ja allkirjasta Smart-ID, Mobiil-ID või ID-kaardiga.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232E6B4F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z'/%3E%3Cpath d='M12 22v-3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<script>document.documentElement.classList.add('js')</script>
+<style>
+/* ---- Tokens ---- */
+:root{
+  --primary:#2E6B4F; --primary-hover:#25573F; --primary-dark:#16382A; --primary-light:#E9F0EC;
+  --accent:#58B368; --cta:#F2A93B; --cta-hover:#D98F1F;
+  --ink:#1B211D; --ink-muted:#6B7570; --ink-inverse:#FFFFFF;
+  --bg-page:#FFFFFF; --bg-mist:#F1F5F2; --border:#E3E7E4;
+  --danger:#B3261E; --danger-light:#FBEAE9; --info:#2D6FA8; --info-light:#E9F1F7;
+  --font-head:"Manrope",system-ui,sans-serif;
+  --font-body:"Inter",system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --container-max:1280px; --gutter:24px;
+  --r-card:14px; --r-btn:10px; --r-hero:16px; --r-pill:999px;
+  --shadow-card:0 2px 12px rgba(22,56,42,.08);
+  --shadow-hover:0 2px 8px rgba(22,56,42,.12),0 8px 24px rgba(22,56,42,.08);
+  --shadow-modal:0 4px 16px rgba(22,56,42,.12),0 16px 48px rgba(22,56,42,.10);
+  --header-h:72px;
+  --ease-reveal:cubic-bezier(.22,.61,.36,1);
+}
+
+/* ---- Base ---- */
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg-page); color:var(--ink);
+  font:400 1rem/1.6 var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+img,svg{display:block}
+h1,h2,h3,h4{font-family:var(--font-head); line-height:1.2; margin:0 0 .5em}
+h1{font-size:3rem; font-weight:800; line-height:1.15}
+h2{font-size:2.25rem; font-weight:700; line-height:1.2}
+h3{font-size:1.5rem; font-weight:700; line-height:1.25}
+h4{font-size:1.125rem; font-weight:700; letter-spacing:.02em}
+p{margin:0 0 1em}
+a{color:var(--primary)}
+a:hover{color:var(--primary-hover)}
+ul{margin:0; padding:0; list-style:none}
+button{font:inherit; cursor:pointer}
+input,select{font:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+::selection{background:var(--primary-light)}
+.mono{font-family:var(--font-mono); font-feature-settings:"tnum"}
+.skip-link{
+  position:absolute; left:-9999px; top:8px; z-index:200;
+  background:var(--primary-dark); color:#fff; padding:10px 16px; border-radius:var(--r-btn);
+}
+.skip-link:focus{left:8px; color:#fff}
+.icon{display:inline-flex; align-items:center; justify-content:center; width:1em; height:1em; flex:none; line-height:1; font-size:20px}
+
+/* ---- Layout ---- */
+.container{max-width:var(--container-max); margin-inline:auto; padding-inline:var(--gutter)}
+.section{padding-block:64px; scroll-margin-top:calc(var(--header-h) + 16px)}
+.bg-mist{background:var(--bg-mist)}
+
+/* ---- Buttons ---- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  min-height:48px; padding:12px 24px; border-radius:var(--r-btn); border:1px solid transparent;
+  font-weight:600; font-size:1rem; text-decoration:none; transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out, box-shadow .15s ease-out;
+}
+.btn-cta{background:var(--cta); color:var(--ink)}
+.btn-cta:hover{background:var(--cta-hover); color:var(--ink)}
+.btn-primary{background:var(--primary); color:#fff}
+.btn-primary:hover{background:var(--primary-hover); color:#fff}
+.btn-outline{background:transparent; border-color:var(--primary); color:var(--primary)}
+.btn-outline:hover{background:var(--primary-light); color:var(--primary-hover)}
+.btn-ghost{background:transparent; color:var(--ink-muted)}
+.btn-ghost:hover{color:var(--ink)}
+.btn-sm{min-height:32px; padding:6px 14px; font-size:.875rem}
+
+/* ---- Pills ---- */
+.pill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:3px 12px; border-radius:var(--r-pill);
+  font-size:.8125rem; font-weight:600; line-height:1.4;
+}
+.pill::before{content:""; width:7px; height:7px; border-radius:50%; background:currentColor}
+.pill-active{background:rgba(46,158,91,.12); color:#2E9E5B}
+.pill-soon{background:rgba(242,169,59,.14); color:var(--cta-hover)}
+.pill-muted{background:#EDEFEA; color:var(--ink-muted)}
+
+/* ---- Header ---- */
+.site-header{
+  position:sticky; top:0; z-index:100; background:#fff;
+  border-bottom:1px solid rgba(27,33,29,.08);
+  height:var(--header-h); transition:height .15s ease-out;
+}
+.site-header.scrolled{--header-h:60px; box-shadow:0 2px 12px rgba(22,56,42,.06)}
+.header-in{display:flex; align-items:center; gap:28px; height:100%}
+.logo{display:inline-flex; align-items:center; gap:10px; font-family:var(--font-head); font-weight:800; font-size:1.375rem; color:var(--primary-dark); text-decoration:none; letter-spacing:-.01em; white-space:nowrap}
+.logo .icon{font-size:26px; color:var(--primary)}
+.main-nav{display:flex; align-items:center; gap:4px; margin-right:auto}
+.nav-link{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:10px 12px; border-radius:8px; text-decoration:none;
+  color:var(--ink); font-weight:600; font-size:1rem; white-space:nowrap;
+  background:none; border:0;
+}
+.nav-link:hover{background:var(--bg-mist); color:var(--primary)}
+.nav-link[aria-current=page]{color:var(--primary); background:var(--primary-light)}
+.header-side{display:flex; align-items:center; gap:14px}
+.header-side .btn{min-height:40px; padding:8px 18px; white-space:nowrap}
+.menu-btn{display:none; background:none; border:0; padding:8px; color:var(--ink)}
+
+/* ---- Mobile drawer ---- */
+.drawer{
+  position:fixed; inset:0 0 0 auto; width:min(360px,92vw); z-index:150;
+  background:#fff; transform:translateX(100%); transition:transform .2s cubic-bezier(.4,0,.2,1);
+  display:flex; flex-direction:column; visibility:hidden;
+}
+body.drawer-open .drawer{transform:none; visibility:visible}
+body.drawer-open{overflow:hidden}
+.drawer-backdrop{position:fixed; inset:0; z-index:140; background:rgba(22,56,42,.4); opacity:0; visibility:hidden; transition:opacity .2s}
+body.drawer-open .drawer-backdrop{opacity:1; visibility:visible}
+.drawer-head{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); height:56px}
+.drawer-head .logo{font-size:1.25rem}
+.drawer-body{flex:1; overflow-y:auto; padding:8px}
+.drawer-body > a.drawer-direct{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 8px; border-bottom:1px solid var(--border); font-weight:600; color:var(--ink); text-decoration:none;
+}
+.drawer-body > a.drawer-direct:hover{color:var(--primary)}
+.drawer-body > a.drawer-direct[aria-current=page]{color:var(--primary)}
+.drawer-footer{padding:16px; border-top:1px solid var(--border); display:grid; gap:10px}
+
+/* ---- Page head + tabs ---- */
+.page-head{background:var(--bg-mist); padding-block:48px 40px; scroll-margin-top:var(--header-h)}
+.page-head h1{margin-bottom:10px}
+.page-summary{color:var(--ink-muted); font-size:1.125rem; max-width:52em; margin:0}
+.tabs-wrap{background:#fff; border-bottom:1px solid var(--border)}
+.tabs{display:flex; gap:8px; overflow-x:auto; padding-block:16px; scrollbar-width:thin}
+.tab{
+  display:inline-flex; align-items:center; gap:8px; flex:none;
+  padding:9px 16px; border:1px solid var(--border); border-radius:var(--r-pill);
+  background:#fff; color:var(--ink); font-weight:600; font-size:.9375rem;
+  transition:background-color .15s ease-out, color .15s ease-out, border-color .15s ease-out;
+  scroll-margin-top:calc(var(--header-h) + 16px);
+}
+.tab:hover{border-color:var(--primary); color:var(--primary)}
+.tab.active{background:var(--primary); border-color:var(--primary); color:#fff}
+.tab-count{background:var(--bg-mist); color:var(--ink-muted); border-radius:var(--r-pill); padding:1px 9px; font-size:.75rem; font-weight:500}
+.tab.active .tab-count{background:rgba(255,255,255,.2); color:#fff}
+
+/* ---- Listing layout ---- */
+.listing{padding-block:32px 64px}
+.listing-grid{display:grid; grid-template-columns:280px minmax(0,1fr); gap:32px; align-items:start}
+.listing-main{display:flex; flex-direction:column; gap:20px; min-width:0}
+
+/* ---- Toolbar ---- */
+.toolbar{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+.view-toggle{display:inline-flex; border:1px solid var(--border); border-radius:var(--r-btn); overflow:hidden}
+.view-btn{
+  display:inline-flex; align-items:center; gap:7px; border:0; background:#fff;
+  padding:9px 16px; font-weight:600; font-size:.9375rem; color:var(--ink-muted);
+}
+.view-btn .icon{font-size:15px}
+.view-btn[aria-pressed=true]{background:var(--primary); color:#fff}
+.sort-label{display:inline-flex; align-items:center; gap:8px; margin-left:auto; font-size:.875rem; font-weight:600; color:var(--ink-muted)}
+.sort-label select{
+  min-height:40px; padding:8px 12px; border:1px solid var(--border); border-radius:var(--r-btn);
+  background:#fff; color:var(--ink); font-weight:500;
+}
+.filters-toggle{display:none}
+
+/* ---- Filter sidebar ---- */
+.filters{
+  background:#fff; border:1px solid var(--border); border-radius:var(--r-card);
+  box-shadow:var(--shadow-card); padding:24px;
+  position:sticky; top:calc(var(--header-h) + 24px);
+  max-height:calc(100vh - var(--header-h) - 48px); overflow-y:auto;
+}
+.filters-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px}
+.filters-head h2{font-size:1.125rem; margin:0}
+.f-badge{background:var(--primary-light); color:var(--primary-hover); border-radius:var(--r-pill); padding:1px 9px; font-size:.8125rem; font-weight:500}
+.filters-close{display:none; background:none; border:0; padding:6px; color:var(--ink)}
+.field{margin-bottom:16px}
+.field label, .f-label{display:block; font-size:.8125rem; font-weight:600; margin-bottom:6px}
+.field select, .field input[type=number], .field input[type=email]{
+  width:100%; min-height:44px; padding:10px 14px;
+  border:1px solid var(--border); border-radius:var(--r-btn);
+  background:#fff; color:var(--ink); transition:border-color .15s ease-out;
+}
+.field select:disabled{background:var(--bg-mist); color:var(--ink-muted)}
+.field select:focus-visible,.field input:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.field .hint{font-size:.8125rem; color:var(--ink-muted); margin:5px 0 0}
+.range{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.f-group{margin-bottom:16px}
+.chips{display:flex; flex-wrap:wrap; gap:6px}
+.chip{
+  border:1px solid var(--border); background:#fff; color:var(--ink);
+  border-radius:var(--r-pill); padding:4px 12px;
+  font-size:.8125rem; font-weight:600;
+  transition:background-color .15s ease-out, color .15s ease-out, border-color .15s ease-out;
+}
+.chip:hover{border-color:var(--primary); color:var(--primary)}
+.chip[aria-pressed=true]{background:var(--primary); border-color:var(--primary); color:#fff}
+.filters-actions{display:grid; gap:10px; margin-top:20px; padding-top:18px; border-top:1px solid var(--border)}
+.filters-actions .btn{width:100%}
+.sub-form{margin-top:14px; padding:16px; background:var(--bg-mist); border-radius:var(--r-btn)}
+.sub-form .field:last-of-type{margin-bottom:12px}
+.consent{display:flex; gap:10px; align-items:flex-start}
+.consent input{width:18px; height:18px; margin-top:2px; accent-color:var(--primary); flex:none}
+.consent label{font-size:.8125rem; color:var(--ink-muted); line-height:1.5; font-weight:400; margin:0}
+
+/* ---- LotCard grid ---- */
+.lotgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:24px}
+.lotcard{
+  display:flex; flex-direction:column; background:#fff; border:1px solid var(--border);
+  border-radius:var(--r-card); overflow:hidden; text-decoration:none; color:var(--ink);
+  box-shadow:var(--shadow-card);
+  transition:transform .15s ease-out, box-shadow .15s ease-out;
+}
+.lotcard:hover{transform:translateY(-2px); box-shadow:var(--shadow-hover); color:var(--ink)}
+.lot-media{position:relative; aspect-ratio:16/10; background:var(--bg-mist); overflow:hidden}
+.lot-media img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+.lot-flag{
+  position:absolute; top:12px; left:12px; z-index:1;
+  display:inline-flex; align-items:center; gap:6px;
+  background:var(--cta); color:var(--ink);
+  border-radius:var(--r-pill); padding:3px 12px;
+  font-size:.8125rem; font-weight:600;
+}
+.lot-flag .icon{font-size:13px}
+.lot-body{display:flex; flex-direction:column; gap:8px; padding:20px 22px; flex:1}
+.lot-top{display:flex; align-items:center; justify-content:space-between; gap:10px}
+.lot-type{font-size:.75rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-muted)}
+.lot-name{font-size:1.125rem; line-height:1.35; margin:0}
+.lot-cad{font-size:.9375rem; color:var(--ink); font-weight:500}
+.lot-meta{display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.875rem; color:var(--ink-muted)}
+.lot-price{font-size:1.25rem; font-weight:500; color:var(--cta-hover); margin-top:auto; padding-top:6px}
+.lot-price small{display:block; font-family:var(--font-body); font-size:.75rem; font-weight:500; color:var(--ink-muted); letter-spacing:.02em; text-transform:uppercase}
+.countdown{display:flex; align-items:baseline; gap:8px; margin:0; padding-top:6px; border-top:1px solid var(--border)}
+.cd-label{font-size:.75rem; color:var(--ink-muted)}
+.cd-time{font-size:.9375rem; font-weight:500}
+.countdown.warn .cd-time{color:var(--cta-hover)}
+.countdown.warn .cd-label{color:var(--cta-hover)}
+.countdown.crit .cd-time{color:var(--danger); animation:cd-pulse 1s ease infinite}
+.countdown.crit .cd-label{color:var(--danger)}
+@keyframes cd-pulse{50%{opacity:.55}}
+
+/* ---- Empty states ---- */
+.empty-state{
+  display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center;
+  background:var(--primary-light); border-radius:var(--r-card); padding:48px 28px;
+}
+.empty-state .icon{font-size:32px; color:var(--primary)}
+.empty-state h2{font-size:1.375rem; margin:4px 0 0}
+.empty-state p{color:var(--ink-muted); margin:0 0 10px; max-width:34em}
+
+/* ---- Pagination ---- */
+.pagination{display:flex; align-items:center; gap:6px; justify-content:center; margin-top:8px}
+.page-btn{
+  min-width:40px; height:40px; padding:0 10px; border:1px solid var(--border); border-radius:var(--r-btn);
+  background:#fff; color:var(--ink); font-weight:600; font-size:.9375rem;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.page-btn .icon{font-size:14px}
+.page-btn:hover{border-color:var(--primary); color:var(--primary)}
+.page-btn.active{background:var(--primary); border-color:var(--primary); color:#fff}
+.page-ellipsis{color:var(--ink-muted); padding:0 2px}
+
+/* ---- Map view ---- */
+.map-section{display:none}
+.listing-main.map-on .map-section{display:block}
+.listing-main.map-on .lotgrid,
+.listing-main.map-on .pagination{display:none}
+.map-wrap{
+  position:relative; border:1px solid var(--border); border-radius:var(--r-hero);
+  overflow:hidden; background:#E9F1F7; box-shadow:var(--shadow-card);
+}
+.map-wrap > svg{width:100%; height:auto}
+.map-legend{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:12px 16px; border-top:1px solid var(--border); background:#fff;
+  font-size:.8125rem; color:var(--ink-muted);
+}
+.map-legend .icon{font-size:15px; color:var(--primary)}
+.pin{
+  position:absolute; width:32px; height:32px; margin:-28px 0 0 -16px;
+  background:none; border:0; padding:0; color:var(--primary);
+  filter:drop-shadow(0 2px 3px rgba(22,56,42,.35));
+  transition:transform .15s ease-out;
+}
+.pin .icon{font-size:30px}
+.pin:hover{transform:scale(1.15)}
+.pin.active{color:var(--cta)}
+.map-popup{
+  position:absolute; z-index:5; width:280px;
+  background:#fff; border-radius:var(--r-card); box-shadow:var(--shadow-modal);
+  padding:18px; display:none; transform:translate(-50%,-100%);
+}
+.map-popup.open{display:block}
+.map-popup.below{transform:translate(-50%,0)}
+.map-popup h3{font-size:1.0625rem; margin:0 24px 8px 0; line-height:1.35}
+.pop-list{margin:0 0 14px; display:grid; gap:5px}
+.pop-list > div{display:flex; justify-content:space-between; gap:12px; font-size:.875rem}
+.pop-list dt{color:var(--ink-muted)}
+.pop-list dd{margin:0; font-weight:600; text-align:right}
+.popup-close{
+  position:absolute; top:10px; right:10px; background:none; border:0;
+  padding:6px; color:var(--ink-muted);
+}
+.popup-close:hover{color:var(--ink)}
+
+/* ---- Footer ---- */
+.site-footer{background:var(--primary-dark); color:#fff; padding-block:64px 32px}
+.footer-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:32px; margin-bottom:48px}
+.footer-grid h4{color:#fff; margin-bottom:14px}
+.footer-grid a{display:block; color:rgba(255,255,255,.72); text-decoration:none; padding:5px 0; font-size:.9375rem}
+.footer-grid a:hover{color:#fff}
+.social-row{display:flex; gap:10px}
+.social-row a{
+  width:40px; height:40px; padding:0; border-radius:50%;
+  border:1px solid rgba(255,255,255,.25);
+  display:flex; align-items:center; justify-content:center;
+}
+.social-row a:hover{border-color:#fff; background:rgba(255,255,255,.08)}
+.social-row .icon{font-size:18px}
+.footer-bottom{
+  border-top:1px solid rgba(255,255,255,.14); padding-top:24px;
+  display:flex; flex-wrap:wrap; gap:8px 24px; align-items:center;
+  font-size:.875rem; color:rgba(255,255,255,.72);
+}
+.footer-bottom a{color:rgba(255,255,255,.72)}
+.footer-bottom a:hover{color:#fff}
+.footer-bottom .spacer{margin-left:auto}
+
+/* ---- Cookie banner ---- */
+.cookie{
+  position:fixed; z-index:130; left:16px; right:16px; bottom:16px;
+  margin-inline:auto; max-width:880px;
+  background:#fff; border-radius:var(--r-card); box-shadow:var(--shadow-modal);
+  padding:20px 24px; display:flex; gap:20px; align-items:center; flex-wrap:wrap;
+}
+.cookie p{margin:0; font-size:.875rem; color:var(--ink-muted); flex:1 1 320px}
+.cookie p b{color:var(--ink)}
+.cookie-actions{display:flex; gap:10px; flex-wrap:wrap}
+.cookie.hidden{display:none}
+
+/* ---- Toast ---- */
+.toast{
+  position:fixed; z-index:160; right:20px; bottom:20px; max-width:360px;
+  background:var(--primary-dark); color:#fff; border-radius:var(--r-btn);
+  box-shadow:var(--shadow-modal); padding:14px 18px;
+  display:flex; gap:10px; align-items:flex-start; font-size:.9375rem;
+  opacity:0; visibility:hidden; transform:translateY(12px);
+  transition:opacity .3s var(--ease-reveal), transform .3s var(--ease-reveal), visibility 0s .3s;
+}
+.toast.show{opacity:1; visibility:visible; transform:none; transition-delay:0s}
+.toast .icon{font-size:18px; color:var(--accent); margin-top:2px}
+
+/* ---- Reveal ---- */
+.js .reveal{opacity:0; transform:translateY(14px); transition:opacity .3s var(--ease-reveal), transform .3s var(--ease-reveal)}
+.js .reveal.in{opacity:1; transform:none}
+
+/* ---- Responsive ---- */
+@media (max-width:1080px){
+  .main-nav{display:none}
+  .menu-btn{display:inline-flex}
+  .header-side .btn-outline{display:none}
+}
+@media (max-width:768px){
+  h1{font-size:2.125rem}
+  h2{font-size:1.75rem}
+  h3{font-size:1.25rem}
+  .section{padding-block:40px}
+  .page-head{padding-block:32px 28px}
+  .page-summary{font-size:1rem}
+  .listing{padding-block:24px 48px}
+  .listing-grid{display:block}
+  .filters{
+    position:fixed; inset:0 0 0 auto; width:min(360px,92vw); z-index:150;
+    border-radius:0; max-height:none; overflow-y:auto;
+    transform:translateX(100%); transition:transform .2s cubic-bezier(.4,0,.2,1);
+  }
+  body.filters-open .filters{transform:none}
+  body.filters-open{overflow:hidden}
+  .filters-backdrop{position:fixed; inset:0; z-index:140; background:rgba(22,56,42,.4); opacity:0; visibility:hidden; transition:opacity .2s}
+  body.filters-open .filters-backdrop{opacity:1; visibility:visible}
+  .filters-close{display:inline-flex}
+  .filters-toggle{display:inline-flex}
+  .sort-label{margin-left:0; width:100%}
+  .sort-label select{flex:1}
+  .lotgrid{grid-template-columns:1fr; gap:14px}
+  .lot-body{padding:16px 18px}
+  .footer-grid{grid-template-columns:repeat(2,1fr)}
+  .cookie{flex-direction:column; align-items:stretch}
+  .cookie-actions .btn{flex:1 1 auto}
+  .map-popup{width:240px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important; transition-duration:.01ms!important; scroll-behavior:auto!important}
+}
+
+/* ---- Page: Lepingu allkirjastamine ---- */
+.crumbs{display:flex; align-items:center; gap:8px; font-size:.875rem; color:var(--ink-muted); margin-bottom:14px}
+.crumbs a{color:var(--ink-muted); text-decoration:none}
+.crumbs a:hover{color:var(--primary); text-decoration:underline}
+.crumbs .icon{font-size:11px}
+a.tab{text-decoration:none}
+
+/* Authed user menu (header) */
+.user-menu{position:relative}
+.user-btn{
+  display:inline-flex; align-items:center; gap:10px;
+  background:none; border:0; padding:6px 8px; border-radius:var(--r-btn); color:var(--ink);
+}
+.user-btn:hover{background:var(--bg-mist)}
+.avatar{
+  width:36px; height:36px; border-radius:50%; flex:none;
+  background:var(--primary); color:#fff;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-family:var(--font-head); font-weight:700; font-size:.8125rem; letter-spacing:.02em;
+}
+.user-name{font-weight:600; font-size:.9375rem; white-space:nowrap}
+.user-btn .icon{font-size:12px; color:var(--ink-muted); transition:transform .15s ease-out}
+.user-menu.open .user-btn .icon{transform:rotate(180deg)}
+.user-drop{
+  position:absolute; right:0; top:calc(100% + 8px); z-index:120; min-width:230px;
+  background:#fff; border:1px solid var(--border); border-radius:var(--r-card);
+  box-shadow:var(--shadow-modal); padding:8px; display:none;
+}
+.user-menu.open .user-drop{display:block}
+.user-drop a{
+  display:flex; align-items:center; gap:10px; padding:10px 12px;
+  border-radius:var(--r-btn); color:var(--ink); text-decoration:none;
+  font-size:.9375rem; font-weight:500;
+}
+.user-drop a:hover{background:var(--bg-mist); color:var(--primary)}
+.user-drop a .icon{font-size:14px; color:var(--ink-muted); width:18px}
+.user-divider{border:0; border-top:1px solid var(--border); margin:6px 4px}
+.user-drop a.logout{color:var(--danger)}
+.user-drop a.logout:hover{background:var(--danger-light); color:var(--danger)}
+.user-drop a.logout .icon{color:var(--danger)}
+
+/* Contract flow */
+.contract-wrap{max-width:1040px; margin-inline:auto; display:flex; flex-direction:column; gap:20px}
+.deadline-banner{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  background:rgba(242,169,59,.14); border-radius:var(--r-card); padding:16px 20px;
+}
+.deadline-banner .icon{font-size:20px; color:var(--cta-hover); flex:none}
+.deadline-banner p{margin:0; flex:1 1 320px; font-size:.9375rem}
+.deadline-banner b{color:var(--cta-hover)}
+
+.steps-card{background:#fff; border:1px solid var(--border); border-radius:var(--r-card); box-shadow:var(--shadow-card); padding:18px 24px}
+.steps-head{display:flex; align-items:center; gap:16px; flex-wrap:wrap}
+.steps-type{font-size:.8125rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--primary)}
+.steps{display:flex; flex:1 1 420px; gap:0; margin:12px 0 0; padding:0; list-style:none; counter-reset:step}
+.step{display:flex; align-items:center; gap:8px; font-size:.875rem; font-weight:600; color:var(--ink-muted); flex:none}
+.step + .step{margin-left:24px}
+.step::before{
+  content:counter(step); counter-increment:step;
+  width:26px; height:26px; border-radius:50%;
+  border:2px solid var(--border); background:#fff; color:var(--ink-muted);
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:.75rem; flex:none;
+}
+.step.done{color:var(--primary)}
+.step.done::before{content:"✓"; border-color:var(--primary); background:var(--primary); color:#fff}
+.step.current{color:var(--ink)}
+.step.current::before{border-color:var(--primary); color:var(--primary)}
+.steps-progress{margin-left:auto; font-size:.8125rem; font-weight:500; color:var(--ink-muted); white-space:nowrap}
+
+/* Status rail */
+.status-rail{display:flex; align-items:center; flex-wrap:wrap; gap:12px 0; background:var(--bg-mist); border-radius:var(--r-card); padding:16px 20px}
+.rail-item{display:flex; align-items:center; gap:8px; font-size:.875rem; font-weight:600; color:var(--ink-muted)}
+.rail-item::before{content:""; width:10px; height:10px; border-radius:50%; border:2px solid var(--border); background:#fff; flex:none}
+.rail-item + .rail-item{margin-left:28px}
+.rail-item.done{color:var(--primary)}
+.rail-item.done::before{border-color:var(--primary); background:var(--primary)}
+.rail-item.current{color:var(--ink)}
+.rail-item.current::before{border-color:var(--cta-hover); background:var(--cta)}
+.rail-date{font-weight:500}
+
+/* Step panels */
+.step-panel{display:none}
+.step-panel.active{display:flex; flex-direction:column; gap:20px}
+
+/* Context card */
+.ctx-card{background:#fff; border:1px solid var(--border); border-radius:var(--r-card); box-shadow:var(--shadow-card); padding:24px}
+.ctx-card h2{font-size:1.375rem; margin-bottom:4px}
+.ctx-sub{color:var(--ink-muted); font-size:.9375rem; margin:0}
+.ctx-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:20px 32px; margin-top:18px; padding-top:18px; border-top:1px solid var(--border)}
+.ctx-block h3{font-size:.8125rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-muted); margin-bottom:10px}
+.ctx-rows{display:grid; gap:6px; margin:0}
+.ctx-row{display:flex; justify-content:space-between; gap:16px; font-size:.9375rem}
+.ctx-row dt{color:var(--ink-muted)}
+.ctx-row dd{margin:0; font-weight:600; text-align:right}
+.ctx-row.total{border-top:1px solid var(--border); padding-top:8px; margin-top:4px}
+.ctx-row.total dd{color:var(--cta-hover); font-size:1.0625rem}
+.ctx-note{font-size:.8125rem; color:var(--ink-muted); margin:10px 0 0}
+.ctx-actions{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+
+/* Document viewer */
+.doc-card{background:#fff; border:1px solid var(--border); border-radius:var(--r-card); box-shadow:var(--shadow-card); overflow:hidden}
+.doc-toolbar{display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:14px 20px; border-bottom:1px solid var(--border); background:var(--bg-mist)}
+.doc-title{font-weight:700; font-size:.9375rem}
+.doc-pages{font-size:.8125rem; color:var(--ink-muted)}
+.doc-toolbar .btn{margin-left:auto}
+.doc-viewer{max-height:420px; overflow-y:auto; padding:28px 32px; border-bottom:1px solid var(--border)}
+.doc-text{font-family:Georgia,"Times New Roman",serif; font-size:.9375rem; line-height:1.7; max-width:64ch; margin-inline:auto}
+.doc-text h2{font-family:inherit; font-size:1.25rem; text-align:center; margin-bottom:2px}
+.doc-text .doc-no{text-align:center; color:var(--ink-muted); font-size:.875rem; margin-bottom:20px}
+.doc-text h3{font-family:inherit; font-size:1rem; margin:18px 0 6px}
+.doc-text p{margin:0 0 10px}
+.doc-hint{display:flex; align-items:center; gap:8px; font-size:.8125rem; color:var(--ink-muted); padding:10px 20px 0}
+.doc-hint .icon{font-size:14px; color:var(--info)}
+.doc-actions{display:flex; align-items:center; gap:18px; flex-wrap:wrap; padding:16px 20px 20px; background:#fff}
+.agree{display:flex; gap:10px; align-items:flex-start; flex:1 1 320px}
+.agree input{width:18px; height:18px; margin-top:2px; accent-color:var(--primary); flex:none}
+.agree label{font-size:.9375rem; font-weight:600; margin:0}
+.btn[disabled]{opacity:.5; cursor:not-allowed; pointer-events:none}
+
+/* Signing */
+.sign-card{background:#fff; border:1px solid var(--border); border-radius:var(--r-card); box-shadow:var(--shadow-card); padding:24px}
+.sign-card h2{font-size:1.375rem; margin-bottom:4px}
+.sign-sub{color:var(--ink-muted); font-size:.9375rem; margin:0 0 18px}
+.eid-methods{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+.eid-btn{flex-direction:column; gap:8px; min-height:104px; border:1px solid var(--border); background:#fff; font-weight:600; font-size:1rem; color:var(--ink); transition:border-color .15s ease-out, background-color .15s ease-out}
+.eid-btn:hover{border-color:var(--primary); background:var(--primary-light); color:var(--ink)}
+.eid-btn .icon{font-size:26px; color:var(--primary)}
+.eid-tip{display:flex; gap:8px; align-items:flex-start; background:var(--info-light); border-radius:var(--r-btn); padding:12px 16px; font-size:.875rem; color:var(--ink); margin:18px 0 0}
+.eid-tip .icon{font-size:15px; color:var(--info); margin-top:3px}
+.eid-support{font-size:.8125rem; color:var(--ink-muted); margin:12px 0 0}
+.eid-waiting{display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; padding:24px 16px 8px}
+.eid-waiting[hidden]{display:none}
+.eid-note{font-size:1rem; font-weight:600; margin:0; max-width:34em}
+.control-code{
+  font-family:var(--font-mono); font-feature-settings:"tnum";
+  font-size:3rem; font-weight:500; letter-spacing:.14em;
+  background:var(--bg-mist); border-radius:var(--r-btn); padding:10px 28px; margin:0;
+}
+.control-code[hidden]{display:none}
+.spinner{width:34px; height:34px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--primary); animation:spin 1s linear infinite; flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Success */
+.success-card{display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center; background:var(--primary-light); border-radius:var(--r-card); padding:48px 28px}
+.success-card .icon{font-size:44px; color:var(--primary)}
+.success-card h2{font-size:1.625rem; margin:2px 0 0}
+.success-card p{color:var(--ink-muted); margin:0; max-width:44em}
+.success-actions{display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:8px}
+.next-steps{background:#fff; border:1px solid var(--border); border-radius:var(--r-card); box-shadow:var(--shadow-card); padding:24px}
+.next-steps h2{font-size:1.375rem; margin-bottom:14px}
+.next-steps ul{display:grid; gap:14px}
+.next-steps li{display:flex; gap:12px; font-size:.9375rem}
+.next-steps li .icon{color:var(--primary); margin-top:3px; flex:none}
+
+@media (max-width:768px){
+  .eid-methods{grid-template-columns:1fr}
+  .eid-btn{flex-direction:row; min-height:56px; justify-content:flex-start}
+  .status-rail{flex-direction:column; align-items:flex-start; gap:10px}
+  .rail-item + .rail-item{margin-left:0}
+  .step + .step{margin-left:14px}
+  .step{font-size:.8125rem}
+  .doc-viewer{padding:20px 18px}
+}
+@media (max-width:600px){
+  .user-name{display:none}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#sisu">Otse sisuni</a>
+
+<!-- ============ HEADER (authed variant) ============ -->
+<header class="site-header" id="header">
+  <div class="container header-in">
+    <a class="logo" href="01-listing.html" aria-label="Erametsad Oksjonid — avaleht">
+      <i class="icon fa-solid fa-tree" aria-hidden="true"></i>Erametsad Oksjonid
+    </a>
+    <nav class="main-nav" aria-label="Peamenüü">
+      <a class="nav-link" href="01-listing.html">Kõik oksjonid</a>
+      <a class="nav-link" href="01-listing.html#raieoigused">Raieõigused</a>
+      <a class="nav-link" href="01-listing.html#metskinnistud">Metskinnistud</a>
+      <a class="nav-link" href="04-ajalugu.html">Ajalugu</a>
+      <a class="nav-link" href="../marketing/kkk.html">KKK</a>
+      <a class="nav-link" href="../marketing/kontakt.html">Kontakt</a>
+    </nav>
+    <div class="header-side">
+      <div class="user-menu" id="userMenu">
+        <button class="user-btn" id="userMenuBtn" aria-expanded="false" aria-haspopup="true">
+          <span class="avatar" aria-hidden="true">TK</span>
+          <span class="user-name">Tõnis K.</span>
+          <i class="icon fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </button>
+        <div class="user-drop" role="menu" aria-label="Kasutaja menüü">
+          <a role="menuitem" href="09-user-bids.html"><i class="icon fa-solid fa-gavel" aria-hidden="true"></i>Minu pakkumised</a>
+          <a role="menuitem" href="10-user-objects.html"><i class="icon fa-solid fa-tree" aria-hidden="true"></i>Minu objektid</a>
+          <a role="menuitem" href="11-user-notifications.html"><i class="icon fa-solid fa-bell" aria-hidden="true"></i>Teavitused</a>
+          <a role="menuitem" href="12-user-profile.html"><i class="icon fa-solid fa-user" aria-hidden="true"></i>Minu profiil</a>
+          <hr class="user-divider" role="separator">
+          <a class="logout" role="menuitem" href="01-listing.html"><i class="icon fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i>Logi välja</a>
+        </div>
+      </div>
+      <a class="btn btn-cta" href="../marketing/teenused-raieoiguse-muuk.html">Paku oma metsa</a>
+      <button class="menu-btn" id="menuOpen" aria-expanded="false" aria-controls="drawer" aria-label="Ava menüü">
+        <i class="icon fa-solid fa-bars" style="font-size:26px" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Mobile drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+<aside class="drawer" id="drawer" aria-label="Mobiilmenüü" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="logo"><i class="icon fa-solid fa-tree" aria-hidden="true"></i>Erametsad Oksjonid</span>
+    <button class="menu-btn" id="menuClose" style="display:inline-flex" aria-label="Sulge menüü">
+      <i class="icon fa-solid fa-xmark" style="font-size:24px" aria-hidden="true"></i>
+    </button>
+  </div>
+  <div class="drawer-body">
+    <a class="drawer-direct" href="01-listing.html">Kõik oksjonid <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="01-listing.html#raieoigused">Raieõigused <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="01-listing.html#metskinnistud">Metskinnistud <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="04-ajalugu.html">Ajalugu <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="../marketing/kkk.html">KKK <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a class="drawer-direct" href="../marketing/kontakt.html">Kontakt <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+  </div>
+  <div class="drawer-footer">
+    <a class="btn btn-cta" href="../marketing/teenused-raieoiguse-muuk.html">Paku oma metsa</a>
+    <a class="btn btn-outline" href="09-user-bids.html">Minu pakkumised</a>
+  </div>
+</aside>
+
+<main id="sisu">
+
+<!-- ============ Page head ============ -->
+<section class="page-head" aria-labelledby="pageTitle">
+  <div class="container">
+    <nav class="crumbs" aria-label="Asukoht">
+      <a href="09-user-bids.html">Minu keskkond</a>
+      <i class="icon fa-solid fa-chevron-right" aria-hidden="true"></i>
+      <span aria-current="page">Lepingud</span>
+    </nav>
+    <h1 id="pageTitle">Lepingu allkirjastamine</h1>
+    <p class="page-summary">Oksjon #4812 Ööviiuli kinnistu — tutvu võidetud oksjoni lepinguga ja allkirjasta see elektrooniliselt.</p>
+  </div>
+</section>
+
+<!-- ============ User sub-nav ============ -->
+<div class="tabs-wrap">
+  <div class="container">
+    <nav class="tabs" aria-label="Minu keskkond">
+      <a class="tab" href="09-user-bids.html">Pakkumised</a>
+      <a class="tab" href="10-user-objects.html">Objektid</a>
+      <a class="tab" href="11-user-notifications.html">Teavitused</a>
+      <a class="tab" href="12-user-profile.html">Profiil</a>
+    </nav>
+  </div>
+</div>
+
+<!-- ============ Contract signing flow ============ -->
+<section class="listing" id="contractWrap">
+  <div class="container">
+    <div class="contract-wrap">
+
+      <div class="deadline-banner reveal" role="note">
+        <i class="icon fa-solid fa-hourglass-half" aria-hidden="true"></i>
+        <p><b>Allkirjasta 05.09.2026</b> — vastasel juhul läheb oksjon järgmisele pakkujale.</p>
+      </div>
+
+      <!-- Steps header -->
+      <div class="steps-card">
+        <div class="steps-head">
+          <span class="steps-type">Oksjonileping</span>
+          <ol class="steps" aria-label="Allkirjastamise sammud" id="stepsList">
+            <li class="step current">Andmed</li>
+            <li class="step">Kontroll</li>
+            <li class="step">Allkiri</li>
+            <li class="step">Valmis</li>
+          </ol>
+          <span class="steps-progress mono" id="stepsProgress">Allkirjastamine 1/4</span>
+        </div>
+      </div>
+
+      <!-- Signature status timeline -->
+      <div class="status-rail" role="list" aria-label="Lepingu staatus">
+        <span class="rail-item done" role="listitem">Koostatud <span class="rail-date mono">28.08.2026</span></span>
+        <span class="rail-item current" role="listitem" id="railSent">Saadetud allkirjastamisele</span>
+        <span class="rail-item" role="listitem">Allkirjastatud <span class="rail-date mono" id="railSignedDate" hidden>01.09.2026</span></span>
+        <span class="rail-item" role="listitem" id="railCounter">Erametsadi vastuallkiri</span>
+      </div>
+
+      <!-- Step 1: Andmed -->
+      <div class="step-panel active" data-step="1">
+        <div class="ctx-card">
+          <h2 id="ctxTitle">Oksjonileping #4812 — Ööviiuli kinnistu</h2>
+          <p class="ctx-sub">Saare maakond · 21,0 ha · Metsakinnistu · Sinu pimepakkumine võitis avamisel 29.08.2026. <a href="03-lot-detail-sealed.html">Vaata oksjonit</a></p>
+          <div class="ctx-grid">
+            <div class="ctx-block">
+              <h3>Ostja (andmed profiilist)</h3>
+              <dl class="ctx-rows">
+                <div class="ctx-row"><dt>Nimi</dt><dd>Tõnis Kask</dd></div>
+                <div class="ctx-row"><dt>Isikukood</dt><dd class="mono">38001010000</dd></div>
+                <div class="ctx-row"><dt>E-post</dt><dd>tonis.kask@email.ee</dd></div>
+                <div class="ctx-row"><dt>Telefon</dt><dd class="mono">+372 501 23 456</dd></div>
+              </dl>
+              <p class="ctx-note">Andmed on muudetavad <a href="12-user-profile.html">profiilis</a> enne allkirjastamist.</p>
+            </div>
+            <div class="ctx-block">
+              <h3>Hinna kokkuvõte</h3>
+              <dl class="ctx-rows">
+                <div class="ctx-row"><dt>Sinu lõpphind</dt><dd class="mono">58 500 €</dd></div>
+                <div class="ctx-row"><dt>Teenustasu 3%</dt><dd class="mono">1 755 €</dd></div>
+                <div class="ctx-row"><dt>Käibemaks 22% (teenustasule)</dt><dd class="mono">386,10 €</dd></div>
+                <div class="ctx-row total"><dt>Kokku laekumisel</dt><dd class="mono">60 641,10 €</dd></div>
+              </dl>
+            </div>
+            <div class="ctx-block">
+              <h3>Makse- ja raietingimused</h3>
+              <dl class="ctx-rows">
+                <div class="ctx-row"><dt>Makse tähtaeg</dt><dd>10 päeva arve saamisest</dd></div>
+                <div class="ctx-row"><dt>Raietähtaeg</dt><dd class="mono">31.03.2027</dd></div>
+                <div class="ctx-row"><dt>Väljaveo tähtaeg</dt><dd class="mono">30.04.2027</dd></div>
+              </dl>
+            </div>
+          </div>
+        </div>
+        <div class="ctx-actions">
+          <button type="button" class="btn btn-primary" id="toReview">Jätka kontrolli <i class="icon fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+          <p class="ctx-note">Andmed tulevad sinu profiilist ja võidetud pakkumisest — sisestada ei ole vaja midagi.</p>
+        </div>
+      </div>
+
+      <!-- Step 2: Kontroll -->
+      <div class="step-panel" data-step="2">
+        <div class="doc-card">
+          <div class="doc-toolbar">
+            <span class="doc-title">Oksjonileping v1.0</span>
+            <span class="doc-pages mono">lk 1/4 · PDF eelvaade</span>
+            <button type="button" class="btn btn-ghost btn-sm" id="downloadPdf"><i class="icon fa-solid fa-download" aria-hidden="true"></i> Laadi alla PDF</button>
+          </div>
+          <div class="doc-viewer" tabindex="0" aria-label="Lepingu tekst, kerige läbi">
+            <div class="doc-text">
+              <h2>OKSJONILEPING nr 4812/OK</h2>
+              <p class="doc-no">sõlmitud 28.08.2026 Erametsa oksjoni #4812 tulemusel</p>
+              <h3>1. Lepinguosalised</h3>
+              <p>Müüja: Erametsad OÜ, registrikood 16382940, aadress Lai 22, 93816 Kuressaare, e-post info@erametsad.ee. Ostja: Tõnis Kask, isikukood 38001010000, e-post tonis.kask@email.ee, telefon +372 501 23 456.</p>
+              <h3>2. Müügiobjekt</h3>
+              <p>Müüja annab oksjoni tulemusel ostjale raieõiguse Ööviiuli kinnistul, katastritunnus 50301:001:0218, pindala 21,0 ha, Saaremaa vald, Saare maakond. Raiemaht ja puuliigid on sätestatud oksjoni tihendi ja metsateatisega.</p>
+              <h3>3. Hind ja tasumine</h3>
+              <p>Oksjoni lõpphind on 58 500 eurot. Teenustasu 3% lõpphinnast on 1 755 eurot, millele lisandub käibemaks 22% (386,10 eurot). Kokku laekub müüjale 60 641,10 eurot. Arve esitatakse ostja e-postile lepingu vastuallakirjastamise päeval. Makse tähtaeg on 10 päeva arve saamisest.</p>
+              <h3>4. Raie- ja väljaveotingimused</h3>
+              <p>Ostjal on õigus raiet teostada kuni 31.03.2027. Toodang tuleb kinnistult välja viia hiljemalt 30.04.2027. Raie järgib kehtiva metsaseaduse nõudeid ja metsateatise tingimusi. Müüjal on õigus raiet kontrollida.</p>
+              <h3>5. Vastutus ja vaidlused</h3>
+              <p>Leping on sõlmitud oksjonitingimuste alusel. Poolad lahendavad vaidlused läbirääkimiste teel; kokkuleppe puudumisel otsustab Kuressaare kohtusüsteem. Leping on allkirjastatud elektrooniliselt ning allkirjastatud fail säilitatakse müüja arhiivis koos ajatempliga.</p>
+              <h3>6. Jõustumine</h3>
+              <p>Leping jõustub mõlema poole allkirjastamisel. Ostja kinnitab, et on tutvunud oksjonitingimuste ja tihendi andmetega ning ei esita hindadega seotud pretensioone.</p>
+            </div>
+          </div>
+          <p class="doc-hint"><i class="icon fa-solid fa-circle-info" aria-hidden="true"></i> Kerige dokument läbi — täielik leping on 4 lehekülge ja jääb pärast allkirjastamist sinu profiili.</p>
+          <div class="doc-actions">
+            <div class="agree">
+              <input type="checkbox" id="agreeCheck">
+              <label for="agreeCheck">Olen dokumendi läbi lugenud ja nõustun tingimustega</label>
+            </div>
+            <button type="button" class="btn btn-primary" id="toSign" disabled>Ava allkirjastamiseks</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Allkiri -->
+      <div class="step-panel" data-step="3">
+        <div class="sign-card">
+          <h2>Allkirjasta leping</h2>
+          <p class="sign-sub">Leping saadetakse allkirjastamise teenusesse. Kontrollkood kehtib 15 minutit, seejärel tuleb andmed uuesti ette valmistada.</p>
+          <div id="eidPicker">
+            <div class="eid-methods">
+              <button type="button" class="btn eid-btn" data-method="smartid"><i class="icon fa-solid fa-mobile-screen-button" aria-hidden="true"></i>Smart-ID</button>
+              <button type="button" class="btn eid-btn" data-method="mid"><i class="icon fa-solid fa-comment-sms" aria-hidden="true"></i>Mobiil-ID</button>
+              <button type="button" class="btn eid-btn" data-method="idcard"><i class="icon fa-solid fa-id-card" aria-hidden="true"></i>ID-kort</button>
+            </div>
+            <p class="eid-tip"><i class="icon fa-solid fa-circle-info" aria-hidden="true"></i> Vaheta seadet või kasuta Mobiil-ID-d, kui Smart-ID rakendus ühel ekraanil ei mahtu.</p>
+            <p class="eid-support">Allkirjastamine ei õnnestu? Võta ühendust info@erametsad.ee.</p>
+          </div>
+          <div class="eid-waiting" id="eidWait" hidden>
+            <div class="spinner" aria-hidden="true"></div>
+            <p class="eid-note" id="eidWaitText">Kontrolli, et telefonis kuvatakse sama koodi, seejärel sisesta PIN2.</p>
+            <p class="control-code" id="controlCode" aria-label="Kontrollkood">0000</p>
+            <button type="button" class="btn btn-ghost btn-sm" id="eidCancel">Katkesta allkirjastamine</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Valmis -->
+      <div class="step-panel" data-step="4">
+        <div class="success-card">
+          <i class="icon fa-solid fa-circle-check" aria-hidden="true"></i>
+          <h2>Leping allkirjastatud!</h2>
+          <p id="signedAt">Leping #4812/OK allkirjastatud 01.09.2026 kell 14:32 · Allkirjastaja Tõnis Kask. Erametsad lisab vastuallkirja 1 tööpäeva jooksul.</p>
+          <div class="success-actions">
+            <button type="button" class="btn btn-primary" id="downloadBdoc"><i class="icon fa-solid fa-download" aria-hidden="true"></i> Laadi allkirjastatud fail (.bdoc)</button>
+            <a class="btn btn-outline" href="09-user-bids.html">Minu pakkumised</a>
+            <a class="btn btn-ghost" href="01-listing.html">Tagasi oksjonitele</a>
+          </div>
+        </div>
+        <div class="next-steps">
+          <h2>Mis edasi?</h2>
+          <ul>
+            <li><i class="icon fa-solid fa-file-invoice" aria-hidden="true"></i><span><b>Arve saadetakse.</b> Saadame arve (60 641,10 €) sinu e-postile 1 päeva jooksul pärast vastuallkirja. Makse tähtaeg 10 päeva arve saamisest.</span></li>
+            <li><i class="icon fa-solid fa-tree" aria-hidden="true"></i><span><b>Raieteavitus.</b> Teatame, kui metsateatis on valmis ja raiet saab planeerima hakata. Raietähtaeg 31.03.2027, väljaveo tähtaeg 30.04.2027.</span></li>
+            <li><i class="icon fa-solid fa-gavel" aria-hidden="true"></i><span><b>Järgmised oksjonid.</b> Vaata aktiivseid oksjoneid ja anna uus pakkumine.</span></li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ Footer ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <h4>Oksjonid</h4>
+        <a href="01-listing.html#raieoigused">Raieõigused</a>
+        <a href="01-listing.html#metskinnistud">Metskinnistud</a>
+        <a href="01-listing.html#polumaad">Põllumaad</a>
+        <a href="01-listing.html#paketid">Paketid</a>
+        <a href="01-listing.html#kiiroksjonid">Kiiroksjonid</a>
+      </div>
+      <div>
+        <h4>Ajalugu</h4>
+        <a href="04-ajalugu.html">Lõppenud oksjonid</a>
+        <a href="04-ajalugu.html">Tulemused</a>
+      </div>
+      <div>
+        <h4>Erametsad</h4>
+        <a href="../marketing/home.html">Metsa müümine</a>
+        <a href="../marketing/hindamisaktid.html">Hindamisaktid</a>
+        <a href="../marketing/metsateatis.html">Metsateatis</a>
+        <a href="../marketing/meist-metsaspetsialistid.html">Metsaspetsialistid</a>
+        <a href="../marketing/kkk.html">KKK</a>
+      </div>
+      <div>
+        <h4>Jälgi meid</h4>
+        <div class="social-row">
+          <a href="https://facebook.com/erametsad" target="_blank" rel="noopener" aria-label="Facebook"><i class="icon fa-brands fa-facebook-f" aria-hidden="true"></i></a>
+          <a href="https://instagram.com/erametsad" target="_blank" rel="noopener" aria-label="Instagram"><i class="icon fa-brands fa-instagram" aria-hidden="true"></i></a>
+          <a href="https://youtube.com/@erametsad" target="_blank" rel="noopener" aria-label="YouTube"><i class="icon fa-brands fa-youtube" aria-hidden="true"></i></a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Erametsad OÜ</span>
+      <span class="spacer"></span>
+      <a href="#">Privaatsuspoliitika</a>
+      <a href="#" id="cookieSettingsLink">Küpsisesätted</a>
+    </div>
+  </div>
+</footer>
+
+<!-- Cookie banner -->
+<div class="cookie" id="cookie" role="region" aria-label="Küpsiste teavitus">
+  <p><b>Kasutame küpsiseid.</b> Vajalikud küpsised tagavad lehe toimimise, analüütika abil mõõdame liiklust. Vali, mida lubad.</p>
+  <div class="cookie-actions">
+    <button class="btn btn-cta btn-sm" data-cookie="all">Nõustun kõigiga</button>
+    <button class="btn btn-outline btn-sm" data-cookie="needed">Ainult vajalikud</button>
+    <button class="btn btn-ghost btn-sm" data-cookie="settings">Sätete muutmine</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <i class="icon fa-solid fa-circle-check" aria-hidden="true"></i>
+  <span></span>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+
+  /* Header shrink */
+  const header=$("#header");
+  const onScroll=()=>header.classList.toggle("scrolled",window.scrollY>8);
+  addEventListener("scroll",onScroll,{passive:true}); onScroll();
+
+  /* Mobile drawer */
+  const drawer=$("#drawer"), backdrop=$("#drawerBackdrop"),
+        openBtn=$("#menuOpen"), closeBtn=$("#menuClose");
+  const setDrawer=open=>{
+    document.body.classList.toggle("drawer-open",open);
+    drawer.setAttribute("aria-hidden",String(!open));
+    openBtn.setAttribute("aria-expanded",String(open));
+    backdrop.hidden=!open;
+  };
+  openBtn.addEventListener("click",()=>setDrawer(true));
+  closeBtn.addEventListener("click",()=>setDrawer(false));
+  backdrop.addEventListener("click",()=>setDrawer(false));
+
+  /* Scroll reveal */
+  $$(".stagger").forEach(g=>Array.from(g.children).slice(0,6).forEach((c,i)=>{
+    c.classList.add("reveal"); c.style.transitionDelay=(i*50)+"ms";
+  }));
+  const io=new IntersectionObserver(es=>es.forEach(e=>{
+    if(e.isIntersecting){e.target.classList.add("in"); io.unobserve(e.target);}
+  }),{threshold:.1,rootMargin:"0px 0px -40px"});
+  $$(".reveal").forEach(el=>io.observe(el));
+
+  /* Toast helper (pages call window.toast(msg)) */
+  const toast=$("#toast"); let toastTimer;
+  window.toast=function(msg){
+    $("span",toast).textContent=msg;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>toast.classList.remove("show"),5000);
+  };
+
+  /* Cookie banner (visual demo) */
+  const cookie=$("#cookie");
+  const hideCookie=()=>{cookie.classList.add("hidden"); try{sessionStorage.setItem("cookie","1")}catch(e){}};
+  try{if(sessionStorage.getItem("cookie"))cookie.classList.add("hidden")}catch(e){}
+  $$("[data-cookie]",cookie).forEach(b=>b.addEventListener("click",hideCookie));
+  $("#cookieSettingsLink").addEventListener("click",e=>{e.preventDefault(); cookie.classList.remove("hidden")});
+})();
+</script>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+  const REDUCED=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* Authed user menu */
+  const userMenu=$("#userMenu"), userBtn=$("#userMenuBtn");
+  const setUserMenu=open=>{
+    userMenu.classList.toggle("open",open);
+    userBtn.setAttribute("aria-expanded",String(open));
+  };
+  userBtn.addEventListener("click",()=>setUserMenu(!userMenu.classList.contains("open")));
+  document.addEventListener("click",e=>{
+    if(userMenu.classList.contains("open")&&!userMenu.contains(e.target))setUserMenu(false);
+  });
+
+  /* Step navigation */
+  const panels=$$(".step-panel"),
+        steps=$$("#stepsList .step"),
+        progress=$("#stepsProgress"),
+        wrap=$("#contractWrap");
+  let waitTimer=null;
+
+  function goto(n,scroll=true){
+    panels.forEach(p=>p.classList.toggle("active",p.dataset.step===String(n)));
+    steps.forEach((s,i)=>{
+      s.classList.toggle("done",i<n-1);
+      s.classList.toggle("current",i===n-1);
+    });
+    progress.textContent="Allkirjastamine "+n+"/4";
+    if(scroll)wrap.scrollIntoView({behavior:REDUCED?"auto":"smooth",block:"start"});
+  }
+
+  /* Step 1 → 2 */
+  $("#toReview").addEventListener("click",()=>goto(2));
+
+  /* Step 2: required-reading checkbox gates signing */
+  const agree=$("#agreeCheck"), toSign=$("#toSign");
+  agree.addEventListener("change",()=>{toSign.disabled=!agree.checked});
+  $("#downloadPdf").addEventListener("click",()=>window.toast("Demo: PDF-i allalaadimine on näitlik."));
+  toSign.addEventListener("click",()=>goto(3));
+
+  /* Step 3: eID signing demo (simulated provider) */
+  const eidPicker=$("#eidPicker"), eidWait=$("#eidWait"),
+        waitText=$("#eidWaitText"), codeBox=$("#controlCode");
+  const EID={
+    smartid:{text:"Kontrolli, et telefonis kuvatakse sama koodi, seejärel sisesta PIN2.",code:true},
+    mid:{text:"Kontrolli, et telefonis kuvatakse sama koodi, seejärel sisesta PIN2.",code:true},
+    idcard:{text:"Sisesta ID-kaardi PIN2 kaardilugejaga.",code:false}
+  };
+  function signWith(m){
+    const conf=EID[m];
+    waitText.textContent=conf.text;
+    codeBox.textContent=String(Math.floor(1000+Math.random()*9000));
+    codeBox.hidden=!conf.code;
+    eidPicker.hidden=true;
+    eidWait.hidden=false;
+    /* Simulated provider poll → signed */
+    waitTimer=setTimeout(finishSigning,3500);
+  }
+  function finishSigning(){
+    clearTimeout(waitTimer);
+    eidWait.hidden=true;
+    setSigned();
+    goto(4);
+    window.toast("Leping allkirjastatud!");
+  }
+  $$(".eid-btn").forEach(b=>b.addEventListener("click",()=>signWith(b.dataset.method)));
+  $("#eidCancel").addEventListener("click",()=>{
+    clearTimeout(waitTimer);
+    eidWait.hidden=true;
+    eidPicker.hidden=false;
+    window.toast("Allkirjastamine katkestati. Proovi uuesti.");
+  });
+
+  /* Signed state: timeline + dates */
+  const railItems=$$(".rail-item");
+  function setSigned(){
+    railItems.forEach((r,i)=>{
+      r.classList.toggle("done",i<3);
+      r.classList.toggle("current",i===3);
+    });
+    $("#railSignedDate").hidden=false;
+    $("#railCounter").textContent="Ootab Erametsadi vastuallkirja";
+  }
+  $("#downloadBdoc").addEventListener("click",()=>window.toast("Demo: allkirjastatud konteineri (.bdoc) allalaadimine on näitlik."));
+
+  /* Escape closes user menu */
+  addEventListener("keydown",e=>{
+    if(e.key==="Escape")setUserMenu(false);
+  });
+
+  /* Demo state from URL: ?allkirjastatud=1 skips to signed */
+  if(new URLSearchParams(location.search).get("allkirjastatud")==="1"){
+    setSigned();
+    goto(4,false);
+  }
+})();
+</script>
+</body>
+</html>

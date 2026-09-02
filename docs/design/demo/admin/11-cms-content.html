@@ -1,0 +1,1218 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sisuhaldus | Erametsad haldus</title>
+<meta name="description" content="Erametsad haldusplaadi sisuhaldus — CMS blokkredaktori demo prototüüp.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23012d1d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z'/%3E%3Cpath d='M12 22v-3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ---- Tokens (ADMIN-DESIGN-SPEC §1.2) ---- */
+:root{
+  --primary:#012d1d; --primary-hover:#1b4332; --primary-dark:#16382A; --primary-light:#c1ecd4;
+  --accent:#58B368; --cta:#F2A93B; --cta-hover:#D98F1F;
+  --ink:#181a2e; --ink-muted:#414844; --ink-inverse:#FFFFFF;
+  --bg-page:#fbf8ff; --bg-mist:#f4f2ff; --border:#c1c8c2;
+  --danger:#B3261E; --danger-light:#FBEAE9; --info:#2D6FA8; --info-light:#E9F1F7;
+  --st-draft-text:#414844; --st-draft-bg:#EBEBEB; --st-draft-dot:#6B7570;
+  --st-sched-text:#1F4E79; --st-sched-bg:#E9F1F7; --st-sched-dot:#2D6FA8;
+  --st-active-text:#1B6338; --st-active-bg:#E8F6ED; --st-active-dot:#2E9E5B;
+  --st-ending-text:#941E17; --st-ending-bg:#FBEAE9; --st-ending-dot:#B3261E;
+  --st-ended-text:#8F590A; --st-ended-bg:#FEF5E7; --st-ended-dot:#F2A93B;
+  --st-unsold:#B3261E;
+  --st-contract-text:#236B3B; --st-contract-bg:#EBF7F0; --st-contract-dot:#58B368;
+  --st-arch-text:#414844; --st-arch-bg:#ECEEEB; --st-arch-dot:#6B7570;
+  --font-heading:"Public Sans",system-ui,sans-serif;
+  --font-body:"Inter",system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --space-2xs:4px; --space-xs:8px; --space-sm:12px; --space-md:16px;
+  --space-lg:24px; --space-xl:32px; --space-2xl:40px; --space-3xl:48px; --space-4xl:64px;
+  --radius:8px; --radius-pill:999px;
+  --surface:#FFFFFF;
+  --shadow-card:0 1px 2px rgba(24,26,46,.04),0 2px 8px rgba(24,26,46,.05);
+  --shadow-hover:0 2px 8px rgba(24,26,46,.08),0 8px 24px rgba(24,26,46,.08);
+  --shadow-pop:0 8px 24px rgba(24,26,46,.14);
+  --tint-primary:rgba(1,45,29,.06);
+  --tint-primary-strong:rgba(1,45,29,.1);
+  --glow-active:rgba(46,158,91,.45);
+  --accent-soft:rgba(88,179,104,.28);
+  --overlay:rgba(24,26,46,.45);
+  --rail-w:56px; --topbar-h:64px;
+}
+
+/* ---- Base ---- */
+*,*::before,*::after{box-sizing:border-box}
+html{color-scheme:light; -webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg-page); color:var(--ink);
+  font:400 14px/20px var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--primary)}
+button{font:inherit; cursor:pointer}
+ul{margin:0; padding:0; list-style:none}
+svg{display:block}
+svg.lucide{flex:none}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+::selection{background:var(--primary-light)}
+.mono{font-family:var(--font-mono); font-feature-settings:"tnum"}
+.sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
+.skip-link{
+  position:absolute; left:-9999px; top:8px; z-index:200;
+  background:var(--primary); color:var(--ink-inverse); padding:10px 16px; border-radius:var(--radius);
+}
+.skip-link:focus{left:8px; color:var(--ink-inverse)}
+
+/* ---- Left icon rail (fixed 56px) ---- */
+.rail{
+  position:fixed; inset:0 auto 0 0; width:var(--rail-w); z-index:100;
+  display:flex; flex-direction:column; align-items:center;
+  background:var(--surface); border-right:1px solid var(--border); padding:12px 0;
+}
+.rail-logo{
+  display:grid; place-items:center; width:32px; height:32px; margin-bottom:16px;
+  border-radius:var(--radius); background:var(--bg-mist); color:var(--primary);
+}
+.rail-logo svg{width:20px; height:20px}
+.rail-nav{display:flex; flex-direction:column; align-items:center; gap:2px; width:100%}
+.rail-item{
+  position:relative; display:grid; place-items:center; width:40px; height:40px;
+  border-radius:var(--radius); color:var(--ink-muted); text-decoration:none;
+  transition:background-color .15s ease-out, color .15s ease-out;
+}
+.rail-item svg{width:20px; height:20px}
+.rail-item:hover{background:var(--tint-primary); color:var(--primary)}
+.rail-item.active{background:var(--tint-primary-strong); color:var(--primary)}
+.rail-item.active::before{content:""; position:absolute; left:-8px; top:6px; bottom:6px; width:3px; border-radius:0 2px 2px 0; background:var(--primary)}
+.rail-item::after{
+  content:attr(data-tip); position:absolute; left:calc(100% + 12px); top:50%; transform:translateY(-50%);
+  z-index:110; background:var(--ink); color:var(--ink-inverse);
+  font:500 12px/16px var(--font-body); padding:5px 9px; border-radius:6px; white-space:nowrap;
+  opacity:0; visibility:hidden; transition:opacity .12s ease-out .08s, visibility 0s .2s; pointer-events:none;
+}
+.rail-item:hover::after,.rail-item:focus-visible::after{opacity:1; visibility:visible; transition-delay:0s}
+.rail-flag{position:absolute; top:3px; right:2px; z-index:1}
+.rail-flag.dot{width:8px; height:8px; border-radius:var(--radius-pill)}
+.rail-flag.num{
+  min-width:14px; height:14px; padding:0 3px; border-radius:var(--radius-pill);
+  display:grid; place-items:center; font:700 9px/1 var(--font-body); color:var(--ink-inverse);
+  border:2px solid var(--surface);
+}
+.is-amber{background:var(--cta)}
+.is-red{background:var(--danger)}
+
+/* ---- Topbar (sticky 64px) ---- */
+.app{margin-left:var(--rail-w)}
+.topbar{
+  position:sticky; top:0; z-index:90; display:flex; align-items:center; gap:12px;
+  height:var(--topbar-h); padding:0 24px;
+  background:var(--surface); border-bottom:1px solid var(--border);
+}
+.menu-btn{display:none; place-items:center; width:36px; height:36px; margin-left:-8px; border:0; border-radius:var(--radius); background:transparent; color:var(--ink)}
+.menu-btn:hover{background:var(--bg-mist)}
+.topbar-brand{display:flex; align-items:center; gap:10px; flex:none}
+.env-badge{display:inline-flex; align-items:center; padding:3px 10px; border-radius:var(--radius-pill); font:700 11px/14px var(--font-heading); letter-spacing:.04em}
+.env-prod{background:var(--st-active-bg); color:var(--st-active-text)}
+.env-stage{background:var(--st-ended-bg); color:var(--st-ended-text)}
+.env-dev{background:var(--danger-light); color:var(--danger)}
+.topbar-title{font:600 15px/20px var(--font-heading); color:var(--ink)}
+.topbar-search{
+  position:relative; display:flex; align-items:center; gap:8px; flex:1; max-width:420px; height:36px;
+  margin-inline:auto; padding:0 10px; border-radius:var(--radius);
+  background:var(--bg-mist); border:1px solid transparent;
+  transition:border-color .15s ease-out, background-color .15s ease-out;
+}
+.topbar-search:focus-within{border-color:var(--primary); background:var(--surface)}
+.topbar-search svg{width:16px; height:16px; color:var(--ink-muted)}
+.topbar-search input{flex:1; min-width:0; border:0; background:transparent; outline:0; font:400 13px/18px var(--font-body); color:var(--ink)}
+.topbar-search input::placeholder{color:var(--ink-muted)}
+.search-kbd{flex:none; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1px 6px; font:500 11px/16px var(--font-mono); color:var(--ink-muted)}
+.topbar-user{display:flex; align-items:center; gap:8px; flex:none}
+.icon-btn{
+  position:relative; display:grid; place-items:center; width:36px; height:36px;
+  border:0; border-radius:var(--radius); background:transparent; color:var(--ink-muted);
+}
+.icon-btn:hover{background:var(--bg-mist); color:var(--primary)}
+.icon-btn svg{width:18px; height:18px}
+.bell-badge{
+  position:absolute; top:3px; right:3px; min-width:15px; height:15px; padding:0 3px;
+  border-radius:var(--radius-pill); background:var(--danger); color:var(--ink-inverse);
+  border:2px solid var(--surface); font:600 10px/1 var(--font-body);
+  display:grid; place-items:center;
+}
+.user-menu{
+  display:flex; align-items:center; gap:10px; padding:4px 6px 4px 4px;
+  border:0; border-radius:var(--radius); background:transparent;
+}
+.user-menu:hover{background:var(--bg-mist)}
+.avatar{
+  width:32px; height:32px; border-radius:50%;
+  background:var(--primary); color:var(--ink-inverse);
+  display:grid; place-items:center; font:600 12px/1 var(--font-heading); letter-spacing:.02em;
+}
+.user-meta{display:flex; align-items:center; gap:8px}
+.user-name{font:600 13px/16px var(--font-body); color:var(--ink)}
+.role-chip{padding:2px 8px; border-radius:var(--radius-pill); background:var(--primary-light); color:var(--primary); font:600 11px/14px var(--font-body)}
+.user-menu > svg{width:16px; height:16px; color:var(--ink-muted)}
+
+/* ---- Workspace ---- */
+.container{max-width:1400px; margin-inline:auto; padding:var(--space-lg)}
+.breadcrumb{display:flex; align-items:center; gap:6px; font:500 12px/16px var(--font-body); color:var(--ink-muted); margin-bottom:6px}
+.page-head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:var(--space-lg)}
+.page-title{margin:0; font:700 28px/34px var(--font-heading); color:var(--ink)}
+
+/* ---- Cards ---- */
+.card{
+  display:flex; flex-direction:column; overflow:hidden;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card);
+}
+.card-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 20px; border-bottom:1px solid var(--border)}
+.card-title{margin:0; font:600 16px/22px var(--font-heading); color:var(--ink)}
+.card-foot{margin-top:auto; padding:12px 20px; border-top:1px solid var(--border); text-align:right}
+.card-link{font:600 13px/18px var(--font-body); color:var(--primary); text-decoration:none}
+.card-link:hover{color:var(--primary-hover); text-decoration:underline}
+
+/* ---- KPI strip ---- */
+.kpi-grid{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--space-sm); margin-bottom:var(--space-lg)}
+.kpi-card{
+  display:flex; flex-direction:column; gap:2px; padding:var(--space-md);
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card); color:var(--ink); text-decoration:none;
+  transition:border-color .15s ease-out, box-shadow .15s ease-out, transform .15s ease-out;
+}
+.kpi-card:hover{border-color:var(--primary); box-shadow:var(--shadow-hover); transform:translateY(-1px)}
+.kpi-label{font:500 12px/16px var(--font-body); color:var(--ink-muted)}
+.kpi-value{font:700 28px/32px var(--font-mono); font-feature-settings:"tnum"; letter-spacing:-.01em}
+.kpi-value.is-danger{color:var(--danger)}
+.kpi-alert{
+  display:inline-grid; place-items:center; width:18px; height:18px; margin-left:8px; vertical-align:6px;
+  border-radius:var(--radius-pill); background:var(--cta); color:var(--ink);
+  font:700 12px/1 var(--font-body);
+}
+.kpi-sub{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.trend-up{color:var(--st-active-text); font-weight:500}
+.spark{width:100%; height:24px; margin:4px 0 2px}
+.info-dot{display:inline-grid; place-items:center; vertical-align:-2px; color:var(--ink-muted); cursor:help}
+.info-dot svg{width:12px; height:12px}
+
+/* ---- Dashboard grid (2/3 + 1/3) ---- */
+.dash-grid{display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:var(--space-lg); align-items:stretch}
+
+/* ---- Live table ---- */
+.live{display:inline-flex; align-items:center; gap:7px; font:600 12px/16px var(--font-body); color:var(--st-active-text)}
+.live-dot{width:8px; height:8px; border-radius:var(--radius-pill); background:var(--st-active-dot); animation:live-pulse 2s ease-out infinite}
+@keyframes live-pulse{0%{box-shadow:0 0 0 0 var(--glow-active)}70%,100%{box-shadow:0 0 0 6px transparent}}
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%; min-width:620px; border-collapse:collapse}
+.tbl th{padding:10px 16px; background:var(--bg-mist); font:500 12px/16px var(--font-body); color:var(--ink-muted); text-align:left; white-space:nowrap}
+.tbl td{padding:12px 16px; border-top:1px solid var(--border); font:400 13px/18px var(--font-body); vertical-align:middle}
+.tbl th:first-child,.tbl td:first-child{padding-left:20px}
+.tbl th:last-child,.tbl td:last-child{padding-right:20px}
+.tbl tbody tr{transition:background-color .15s ease-out}
+.tbl tbody tr:hover{background:var(--bg-mist)}
+.num{text-align:right}
+.lot-id{font:500 12px/16px var(--font-mono); color:var(--ink-muted)}
+.lot-name{color:var(--ink); font:500 13px/18px var(--font-body); text-decoration:none}
+.lot-name:hover{color:var(--primary); text-decoration:underline}
+td .cd{font:500 14px/18px var(--font-mono); font-feature-settings:"tnum"}
+.bid{font:500 13px/18px var(--font-mono); font-feature-settings:"tnum"}
+.bid-muted{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.type-chip{display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.type-chip svg{width:12px; height:12px}
+.type-raie{background:var(--st-active-bg); color:var(--st-active-text)}
+.type-kinnistu{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.type-pakett{background:var(--st-draft-bg); color:var(--st-draft-text)}
+.btn-outline{
+  display:inline-flex; align-items:center; gap:6px; padding:5px 12px;
+  border:1px solid var(--accent); border-radius:var(--radius); background:transparent;
+  color:var(--primary); font:600 12px/16px var(--font-body); text-decoration:none; white-space:nowrap;
+  transition:background-color .15s ease-out;
+}
+.btn-outline svg{width:11px; height:11px}
+.btn-outline:hover{background:var(--st-active-bg)}
+.cd-crit{color:var(--danger) !important; animation:cd-blink 1s step-end infinite}
+@keyframes cd-blink{50%{opacity:.45}}
+@keyframes row-flash{0%{background:var(--accent-soft)}100%{background:transparent}}
+tr.row-extend td{animation:row-flash .9s ease-out 2}
+
+/* ---- Süsteemi tervis ---- */
+.health-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 20px; border-top:1px solid var(--border)}
+.health-row:first-child{border-top:0}
+.health-name{font:400 13px/18px var(--font-body); color:var(--ink-muted)}
+.health-val{display:inline-flex; align-items:center; gap:8px; font:500 13px/18px var(--font-body); color:var(--ink)}
+.ok-text{font:600 12px/16px var(--font-body); color:var(--st-active-text)}
+.status-dot{width:8px; height:8px; border-radius:var(--radius-pill); flex:none}
+.status-dot.ok{background:var(--st-active-dot)}
+.status-dot.warn{background:var(--cta)}
+.status-dot.err{background:var(--danger)}
+.health-foot{
+  display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:auto; padding:10px 20px 14px;
+  border-top:1px solid var(--border);
+  font:400 11px/16px var(--font-body); color:var(--ink-muted);
+}
+.health-foot span{display:inline-flex; align-items:center; gap:6px}
+.mini-dot{width:6px; height:6px; border-radius:var(--radius-pill); background:var(--st-active-dot)}
+
+/* ---- Kiire tegevus ---- */
+.action-row{
+  display:flex; align-items:center; gap:12px; padding:13px 20px;
+  border-top:1px solid var(--border); color:var(--ink); text-decoration:none;
+  transition:background-color .15s ease-out;
+}
+.action-row:first-child{border-top:0}
+.action-row:hover{background:var(--bg-mist)}
+.action-ico{display:grid; place-items:center; width:36px; height:36px; flex:none; border-radius:var(--radius); background:var(--bg-mist); color:var(--primary)}
+.action-ico svg{width:18px; height:18px}
+.action-main{display:flex; flex-direction:column; gap:1px; flex:1; min-width:0}
+.action-title{font:500 13px/18px var(--font-body); color:var(--ink)}
+.action-note{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.action-note.warn{color:var(--st-ended-text)}
+.count-pill{flex:none; padding:2px 10px; border-radius:var(--radius-pill); background:var(--primary-light); color:var(--primary); font:700 12px/16px var(--font-body); white-space:nowrap}
+.action-go{
+  display:grid; place-items:center; width:28px; height:28px; flex:none;
+  border:1px solid transparent; border-radius:var(--radius-pill); color:var(--ink-muted);
+  transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out;
+}
+.action-go svg{width:14px; height:14px}
+.action-row:hover .action-go{border-color:var(--border); background:var(--surface); color:var(--primary)}
+
+/* ---- Viimased juhtlõimed ---- */
+.lead-row{display:flex; align-items:center; gap:10px; padding:13px 20px; border-top:1px solid var(--border)}
+.lead-row:first-child{border-top:0}
+.lead-time{font:500 12px/16px var(--font-mono); font-feature-settings:"tnum"; color:var(--ink-muted)}
+.chip{display:inline-flex; align-items:center; padding:2px 10px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.chip-name{background:var(--bg-mist); border:1px solid var(--border); color:var(--ink)}
+.lead-county{flex:1; min-width:0; font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.chip-src{font:600 11px/16px var(--font-body)}
+.src-kava{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.src-raie{background:var(--st-active-bg); color:var(--st-active-text)}
+.src-ost{background:var(--st-ended-bg); color:var(--st-ended-text)}
+
+/* ---- Mobile drawer (<768px) ---- */
+.drawer{
+  position:fixed; top:0; bottom:0; left:0; z-index:140; width:min(320px,86vw);
+  display:flex; flex-direction:column; visibility:hidden;
+  background:var(--surface); box-shadow:var(--shadow-pop);
+  transform:translateX(-102%); transition:transform .2s cubic-bezier(.4,0,.2,1), visibility 0s .2s;
+}
+body.drawer-open .drawer{transform:none; visibility:visible; transition-delay:0s}
+body.drawer-open{overflow:hidden}
+.drawer-head{display:flex; align-items:center; gap:10px; height:var(--topbar-h); padding:0 12px 0 16px; border-bottom:1px solid var(--border)}
+.drawer-head .rail-logo{margin:0}
+.drawer-head .topbar-title{flex:1}
+.drawer-nav{flex:1; overflow-y:auto; padding:8px}
+.drawer-link{
+  display:flex; align-items:center; gap:12px; padding:11px 12px; margin-bottom:2px;
+  border-radius:var(--radius); color:var(--ink); font:500 14px/20px var(--font-body); text-decoration:none;
+}
+.drawer-link:hover{background:var(--bg-mist)}
+.drawer-link.active{background:var(--tint-primary-strong); color:var(--primary); font-weight:600}
+.drawer-link svg{width:18px; height:18px; color:var(--ink-muted)}
+.drawer-link.active svg{color:var(--primary)}
+.drawer-flag{margin-left:auto; flex:none}
+.drawer-flag.dot{width:8px; height:8px; border-radius:var(--radius-pill)}
+.drawer-flag.num{min-width:14px; height:14px; padding:0 4px; border-radius:var(--radius-pill); display:grid; place-items:center; font:700 10px/1 var(--font-body); color:var(--ink-inverse)}
+.drawer-backdrop{
+  position:fixed; inset:0; z-index:130; background:var(--overlay);
+  opacity:0; visibility:hidden; transition:opacity .2s, visibility 0s .2s;
+}
+body.drawer-open .drawer-backdrop{opacity:1; visibility:visible; transition-delay:0s}
+
+/* ---- Responsive ---- */
+@media (max-width:1280px){.kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:1024px){.dash-grid{grid-template-columns:1fr}}
+@media (max-width:860px){.topbar-search{display:none}}
+@media (max-width:767px){
+  .rail{display:none}
+  .app{margin-left:0}
+  .menu-btn{display:grid}
+  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .topbar{padding:0 16px}
+  .container{padding:16px}
+}
+@media (max-width:640px){.user-meta{display:none}}
+@media (max-width:420px){.kpi-grid{grid-template-columns:1fr}}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important}
+}
+/* ---- Page 11: Sisuhaldus — collections, entries table, block editor, versions, toast ---- */
+[hidden]{display:none !important}
+.breadcrumb a{color:inherit; text-decoration:none}
+.breadcrumb a:hover{color:var(--primary); text-decoration:underline}
+.breadcrumb .sep{color:var(--ink-muted)}
+.page-actions{display:flex; flex-wrap:wrap; gap:8px}
+.btn{display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border:1px solid transparent; border-radius:var(--radius); font:600 13px/18px var(--font-body); text-decoration:none; white-space:nowrap; transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out}
+.btn svg{width:15px; height:15px}
+.btn-primary{background:var(--primary); color:var(--ink-inverse)}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-ghost{background:var(--surface); border-color:var(--border); color:var(--ink)}
+.btn-ghost:hover{border-color:var(--primary); color:var(--primary); background:var(--bg-mist)}
+.btn-sm{padding:5px 10px; font:600 12px/16px var(--font-body)}
+.tabs{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:var(--space-md)}
+.tab{display:inline-flex; align-items:center; gap:8px; padding:6px 8px 6px 14px; border:1px solid var(--border); border-radius:var(--radius-pill); background:var(--surface); color:var(--ink); font:500 13px/18px var(--font-body)}
+.tab:hover{border-color:var(--primary); color:var(--primary)}
+.tab[aria-pressed="true"]{background:var(--primary); border-color:var(--primary); color:var(--ink-inverse); font-weight:600}
+.tab-count{padding:1px 8px; border-radius:var(--radius-pill); background:var(--bg-mist); font:500 11px/16px var(--font-mono); color:var(--ink-muted)}
+.tab[aria-pressed="true"] .tab-count{background:rgba(255,255,255,.18); color:var(--ink-inverse)}
+.list-tools{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:var(--space-md)}
+.content-search{display:flex; align-items:center; gap:8px; flex:1; max-width:420px; min-width:210px; height:36px; padding:0 12px; border:1px solid var(--border); border-radius:var(--radius-pill); background:var(--surface); cursor:text}
+.content-search:focus-within{border-color:var(--primary)}
+.content-search svg{width:14px; height:14px; flex:none; color:var(--ink-muted)}
+.content-search input{flex:1; min-width:0; border:0; background:transparent; outline:0; font:400 13px/18px var(--font-body); color:var(--ink)}
+.result-note{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.tbl-cms{min-width:960px}
+.tbl-cms th,.tbl-cms td{padding:10px 12px}
+.url-cell{font:400 12px/16px var(--font-mono); color:var(--ink-muted); white-space:nowrap}
+.updated-cell{font:400 12px/16px var(--font-mono); font-feature-settings:"tnum"; color:var(--ink-muted); white-space:nowrap}
+.type-leht{background:var(--st-active-bg); color:var(--st-active-text)}
+.type-artikkel{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.type-kkk{background:var(--st-draft-bg); color:var(--st-draft-text)}
+.type-akordion{background:var(--st-ended-bg); color:var(--st-ended-text)}
+.type-mall{background:var(--st-contract-bg); color:var(--st-contract-text)}
+.pill{display:inline-flex; align-items:center; gap:6px; padding:2px 10px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.pill-dot{width:6px; height:6px; border-radius:var(--radius-pill); flex:none}
+.pill-avaldatud{background:var(--st-active-bg); color:var(--st-active-text)}
+.pill-avaldatud .pill-dot{background:var(--st-active-dot)}
+.pill-mustand{background:var(--st-draft-bg); color:var(--st-draft-text)}
+.pill-mustand .pill-dot{background:var(--st-draft-dot)}
+.pill-ajastatud{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.pill-ajastatud .pill-dot{background:var(--st-sched-dot)}
+.pill-arhiivis{background:var(--st-arch-bg); color:var(--st-arch-text)}
+.pill-arhiivis .pill-dot{background:var(--st-arch-dot)}
+.sp-avatar{display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--primary-light); color:var(--primary); font:600 10px/1 var(--font-heading); letter-spacing:.02em}
+.sp-name{margin-left:8px; font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.row-actions{display:inline-flex; gap:4px; opacity:0; transition:opacity .12s ease-out}
+.tbl-cms tr:hover .row-actions,.tbl-cms tr:focus-within .row-actions{opacity:1}
+@media (hover:none){.row-actions{opacity:1}}
+.ra-btn{display:inline-flex; align-items:center; gap:4px; padding:4px 8px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--ink-muted); font:500 11px/14px var(--font-body); text-decoration:none; white-space:nowrap}
+.ra-btn:hover{border-color:var(--primary); color:var(--primary); background:var(--bg-mist)}
+.ra-btn svg{width:12px; height:12px}
+
+/* Blokkide redaktor */
+.cms-editor-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:var(--space-md)}
+.ed-title-wrap{flex:1; min-width:200px}
+.ed-name{margin:0; font:600 18px/24px var(--font-heading); color:var(--ink)}
+.ed-url{font:400 12px/16px var(--font-mono); color:var(--ink-muted)}
+.builder-grid{display:grid; grid-template-columns:minmax(300px,380px) minmax(0,1fr); gap:var(--space-lg); align-items:start}
+.blocks-body{padding:12px}
+.block-item{display:flex; align-items:center; gap:8px; padding:9px 10px; margin-bottom:8px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface)}
+.block-grip{flex:none; color:var(--ink-muted)}
+.block-grip svg{width:14px; height:14px}
+.block-num{flex:none; width:22px; text-align:right; font:500 12px/16px var(--font-mono); color:var(--ink-muted)}
+.block-ico{display:grid; place-items:center; width:28px; height:28px; flex:none; border-radius:6px; background:var(--bg-mist); color:var(--primary)}
+.block-ico svg{width:14px; height:14px}
+.block-main{flex:1; min-width:0}
+.block-name{display:block; font:600 12px/16px var(--font-body); color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.block-sub{display:block; font:400 11px/14px var(--font-body); color:var(--ink-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.block-actions{display:flex; align-items:center; gap:3px; flex:none}
+.mini-btn{display:grid; place-items:center; width:24px; height:24px; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--ink-muted)}
+.mini-btn:hover{border-color:var(--border); background:var(--bg-mist); color:var(--primary)}
+.mini-btn svg{width:12px; height:12px}
+.mini-btn[aria-pressed="true"]{background:var(--tint-primary-strong); color:var(--primary)}
+.mini-text{padding:3px 7px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--ink-muted); font:500 11px/14px var(--font-body); white-space:nowrap}
+.mini-text:hover{border-color:var(--primary); color:var(--primary); background:var(--bg-mist)}
+.mini-text.is-del:hover{border-color:var(--danger); color:var(--danger); background:var(--danger-light)}
+.add-row{display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:4px; padding-top:12px; border-top:1px dashed var(--border)}
+.add-btn{display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border:1px dashed var(--border); border-radius:var(--radius-pill); background:var(--surface); color:var(--ink-muted); font:500 11px/14px var(--font-body); white-space:nowrap}
+.add-btn:hover{border-style:solid; border-color:var(--primary); color:var(--primary); background:var(--bg-mist)}
+.add-btn svg{width:11px; height:11px}
+
+/* Reaalajas eelvaade */
+.device-toggle{display:inline-flex; gap:4px; padding:3px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-mist)}
+.pv-canvas{flex:1; padding:16px; background:var(--bg-mist); overflow:auto}
+.pv-doc{max-width:640px; margin-inline:auto; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow-card); transition:max-width .2s ease-out}
+.pv-frame.is-mobile .pv-doc{max-width:375px}
+.pv-hero{padding:34px 24px; background:var(--primary-dark); color:var(--ink-inverse); text-align:center}
+.pv-kicker{font:600 11px/16px var(--font-body); letter-spacing:.08em; text-transform:uppercase; color:var(--primary-light)}
+.pv-h1{margin:8px auto 6px; max-width:420px; font:700 24px/30px var(--font-heading); color:var(--ink-inverse)}
+.pv-sub{margin:0 auto 16px; max-width:420px; font:400 13px/19px var(--font-body); color:rgba(255,255,255,.85)}
+.pv-btnrow{display:flex; justify-content:center; flex-wrap:wrap; gap:8px}
+.pv-btn{display:inline-block; padding:7px 14px; border-radius:var(--radius); font:600 12px/16px var(--font-body)}
+.pv-btn-solid{background:var(--cta); color:var(--ink)}
+.pv-btn-line{border:1px solid rgba(255,255,255,.5); color:var(--ink-inverse)}
+.pv-sec{padding:20px 24px; border-top:1px solid var(--border)}
+.pv-sec h2{margin:0 0 6px; font:600 17px/22px var(--font-heading); color:var(--ink)}
+.pv-sec p{margin:0; font:400 13px/19px var(--font-body); color:var(--ink-muted)}
+.pv-imgbox{display:flex; align-items:center; justify-content:center; gap:8px; height:140px; padding:0 12px; border-radius:var(--radius); background:var(--bg-mist); color:var(--ink-muted); font:400 12px/16px var(--font-body); text-align:center}
+.pv-imgbox svg{width:20px; height:20px; flex:none}
+.pv-acc details{margin-bottom:6px; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface)}
+.pv-acc summary{cursor:pointer; font:500 13px/18px var(--font-body); color:var(--ink)}
+.pv-acc details[open] summary{margin-bottom:4px}
+.pv-cta{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:16px 24px; background:var(--primary); color:var(--ink-inverse)}
+.pv-cta b{font:600 15px/20px var(--font-heading)}
+
+/* Avaldamise juhtnupud */
+.pub-bar{display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:var(--space-lg); padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-card)}
+.pub-spacer{flex:1}
+.pub-note{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.sched{display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface)}
+.sched:focus-within{border-color:var(--primary)}
+.sched svg{width:13px; height:13px; color:var(--ink-muted)}
+.sched input{border:0; background:transparent; outline:0; font:400 12px/16px var(--font-mono); color:var(--ink)}
+
+/* Versioonide ajalugu — slaid-üle sahtel */
+.vers-backdrop{position:fixed; inset:0; z-index:150; background:var(--overlay); opacity:0; visibility:hidden; transition:opacity .2s, visibility 0s .2s}
+body.vers-open .vers-backdrop{opacity:1; visibility:visible; transition-delay:0s}
+.vers-drawer{position:fixed; top:0; bottom:0; right:0; z-index:160; width:min(560px,94vw); display:flex; flex-direction:column; visibility:hidden; background:var(--surface); box-shadow:var(--shadow-pop); transform:translateX(102%); transition:transform .2s cubic-bezier(.4,0,.2,1), visibility 0s .2s}
+body.vers-open .vers-drawer{transform:none; visibility:visible; transition-delay:0s}
+body.vers-open{overflow:hidden}
+.vers-head{display:flex; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid var(--border)}
+.vers-title{flex:1; margin:0; font:600 16px/22px var(--font-heading); color:var(--ink)}
+.vers-body{flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:10px}
+.vers-row{display:flex; align-items:center; gap:10px; padding:11px 12px; border:1px solid var(--border); border-radius:var(--radius)}
+.vers-ver{flex:none; font:600 13px/18px var(--font-mono); color:var(--ink)}
+.badge-now{flex:none; padding:1px 8px; border-radius:var(--radius-pill); background:var(--st-active-bg); color:var(--st-active-text); font:600 10px/14px var(--font-body); letter-spacing:.04em; text-transform:uppercase}
+.vers-meta{flex:1; min-width:0; font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.vers-foot{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.diff-head{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:6px}
+.diff-title{margin:0; font:600 13px/18px var(--font-heading); color:var(--ink)}
+.diff-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.diff-col{border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--surface)}
+.diff-col-head{padding:8px 10px; border-bottom:1px solid var(--border); background:var(--bg-mist); font:600 11px/16px var(--font-body); color:var(--ink-muted)}
+.diff-line{padding:6px 10px; border-top:1px solid var(--bg-mist); font:400 11px/16px var(--font-mono); color:var(--ink-muted)}
+.diff-line:first-child{border-top:0}
+.diff-add{background:var(--st-active-bg); color:var(--st-active-text)}
+.diff-del{background:var(--danger-light); color:var(--danger); text-decoration:line-through}
+
+/* Toast */
+.toast{position:fixed; right:16px; bottom:16px; z-index:180; max-width:380px; padding:12px 16px; border-left:3px solid var(--accent); border-radius:var(--radius); background:var(--ink); color:var(--ink-inverse); box-shadow:var(--shadow-pop); font:500 13px/18px var(--font-body)}
+
+/* Erivahemikud */
+@media (max-width:1024px){.builder-grid{grid-template-columns:1fr}}
+@media (max-width:640px){.diff-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Liigu sisuni</a>
+<!-- Left icon rail -->
+<aside class="rail" aria-label="Peamenüü">
+  <a class="rail-logo" href="01-dashboard.html" data-tip="Erametsad haldus" aria-label="Erametsad haldus">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/></svg>
+  </a>
+  <nav class="rail-nav">
+    <a class="rail-item" href="01-dashboard.html" data-tip="Töölaud" aria-label="Töölaud"><i data-lucide="layout-dashboard"></i></a>
+    <a class="rail-item" href="02-auctions-list.html" data-tip="Oksjonid" aria-label="Oksjonid"><i data-lucide="gavel"></i></a>
+    <a class="rail-item" href="04-bids-monitoring.html" data-tip="Pakkumised" aria-label="Pakkumised"><i data-lucide="activity"></i></a>
+    <a class="rail-item" href="05-sealed-opening.html" data-tip="Sul. avamine" aria-label="Sul. avamine — ootel tseremoonia"><i data-lucide="key-round"></i><span class="rail-flag dot is-amber"></span></a>
+    <a class="rail-item" href="06-users.html" data-tip="Kasutajad" aria-label="Kasutajad"><i data-lucide="users"></i></a>
+    <a class="rail-item" href="07-company-approvals.html" data-tip="Ettevõtted" aria-label="Ettevõtted — 3 ootel"><i data-lucide="building-2"></i><span class="rail-flag num is-red">3</span></a>
+    <a class="rail-item" href="08-contracts.html" data-tip="Lepingud" aria-label="Lepingud"><i data-lucide="file-signature"></i></a>
+    <a class="rail-item" href="09-leads-crm.html" data-tip="Juhtlõimed" aria-label="Juhtlõimed"><i data-lucide="kanban"></i></a>
+    <a class="rail-item" href="10-service-requests.html" data-tip="Päringud" aria-label="Päringud"><i data-lucide="send-horizontal"></i></a>
+    <a class="rail-item active" href="11-cms-content.html" data-tip="Sisuhaldus" aria-label="Sisuhaldus" aria-current="page"><i data-lucide="file-pen"></i></a>
+    <a class="rail-item" href="12-statistics.html" data-tip="Statistika" aria-label="Statistika"><i data-lucide="chart-column"></i></a>
+    <a class="rail-item" href="13-settings.html" data-tip="Seaded" aria-label="Seaded"><i data-lucide="settings"></i></a>
+    <a class="rail-item" href="14-audit-log.html" data-tip="Auditlogi" aria-label="Auditlogi"><i data-lucide="shield-check"></i></a>
+  </nav>
+</aside>
+<div class="app">
+  <!-- Topbar -->
+  <header class="topbar">
+    <button class="menu-btn" id="menuOpen" type="button" aria-label="Ava menüü" aria-expanded="false" aria-controls="drawer"><i data-lucide="menu"></i></button>
+    <div class="topbar-brand">
+      <span class="env-badge env-stage" title="Staging keskkond">STAGE</span>
+      <span class="topbar-title">Erametsad haldus</span>
+    </div>
+    <div class="topbar-search">
+      <i data-lucide="search"></i>
+      <input id="globalSearch" type="search" placeholder="Otsi oksjoneid, kasutajaid, juhtlõimi... (⌘K)" aria-label="Globaalne otsing">
+      <kbd class="search-kbd">⌘K</kbd>
+    </div>
+    <div class="topbar-user">
+      <button class="icon-btn" type="button" aria-label="Teavitused — 3 lugemata"><i data-lucide="bell"></i><span class="bell-badge">3</span></button>
+      <button class="user-menu" type="button" aria-haspopup="menu" aria-label="Kasutajamenüü: Marit Vain">
+        <span class="avatar" aria-hidden="true">MV</span>
+        <span class="user-meta">
+          <span class="user-name">Marit Vain</span>
+          <span class="role-chip">Admin</span>
+        </span>
+        <i data-lucide="chevron-down"></i>
+      </button>
+    </div>
+  </header>
+  <!-- Sisuhaldus -->
+  <main id="main">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Asukoht">
+        <a href="01-dashboard.html">Töölaud</a>
+        <span class="sep" aria-hidden="true">/</span>
+        <span aria-current="page">Sisuhaldus</span>
+      </nav>
+      <header class="page-head">
+        <h1 class="page-title">Sisuhaldus</h1>
+        <div class="page-actions">
+          <button class="btn btn-primary" id="btnNew" type="button"><i data-lucide="plus" aria-hidden="true"></i>Uus sisu</button>
+        </div>
+      </header>
+
+      <!-- Kogumike nimekiri: vahelehed + otsing + tabel -->
+      <div id="cmsList">
+        <div class="tabs" role="group" aria-label="Kogumikud">
+          <button class="tab" type="button" data-collection="all" aria-pressed="true">Kõik <span class="tab-count">10</span></button>
+          <button class="tab" type="button" data-collection="leht" aria-pressed="false">Lehed <span class="tab-count">5</span></button>
+          <button class="tab" type="button" data-collection="artikkel" aria-pressed="false">Artiklid <span class="tab-count">2</span></button>
+          <button class="tab" type="button" data-collection="kkk" aria-pressed="false">KKK <span class="tab-count">1</span></button>
+          <button class="tab" type="button" data-collection="akordion" aria-pressed="false">Akordionid <span class="tab-count">1</span></button>
+          <button class="tab" type="button" data-collection="mall" aria-pressed="false">Mallid <span class="tab-count">1</span></button>
+        </div>
+        <div class="list-tools">
+          <label class="content-search">
+            <i data-lucide="search" aria-hidden="true"></i>
+            <input id="cmsSearch" type="search" placeholder="Otsi pealkirja või URL-i järgi..." aria-label="Otsi sisu">
+          </label>
+          <span class="result-note" id="resultNote">10 kirjet</span>
+        </div>
+
+        <section class="card" aria-labelledby="h-entries">
+          <div class="card-head">
+            <h2 class="card-title" id="h-entries">Sisukirjed</h2>
+            <span class="result-note">Marketingu veebilehe CMS</span>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl tbl-cms">
+              <thead>
+                <tr>
+                  <th scope="col">Pealkiri</th>
+                  <th scope="col">URL</th>
+                  <th scope="col">Tüüp</th>
+                  <th scope="col">Olek</th>
+                  <th scope="col">Viimati muudetud</th>
+                  <th scope="col">Autor</th>
+                  <th scope="col" class="num"><span class="sr-only">Tegevus</span></th>
+                </tr>
+              </thead>
+              <tbody id="cmsRows">
+                <tr data-collection="leht">
+                  <td><a class="lot-name" href="#" data-edit data-title="Avaleht" data-url="/">Avaleht</a></td>
+                  <td class="url-cell">/</td>
+                  <td><span class="type-chip type-leht"><i data-lucide="file-text" aria-hidden="true"></i>Leht</span></td>
+                  <td><span class="pill pill-avaldatud"><span class="pill-dot" aria-hidden="true"></span>Avaldatud</span></td>
+                  <td class="updated-cell">29.08 10:12</td>
+                  <td><span class="sp-avatar" aria-hidden="true">MV</span><span class="sp-name">Marit Vain</span></td>
+                  <td class="num"><span class="row-actions"><a class="ra-btn" href="#" data-edit data-title="Avaleht" data-url="/"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a></span></td>
+                </tr>
+                <tr data-collection="leht">
+                  <td><a class="lot-name" href="#" data-edit data-title="Raieõiguse müük" data-url="/teenused/raieoiguse-muuk">Raieõiguse müük</a></td>
+                  <td class="url-cell">/teenused/raieoiguse-muuk</td>
+                  <td><span class="type-chip type-leht"><i data-lucide="file-text" aria-hidden="true"></i>Leht</span></td>
+                  <td><span class="pill pill-avaldatud"><span class="pill-dot" aria-hidden="true"></span>Avaldatud</span></td>
+                  <td class="updated-cell">31.08 16:42</td>
+                  <td><span class="sp-avatar" aria-hidden="true">MV</span><span class="sp-name">Marit Vain</span></td>
+                  <td class="num"><span class="row-actions"><a class="ra-btn" href="#" data-edit data-title="Raieõiguse müük" data-url="/teenused/raieoiguse-muuk"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a></span></td>
+                </tr>
+                <tr data-collection="leht">
+                  <td><a class="lot-name" href="#" data-edit data-title="Teenused" data-url="/teenused">Teenused</a></td>
+                  <td class="url-cell">/teenused</td>
+                  <td><span class="type-chip type-leht"><i data-lucide="file-text" aria-hidden="true"></i>Leht</span></td>
+                  <td><span class="pill pill-avaldatud"><span class="pill-dot" aria-hidden="true"></span>Avaldatud</span></td>
+                  <td class="updated-cell">28.08 14:03</td>
+                  <td><span class="sp-avatar" aria-hidden="true">TK</span><span class="sp-name">Tõnis Kask</span></td>
+                  <td class="num"><span class="row-actions"><a class="ra-btn" href="#" data-edit data-title="Teenused" data-url="/teenused"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a></span></td>
+                </tr>
+                <tr data-collection="leht">
+                  <td><a class="lot-name" href="#" data-edit data-title="Metsa hindamine" data-url="/teenused/metsa-hindamine">Metsa hindamine</a></td>
+                  <td class="url-cell">/teenused/metsa-hindamine</td>
+                  <td><span class="type-chip type-leht"><i data-lucide="file-text" aria-hidden="true"></i>Leht</span></td>
+                  <td><span class="pill pill-avaldatud"><span class="pill-dot" aria-hidden="true"></span>Avaldatud</span></td>
+                  <td class="updated-cell">20.08 09:31</td>
+                  <td><span class="sp-avatar" aria-hidden="true">PK</span><span class="sp-name">Piret Kuusk</span></td>
+                  <td class="num"><span class="row-actions"><a class="ra-btn" href="#" data-edit data-title="Metsa hindamine" data-url="/teenused/metsa-hindamine"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a></span></td>
+                </tr>
+                <tr data-collection="leht">
+                  <td><a class="lot-name" href="#" data-edit data-title="Metsamajanduskava" data-url="/teenused/metsamajanduskava">Metsamajanduskava</a></td>
+                  <td class="url-cell">/teenused/metsamajanduskava</td>
+                  <td><span class="type-chip type-leht"><i data-lucide="file-text" aria-hidden="true"></i>Leht</span></td>
+                  <td><span class="pill pill-mustand"><span class="pill-dot" aria-hidden="true"></span>Mustand</span></td>
+                  <td class="updated-cell">27.08 11:58</td>
+                  <td><span class="sp-avatar" aria-hidden="true">MV</span><span class="sp-name">Marit Vain</span></td>
+                  <td class="num"><span class="row-actions"><a class="ra-btn" href="#" data-edit data-title="Metsamajanduskava" data-url="/teenused/metsamajanduskava"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a></span></td>
+                </tr>
+                <tr data-collection="artikkel">
+                  <td><a class="lot-name" href="#" data-edit data-title="Raieõiguse müük oksjonil: juhend müüjale" data-url="/artiklid/raieoiguse-muuk-juhend">Raieõiguse müük oksjonil: juhend müüjale</a></td>
+                  <td class="url-cell">/artiklid/raieoiguse-muuk-juhend</td>
+                  <td><span class="type-chip type-artikkel"><i data-lucide="newspaper" aria-hidden="true"></i>Artikkel</span></td>
+                  <td><span class="pill pill-avaldatud"><span class="pill-dot" aria-hidden="true"></span>Avaldatud</span></td>
+                  <td class="updated-cell">26.08 13:20</td>
+                  <td><span class="sp-avatar" aria-hidden="true">TK</span><span class="sp-name">Tõnis Kask</span></td>
+                  <td class="num"><span class="row-actions"><a class="ra-btn" href="#" data-edit data-title="Raieõiguse müük oksjonil: juhend müüjale" data-url="/artiklid/raieoiguse-muuk-juhend"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a></span></td>
+                </tr>
+                <tr data-collection="artikkel">
+                  <td><a class="lot-name" href="#" data-edit data-title="Raieõiguse hinnad 2026" data-url="/artiklid/raieoiguse-hinnad-2026">Raieõiguse hinnad 2026</a></td>
+                  <td class="url-cell">/artiklid/raieoiguse-hinnad-2026</td>
+                  <td><span class="type-chip type-artikkel"><i data-lucide="newspaper" aria-hidden="true"></i>Artikkel</span></td>
+                  <td><span class="pill pill-mustand"><span class="pill-dot" aria-hidden="true"></span>Mustand</span></td>
+                  <td class="updated-cell">30.08 17:45</td>
+                  <td><span class="sp-avatar" aria-hidden="true">JR</span><span class="sp-name">Jüri Rask</span></td>
+                  <td class="num"><span class="row-actions"><a class="ra-btn" href="#" data-edit data-title="Raieõiguse hinnad 2026" data-url="/artiklid/raieoiguse-hinnad-2026"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a></span></td>
+                </tr>
+                <tr data-collection="kkk">
+                  <td><a class="lot-name" href="#" data-edit data-title="Korduma kippuvad küsimused" data-url="/kkk">Korduma kippuvad küsimused</a></td>
+                  <td class="url-cell">/kkk</td>
+                  <td><span class="type-chip type-kkk"><i data-lucide="help-circle" aria-hidden="true"></i>KKK</span></td>
+                  <td><span class="pill pill-avaldatud"><span class="pill-dot" aria-hidden="true"></span>Avaldatud</span></td>
+                  <td class="updated-cell">22.08 08:54</td>
+                  <td><span class="sp-avatar" aria-hidden="true">MV</span><span class="sp-name">Marit Vain</span></td>
+                  <td class="num"><span class="row-actions"><a class="ra-btn" href="#" data-edit data-title="Korduma kippuvad küsimused" data-url="/kkk"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a></span></td>
+                </tr>
+                <tr data-collection="akordion">
+                  <td><a class="lot-name" href="#" data-edit data-title="Raieõiguse KKK akordion" data-url="/akordionid/raieoiguse-kkk">Raieõiguse KKK akordion</a></td>
+                  <td class="url-cell">/akordionid/raieoiguse-kkk</td>
+                  <td><span class="type-chip type-akordion"><i data-lucide="list" aria-hidden="true"></i>Akordion</span></td>
+                  <td><span class="pill pill-avaldatud"><span class="pill-dot" aria-hidden="true"></span>Avaldatud</span></td>
+                  <td class="updated-cell">21.08 15:10</td>
+                  <td><span class="sp-avatar" aria-hidden="true">PK</span><span class="sp-name">Piret Kuusk</span></td>
+                  <td class="num"><span class="row-actions"><a class="ra-btn" href="#" data-edit data-title="Raieõiguse KKK akordion" data-url="/akordionid/raieoiguse-kkk"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a></span></td>
+                </tr>
+                <tr data-collection="mall">
+                  <td><a class="lot-name" href="#" data-edit data-title="Teenuselehe mall" data-url="/mallid/teenuseleht">Teenuselehe mall</a></td>
+                  <td class="url-cell">/mallid/teenuseleht</td>
+                  <td><span class="type-chip type-mall"><i data-lucide="layout-template" aria-hidden="true"></i>Mall</span></td>
+                  <td><span class="pill pill-arhiivis"><span class="pill-dot" aria-hidden="true"></span>Arhiivis</span></td>
+                  <td class="updated-cell">02.08 12:00</td>
+                  <td><span class="sp-avatar" aria-hidden="true">TK</span><span class="sp-name">Tõnis Kask</span></td>
+                  <td class="num"><span class="row-actions"><a class="ra-btn" href="#" data-edit data-title="Teenuselehe mall" data-url="/mallid/teenuseleht"><i data-lucide="pencil" aria-hidden="true"></i>Muuda</a></span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <!-- Blokkide redaktor (avaneb rea Muuda nupust) -->
+      <section id="cmsEditor" hidden aria-labelledby="edTitle">
+        <div class="cms-editor-bar">
+          <button class="btn btn-ghost btn-sm" id="edBack" type="button"><i data-lucide="arrow-left" aria-hidden="true"></i>Nimekirja</button>
+          <div class="ed-title-wrap">
+            <h2 class="ed-name" id="edTitle" tabindex="-1">Raieõiguse müük</h2>
+            <span class="ed-url" id="edUrl">/teenused/raieoiguse-muuk</span>
+          </div>
+          <span class="pill pill-avaldatud" id="edStatus"><span class="pill-dot" aria-hidden="true"></span>Avaldatud (v3)</span>
+          <button class="btn btn-ghost btn-sm" id="btnVersions" type="button"><i data-lucide="history" aria-hidden="true"></i>Versioonid (3)</button>
+          <button class="btn btn-ghost btn-sm" id="btnPreview" type="button"><i data-lucide="external-link" aria-hidden="true"></i>Eelvaade</button>
+        </div>
+
+        <div class="builder-grid">
+          <!-- Blokkide loend -->
+          <section class="card" aria-labelledby="h-blocks">
+            <div class="card-head">
+              <h3 class="card-title" id="h-blocks">Lehe blokid</h3>
+              <span class="result-note">▲▼ järjesta</span>
+            </div>
+            <div class="blocks-body">
+              <ul id="blockList">
+                <li class="block-item" data-pid="hero">
+                  <span class="block-grip" aria-hidden="true"><i data-lucide="grip-vertical"></i></span>
+                  <span class="block-num">1.</span>
+                  <span class="block-ico"><i data-lucide="heading-2" aria-hidden="true"></i></span>
+                  <span class="block-main">
+                    <span class="block-name">Hero päis</span>
+                    <span class="block-sub">Müü raieõigus parima hinnaga oksjonil</span>
+                  </span>
+                  <span class="block-actions">
+                    <button class="mini-btn" type="button" data-move="up" aria-label="Teisalda üles"><i data-lucide="chevron-up"></i></button>
+                    <button class="mini-btn" type="button" data-move="down" aria-label="Teisalda alla"><i data-lucide="chevron-down"></i></button>
+                    <button class="mini-text" type="button" data-act="edit">Muuda</button>
+                    <button class="mini-text is-del" type="button" data-act="del">Kustuta</button>
+                    <button class="mini-btn" type="button" data-act="more" aria-label="Lisategevused"><i data-lucide="more-vertical"></i></button>
+                  </span>
+                </li>
+                <li class="block-item" data-pid="miks">
+                  <span class="block-grip" aria-hidden="true"><i data-lucide="grip-vertical"></i></span>
+                  <span class="block-num">2.</span>
+                  <span class="block-ico"><i data-lucide="type" aria-hidden="true"></i></span>
+                  <span class="block-main">
+                    <span class="block-name">Tekstiplokk</span>
+                    <span class="block-sub">Miks müüa oksjonil?</span>
+                  </span>
+                  <span class="block-actions">
+                    <button class="mini-btn" type="button" data-move="up" aria-label="Teisalda üles"><i data-lucide="chevron-up"></i></button>
+                    <button class="mini-btn" type="button" data-move="down" aria-label="Teisalda alla"><i data-lucide="chevron-down"></i></button>
+                    <button class="mini-text" type="button" data-act="edit">Muuda</button>
+                    <button class="mini-text is-del" type="button" data-act="del">Kustuta</button>
+                    <button class="mini-btn" type="button" data-act="more" aria-label="Lisategevused"><i data-lucide="more-vertical"></i></button>
+                  </span>
+                </li>
+                <li class="block-item" data-pid="foto">
+                  <span class="block-grip" aria-hidden="true"><i data-lucide="grip-vertical"></i></span>
+                  <span class="block-num">3.</span>
+                  <span class="block-ico"><i data-lucide="image" aria-hidden="true"></i></span>
+                  <span class="block-main">
+                    <span class="block-name">Pilt</span>
+                    <span class="block-sub">Lageraie Pärnumaal</span>
+                  </span>
+                  <span class="block-actions">
+                    <button class="mini-btn" type="button" data-move="up" aria-label="Teisalda üles"><i data-lucide="chevron-up"></i></button>
+                    <button class="mini-btn" type="button" data-move="down" aria-label="Teisalda alla"><i data-lucide="chevron-down"></i></button>
+                    <button class="mini-text" type="button" data-act="edit">Muuda</button>
+                    <button class="mini-text is-del" type="button" data-act="del">Kustuta</button>
+                    <button class="mini-btn" type="button" data-act="more" aria-label="Lisategevused"><i data-lucide="more-vertical"></i></button>
+                  </span>
+                </li>
+                <li class="block-item" data-pid="sammud">
+                  <span class="block-grip" aria-hidden="true"><i data-lucide="grip-vertical"></i></span>
+                  <span class="block-num">4.</span>
+                  <span class="block-ico"><i data-lucide="list" aria-hidden="true"></i></span>
+                  <span class="block-main">
+                    <span class="block-name">Akordion</span>
+                    <span class="block-sub">Müügi protsess (3 sammu)</span>
+                  </span>
+                  <span class="block-actions">
+                    <button class="mini-btn" type="button" data-move="up" aria-label="Teisalda üles"><i data-lucide="chevron-up"></i></button>
+                    <button class="mini-btn" type="button" data-move="down" aria-label="Teisalda alla"><i data-lucide="chevron-down"></i></button>
+                    <button class="mini-text" type="button" data-act="edit">Muuda</button>
+                    <button class="mini-text is-del" type="button" data-act="del">Kustuta</button>
+                    <button class="mini-btn" type="button" data-act="more" aria-label="Lisategevused"><i data-lucide="more-vertical"></i></button>
+                  </span>
+                </li>
+                <li class="block-item" data-pid="kkk">
+                  <span class="block-grip" aria-hidden="true"><i data-lucide="grip-vertical"></i></span>
+                  <span class="block-num">5.</span>
+                  <span class="block-ico"><i data-lucide="help-circle" aria-hidden="true"></i></span>
+                  <span class="block-main">
+                    <span class="block-name">KKK</span>
+                    <span class="block-sub">2 küsimust</span>
+                  </span>
+                  <span class="block-actions">
+                    <button class="mini-btn" type="button" data-move="up" aria-label="Teisalda üles"><i data-lucide="chevron-up"></i></button>
+                    <button class="mini-btn" type="button" data-move="down" aria-label="Teisalda alla"><i data-lucide="chevron-down"></i></button>
+                    <button class="mini-text" type="button" data-act="edit">Muuda</button>
+                    <button class="mini-text is-del" type="button" data-act="del">Kustuta</button>
+                    <button class="mini-btn" type="button" data-act="more" aria-label="Lisategevused"><i data-lucide="more-vertical"></i></button>
+                  </span>
+                </li>
+                <li class="block-item" data-pid="cta">
+                  <span class="block-grip" aria-hidden="true"><i data-lucide="grip-vertical"></i></span>
+                  <span class="block-num">6.</span>
+                  <span class="block-ico"><i data-lucide="megaphone" aria-hidden="true"></i></span>
+                  <span class="block-main">
+                    <span class="block-name">CTA-riba</span>
+                    <span class="block-sub">Hindame sinu metsa tasuta</span>
+                  </span>
+                  <span class="block-actions">
+                    <button class="mini-btn" type="button" data-move="up" aria-label="Teisalda üles"><i data-lucide="chevron-up"></i></button>
+                    <button class="mini-btn" type="button" data-move="down" aria-label="Teisalda alla"><i data-lucide="chevron-down"></i></button>
+                    <button class="mini-text" type="button" data-act="edit">Muuda</button>
+                    <button class="mini-text is-del" type="button" data-act="del">Kustuta</button>
+                    <button class="mini-btn" type="button" data-act="more" aria-label="Lisategevused"><i data-lucide="more-vertical"></i></button>
+                  </span>
+                </li>
+              </ul>
+              <div class="add-row" aria-label="Lisa uus blokk">
+                <span class="result-note">Lisa:</span>
+                <button class="add-btn" type="button" data-add="h2"><i data-lucide="plus" aria-hidden="true"></i>H2</button>
+                <button class="add-btn" type="button" data-add="text"><i data-lucide="plus" aria-hidden="true"></i>Tekst</button>
+                <button class="add-btn" type="button" data-add="image"><i data-lucide="plus" aria-hidden="true"></i>Pilt</button>
+                <button class="add-btn" type="button" data-add="accordion"><i data-lucide="plus" aria-hidden="true"></i>Akordion</button>
+                <button class="add-btn" type="button" data-add="faq"><i data-lucide="plus" aria-hidden="true"></i>KKK</button>
+                <button class="add-btn" type="button" data-add="cta"><i data-lucide="plus" aria-hidden="true"></i>CTA</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Reaalajas eelvaade -->
+          <section class="card pv-frame" aria-labelledby="h-preview">
+            <div class="card-head">
+              <h3 class="card-title" id="h-preview">Reaalajas eelvaade</h3>
+              <div class="device-toggle" role="group" aria-label="Seadme vaade">
+                <button class="mini-btn" type="button" data-device="desktop" aria-pressed="true" aria-label="Töölauavaade"><i data-lucide="monitor"></i></button>
+                <button class="mini-btn" type="button" data-device="mobile" aria-pressed="false" aria-label="Mobiilivaade"><i data-lucide="smartphone"></i></button>
+              </div>
+            </div>
+            <div class="pv-canvas">
+              <div class="pv-doc" id="previewDoc">
+                <section class="pv-hero" id="pv-hero">
+                  <span class="pv-kicker">Raieõiguse müük</span>
+                  <p class="pv-h1">Müü raieõigus parima hinnaga oksjonil</p>
+                  <p class="pv-sub">Võta vastu pakkumised kontrollitud ostjatelt kogu Eestis. Hindame metsa tasuta ja juhame müügi lepinguni.</p>
+                  <div class="pv-btnrow"><span class="pv-btn pv-btn-solid">Alusta siit</span><span class="pv-btn pv-btn-line">Loe lisa</span></div>
+                </section>
+                <section class="pv-sec" id="pv-miks">
+                  <h2>Miks müüa oksjonil?</h2>
+                  <p>Oksjon toob kokku mitu ostjat ja tõstab lõpphinda. Erametsad korraldab kogu müügi: hindamine, oksjon, leping ja raha laekumine.</p>
+                </section>
+                <section class="pv-sec" id="pv-foto">
+                  <div class="pv-imgbox"><i data-lucide="image" aria-hidden="true"></i><span>Lageraie Pärnumaal · alt: "Raieala Pärnumaal sügisel"</span></div>
+                </section>
+                <section class="pv-sec pv-acc" id="pv-sammud">
+                  <h2>Nii toimub müük</h2>
+                  <details open>
+                    <summary>1. Hindamine</summary>
+                    <p>Metsaspetsialist hindab puistu väärtuse kohapeal.</p>
+                  </details>
+                  <details>
+                    <summary>2. Oksjon</summary>
+                    <p>Oksjon kestab tavaliselt 7–14 päeva.</p>
+                  </details>
+                  <details>
+                    <summary>3. Leping ja raha</summary>
+                    <p>Leping sõlmitakse 7 päeva jooksul pärast oksjoni lõppu.</p>
+                  </details>
+                </section>
+                <section class="pv-sec pv-acc" id="pv-kkk">
+                  <h2>Korduma kippuvad küsimused</h2>
+                  <details open>
+                    <summary>Kui kiiret müük toimub?</summary>
+                    <p>Keskmine aeg hindamisest lepinguni on 6 nädalat.</p>
+                  </details>
+                  <details>
+                    <summary>Kas pean parima pakkumise vastu võtma?</summary>
+                    <p>Ei. Otsustad müügi üle alles pärast pakkumiste üle vaatamist.</p>
+                  </details>
+                </section>
+                <section class="pv-cta" id="pv-cta">
+                  <b>Hindame sinu metsa tasuta</b>
+                  <span class="pv-btn pv-btn-solid">Tell hinnang</span>
+                </section>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Avaldamise juhtnupud -->
+        <div class="pub-bar">
+          <button class="btn btn-ghost" id="btnDraft" type="button"><i data-lucide="save" aria-hidden="true"></i>Salvesta mustand</button>
+          <label class="sched">
+            <i data-lucide="calendar-clock" aria-hidden="true"></i>
+            <span class="sr-only">Avaldamise aeg</span>
+            <input id="schedAt" type="datetime-local" value="2026-09-03T09:00">
+          </label>
+          <button class="btn btn-ghost" id="btnSchedule" type="button">Ajasta avaldamine</button>
+          <span class="pub-spacer"></span>
+          <span class="pub-note">Automaatselt salvestatud 16:42</span>
+          <button class="btn btn-primary" id="btnPublish" type="button"><i data-lucide="globe" aria-hidden="true"></i>Avalda</button>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<!-- Mobile drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true"></div>
+<aside class="drawer" id="drawer" aria-label="Peamenüü" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="rail-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/></svg>
+    </span>
+    <span class="topbar-title">Erametsad haldus</span>
+    <button class="icon-btn" id="menuClose" type="button" aria-label="Sulge menüü"><i data-lucide="x"></i></button>
+  </div>
+  <nav class="drawer-nav">
+    <a class="drawer-link" href="01-dashboard.html"><i data-lucide="layout-dashboard"></i>Töölaud</a>
+    <a class="drawer-link" href="02-auctions-list.html"><i data-lucide="gavel"></i>Oksjonid</a>
+    <a class="drawer-link" href="04-bids-monitoring.html"><i data-lucide="activity"></i>Pakkumised</a>
+    <a class="drawer-link" href="05-sealed-opening.html"><i data-lucide="key-round"></i>Sul. avamine<span class="drawer-flag dot is-amber"></span></a>
+    <a class="drawer-link" href="06-users.html"><i data-lucide="users"></i>Kasutajad</a>
+    <a class="drawer-link" href="07-company-approvals.html"><i data-lucide="building-2"></i>Ettevõtted<span class="drawer-flag num is-red">3</span></a>
+    <a class="drawer-link" href="08-contracts.html"><i data-lucide="file-signature"></i>Lepingud</a>
+    <a class="drawer-link" href="09-leads-crm.html"><i data-lucide="kanban"></i>Juhtlõimed</a>
+    <a class="drawer-link" href="10-service-requests.html"><i data-lucide="send-horizontal"></i>Päringud</a>
+    <a class="drawer-link active" href="11-cms-content.html" aria-current="page"><i data-lucide="file-pen"></i>Sisuhaldus</a>
+    <a class="drawer-link" href="12-statistics.html"><i data-lucide="chart-column"></i>Statistika</a>
+    <a class="drawer-link" href="13-settings.html"><i data-lucide="settings"></i>Seaded</a>
+    <a class="drawer-link" href="14-audit-log.html"><i data-lucide="shield-check"></i>Auditlogi</a>
+  </nav>
+</aside>
+<!-- Versioonide ajalugu (slaid-üle sahtel) -->
+<div class="vers-backdrop" id="versBackdrop" aria-hidden="true"></div>
+<aside class="vers-drawer" id="versDrawer" role="dialog" aria-modal="true" aria-labelledby="versTitle" aria-hidden="true">
+  <div class="vers-head">
+    <h2 class="vers-title" id="versTitle">Versioonide ajalugu</h2>
+    <button class="icon-btn" id="versClose" type="button" aria-label="Sulge versioonide ajalugu"><i data-lucide="x"></i></button>
+  </div>
+  <div class="vers-body">
+    <div class="vers-row">
+      <span class="vers-ver">v3</span>
+      <span class="badge-now">Praegu</span>
+      <span class="vers-meta">31.08.2026 16:42 · Marit Vain</span>
+    </div>
+    <div class="vers-row">
+      <span class="vers-ver">v2</span>
+      <span class="vers-meta">24.08.2026 09:15 · Tõnis Kask</span>
+      <button class="btn btn-ghost btn-sm" type="button" data-compare="v2">Võrrelda</button>
+    </div>
+    <div class="vers-row">
+      <span class="vers-ver">v1</span>
+      <span class="vers-meta">12.08.2026 11:03 · Marit Vain</span>
+      <button class="btn btn-ghost btn-sm" type="button" data-compare="v1">Võrrelda</button>
+    </div>
+
+    <div class="diff-wrap" id="versDiff" hidden>
+      <div class="diff-head">
+        <h3 class="diff-title" id="diffTitle">Võrdlus: v2 → v3</h3>
+        <button class="mini-text" id="diffClose" type="button">Sulge võrdlus</button>
+      </div>
+      <div class="diff-grid">
+        <div class="diff-col">
+          <div class="diff-col-head">v2 · 24.08 (Tõnis Kask)</div>
+          <div class="diff-line">Hero: "Müü raieõigus oksjonil"</div>
+          <div class="diff-line diff-del">- Alghinnang alates 12 000 €</div>
+          <div class="diff-line">Tekst: "Miks müüa oksjonil?"</div>
+          <div class="diff-line">Akordion: 2 sammu</div>
+        </div>
+        <div class="diff-col">
+          <div class="diff-col-head">v3 · 31.08 (Marit Vain)</div>
+          <div class="diff-line">Hero: "Müü raieõigus parima hinnaga oksjonil"</div>
+          <div class="diff-line diff-add">+ Pilt: lageraie Pärnumaal</div>
+          <div class="diff-line">Tekst: "Miks müüa oksjonil?"</div>
+          <div class="diff-line diff-add">+ KKK: 2 küsimust</div>
+          <div class="diff-line diff-add">+ Akordion: 3. samm "Leping ja raha"</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="vers-foot">Iga avaldamine loob uue versiooni. Versioone hoitakse 12 kuud.</p>
+  </div>
+</aside>
+
+<!-- Toast -->
+<div class="toast" id="toast" role="status" aria-live="polite" hidden><span id="toastMsg"></span></div>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+
+  /* Lucide icons */
+  if(window.lucide)lucide.createIcons();
+
+  /* Mobile drawer */
+  const drawer=$("#drawer"), backdrop=$("#drawerBackdrop"),
+        openBtn=$("#menuOpen"), closeBtn=$("#menuClose");
+  const setDrawer=open=>{
+    document.body.classList.toggle("drawer-open",open);
+    drawer.setAttribute("aria-hidden",String(!open));
+    openBtn.setAttribute("aria-expanded",String(open));
+  };
+  openBtn.addEventListener("click",()=>setDrawer(true));
+  closeBtn.addEventListener("click",()=>setDrawer(false));
+  backdrop.addEventListener("click",()=>setDrawer(false));
+  addEventListener("keydown",e=>{if(e.key==="Escape")setDrawer(false)});
+
+  /* Global search: focus with Cmd/Ctrl+K */
+  const search=$("#globalSearch");
+  addEventListener("keydown",e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
+      e.preventDefault();
+      search.focus(); search.select();
+    }
+  });
+
+  /* Live countdowns (demo offsets in seconds from load) */
+  const pad=n=>String(n).padStart(2,"0");
+  const cds=$$("[data-countdown]").map(el=>({el,end:Date.now()+Number(el.dataset.countdown)*1000}));
+  function tick(){
+    const now=Date.now();
+    cds.forEach(c=>{
+      const r=Math.max(0,c.end-now);
+      if(r===0){c.el.textContent="Lõppenud"; c.el.classList.remove("cd-crit"); return;}
+      const h=Math.floor(r/36e5), m=Math.floor(r%36e5/6e4), s=Math.floor(r%6e4/1e3);
+      c.el.textContent=pad(h)+":"+pad(m)+":"+pad(s);
+      c.el.classList.toggle("cd-crit",r<3e5);
+    });
+  }
+  tick(); setInterval(tick,1000);
+})();
+</script>
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+  const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const icons=()=>{if(window.lucide)lucide.createIcons()};
+
+  /* Toast */
+  const toastEl=$("#toast"), toastMsg=$("#toastMsg");
+  let toastTimer=null;
+  const toast=msg=>{
+    if(!toastEl||!toastMsg)return;
+    toastMsg.textContent=msg;
+    toastEl.hidden=false;
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>{toastEl.hidden=true},3600);
+  };
+
+  /* Kogumike vahelehed */
+  const rows=$$("#cmsRows tr"), note=$("#resultNote");
+  const syncNote=()=>{if(note)note.textContent=rows.filter(tr=>!tr.hidden).length+" kirjet"};
+  $$(".tab[data-collection]").forEach(tab=>tab.addEventListener("click",()=>{
+    $$(".tab[data-collection]").forEach(t=>t.setAttribute("aria-pressed",String(t===tab)));
+    const v=tab.dataset.collection;
+    rows.forEach(tr=>{tr.hidden=v!=="all"&&tr.dataset.collection!==v});
+    syncNote();
+  }));
+
+  /* Otsing */
+  const search=$("#cmsSearch");
+  if(search)search.addEventListener("input",()=>{
+    const q=search.value.trim().toLowerCase();
+    rows.forEach(tr=>{tr.hidden=!!q&&!tr.textContent.toLowerCase().includes(q)});
+    syncNote();
+  });
+
+  /* Uus sisu */
+  const btnNew=$("#btnNew");
+  if(btnNew)btnNew.addEventListener("click",()=>toast("Uue sisu viisard (demo) — vali kogumik ja mall"));
+
+  /* Redaktori avamine/sulgemine */
+  const listView=$("#cmsList"), editor=$("#cmsEditor"), edTitle=$("#edTitle"), edUrl=$("#edUrl");
+  let listFocus=null;
+  const scrollTop=()=>{if(reduced)window.scrollTo(0,0);else window.scrollTo({top:0,behavior:"smooth"})};
+  const openEditor=el=>{
+    listFocus=el;
+    if(edTitle)edTitle.textContent=el.dataset.title||"";
+    if(edUrl)edUrl.textContent=el.dataset.url||"";
+    if(listView)listView.hidden=true;
+    if(editor)editor.hidden=false;
+    scrollTop();
+    if(edTitle)edTitle.focus();
+  };
+  const closeEditor=()=>{
+    if(editor)editor.hidden=true;
+    if(listView)listView.hidden=false;
+    scrollTop();
+    if(listFocus)listFocus.focus();
+  };
+  $$("[data-edit]").forEach(el=>el.addEventListener("click",e=>{e.preventDefault();openEditor(el)}));
+  const edBack=$("#edBack");
+  if(edBack)edBack.addEventListener("click",closeEditor);
+
+  /* Blokid: järjestus, muutmine, kustutamine (sünkroonitakse eelvaatega) */
+  const blockList=$("#blockList"), previewDoc=$("#previewDoc");
+  const renumber=()=>{
+    if(!blockList)return;
+    $$(".block-item",blockList).forEach((li,i)=>{
+      const n=$(".block-num",li); if(n)n.textContent=(i+1)+".";
+    });
+  };
+  const syncPreview=()=>{
+    if(!blockList||!previewDoc)return;
+    $$(".block-item",blockList).forEach(li=>{
+      const pv=$("#pv-"+li.dataset.pid);
+      if(pv)previewDoc.appendChild(pv);
+    });
+  };
+  if(blockList)blockList.addEventListener("click",e=>{
+    const btn=e.target.closest("button"); if(!btn)return;
+    const li=btn.closest(".block-item"); if(!li)return;
+    if(btn.dataset.move==="up"&&li.previousElementSibling)li.previousElementSibling.before(li);
+    else if(btn.dataset.move==="down"&&li.nextElementSibling)li.nextElementSibling.after(li);
+    else if(btn.dataset.act==="del"){
+      const pv=$("#pv-"+li.dataset.pid); if(pv)pv.remove();
+      li.remove();
+      toast("Blokk kustutatud (demo)");
+    }
+    else if(btn.dataset.act==="edit")toast("Bloki seadete külgsahtel (demo)");
+    else if(btn.dataset.act==="more")toast("Dupleeri, vaata ajalugu, peida (demo)");
+    renumber(); syncPreview();
+  });
+
+  /* Uue bloki lisamine */
+  const ADD={
+    h2:{icon:"heading-2",name:"H2 pealkiri",sub:"Uus pealkiri",pv:'<section class="pv-sec" id="pv-ID"><h2>Uus pealkiri</h2><p>Kirjuta siia jaotise tutvustav tekst.</p></section>'},
+    text:{icon:"type",name:"Tekstiplokk",sub:"Uus tekst",pv:'<section class="pv-sec" id="pv-ID"><h2>Uus tekstiplokk</h2><p>Kirjuta siia sõnum, mida külastaja vajab.</p></section>'},
+    image:{icon:"image",name:"Pilt",sub:"Uus pilt",pv:'<section class="pv-sec" id="pv-ID"><div class="pv-imgbox"><i data-lucide="image" aria-hidden="true"></i><span>Uus pilt · alt-tekst on kohustuslik</span></div></section>'},
+    accordion:{icon:"list",name:"Akordion",sub:"Uus akordion",pv:'<section class="pv-sec pv-acc" id="pv-ID"><h2>Uus akordion</h2><details open><summary>Küsimus või samm</summary><p>Sisu, mis avaneb klõpsul.</p></details></section>'},
+    faq:{icon:"help-circle",name:"KKK",sub:"Uus KKK",pv:'<section class="pv-sec pv-acc" id="pv-ID"><h2>Korduma kippuvad küsimused</h2><details open><summary>Uus küsimus</summary><p>Vastus küsimusele.</p></details></section>'},
+    cta:{icon:"megaphone",name:"CTA-riba",sub:"Uus CTA",pv:'<section class="pv-cta" id="pv-ID"><b>Uus tegevuskutse</b><span class="pv-btn pv-btn-solid">Toimeta</span></section>'}
+  };
+  let addSeq=0;
+  $$("[data-add]").forEach(btn=>btn.addEventListener("click",()=>{
+    const t=ADD[btn.dataset.add]; if(!t||!blockList||!previewDoc)return;
+    addSeq+=1;
+    const pid="new"+addSeq;
+    const li=document.createElement("li");
+    li.className="block-item"; li.dataset.pid=pid;
+    li.innerHTML='<span class="block-grip" aria-hidden="true"><i data-lucide="grip-vertical"></i></span>'
+      +'<span class="block-num"></span>'
+      +'<span class="block-ico"><i data-lucide="'+t.icon+'" aria-hidden="true"></i></span>'
+      +'<span class="block-main"><span class="block-name">'+t.name+'</span><span class="block-sub">'+t.sub+'</span></span>'
+      +'<span class="block-actions">'
+      +'<button class="mini-btn" type="button" data-move="up" aria-label="Teisalda üles"><i data-lucide="chevron-up"></i></button>'
+      +'<button class="mini-btn" type="button" data-move="down" aria-label="Teisalda alla"><i data-lucide="chevron-down"></i></button>'
+      +'<button class="mini-text" type="button" data-act="edit">Muuda</button>'
+      +'<button class="mini-text is-del" type="button" data-act="del">Kustuta</button>'
+      +'<button class="mini-btn" type="button" data-act="more" aria-label="Lisategevused"><i data-lucide="more-vertical"></i></button>'
+      +'</span>';
+    blockList.appendChild(li);
+    previewDoc.insertAdjacentHTML("beforeend",t.pv.replaceAll("ID",pid));
+    icons(); renumber(); syncPreview();
+    toast("Blokk lisatud: "+t.name+" (demo)");
+  }));
+
+  /* Seadmevaade eelvaates */
+  const pvFrame=$(".pv-frame");
+  $$("[data-device]").forEach(btn=>btn.addEventListener("click",()=>{
+    $$("[data-device]").forEach(b=>b.setAttribute("aria-pressed",String(b===btn)));
+    if(pvFrame)pvFrame.classList.toggle("is-mobile",btn.dataset.device==="mobile");
+  }));
+
+  /* Versioonide ajalugu — sahtel */
+  const vd=$("#versDrawer"), vb=$("#versBackdrop"), vo=$("#btnVersions"), vc=$("#versClose");
+  let versFocus=null;
+  const openVers=()=>{
+    versFocus=document.activeElement;
+    document.body.classList.add("vers-open");
+    if(vd)vd.setAttribute("aria-hidden","false");
+    if(vc)vc.focus();
+  };
+  const closeVers=()=>{
+    document.body.classList.remove("vers-open");
+    if(vd)vd.setAttribute("aria-hidden","true");
+    if(versFocus instanceof HTMLElement)versFocus.focus();
+  };
+  if(vo)vo.addEventListener("click",openVers);
+  if(vc)vc.addEventListener("click",closeVers);
+  if(vb)vb.addEventListener("click",closeVers);
+
+  /* Versioonide võrdlus — diff */
+  const diff=$("#versDiff"), diffTitle=$("#diffTitle");
+  $$("[data-compare]").forEach(btn=>btn.addEventListener("click",()=>{
+    if(!diff)return;
+    if(diffTitle)diffTitle.textContent="Võrdlus: "+btn.dataset.compare+" → v3";
+    diff.hidden=false;
+    if(reduced)diff.scrollIntoView();else diff.scrollIntoView({behavior:"smooth",block:"nearest"});
+  }));
+  const diffClose=$("#diffClose");
+  if(diffClose)diffClose.addEventListener("click",()=>{if(diff)diff.hidden=true});
+
+  /* Esc sulgeb sahtli */
+  addEventListener("keydown",e=>{
+    if(e.key==="Escape"&&document.body.classList.contains("vers-open"))closeVers();
+  });
+
+  /* Avaldamise juhtnupud */
+  const edStatus=$("#edStatus");
+  const setStatus=(cls,text)=>{
+    if(!edStatus)return;
+    edStatus.className="pill "+cls;
+    edStatus.innerHTML='<span class="pill-dot" aria-hidden="true"></span>'+text;
+  };
+  const btnDraft=$("#btnDraft");
+  if(btnDraft)btnDraft.addEventListener("click",()=>toast("Mustand salvestatud (demo)"));
+  const btnPublish=$("#btnPublish");
+  if(btnPublish)btnPublish.addEventListener("click",()=>{
+    setStatus("pill-avaldatud","Avaldatud (v3)");
+    toast("Avaldatud (demo)");
+  });
+  const schedAt=$("#schedAt"), btnSchedule=$("#btnSchedule");
+  if(btnSchedule)btnSchedule.addEventListener("click",()=>{
+    if(!schedAt||!schedAt.value){toast("Vali avaldamise kuupäev ja kellaaeg");return}
+    const d=new Date(schedAt.value);
+    if(isNaN(d)){toast("Vigane kuupäev");return}
+    const txt=d.toLocaleString("et-EE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+    setStatus("pill-ajastatud","Ajastatud");
+    toast("Avaldamine ajastatud: "+txt+" (demo)");
+  });
+  const btnPreview=$("#btnPreview");
+  if(btnPreview)btnPreview.addEventListener("click",()=>toast("Portaali eelvaade avaneb uuel vahelehel (demo)"));
+})();
+</script>
+</body>
+</html>

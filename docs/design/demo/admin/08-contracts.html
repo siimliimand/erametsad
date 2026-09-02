@@ -1,0 +1,1053 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lepingud | Erametsad haldus</title>
+<meta name="description" content="Erametsad haldusplaadi lepingud ja mallid — demo prototüüp.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23012d1d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z'/%3E%3Cpath d='M12 22v-3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ---- Tokens (ADMIN-DESIGN-SPEC §1.2) ---- */
+:root{
+  --primary:#012d1d; --primary-hover:#1b4332; --primary-dark:#16382A; --primary-light:#c1ecd4;
+  --accent:#58B368; --cta:#F2A93B; --cta-hover:#D98F1F;
+  --ink:#181a2e; --ink-muted:#414844; --ink-inverse:#FFFFFF;
+  --bg-page:#fbf8ff; --bg-mist:#f4f2ff; --border:#c1c8c2;
+  --danger:#B3261E; --danger-light:#FBEAE9; --info:#2D6FA8; --info-light:#E9F1F7;
+  --st-draft-text:#414844; --st-draft-bg:#EBEBEB; --st-draft-dot:#6B7570;
+  --st-sched-text:#1F4E79; --st-sched-bg:#E9F1F7; --st-sched-dot:#2D6FA8;
+  --st-active-text:#1B6338; --st-active-bg:#E8F6ED; --st-active-dot:#2E9E5B;
+  --st-ending-text:#941E17; --st-ending-bg:#FBEAE9; --st-ending-dot:#B3261E;
+  --st-ended-text:#8F590A; --st-ended-bg:#FEF5E7; --st-ended-dot:#F2A93B;
+  --st-unsold:#B3261E;
+  --st-contract-text:#236B3B; --st-contract-bg:#EBF7F0; --st-contract-dot:#58B368;
+  --st-arch-text:#414844; --st-arch-bg:#ECEEEB; --st-arch-dot:#6B7570;
+  --font-heading:"Public Sans",system-ui,sans-serif;
+  --font-body:"Inter",system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --space-2xs:4px; --space-xs:8px; --space-sm:12px; --space-md:16px;
+  --space-lg:24px; --space-xl:32px; --space-2xl:40px; --space-3xl:48px; --space-4xl:64px;
+  --radius:8px; --radius-pill:999px;
+  --surface:#FFFFFF;
+  --shadow-card:0 1px 2px rgba(24,26,46,.04),0 2px 8px rgba(24,26,46,.05);
+  --shadow-hover:0 2px 8px rgba(24,26,46,.08),0 8px 24px rgba(24,26,46,.08);
+  --shadow-pop:0 8px 24px rgba(24,26,46,.14);
+  --tint-primary:rgba(1,45,29,.06);
+  --tint-primary-strong:rgba(1,45,29,.1);
+  --glow-active:rgba(46,158,91,.45);
+  --accent-soft:rgba(88,179,104,.28);
+  --overlay:rgba(24,26,46,.45);
+  --rail-w:56px; --topbar-h:64px;
+}
+
+/* ---- Base ---- */
+*,*::before,*::after{box-sizing:border-box}
+html{color-scheme:light; -webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg-page); color:var(--ink);
+  font:400 14px/20px var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--primary)}
+button{font:inherit; cursor:pointer}
+ul{margin:0; padding:0; list-style:none}
+svg{display:block}
+svg.lucide{flex:none}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+::selection{background:var(--primary-light)}
+.mono{font-family:var(--font-mono); font-feature-settings:"tnum"}
+.sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
+.skip-link{
+  position:absolute; left:-9999px; top:8px; z-index:200;
+  background:var(--primary); color:var(--ink-inverse); padding:10px 16px; border-radius:var(--radius);
+}
+.skip-link:focus{left:8px; color:var(--ink-inverse)}
+
+/* ---- Left icon rail (fixed 56px) ---- */
+.rail{
+  position:fixed; inset:0 auto 0 0; width:var(--rail-w); z-index:100;
+  display:flex; flex-direction:column; align-items:center;
+  background:var(--surface); border-right:1px solid var(--border); padding:12px 0;
+}
+.rail-logo{
+  display:grid; place-items:center; width:32px; height:32px; margin-bottom:16px;
+  border-radius:var(--radius); background:var(--bg-mist); color:var(--primary);
+}
+.rail-logo svg{width:20px; height:20px}
+.rail-nav{display:flex; flex-direction:column; align-items:center; gap:2px; width:100%}
+.rail-item{
+  position:relative; display:grid; place-items:center; width:40px; height:40px;
+  border-radius:var(--radius); color:var(--ink-muted); text-decoration:none;
+  transition:background-color .15s ease-out, color .15s ease-out;
+}
+.rail-item svg{width:20px; height:20px}
+.rail-item:hover{background:var(--tint-primary); color:var(--primary)}
+.rail-item.active{background:var(--tint-primary-strong); color:var(--primary)}
+.rail-item.active::before{content:""; position:absolute; left:-8px; top:6px; bottom:6px; width:3px; border-radius:0 2px 2px 0; background:var(--primary)}
+.rail-item::after{
+  content:attr(data-tip); position:absolute; left:calc(100% + 12px); top:50%; transform:translateY(-50%);
+  z-index:110; background:var(--ink); color:var(--ink-inverse);
+  font:500 12px/16px var(--font-body); padding:5px 9px; border-radius:6px; white-space:nowrap;
+  opacity:0; visibility:hidden; transition:opacity .12s ease-out .08s, visibility 0s .2s; pointer-events:none;
+}
+.rail-item:hover::after,.rail-item:focus-visible::after{opacity:1; visibility:visible; transition-delay:0s}
+.rail-flag{position:absolute; top:3px; right:2px; z-index:1}
+.rail-flag.dot{width:8px; height:8px; border-radius:var(--radius-pill)}
+.rail-flag.num{
+  min-width:14px; height:14px; padding:0 3px; border-radius:var(--radius-pill);
+  display:grid; place-items:center; font:700 9px/1 var(--font-body); color:var(--ink-inverse);
+  border:2px solid var(--surface);
+}
+.is-amber{background:var(--cta)}
+.is-red{background:var(--danger)}
+
+/* ---- Topbar (sticky 64px) ---- */
+.app{margin-left:var(--rail-w)}
+.topbar{
+  position:sticky; top:0; z-index:90; display:flex; align-items:center; gap:12px;
+  height:var(--topbar-h); padding:0 24px;
+  background:var(--surface); border-bottom:1px solid var(--border);
+}
+.menu-btn{display:none; place-items:center; width:36px; height:36px; margin-left:-8px; border:0; border-radius:var(--radius); background:transparent; color:var(--ink)}
+.menu-btn:hover{background:var(--bg-mist)}
+.topbar-brand{display:flex; align-items:center; gap:10px; flex:none}
+.env-badge{display:inline-flex; align-items:center; padding:3px 10px; border-radius:var(--radius-pill); font:700 11px/14px var(--font-heading); letter-spacing:.04em}
+.env-prod{background:var(--st-active-bg); color:var(--st-active-text)}
+.env-stage{background:var(--st-ended-bg); color:var(--st-ended-text)}
+.env-dev{background:var(--danger-light); color:var(--danger)}
+.topbar-title{font:600 15px/20px var(--font-heading); color:var(--ink)}
+.topbar-search{
+  position:relative; display:flex; align-items:center; gap:8px; flex:1; max-width:420px; height:36px;
+  margin-inline:auto; padding:0 10px; border-radius:var(--radius);
+  background:var(--bg-mist); border:1px solid transparent;
+  transition:border-color .15s ease-out, background-color .15s ease-out;
+}
+.topbar-search:focus-within{border-color:var(--primary); background:var(--surface)}
+.topbar-search svg{width:16px; height:16px; color:var(--ink-muted)}
+.topbar-search input{flex:1; min-width:0; border:0; background:transparent; outline:0; font:400 13px/18px var(--font-body); color:var(--ink)}
+.topbar-search input::placeholder{color:var(--ink-muted)}
+.search-kbd{flex:none; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1px 6px; font:500 11px/16px var(--font-mono); color:var(--ink-muted)}
+.topbar-user{display:flex; align-items:center; gap:8px; flex:none}
+.icon-btn{
+  position:relative; display:grid; place-items:center; width:36px; height:36px;
+  border:0; border-radius:var(--radius); background:transparent; color:var(--ink-muted);
+}
+.icon-btn:hover{background:var(--bg-mist); color:var(--primary)}
+.icon-btn svg{width:18px; height:18px}
+.bell-badge{
+  position:absolute; top:3px; right:3px; min-width:15px; height:15px; padding:0 3px;
+  border-radius:var(--radius-pill); background:var(--danger); color:var(--ink-inverse);
+  border:2px solid var(--surface); font:600 10px/1 var(--font-body);
+  display:grid; place-items:center;
+}
+.user-menu{
+  display:flex; align-items:center; gap:10px; padding:4px 6px 4px 4px;
+  border:0; border-radius:var(--radius); background:transparent;
+}
+.user-menu:hover{background:var(--bg-mist)}
+.avatar{
+  width:32px; height:32px; border-radius:50%;
+  background:var(--primary); color:var(--ink-inverse);
+  display:grid; place-items:center; font:600 12px/1 var(--font-heading); letter-spacing:.02em;
+}
+.user-meta{display:flex; align-items:center; gap:8px}
+.user-name{font:600 13px/16px var(--font-body); color:var(--ink)}
+.role-chip{padding:2px 8px; border-radius:var(--radius-pill); background:var(--primary-light); color:var(--primary); font:600 11px/14px var(--font-body)}
+.user-menu > svg{width:16px; height:16px; color:var(--ink-muted)}
+
+/* ---- Workspace ---- */
+.container{max-width:1400px; margin-inline:auto; padding:var(--space-lg)}
+.breadcrumb{display:flex; align-items:center; gap:6px; font:500 12px/16px var(--font-body); color:var(--ink-muted); margin-bottom:6px}
+.page-head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:var(--space-lg)}
+.page-title{margin:0; font:700 28px/34px var(--font-heading); color:var(--ink)}
+
+/* ---- Cards ---- */
+.card{
+  display:flex; flex-direction:column; overflow:hidden;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card);
+}
+.card-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 20px; border-bottom:1px solid var(--border)}
+.card-title{margin:0; font:600 16px/22px var(--font-heading); color:var(--ink)}
+.card-foot{margin-top:auto; padding:12px 20px; border-top:1px solid var(--border); text-align:right}
+.card-link{font:600 13px/18px var(--font-body); color:var(--primary); text-decoration:none}
+.card-link:hover{color:var(--primary-hover); text-decoration:underline}
+
+/* ---- KPI strip ---- */
+.kpi-grid{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--space-sm); margin-bottom:var(--space-lg)}
+.kpi-card{
+  display:flex; flex-direction:column; gap:2px; padding:var(--space-md);
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card); color:var(--ink); text-decoration:none;
+  transition:border-color .15s ease-out, box-shadow .15s ease-out, transform .15s ease-out;
+}
+.kpi-card:hover{border-color:var(--primary); box-shadow:var(--shadow-hover); transform:translateY(-1px)}
+.kpi-label{font:500 12px/16px var(--font-body); color:var(--ink-muted)}
+.kpi-value{font:700 28px/32px var(--font-mono); font-feature-settings:"tnum"; letter-spacing:-.01em}
+.kpi-value.is-danger{color:var(--danger)}
+.kpi-alert{
+  display:inline-grid; place-items:center; width:18px; height:18px; margin-left:8px; vertical-align:6px;
+  border-radius:var(--radius-pill); background:var(--cta); color:var(--ink);
+  font:700 12px/1 var(--font-body);
+}
+.kpi-sub{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.trend-up{color:var(--st-active-text); font-weight:500}
+.spark{width:100%; height:24px; margin:4px 0 2px}
+.info-dot{display:inline-grid; place-items:center; vertical-align:-2px; color:var(--ink-muted); cursor:help}
+.info-dot svg{width:12px; height:12px}
+
+/* ---- Dashboard grid (2/3 + 1/3) ---- */
+.dash-grid{display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:var(--space-lg); align-items:stretch}
+
+/* ---- Live table ---- */
+.live{display:inline-flex; align-items:center; gap:7px; font:600 12px/16px var(--font-body); color:var(--st-active-text)}
+.live-dot{width:8px; height:8px; border-radius:var(--radius-pill); background:var(--st-active-dot); animation:live-pulse 2s ease-out infinite}
+@keyframes live-pulse{0%{box-shadow:0 0 0 0 var(--glow-active)}70%,100%{box-shadow:0 0 0 6px transparent}}
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%; min-width:620px; border-collapse:collapse}
+.tbl th{padding:10px 16px; background:var(--bg-mist); font:500 12px/16px var(--font-body); color:var(--ink-muted); text-align:left; white-space:nowrap}
+.tbl td{padding:12px 16px; border-top:1px solid var(--border); font:400 13px/18px var(--font-body); vertical-align:middle}
+.tbl th:first-child,.tbl td:first-child{padding-left:20px}
+.tbl th:last-child,.tbl td:last-child{padding-right:20px}
+.tbl tbody tr{transition:background-color .15s ease-out}
+.tbl tbody tr:hover{background:var(--bg-mist)}
+.num{text-align:right}
+.lot-id{font:500 12px/16px var(--font-mono); color:var(--ink-muted)}
+.lot-name{color:var(--ink); font:500 13px/18px var(--font-body); text-decoration:none}
+.lot-name:hover{color:var(--primary); text-decoration:underline}
+td .cd{font:500 14px/18px var(--font-mono); font-feature-settings:"tnum"}
+.bid{font:500 13px/18px var(--font-mono); font-feature-settings:"tnum"}
+.bid-muted{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.type-chip{display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.type-chip svg{width:12px; height:12px}
+.type-raie{background:var(--st-active-bg); color:var(--st-active-text)}
+.type-kinnistu{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.type-pakett{background:var(--st-draft-bg); color:var(--st-draft-text)}
+.btn-outline{
+  display:inline-flex; align-items:center; gap:6px; padding:5px 12px;
+  border:1px solid var(--accent); border-radius:var(--radius); background:transparent;
+  color:var(--primary); font:600 12px/16px var(--font-body); text-decoration:none; white-space:nowrap;
+  transition:background-color .15s ease-out;
+}
+.btn-outline svg{width:11px; height:11px}
+.btn-outline:hover{background:var(--st-active-bg)}
+.cd-crit{color:var(--danger) !important; animation:cd-blink 1s step-end infinite}
+@keyframes cd-blink{50%{opacity:.45}}
+@keyframes row-flash{0%{background:var(--accent-soft)}100%{background:transparent}}
+tr.row-extend td{animation:row-flash .9s ease-out 2}
+
+/* ---- Süsteemi tervis ---- */
+.health-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 20px; border-top:1px solid var(--border)}
+.health-row:first-child{border-top:0}
+.health-name{font:400 13px/18px var(--font-body); color:var(--ink-muted)}
+.health-val{display:inline-flex; align-items:center; gap:8px; font:500 13px/18px var(--font-body); color:var(--ink)}
+.ok-text{font:600 12px/16px var(--font-body); color:var(--st-active-text)}
+.status-dot{width:8px; height:8px; border-radius:var(--radius-pill); flex:none}
+.status-dot.ok{background:var(--st-active-dot)}
+.status-dot.warn{background:var(--cta)}
+.status-dot.err{background:var(--danger)}
+.health-foot{
+  display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:auto; padding:10px 20px 14px;
+  border-top:1px solid var(--border);
+  font:400 11px/16px var(--font-body); color:var(--ink-muted);
+}
+.health-foot span{display:inline-flex; align-items:center; gap:6px}
+.mini-dot{width:6px; height:6px; border-radius:var(--radius-pill); background:var(--st-active-dot)}
+
+/* ---- Kiire tegevus ---- */
+.action-row{
+  display:flex; align-items:center; gap:12px; padding:13px 20px;
+  border-top:1px solid var(--border); color:var(--ink); text-decoration:none;
+  transition:background-color .15s ease-out;
+}
+.action-row:first-child{border-top:0}
+.action-row:hover{background:var(--bg-mist)}
+.action-ico{display:grid; place-items:center; width:36px; height:36px; flex:none; border-radius:var(--radius); background:var(--bg-mist); color:var(--primary)}
+.action-ico svg{width:18px; height:18px}
+.action-main{display:flex; flex-direction:column; gap:1px; flex:1; min-width:0}
+.action-title{font:500 13px/18px var(--font-body); color:var(--ink)}
+.action-note{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.action-note.warn{color:var(--st-ended-text)}
+.count-pill{flex:none; padding:2px 10px; border-radius:var(--radius-pill); background:var(--primary-light); color:var(--primary); font:700 12px/16px var(--font-body); white-space:nowrap}
+.action-go{
+  display:grid; place-items:center; width:28px; height:28px; flex:none;
+  border:1px solid transparent; border-radius:var(--radius-pill); color:var(--ink-muted);
+  transition:background-color .15s ease-out, border-color .15s ease-out, color .15s ease-out;
+}
+.action-go svg{width:14px; height:14px}
+.action-row:hover .action-go{border-color:var(--border); background:var(--surface); color:var(--primary)}
+
+/* ---- Viimased juhtlõimed ---- */
+.lead-row{display:flex; align-items:center; gap:10px; padding:13px 20px; border-top:1px solid var(--border)}
+.lead-row:first-child{border-top:0}
+.lead-time{font:500 12px/16px var(--font-mono); font-feature-settings:"tnum"; color:var(--ink-muted)}
+.chip{display:inline-flex; align-items:center; padding:2px 10px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.chip-name{background:var(--bg-mist); border:1px solid var(--border); color:var(--ink)}
+.lead-county{flex:1; min-width:0; font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.chip-src{font:600 11px/16px var(--font-body)}
+.src-kava{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.src-raie{background:var(--st-active-bg); color:var(--st-active-text)}
+.src-ost{background:var(--st-ended-bg); color:var(--st-ended-text)}
+
+/* ---- Mobile drawer (<768px) ---- */
+.drawer{
+  position:fixed; top:0; bottom:0; left:0; z-index:140; width:min(320px,86vw);
+  display:flex; flex-direction:column; visibility:hidden;
+  background:var(--surface); box-shadow:var(--shadow-pop);
+  transform:translateX(-102%); transition:transform .2s cubic-bezier(.4,0,.2,1), visibility 0s .2s;
+}
+body.drawer-open .drawer{transform:none; visibility:visible; transition-delay:0s}
+body.drawer-open{overflow:hidden}
+.drawer-head{display:flex; align-items:center; gap:10px; height:var(--topbar-h); padding:0 12px 0 16px; border-bottom:1px solid var(--border)}
+.drawer-head .rail-logo{margin:0}
+.drawer-head .topbar-title{flex:1}
+.drawer-nav{flex:1; overflow-y:auto; padding:8px}
+.drawer-link{
+  display:flex; align-items:center; gap:12px; padding:11px 12px; margin-bottom:2px;
+  border-radius:var(--radius); color:var(--ink); font:500 14px/20px var(--font-body); text-decoration:none;
+}
+.drawer-link:hover{background:var(--bg-mist)}
+.drawer-link.active{background:var(--tint-primary-strong); color:var(--primary); font-weight:600}
+.drawer-link svg{width:18px; height:18px; color:var(--ink-muted)}
+.drawer-link.active svg{color:var(--primary)}
+.drawer-flag{margin-left:auto; flex:none}
+.drawer-flag.dot{width:8px; height:8px; border-radius:var(--radius-pill)}
+.drawer-flag.num{min-width:14px; height:14px; padding:0 4px; border-radius:var(--radius-pill); display:grid; place-items:center; font:700 10px/1 var(--font-body); color:var(--ink-inverse)}
+.drawer-backdrop{
+  position:fixed; inset:0; z-index:130; background:var(--overlay);
+  opacity:0; visibility:hidden; transition:opacity .2s, visibility 0s .2s;
+}
+body.drawer-open .drawer-backdrop{opacity:1; visibility:visible; transition-delay:0s}
+
+/* ---- Responsive ---- */
+@media (max-width:1280px){.kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:1024px){.dash-grid{grid-template-columns:1fr}}
+@media (max-width:860px){.topbar-search{display:none}}
+@media (max-width:767px){
+  .rail{display:none}
+  .app{margin-left:0}
+  .menu-btn{display:grid}
+  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .topbar{padding:0 16px}
+  .container{padding:16px}
+}
+@media (max-width:640px){.user-meta{display:none}}
+@media (max-width:420px){.kpi-grid{grid-template-columns:1fr}}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important}
+}
+
+/* ---- Page 08: Lepingud & mallid (contracts & templates) ---- */
+.page-head--tabs{flex-wrap:wrap; align-items:center}
+.tabs{display:flex; flex-wrap:wrap; gap:8px}
+.tab{
+  display:inline-flex; align-items:center; gap:8px; padding:7px 14px;
+  border:1px solid var(--border); border-radius:var(--radius-pill); background:var(--surface);
+  font:600 13px/18px var(--font-body); color:var(--ink-muted);
+  transition:background-color .15s ease-out, color .15s ease-out, border-color .15s ease-out;
+}
+.tab:hover{border-color:var(--primary); color:var(--primary)}
+.tab.active{background:var(--primary); border-color:var(--primary); color:var(--ink-inverse)}
+.tab-count{padding:1px 8px; border-radius:var(--radius-pill); background:var(--bg-mist); font:500 11px/16px var(--font-mono); color:var(--ink-muted)}
+.tab.active .tab-count{background:var(--primary-hover); color:var(--ink-inverse)}
+.tab-panel+.tab-panel{margin-top:var(--space-lg)}
+
+/* Filters */
+.filters{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px 20px; border-bottom:1px solid var(--border)}
+.filter-chip{
+  display:inline-flex; align-items:center; gap:6px; padding:5px 6px 5px 12px;
+  border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-mist);
+  font:500 12px/16px var(--font-body); color:var(--ink-muted); white-space:nowrap;
+}
+.filter-chip:focus-within{border-color:var(--primary)}
+.filter-chip select{border:0; background:transparent; padding:2px 4px; border-radius:6px; outline:0; font:600 12px/16px var(--font-body); color:var(--ink)}
+.filter-chip input[type="date"]{border:0; background:transparent; padding:2px; border-radius:6px; outline:0; font:500 12px/16px var(--font-mono); color:var(--ink)}
+.filter-sep{color:var(--ink-muted); font-weight:600}
+
+/* Contracts table */
+.tbl-contracts{min-width:980px}
+.type-oks{background:var(--st-sched-bg); color:var(--st-sched-text)}
+.type-raam{background:var(--st-draft-bg); color:var(--st-draft-text)}
+.pill{display:inline-flex; align-items:center; gap:5px; padding:2px 10px; border-radius:var(--radius-pill); font:500 12px/16px var(--font-body); white-space:nowrap}
+.pill-prep{background:var(--st-draft-bg); color:var(--st-draft-text)}
+.pill-sent{background:var(--st-ended-bg); color:var(--st-ended-text)}
+.pill-signed{background:var(--st-contract-bg); color:var(--st-contract-text)}
+.pill-void{background:var(--danger-light); color:var(--danger)}
+.pill-active{background:var(--st-active-bg); color:var(--st-active-text)}
+.mall-tag{font:500 12px/16px var(--font-mono); color:var(--ink); white-space:nowrap}
+.wait-note{font:400 12px/16px var(--font-body); color:var(--st-ended-text); white-space:nowrap}
+.row-actions{display:inline-flex; gap:6px; justify-content:flex-end}
+.btn-sm{
+  display:inline-flex; align-items:center; gap:5px; padding:4px 10px;
+  border:1px solid var(--border); border-radius:var(--radius); background:var(--surface);
+  color:var(--primary); font:600 12px/16px var(--font-body); white-space:nowrap; text-decoration:none;
+  transition:background-color .15s ease-out, border-color .15s ease-out;
+}
+.btn-sm:hover{border-color:var(--accent); background:var(--st-active-bg)}
+.btn-sm svg{width:12px; height:12px}
+.btn-sm.is-cta{border-color:var(--cta); color:var(--st-ended-text)}
+.btn-sm.is-cta:hover{background:var(--st-ended-bg); border-color:var(--cta-hover)}
+.btn-primary{
+  display:inline-flex; align-items:center; gap:6px; padding:7px 14px;
+  border:0; border-radius:var(--radius); background:var(--primary); color:var(--ink-inverse);
+  font:600 13px/18px var(--font-body); text-decoration:none; white-space:nowrap;
+  transition:background-color .15s ease-out;
+}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-primary svg{width:14px; height:14px}
+
+/* Template manager */
+.tpl-toolbar{display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:var(--space-md)}
+.tpl-hint{font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.tpl-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:var(--space-md)}
+.tpl-card{
+  display:flex; flex-direction:column; gap:8px; padding:var(--space-md);
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-card);
+}
+.tpl-head{display:flex; align-items:flex-start; gap:10px}
+.tpl-ico{display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:var(--radius); background:var(--bg-mist); color:var(--primary)}
+.tpl-ico svg{width:18px; height:18px}
+.tpl-name{margin:0; font:600 14px/20px var(--font-body); color:var(--ink)}
+.tpl-sub{display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:3px}
+.ver-badge{padding:1px 8px; border:1px solid var(--border); border-radius:var(--radius-pill); background:var(--bg-mist); font:500 11px/16px var(--font-mono); color:var(--ink-muted); white-space:nowrap}
+.tpl-vars{margin:0; font:400 12px/18px var(--font-mono); color:var(--ink-muted); overflow-wrap:anywhere}
+.tpl-meta{display:flex; align-items:center; gap:6px; font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.tpl-meta svg{width:13px; height:13px; flex:none}
+.tpl-actions{display:flex; flex-wrap:wrap; gap:8px; margin-top:auto; padding-top:8px}
+.tpl-history{margin:0; padding:8px 0 0; border-top:1px dashed var(--border); font:400 12px/18px var(--font-body); color:var(--ink-muted)}
+.tpl-history li{display:flex; justify-content:space-between; gap:8px}
+.tpl-history .mono{white-space:nowrap}
+
+/* Modals */
+.modal-backdrop{
+  position:fixed; inset:0; z-index:150; display:grid; place-items:center; padding:16px;
+  background:var(--overlay); opacity:0; visibility:hidden;
+  transition:opacity .2s, visibility 0s .2s;
+}
+.modal-backdrop.open{opacity:1; visibility:visible; transition-delay:0s}
+.modal{
+  display:flex; flex-direction:column; width:min(720px,100%); max-height:min(84vh,760px);
+  background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow-pop);
+  transform:translateY(10px); transition:transform .2s ease-out;
+}
+.modal-backdrop.open .modal{transform:none}
+.modal-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 20px; border-bottom:1px solid var(--border)}
+.modal-title{margin:0; font:600 16px/22px var(--font-heading); color:var(--ink)}
+.modal-body{overflow-y:auto; padding:20px}
+.modal-foot{display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; padding:12px 20px; border-top:1px solid var(--border)}
+
+/* Mock contract document */
+.doc{padding:24px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface)}
+.doc-title{margin:0 0 16px; font:700 15px/22px var(--font-heading); color:var(--ink); text-align:center}
+.doc p{margin:0 0 10px; font:400 13px/20px var(--font-body); color:var(--ink)}
+.doc-var{padding:0 4px; border-radius:4px; background:var(--primary-light); font:500 11px/18px var(--font-mono); color:var(--primary)}
+.doc-sig{display:flex; flex-wrap:wrap; gap:12px 32px; margin-top:20px; padding-top:14px; border-top:1px solid var(--border); font:400 12px/18px var(--font-body); color:var(--ink-muted)}
+
+/* Template editor + variable chips */
+.editor{display:grid; gap:12px}
+.legend-note{margin:0; font:400 12px/16px var(--font-body); color:var(--ink-muted)}
+.editor-chips{display:flex; flex-wrap:wrap; gap:6px}
+.var-chip{
+  display:inline-flex; align-items:center; padding:3px 10px;
+  border:1px dashed var(--accent); border-radius:var(--radius-pill);
+  background:var(--st-contract-bg); color:var(--st-contract-text);
+  font:500 12px/16px var(--font-mono); white-space:nowrap;
+  transition:background-color .15s ease-out;
+}
+.var-chip:hover{background:var(--accent-soft)}
+.var-chip.is-static{cursor:default}
+.var-chip.is-static:hover{background:var(--st-contract-bg)}
+.editor-area{
+  width:100%; min-height:230px; resize:vertical; padding:14px;
+  border:1px solid var(--border); border-radius:var(--radius);
+  background:var(--bg-mist); color:var(--ink);
+  font:400 13px/20px var(--font-mono); font-feature-settings:"tnum";
+}
+.editor-area:focus{outline:2px solid var(--accent); outline-offset:1px; background:var(--surface)}
+.legend-title{margin:0 0 8px; font:600 13px/18px var(--font-body); color:var(--ink)}
+.legend-tbl{min-width:0}
+.legend-tbl td:first-child{white-space:nowrap}
+
+@media (max-width:767px){.page-head--tabs{flex-direction:column; align-items:flex-start}}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Liigu sisuni</a>
+
+<!-- Left icon rail -->
+<aside class="rail" aria-label="Peamenüü">
+  <a class="rail-logo" href="01-dashboard.html" data-tip="Erametsad haldus" aria-label="Erametsad haldus">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/></svg>
+  </a>
+  <nav class="rail-nav">
+    <a class="rail-item" href="01-dashboard.html" data-tip="Töölaud" aria-label="Töölaud"><i data-lucide="layout-dashboard"></i></a>
+    <a class="rail-item" href="02-auctions-list.html" data-tip="Oksjonid" aria-label="Oksjonid"><i data-lucide="gavel"></i></a>
+    <a class="rail-item" href="04-bids-monitoring.html" data-tip="Pakkumised" aria-label="Pakkumised"><i data-lucide="activity"></i></a>
+    <a class="rail-item" href="05-sealed-opening.html" data-tip="Sul. avamine" aria-label="Sul. avamine — ootel tseremoonia"><i data-lucide="key-round"></i><span class="rail-flag dot is-amber"></span></a>
+    <a class="rail-item" href="06-users.html" data-tip="Kasutajad" aria-label="Kasutajad"><i data-lucide="users"></i></a>
+    <a class="rail-item" href="07-company-approvals.html" data-tip="Ettevõtted" aria-label="Ettevõtted — 3 ootel"><i data-lucide="building-2"></i><span class="rail-flag num is-red">3</span></a>
+    <a class="rail-item active" href="08-contracts.html" data-tip="Lepingud" aria-label="Lepingud" aria-current="page"><i data-lucide="file-signature"></i></a>
+    <a class="rail-item" href="09-leads-crm.html" data-tip="Juhtlõimed" aria-label="Juhtlõimed"><i data-lucide="kanban"></i></a>
+    <a class="rail-item" href="10-service-requests.html" data-tip="Päringud" aria-label="Päringud"><i data-lucide="send-horizontal"></i></a>
+    <a class="rail-item" href="11-cms-content.html" data-tip="Sisuhaldus" aria-label="Sisuhaldus"><i data-lucide="file-pen"></i></a>
+    <a class="rail-item" href="12-statistics.html" data-tip="Statistika" aria-label="Statistika"><i data-lucide="chart-column"></i></a>
+    <a class="rail-item" href="13-settings.html" data-tip="Seaded" aria-label="Seaded"><i data-lucide="settings"></i></a>
+    <a class="rail-item" href="14-audit-log.html" data-tip="Auditlogi" aria-label="Auditlogi"><i data-lucide="shield-check"></i></a>
+  </nav>
+</aside>
+
+<div class="app">
+  <!-- Topbar -->
+  <header class="topbar">
+    <button class="menu-btn" id="menuOpen" type="button" aria-label="Ava menüü" aria-expanded="false" aria-controls="drawer"><i data-lucide="menu"></i></button>
+    <div class="topbar-brand">
+      <span class="env-badge env-stage" title="Staging keskkond">STAGE</span>
+      <span class="topbar-title">Erametsad haldus</span>
+    </div>
+    <div class="topbar-search">
+      <i data-lucide="search"></i>
+      <input id="globalSearch" type="search" placeholder="Otsi oksjoneid, kasutajaid, juhtlõimi... (⌘K)" aria-label="Globaalne otsing">
+      <kbd class="search-kbd">⌘K</kbd>
+    </div>
+    <div class="topbar-user">
+      <button class="icon-btn" type="button" aria-label="Teavitused — 3 lugemata"><i data-lucide="bell"></i><span class="bell-badge">3</span></button>
+      <button class="user-menu" type="button" aria-haspopup="menu" aria-label="Kasutajamenüü: Marit Vain">
+        <span class="avatar" aria-hidden="true">MV</span>
+        <span class="user-meta">
+          <span class="user-name">Marit Vain</span>
+          <span class="role-chip">Admin</span>
+        </span>
+        <i data-lucide="chevron-down"></i>
+      </button>
+    </div>
+  </header>
+  <!-- Lepingud & mallid -->
+  <main id="main">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Asukoht">
+        <a href="01-dashboard.html">Töölaud</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">Lepingud</span>
+      </nav>
+      <header class="page-head page-head--tabs">
+        <h1 class="page-title">Lepingud &amp; mallid</h1>
+        <div class="tabs" role="tablist" aria-label="Lepingute vaated">
+          <button class="tab active" id="tab-contracts" role="tab" aria-selected="true" aria-controls="panel-contracts" type="button">Lepingute nimekiri (<span class="tab-count">1284</span>)</button>
+          <button class="tab" id="tab-templates" role="tab" aria-selected="false" aria-controls="panel-templates" type="button" tabindex="-1">Lepingumallid (<span class="tab-count">9</span>)</button>
+        </div>
+      </header>
+
+      <!-- TAB 1: Lepingute nimekiri -->
+      <section class="tab-panel" id="panel-contracts" role="tabpanel" aria-labelledby="tab-contracts">
+        <div class="card">
+          <div class="card-head">
+            <h2 class="card-title">Lepingud</h2>
+            <span class="wait-note">1284 lepingut · kuvan viimased 10</span>
+          </div>
+          <div class="filters" aria-label="Filtrid">
+            <label class="filter-chip">Tüüp
+              <select aria-label="Filtreeri tüübi järgi">
+                <option selected>Kõik</option>
+                <option>Oksjonileping</option>
+                <option>Raamleping</option>
+              </select>
+            </label>
+            <label class="filter-chip">Olek
+              <select aria-label="Filtreeri oleku järgi">
+                <option>Kõik</option>
+                <option>Valmistatud</option>
+                <option selected>Saadetud</option>
+                <option>Allkirjastatud</option>
+                <option>Tühistatud</option>
+              </select>
+            </label>
+            <label class="filter-chip">Kuupäev
+              <input type="date" aria-label="Alates" value="2026-08-01">
+              <span class="filter-sep" aria-hidden="true">—</span>
+              <input type="date" aria-label="Kuni">
+            </label>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl tbl-contracts">
+              <thead>
+                <tr>
+                  <th scope="col">Nr</th>
+                  <th scope="col">Tüüp</th>
+                  <th scope="col">Kasutaja</th>
+                  <th scope="col">Ettevõte</th>
+                  <th scope="col">Oksjon</th>
+                  <th scope="col">Mall</th>
+                  <th scope="col">Olek</th>
+                  <th scope="col">Allkirjastatud</th>
+                  <th scope="col" class="num"><span class="sr-only">Tegevused</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="lot-id">#102</span></td>
+                  <td><span class="type-chip type-oks">Oksj</span></td>
+                  <td>T. Kask</td>
+                  <td>Tamm OÜ</td>
+                  <td><span class="lot-id">#4812</span> <a class="lot-name" href="02-auctions-list.html">Ööviiuli kinnistu</a></td>
+                  <td><span class="mall-tag">MK v3.1</span></td>
+                  <td><span class="pill pill-sent">▣ Saadetud</span></td>
+                  <td><span class="wait-note">— (Ootel 2 p)</span></td>
+                  <td class="num"><span class="row-actions"><button class="btn-sm" type="button" data-preview="#102"><i data-lucide="eye"></i>Vaata</button></span></td>
+                </tr>
+                <tr>
+                  <td><span class="lot-id">#101</span></td>
+                  <td><span class="type-chip type-raam">Raam</span></td>
+                  <td>A. Saar</td>
+                  <td>Saar Mets OÜ</td>
+                  <td><span class="bid-muted">—</span></td>
+                  <td><span class="mall-tag">RL v2.0</span></td>
+                  <td><span class="pill pill-signed">✓ Allkirjastatud</span></td>
+                  <td><span class="mono">27.08 14:22</span></td>
+                  <td class="num"><span class="row-actions"><button class="btn-sm" type="button" data-preview="#101"><i data-lucide="eye"></i>Vaata</button></span></td>
+                </tr>
+                <tr>
+                  <td><span class="lot-id">#99</span></td>
+                  <td><span class="type-chip type-oks">Oksj</span></td>
+                  <td>M. Sepp</td>
+                  <td><span class="bid-muted">—</span></td>
+                  <td><span class="lot-id">#4801</span> <a class="lot-name" href="02-auctions-list.html">Kuusiku lank</a></td>
+                  <td><span class="mall-tag">RÕ v2.4</span></td>
+                  <td><span class="pill pill-void">✕ Tühistatud</span></td>
+                  <td><span class="bid-muted">—</span></td>
+                  <td class="num"><span class="row-actions"><button class="btn-sm" type="button" data-preview="#99"><i data-lucide="eye"></i>Vaata</button></span></td>
+                </tr>
+                <tr>
+                  <td><span class="lot-id">#98</span></td>
+                  <td><span class="type-chip type-oks">Oksj</span></td>
+                  <td>K. Tamm</td>
+                  <td>Tamm OÜ</td>
+                  <td><span class="lot-id">#4810</span> <a class="lot-name" href="02-auctions-list.html">Lepsi raieõigus</a></td>
+                  <td><span class="mall-tag">MK v3.1</span></td>
+                  <td><span class="pill pill-signed">✓ Allkirjastatud</span></td>
+                  <td><span class="mono">26.08 09:15</span></td>
+                  <td class="num"><span class="row-actions"><button class="btn-sm" type="button" data-preview="#98"><i data-lucide="eye"></i>Vaata</button></span></td>
+                </tr>
+                <tr>
+                  <td><span class="lot-id">#97</span></td>
+                  <td><span class="type-chip type-oks">Oksj</span></td>
+                  <td>P. Kuusk</td>
+                  <td><span class="bid-muted">—</span></td>
+                  <td><span class="lot-id">#4815</span> <a class="lot-name" href="02-auctions-list.html">Kõpu pakett</a></td>
+                  <td><span class="mall-tag">MK v3.1</span></td>
+                  <td><span class="pill pill-sent">▣ Saadetud</span></td>
+                  <td><span class="wait-note">— (Ootel 1 p)</span></td>
+                  <td class="num"><span class="row-actions"><button class="btn-sm" type="button" data-preview="#97"><i data-lucide="eye"></i>Vaata</button></span></td>
+                </tr>
+                <tr>
+                  <td><span class="lot-id">#96</span></td>
+                  <td><span class="type-chip type-raam">Raam</span></td>
+                  <td>J. Raud</td>
+                  <td>Raud Mets OÜ</td>
+                  <td><span class="bid-muted">—</span></td>
+                  <td><span class="mall-tag">RL v2.0</span></td>
+                  <td><span class="pill pill-signed">✓ Allkirjastatud</span></td>
+                  <td><span class="mono">21.08 16:40</span></td>
+                  <td class="num"><span class="row-actions"><button class="btn-sm" type="button" data-preview="#96"><i data-lucide="eye"></i>Vaata</button></span></td>
+                </tr>
+                <tr>
+                  <td><span class="lot-id">#95</span></td>
+                  <td><span class="type-chip type-oks">Oksj</span></td>
+                  <td>L. Ilves</td>
+                  <td>Ilves Kinnisvara OÜ</td>
+                  <td><span class="lot-id">#4798</span> <a class="lot-name" href="02-auctions-list.html">Vändra mets</a></td>
+                  <td><span class="mall-tag">RÕ v2.4</span></td>
+                  <td><span class="pill pill-sent">▣ Saadetud</span></td>
+                  <td><span class="wait-note">— (Ootel 4 p)</span></td>
+                  <td class="num"><span class="row-actions"><button class="btn-sm" type="button" data-preview="#95"><i data-lucide="eye"></i>Vaata</button></span></td>
+                </tr>
+                <tr>
+                  <td><span class="lot-id">#94</span></td>
+                  <td><span class="type-chip type-oks">Oksj</span></td>
+                  <td>U. Kask</td>
+                  <td><span class="bid-muted">—</span></td>
+                  <td><span class="lot-id">#4790</span> <a class="lot-name" href="02-auctions-list.html">Soomaa raba</a></td>
+                  <td><span class="mall-tag">MK v3.1</span></td>
+                  <td><span class="pill pill-prep">◻ Valmistatud</span></td>
+                  <td><span class="bid-muted">—</span></td>
+                  <td class="num"><span class="row-actions"><button class="btn-sm" type="button" data-preview="#94"><i data-lucide="eye"></i>Vaata</button><button class="btn-sm is-cta" type="button" data-send><i data-lucide="send"></i>Saada allkirja</button></span></td>
+                </tr>
+                <tr>
+                  <td><span class="lot-id">#93</span></td>
+                  <td><span class="type-chip type-raam">Raam</span></td>
+                  <td>M. Tamm</td>
+                  <td>Männi Mets OÜ</td>
+                  <td><span class="bid-muted">—</span></td>
+                  <td><span class="mall-tag">RL v2.0</span></td>
+                  <td><span class="pill pill-signed">✓ Allkirjastatud</span></td>
+                  <td><span class="mono">14.08 11:02</span></td>
+                  <td class="num"><span class="row-actions"><button class="btn-sm" type="button" data-preview="#93"><i data-lucide="eye"></i>Vaata</button></span></td>
+                </tr>
+                <tr>
+                  <td><span class="lot-id">#92</span></td>
+                  <td><span class="type-chip type-oks">Oksj</span></td>
+                  <td>S. Lind</td>
+                  <td><span class="bid-muted">—</span></td>
+                  <td><span class="lot-id">#4787</span> <a class="lot-name" href="02-auctions-list.html">Emajõe luht</a></td>
+                  <td><span class="mall-tag">RÕ v2.4</span></td>
+                  <td><span class="pill pill-prep">◻ Valmistatud</span></td>
+                  <td><span class="bid-muted">—</span></td>
+                  <td class="num"><span class="row-actions"><button class="btn-sm" type="button" data-preview="#92"><i data-lucide="eye"></i>Vaata</button><button class="btn-sm is-cta" type="button" data-send><i data-lucide="send"></i>Saada allkirja</button></span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-foot"><span class="wait-note">Demo: [ Saada allkirja ] näitab oleku muutust; tegelikus süsteemis saadab süsteem kutse e-ID allkirjastamise lüüsi.</span></div>
+        </div>
+      </section>
+
+      <!-- TAB 2: Lepingumallid -->
+      <section class="tab-panel" id="panel-templates" role="tabpanel" aria-labelledby="tab-templates" hidden>
+        <div class="tpl-toolbar">
+          <button class="btn-primary" type="button"><i data-lucide="upload"></i>Laadi üles uus mall (DOCX)</button>
+          <span class="tpl-hint">Süsteem valideerib DOCX-i ja tuvastab {{...}} kohatäited automaatselt.</span>
+        </div>
+        <div class="tpl-grid">
+          <article class="tpl-card">
+            <div class="tpl-head">
+              <span class="tpl-ico"><i data-lucide="file-signature"></i></span>
+              <div>
+                <h3 class="tpl-name">Oksjonileping metsakinnistule</h3>
+                <span class="tpl-sub"><span class="ver-badge">MK · v3.1</span><span class="pill pill-active">● Aktiivne</span></span>
+              </div>
+            </div>
+            <p class="tpl-vars">{{müüja_nimi}} {{oksjoni_id}} {{hind}} {{tähtaeg}} +5</p>
+            <div class="tpl-meta"><i data-lucide="history"></i>Muudetud: 12.06.2026 (Marit Vain)</div>
+            <div class="tpl-actions">
+              <button class="btn-sm" type="button" data-edit="MK — Oksjonileping metsakinnistule (v3.1)"><i data-lucide="pencil"></i>Muuda</button>
+              <button class="btn-sm" type="button" data-history aria-expanded="false"><i data-lucide="history"></i>Ajalugu</button>
+            </div>
+            <ul class="tpl-history" hidden>
+              <li><span class="mono">v3.1</span><span>12.06.2026 · Marit Vain · aktiivne</span></li>
+              <li><span class="mono">v3.0</span><span>02.02.2026 · Marit Vain</span></li>
+              <li><span class="mono">v2.2</span><span>17.09.2025 · Kaire Mets</span></li>
+            </ul>
+          </article>
+          <article class="tpl-card">
+            <div class="tpl-head">
+              <span class="tpl-ico"><i data-lucide="tree-pine"></i></span>
+              <div>
+                <h3 class="tpl-name">Raieõiguse leping</h3>
+                <span class="tpl-sub"><span class="ver-badge">RÕ · v2.4</span><span class="pill pill-active">● Aktiivne</span></span>
+              </div>
+            </div>
+            <p class="tpl-vars">{{müüja_nimi}} {{oksjoni_id}} {{hind}} {{tähtaeg}} +6</p>
+            <div class="tpl-meta"><i data-lucide="history"></i>Muudetud: 28.05.2026 (Kaire Mets)</div>
+            <div class="tpl-actions">
+              <button class="btn-sm" type="button" data-edit="RÕ — Raieõiguse leping (v2.4)"><i data-lucide="pencil"></i>Muuda</button>
+              <button class="btn-sm" type="button" data-history aria-expanded="false"><i data-lucide="history"></i>Ajalugu</button>
+            </div>
+            <ul class="tpl-history" hidden>
+              <li><span class="mono">v2.4</span><span>28.05.2026 · Kaire Mets · aktiivne</span></li>
+              <li><span class="mono">v2.3</span><span>14.11.2025 · Kaire Mets</span></li>
+            </ul>
+          </article>
+          <article class="tpl-card">
+            <div class="tpl-head">
+              <span class="tpl-ico"><i data-lucide="file-text"></i></span>
+              <div>
+                <h3 class="tpl-name">Raamleping</h3>
+                <span class="tpl-sub"><span class="ver-badge">RL · v2.0</span><span class="pill pill-active">● Aktiivne</span></span>
+              </div>
+            </div>
+            <p class="tpl-vars">{{müüja_nimi}} {{tähtaeg}} +3</p>
+            <div class="tpl-meta"><i data-lucide="history"></i>Muudetud: 02.04.2026 (Marit Vain)</div>
+            <div class="tpl-actions">
+              <button class="btn-sm" type="button" data-edit="RL — Raamleping (v2.0)"><i data-lucide="pencil"></i>Muuda</button>
+              <button class="btn-sm" type="button" data-history aria-expanded="false"><i data-lucide="history"></i>Ajalugu</button>
+            </div>
+            <ul class="tpl-history" hidden>
+              <li><span class="mono">v2.0</span><span>02.04.2026 · Marit Vain · aktiivne</span></li>
+              <li><span class="mono">v1.9</span><span>08.10.2025 · Marit Vain</span></li>
+            </ul>
+          </article>
+          <article class="tpl-card">
+            <div class="tpl-head">
+              <span class="tpl-ico"><i data-lucide="pen-tool"></i></span>
+              <div>
+                <h3 class="tpl-name">Volikiri</h3>
+                <span class="tpl-sub"><span class="ver-badge">VK · v1.2</span><span class="pill pill-prep">◻ Mustand</span></span>
+              </div>
+            </div>
+            <p class="tpl-vars">{{müüja_nimi}} {{oksjoni_id}} +2</p>
+            <div class="tpl-meta"><i data-lucide="history"></i>Muudetud: 30.07.2026 (Toomas Rebane)</div>
+            <div class="tpl-actions">
+              <button class="btn-sm" type="button" data-edit="VK — Volikiri (v1.2)"><i data-lucide="pencil"></i>Muuda</button>
+              <button class="btn-sm" type="button" data-history aria-expanded="false"><i data-lucide="history"></i>Ajalugu</button>
+            </div>
+            <ul class="tpl-history" hidden>
+              <li><span class="mono">v1.2</span><span>30.07.2026 · Toomas Rebane · mustand</span></li>
+              <li><span class="mono">v1.1</span><span>21.05.2026 · Toomas Rebane</span></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<!-- Lepingu eelvaade (demo) -->
+<div class="modal-backdrop" id="previewModal" role="dialog" aria-modal="true" aria-labelledby="previewTitle" aria-hidden="true">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 class="modal-title" id="previewTitle">Lepingu eelvaade</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Sulge eelvaade"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="doc">
+        <h3 class="doc-title">OKSJONILEPING nr 102</h3>
+        <p><strong>1. Lepingu pooled.</strong> Müüja <span class="doc-var">Erametsad OÜ</span> (registrikood 16160011) ja ostja <span class="doc-var">Tamm OÜ</span> (registrikood 14309277), esindaja Tõnis Kask, isikukood 38705162718.</p>
+        <p><strong>2. Müügiobjekt.</strong> Oksjoni <span class="doc-var">#4812 Ööviiuli kinnistu</span> tulemusel müüdud raieõigus, katastritunnused 79201:003:0112 ja 79201:003:0113, pindala kokku 21,4 ha, raiemaht 1 240 m³.</p>
+        <p><strong>3. Hind.</strong> Ostja tasub lõpphinna <span class="doc-var">61 000 €</span> ning teenustasu 3 % (<span class="doc-var">1 830 €</span>) viie päeva jooksul arvates lepingu allkirjastamisest.</p>
+        <p><strong>4. Tähtajad.</strong> Raieteostuse tähtaeg on <span class="doc-var">31.12.2027</span> ja väljaveo tähtaeg <span class="doc-var">31.03.2028</span>.</p>
+        <p><strong>5. Muud tingimused.</strong> Leping sõlmitakse Erametsad OÜ veebioksjoni tulemuse alusel. Leping allkirjastatakse e-ID vahendusel (ID-kaart, Mobiil-ID või Smart-ID). Dokument on demomall ja ei oma õigusjõudu.</p>
+        <div class="doc-sig">
+          <span>Müüja: ____________________</span>
+          <span>Ostja: ____________________ (e-allkiri)</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-sm" type="button" data-close>Sulge</button>
+      <button class="btn-primary" type="button"><i data-lucide="download"></i>Laadi alla PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Malli redaktor (demo) -->
+<div class="modal-backdrop" id="editorModal" role="dialog" aria-modal="true" aria-labelledby="editorTitle" aria-hidden="true">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 class="modal-title" id="editorTitle">Malli redaktor</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Sulge redaktor"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="editor">
+        <p class="legend-note">Klõpsa kohatäidet, et sisestada see kursori kohale teksti. Prinditav DOCX genereeritakse mallist automaatselt.</p>
+        <div class="editor-chips" role="group" aria-label="Kohatäited">
+          <button class="var-chip" type="button" data-var="{{müüja_nimi}}">{{müüja_nimi}}</button>
+          <button class="var-chip" type="button" data-var="{{oksjoni_id}}">{{oksjoni_id}}</button>
+          <button class="var-chip" type="button" data-var="{{hind}}">{{hind}}</button>
+          <button class="var-chip" type="button" data-var="{{tähtaeg}}">{{tähtaeg}}</button>
+        </div>
+        <label class="sr-only" for="tplSource">Malli lähtetekst</label>
+        <textarea class="editor-area" id="tplSource" spellcheck="false">METSAKINNISTU OKSJONILEPING
+
+1. Lepingu pooled
+Müüja: {{müüja_nimi}}
+Ostja: {{ostja_nimi}} (isikukood {{ostja_isikukood}})
+
+2. Müügiobjekt
+Oksjon: {{oksjoni_id}}
+Katastritunnused: {{katastrid}}
+
+3. Hind ja teenustasu
+Lõpphind: {{hind}}
+Teenustasu: {{teenustasu}} % — {{teenustasu_summa}}
+
+4. Tähtajad
+Raieteostuse tähtaeg: {{tähtaeg}}
+Väljaveo tähtaeg: {{väljaveo_tahtaeg}}</textarea>
+        <div>
+          <h3 class="legend-title">Asenduste legend (testrender)</h3>
+          <div class="tbl-wrap">
+            <table class="tbl legend-tbl">
+              <thead>
+                <tr><th scope="col">Muutuja</th><th scope="col">Asendatakse näidisandmetega</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><span class="var-chip is-static">{{müüja_nimi}}</span></td><td>Erametsad OÜ (registrikood 16160011)</td></tr>
+                <tr><td><span class="var-chip is-static">{{oksjoni_id}}</span></td><td>#4812 Ööviiuli kinnistu</td></tr>
+                <tr><td><span class="var-chip is-static">{{hind}}</span></td><td>61 000 €</td></tr>
+                <tr><td><span class="var-chip is-static">{{tähtaeg}}</span></td><td>31.12.2027</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-sm" type="button" data-close>Sulge</button>
+      <button class="btn-primary" type="button"><i data-lucide="eye"></i>Testrender näidisandmetega</button>
+      <button class="btn-primary" type="button"><i data-lucide="save"></i>Salvesta versioon</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true"></div>
+<aside class="drawer" id="drawer" aria-label="Peamenüü" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="rail-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/></svg>
+    </span>
+    <span class="topbar-title">Erametsad haldus</span>
+    <button class="icon-btn" id="menuClose" type="button" aria-label="Sulge menüü"><i data-lucide="x"></i></button>
+  </div>
+  <nav class="drawer-nav">
+    <a class="drawer-link" href="01-dashboard.html"><i data-lucide="layout-dashboard"></i>Töölaud</a>
+    <a class="drawer-link" href="02-auctions-list.html"><i data-lucide="gavel"></i>Oksjonid</a>
+    <a class="drawer-link" href="04-bids-monitoring.html"><i data-lucide="activity"></i>Pakkumised</a>
+    <a class="drawer-link" href="05-sealed-opening.html"><i data-lucide="key-round"></i>Sul. avamine<span class="drawer-flag dot is-amber"></span></a>
+    <a class="drawer-link" href="06-users.html"><i data-lucide="users"></i>Kasutajad</a>
+    <a class="drawer-link" href="07-company-approvals.html"><i data-lucide="building-2"></i>Ettevõtted<span class="drawer-flag num is-red">3</span></a>
+    <a class="drawer-link active" href="08-contracts.html" aria-current="page"><i data-lucide="file-signature"></i>Lepingud</a>
+    <a class="drawer-link" href="09-leads-crm.html"><i data-lucide="kanban"></i>Juhtlõimed</a>
+    <a class="drawer-link" href="10-service-requests.html"><i data-lucide="send-horizontal"></i>Päringud</a>
+    <a class="drawer-link" href="11-cms-content.html"><i data-lucide="file-pen"></i>Sisuhaldus</a>
+    <a class="drawer-link" href="12-statistics.html"><i data-lucide="chart-column"></i>Statistika</a>
+    <a class="drawer-link" href="13-settings.html"><i data-lucide="settings"></i>Seaded</a>
+    <a class="drawer-link" href="14-audit-log.html"><i data-lucide="shield-check"></i>Auditlogi</a>
+  </nav>
+</aside>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+
+  /* Lucide icons */
+  if(window.lucide)lucide.createIcons();
+
+  /* Mobile drawer */
+  const drawer=$("#drawer"), backdrop=$("#drawerBackdrop"),
+        openBtn=$("#menuOpen"), closeBtn=$("#menuClose");
+  const setDrawer=open=>{
+    document.body.classList.toggle("drawer-open",open);
+    drawer.setAttribute("aria-hidden",String(!open));
+    openBtn.setAttribute("aria-expanded",String(open));
+  };
+  openBtn.addEventListener("click",()=>setDrawer(true));
+  closeBtn.addEventListener("click",()=>setDrawer(false));
+  backdrop.addEventListener("click",()=>setDrawer(false));
+  addEventListener("keydown",e=>{if(e.key==="Escape")setDrawer(false)});
+
+  /* Global search: focus with Cmd/Ctrl+K */
+  const search=$("#globalSearch");
+  addEventListener("keydown",e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
+      e.preventDefault();
+      search.focus(); search.select();
+    }
+  });
+
+  /* Live countdowns (demo offsets in seconds from load) */
+  const pad=n=>String(n).padStart(2,"0");
+  const cds=$$("[data-countdown]").map(el=>({el,end:Date.now()+Number(el.dataset.countdown)*1000}));
+  function tick(){
+    const now=Date.now();
+    cds.forEach(c=>{
+      const r=Math.max(0,c.end-now);
+      if(r===0){c.el.textContent="Lõppenud"; c.el.classList.remove("cd-crit"); return;}
+      const h=Math.floor(r/36e5), m=Math.floor(r%36e5/6e4), s=Math.floor(r%6e4/1e3);
+      c.el.textContent=pad(h)+":"+pad(m)+":"+pad(s);
+      c.el.classList.toggle("cd-crit",r<3e5);
+    });
+  }
+  tick(); setInterval(tick,1000);
+})();
+</script>
+<script>
+(function(){
+  "use strict";
+  const $=(s,c=document)=>c.querySelector(s);
+  const $$=(s,c=document)=>Array.from(c.querySelectorAll(s));
+  let lastFocus=null;
+
+  /* Tabs: switch panels, keep count badges */
+  const tabs=$$('[role="tab"]');
+  function selectTab(tab){
+    tabs.forEach(t=>{
+      const on=t===tab;
+      t.classList.toggle("active",on);
+      t.setAttribute("aria-selected",String(on));
+      t.tabIndex=on?0:-1;
+    });
+    $$(".tab-panel").forEach(p=>{p.hidden=p.id!==tab.getAttribute("aria-controls");});
+  }
+  tabs.forEach(tab=>tab.addEventListener("click",()=>selectTab(tab)));
+
+  /* Modals: shared open/close, restore focus, Escape closes (motion handled by reduced-motion CSS) */
+  function openModal(m,title){
+    const t=$(".modal-title",m);
+    if(t&&title)t.textContent=title;
+    lastFocus=document.activeElement;
+    m.classList.add("open");
+    m.removeAttribute("aria-hidden");
+    const f=$("textarea, button, [href]",m);
+    if(f)f.focus();
+  }
+  function closeModal(m){
+    m.classList.remove("open");
+    m.setAttribute("aria-hidden","true");
+    if(lastFocus&&lastFocus.focus)lastFocus.focus();
+  }
+  $$(".modal-backdrop").forEach(m=>{
+    m.addEventListener("click",e=>{if(e.target===m)closeModal(m);});
+    $$("[data-close]",m).forEach(b=>b.addEventListener("click",()=>closeModal(m)));
+  });
+  addEventListener("keydown",e=>{
+    if(e.key==="Escape")$$(".modal-backdrop.open").forEach(closeModal);
+  });
+
+  /* Contract row: preview modal with mock document */
+  $$("[data-preview]").forEach(btn=>btn.addEventListener("click",()=>{
+    const m=$("#previewModal");
+    if(m)openModal(m,"Leping "+btn.dataset.preview+" — eelvaade");
+  }));
+
+  /* Template card: open DOCX editor modal */
+  $$("[data-edit]").forEach(btn=>btn.addEventListener("click",()=>{
+    const m=$("#editorModal");
+    if(m)openModal(m,"Mall: "+btn.dataset.edit);
+  }));
+
+  /* Template card: toggle version history list */
+  $$("[data-history]").forEach(btn=>btn.addEventListener("click",()=>{
+    const card=btn.closest(".tpl-card"), list=card&&$(".tpl-history",card);
+    if(!list)return;
+    const open=list.hasAttribute("hidden");
+    if(open)list.removeAttribute("hidden"); else list.setAttribute("hidden","");
+    btn.setAttribute("aria-expanded",String(open));
+  }));
+
+  /* Contract row: [ Saada allkirja ] demo — flip row to Saadetud */
+  $$("[data-send]").forEach(btn=>btn.addEventListener("click",()=>{
+    const row=btn.closest("tr");
+    if(!row)return;
+    const pill=$(".pill",row), sig=row.cells[7];
+    if(pill){
+      pill.className="pill pill-sent";
+      pill.textContent="▣ Saadetud";
+    }
+    if(sig)sig.innerHTML='<span class="wait-note">— (Ootel 0 p)</span>';
+    const wrap=btn.parentElement;
+    if(wrap)wrap.innerHTML='<span class="wait-note">Saadetud ✓</span>';
+  }));
+
+  /* Editor: insert variable chip text at textarea cursor */
+  const area=$("#tplSource");
+  $$(".editor-chips .var-chip").forEach(chip=>chip.addEventListener("click",()=>{
+    if(!area)return;
+    const v=chip.dataset.var||"";
+    const s=area.selectionStart??area.value.length;
+    const e=area.selectionEnd??s;
+    area.setRangeText(v,s,e,"end");
+    area.focus();
+  }));
+})();
+</script>
+</div>
+</body>
+</html>
