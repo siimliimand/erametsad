@@ -57,7 +57,7 @@ Step 6 hidden unless objectType=package. Mobile: steps become top dropdown + lin
 - Teenustasu ülekaal (fee override) % — admin+ only; blank = global default (3% shown greyed placeholder).
 
 **Step 5 Sisu**
-- Nimi* (also used as display; auto-suggest from cadastral address). Alias e-mail — auto-generated read-only (e.g. `mt27082601@oksjonid.eametsad.ee`), regenerate button (logged).
+- Nimi* (also used as display; auto-suggest from cadastral address). Alias e-mail — auto-generated read-only (e.g. `mt27082601@oksjonid.erametsad.ee`), regenerate button (logged).
 - Spetsialist* assign select (admin only for reassign). Avalikuks info / Täiendav info: rich text editors (Lexical-style toolbar: H2/H3, bold, lists, links, table).
 - Pilt* (hero) + galerii `images[]`: upload, drag order, focal-point picker per image, alt text required (accessibility gate on publish). Failid `files[]`: PDF only ("Takseer", "Metsateatised" tag select per file).
 

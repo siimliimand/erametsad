@@ -115,7 +115,7 @@ pnpm exec tsx scripts/loadtest/loadtest.ts verify
 
 The wrangler.jsonc D1 id is still the placeholder, so nothing above touched
 remote D1. After task 8.5 deploys the worker, repeat with
-`--base https://api.eametsad.ee --d1 remote` and record: remote admission
+`--base https://api.erametsad.ee --d1 remote` and record: remote admission
 rate per auction, burst p99, 500 rate, and the same six verify checks. The
 remote D1 single-writer ceiling is expected to be lower than 19 admissions
 per second, because every statement pays a network round trip.

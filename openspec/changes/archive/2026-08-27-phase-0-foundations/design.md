@@ -1,6 +1,6 @@
 ## Context
 
-Greenfield project. The full build plan is in `docs/EAMETSAD-PLAN.md` and the
+Greenfield project. The full build plan is in `docs/ERAMETSAD-PLAN.md` and the
 design system in `docs/design/README.md`. The prototype task list is in
 `docs/tasks.md`. No code exists. The reference product (timber.ee) was built
 on Next.js + Payload + PostgreSQL, so this mirrors a proven shape. The

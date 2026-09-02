@@ -1,5 +1,5 @@
 ---
-# Design tokens - Eametsad
+# Design tokens - Erametsad
 
 colors:
   primary: "#012d1d"
@@ -86,9 +86,9 @@ motion:
 hero-overlay: "linear-gradient(90deg, rgba(22,56,42,.85), rgba(22,56,42,.35))"
 ---
 
-# Eametsad design system
+# Erametsad design system
 
-Eametsad is an Estonian forest-transaction platform: a marketing site, an auction portal, and an admin backend. The backend runs on Cloudflare Workers (via OpenNext) with Cloudflare D1 for storage and Durable Objects for bid serialization. The design keeps the Estonian forest as its visual anchor and pairs it with a pale, lavender-tinted paper surface. The look is calm, genuine, and trustworthy. Nothing is hidden. Fees are stated upfront. Consent checkboxes are visible and unchecked.
+Erametsad is an Estonian forest-transaction platform: a marketing site, an auction portal, and an admin backend. The backend runs on Cloudflare Workers (via OpenNext) with Cloudflare D1 for storage and Durable Objects for bid serialization. The design keeps the Estonian forest as its visual anchor and pairs it with a pale, lavender-tinted paper surface. The look is calm, genuine, and trustworthy. Nothing is hidden. Fees are stated upfront. Consent checkboxes are visible and unchecked.
 
 ## Design principles
 

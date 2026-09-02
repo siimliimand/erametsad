@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, EmptyState } from '@eametsad/ui'
+import { Btn, EmptyState } from '@erametsad/ui'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 

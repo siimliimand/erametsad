@@ -44,7 +44,7 @@ Mobile: steps vertical; PDF preview opens full-screen viewer (or download prompt
 - Already-signed raamleping: flow (a) skips to Valmis ("Sul on raamleping jõus alates {date}") — no re-signing on template version bump (new versions apply to future contracts only).
 - Provider timeout / user cancels: "Allkirjastamine katkestati. Proovi uuesti." — contract stays `sent`, resume allowed.
 - Expired provider session (15 min): re-prepare; drafts invalid.
-- Error/timeout handling: 3 failed attempts → "Allkirjastamine ei õnnestu? Võta ühendust info@eametsad.ee."
+- Error/timeout handling: 3 failed attempts → "Allkirjastamine ei õnnestu? Võta ühendust info@erametsad.ee."
 - Voided contract (admin or template error): timeline shows "Tühistatud" + explanation + new prepare CTA.
 - Winner contract deadline: countdown chip "Allkirjasta {frist} — vastasel juhul läheb oksjon järgmisele pakkujale."
 - Mobile signing often on same phone as Smart-ID app: show tip "Vaheta seadet või kasuta Mobiil-ID-d, kui Smart-ID rakendus ühel ekraanil ei mahtu."
@@ -70,5 +70,5 @@ No caching (authed). No realtime (status polling of provider).
 
 ## Open questions
 - Which contract does a sealed-bid winner sign — same oksjonileping template with `type: auction`? (Assumed yes.)
-- Two-signatory case (company representative + counterparty Eametsad): show counter-signature pending state in timeline? (Recommend yes: "Ootab Eametsadi vastuallkirja".)
+- Two-signatory case (company representative + counterparty Erametsad): show counter-signature pending state in timeline? (Recommend yes: "Ootab Erametsadi vastuallkirja".)
 - Provider choice confirmation (eID Easy pricing) — Phase 0.

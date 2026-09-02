@@ -8,7 +8,7 @@
 | **In nav** | "Uudised" → `/artiklid` |
 
 ## Purpose & user goals
-Lugeja sirvib uudiseid, kliendilugusid ja teadmist; iga artikkel lõpeb konversiooniga (CTA-bänd + LeadForm). Hub on ka SEO sisukorje punkt (~200+ artikli planeeritud, vt EAMETSAD-PLAN §13).
+Lugeja sirvib uudiseid, kliendilugusid ja teadmist; iga artikkel lõpeb konversiooniga (CTA-bänd + LeadForm). Hub on ka SEO sisukorje punkt (~200+ artikli planeeritud, vt ERAMETSAD-PLAN §13).
 
 ## Wireframe (desktop)
 
@@ -61,7 +61,7 @@ Lugeja sirvib uudiseid, kliendilugusid ja teadmist; iga artikkel lõpeb konversi
 - H1: "Artiklid ja uudised" · "Loe artiklit" · "Vanemad artiklid" · "Seotud artiklid" · "Jaga" · "Kopeeri link" · "Konsultatsioon on tasuta" (CTA-bänd).
 
 ## SEO & analytics
-- Title: hub "Artiklid ja uudised | Eametsad"; artikkel "[Pealkiri] | Eametsad". Igal artiklis canonical + `og:image` (hero).
+- Title: hub "Artiklid ja uudised | Erametsad"; artikkel "[Pealkiri] | Erametsad". Igal artiklis canonical + `og:image` (hero).
 - JSON-LD: artikkel `Article` (+ `author` Person kui määratud); hub `CollectionPage` + `BreadcrumbList`.
 - Sündmused: `article_card_click{slug}`, `chip_category_click{category}`, `pagination_next{page}`, `share_click{network}`, `copy_link_click`, `read_progress{25|50|75|100}`, `lead_form_submit_start/complete`, `related_article_click{slug}`.
 

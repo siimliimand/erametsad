@@ -38,7 +38,7 @@ Omanik, kelle nooremad puistud vajavad hooldus- või valgusraiet, saab tutvuda r
 ## Block-by-block spec
 1. **Vahekaardid (Tabs)** — samad 3 kui 10-failis, aktiivne "Hooldusraie".
 2. **Sisuveerg** — H2 "Mis on hooldusraie?" (draft): noorte puistu hooldamine, võsa raie, üldine tervis; **valgusraie** — valitute langetamine, et jäätavatel puudel kasvuruumi; lühivastandus lageraiest (viide `/lageraie` SEO-artiklile ja `/kkk/raie`). H2 "Mis ajakava oodata?" — sama 7-päeva lubadus kui 10-s.
-3. **Päringuvorm (Card)** — väljad EAMETSAD-PLAN §4.3 järgi:
+3. **Päringuvorm (Card)** — väljad ERAMETSAD-PLAN §4.3 järgi:
    - `nimi`, `telefon`, `email` (kohustuslikud)
    - `maakond` — `FormSelect` (15 maakonna ref-tabel, kohustuslik)
    - `katastritunnus` — üks või mitu (kohustuslik)
@@ -67,7 +67,7 @@ Omanik, kelle nooremad puistud vajavad hooldus- või valgusraiet, saab tutvuda r
 - H1: "Hooldusraiete päring" · "Mis on hooldusraie?" · väljad: "Sinu nimi", "Telefoninumber", "E-mail", "Raielangi maakond", "Raielangi katastritunnus", "Eraldis/eraldised", "Kultuuride hooldamist", "Valgusraiet", "Lisa kava fail (valikuline)", "Lisa kommentaar", nõusolek nagu 10-s (sõnastus "hooldusraie teenuse pakkujatele"), "SAADA", "Pakkujad vastavad 7 päeva jooksul."
 
 ## SEO & analytics
-- Title: "Hooldusraie päring — hooldus- ja valgusraie | Eametsad"; desc: "hooldusraie, valgusraie, päring, pakkujad, 7 päeva".
+- Title: "Hooldusraie päring — hooldus- ja valgusraie | Erametsad"; desc: "hooldusraie, valgusraie, päring, pakkujad, 7 päeva".
 - JSON-LD: `Service` + `BreadcrumbList`.
 - Sündmused: `tab_switch{to}`, `service_request_start`, `file_upload_attach{ext,size_bucket}`, `service_request_validation_error{field}`, `service_request_complete`, `content_link_click{target}`.
 

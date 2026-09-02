@@ -70,7 +70,7 @@ Empty: "Uusi päringuid ei ole". Routing panel with no matching partners: "Ühte
 Audit-logged: every forward (request+partner list — personal-data disclosure event), mark responded/done, close, partner create/edit/deactivate. Minimal-payload rule enforced server-side.
 
 ## Forwarding e-mail content (template `request.forward`, editable in 13)
-Included (minimised payload): klient nimi, telefon, e-post, katastrid/eraldised, teenuse valikud (checkbox summary), kommentaar, allkirjastatud manuse-linkid (14 d). Excluded (enforced server-side): isikukood (never collected here), IP, source/UTM, consent metadata, admin notes. Footer: "Andmed on edastatud Eametsad OÜ vahendusel teenusepakkujale {nimi}. Küsimuste korral vastake otse kliendile."
+Included (minimised payload): klient nimi, telefon, e-post, katastrid/eraldised, teenuse valikud (checkbox summary), kommentaar, allkirjastatud manuse-linkid (14 d). Excluded (enforced server-side): isikukood (never collected here), IP, source/UTM, consent metadata, admin notes. Footer: "Andmed on edastatud Erametsad OÜ vahendusel teenusepakkujale {nimi}. Küsimuste korral vastake otse kliendile."
 
 ## Partner routing rules
 Order in routing panel: county match first (sorted by free capacity), then county-agnostic partners ("Kogu Eesti" coverage). Default pre-selection: top N (setting, default 3) by fewest open requests — admin can alter. Capacity = open forwarded-not-responded count vs limit.

@@ -1,6 +1,6 @@
 'use client';
 
-import { AuctionTicker, type LotCardProps } from '@eametsad/ui';
+import { AuctionTicker, type LotCardProps } from '@erametsad/ui';
 import { useCallback, useState } from 'react';
 
 import { PORTAL_HOSTNAME } from '@/lib/routing/host-areas';

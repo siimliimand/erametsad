@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, Card, FormRange, FormSelect, Toast } from '@eametsad/ui'
+import { Btn, Card, FormRange, FormSelect, Toast } from '@erametsad/ui'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useId, useMemo, useState } from 'react'
 

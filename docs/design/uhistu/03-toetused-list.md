@@ -3,7 +3,7 @@
 > **In brief:** Index of subsidy programmes with sidebar navigation.
 | Area | uhistu |
 |---|---|
-| **Route** | `metsauhistu.eametsad.ee/toetused` |
+| **Route** | `metsauhistu.erametsad.ee/toetused` |
 | **Access** | public |
 | **In nav** | subsite header "Toetused"; home "Vaata kõiki toetusi" |
 

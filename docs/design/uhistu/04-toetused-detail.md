@@ -3,7 +3,7 @@
 > **In brief:** A single subsidy: deadline, amounts, eligibility and how to apply.
 | Area | uhistu |
 |---|---|
-| **Route** | `metsauhistu.eametsad.ee/toetused/<slug>` (e.g. `/toetused/hooldusraie`, `/toetused/metsameede-hooldusraie`) |
+| **Route** | `metsauhistu.erametsad.ee/toetused/<slug>` (e.g. `/toetused/hooldusraie`, `/toetused/metsameede-hooldusraie`) |
 | **Access** | public |
 | **In nav** | /toetused sidebar (active item); home table "Taotle" |
 
@@ -42,10 +42,10 @@ Mobile: form card renders as a full-width block after "Kui suur on toetus?" (con
 3. **Kui suur on toetus?** — semantic `<table>` from `rates[]`: rows per applicant type (Füüsiline isik/FIE, Juriidiline isik, Ühistu liige füüsiline isik …), columns Taotleja / Toetuse määr / Ühik. Flat vs per-ha unit rendered from `unit`. If single rate: one emphasized stat card instead of table.
 4. **Olulisemad tingimused** — bullet list from `eligibility[]`; numeric params (0,1 ha, 1 ha/aasta, 30 ha, metsateatis >20 m³ …) wrapped in `<strong class="hl">` amber highlight — CMS stores rich text with `{{param}}` markers.
 5. **Kuidas taotlust esitada?** — `<Tabs>`:
-   - **Ühistu kaudu** (default): Steps 1) Jäta kontakt siin lehel või kirjuta metsauhistu@eametsad.ee → 2) Konsultant kontrollib kõlblikkuse ja pindalad → 3) Ühistu koostab ja esitab e-PRIAs ühistaotluse liikmete eest → 4) Teavitame otsusest ja abistame aruandluses.
+   - **Ühistu kaudu** (default): Steps 1) Jäta kontakt siin lehel või kirjuta metsauhistu@erametsad.ee → 2) Konsultant kontrollib kõlblikkuse ja pindalad → 3) Ühistu koostab ja esitab e-PRIAs ühistaotluse liikmete eest → 4) Teavitame otsusest ja abistame aruandluses.
    - **e-PRIA ise**: Steps 1) Logi sisse e-PRIA → 2) "Esita taotlus KIK-ile → <programmi menüütee>" → 3) Laadi alla Exceli impordimall (external link, tracked) → 4) Esita enne tähtaega.
 6. **Teenustasu** — stat block: **7%** saadud toetusest; note: rakendub ühistaotluse puhul; e-PRIA iseesitamisel tasuta nõustame liikmeid.
-7. **Taotluse esitamine** (email workflow) — numbered list: 1) Täida taotlusvorm (link, Media) ja saada metsauhistu@eametsad.ee; 2) pärast tööde lõppu saada samale aadressile tööde aruanne + kuludokumendid. Plus dokumentide checklist (Checkbox visual list): metsateatis, takseerandmed, krundi andmed, arved.
+7. **Taotluse esitamine** (email workflow) — numbered list: 1) Täida taotlusvorm (link, Media) ja saada metsauhistu@erametsad.ee; 2) pärast tööde lõppu saada samale aadressile tööde aruanne + kuludokumendid. Plus dokumentide checklist (Checkbox visual list): metsateatis, takseerandmed, krundi andmed, arved.
 8. **Seotud toetused** — up to 3 Cards: same `parentProgram` siblings first, else nearest deadlines; links.
 9. **`<ContactBand>`**.
 

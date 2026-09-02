@@ -68,7 +68,7 @@ Omanik, kes peab enne raiet esitama metsateatise metsaportaalis register.metsad.
 - H1: "Metsateatise esitamine metsaportaalis" · "Samm-sammult koos piltidega" · "Vajad abi metsateatise täitmisel?" · "Helista — täidame teatise koos läbi." · külgriba pealkiri "Vaata lisa".
 
 ## SEO & analytics
-- Title: "Metsateatise esitamine — juhend piltidega | Eametsad"; desc: "metsateatis, register.metsad.ee, metsaportaal, raieluba, kuidas esitada".
+- Title: "Metsateatise esitamine — juhend piltidega | Erametsad"; desc: "metsateatis, register.metsad.ee, metsaportaal, raieluba, kuidas esitada".
 - JSON-LD: `HowTo` (8 sammu, iga sammuga `HowToImage`) + `BreadcrumbList`. — tugev rich-result võimalus.
 - Sündmused: `tutorial_step_view{step_index}`, `screenshot_zoom{step_index}`, `tab_switch{tab}`, `phone_band_click`, `sidebar_link_click{target}`, `lead_form_submit_start/complete`, `outbound_click{register.metsad.ee}`.
 

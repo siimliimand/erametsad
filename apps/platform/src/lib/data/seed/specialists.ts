@@ -30,7 +30,7 @@ const SPECIALISTS: {
     slug: 'mari-maasikas',
     role: 'metsaspetsialist',
     phone: '+372 5000 0001',
-    email: 'mari.maasikas@eametsad.ee',
+    email: 'mari.maasikas@erametsad.ee',
     bio: makeRichText(
       'Mari on kogenud metsaspetsialist, kes on spetsialiseerunud metsade hindamisele ja majandamisele. Tal on üle 15 aasta kogemust Eesti metsanduses.',
     ),
@@ -43,7 +43,7 @@ const SPECIALISTS: {
     slug: 'jaan-janes',
     role: 'metsakonsultant',
     phone: '+372 5000 0002',
-    email: 'jaan.janes@eametsad.ee',
+    email: 'jaan.janes@erametsad.ee',
     bio: makeRichText(
       'Jaan pakub professionaalset metsakonsultatsiooni ja nõustab metsaomanikke säästva metsamajanduse küsimustes.',
     ),
@@ -56,7 +56,7 @@ const SPECIALISTS: {
     slug: 'kati-karu',
     role: 'metsaspetsialist',
     phone: '+372 5000 0003',
-    email: 'kati.karu@eametsad.ee',
+    email: 'kati.karu@erametsad.ee',
     bio: makeRichText(
       'Kati on spetsialiseerunud looduskaitseliste metsade hindamisele ja metsaökosüsteemide uuringutele.',
     ),
@@ -69,7 +69,7 @@ const SPECIALISTS: {
     slug: 'peeter-poder',
     role: 'metsakonsultant',
     phone: '+372 5000 0004',
-    email: 'peeter.poder@eametsad.ee',
+    email: 'peeter.poder@erametsad.ee',
     bio: makeRichText(
       'Peeter on pikaajalise kogemusega metsakonsultant, kes abistab metsaoksjonite ettevalmistamisel ja läbiviimisel.',
     ),
@@ -82,7 +82,7 @@ const SPECIALISTS: {
     slug: 'liisa-looke',
     role: 'metsaspetsialist',
     phone: '+372 5000 0005',
-    email: 'liisa.looke@eametsad.ee',
+    email: 'liisa.looke@erametsad.ee',
     bio: makeRichText(
       'Liisa tegeleb metsade inventeerimise ja kasutusõiguse hindamisega, pakkudes metsaomanikele parimaid lahendusi.',
     ),
@@ -95,7 +95,7 @@ const SPECIALISTS: {
     slug: 'tonu-tamm',
     role: 'metsaspetsialist',
     phone: '+372 5000 0006',
-    email: 'tonu.tamm@eametsad.ee',
+    email: 'tonu.tamm@erametsad.ee',
     bio: makeRichText(
       'Tõnu on metsandusekspert, kes on juhtinud arvukalt metsaoksjoneid ja nõustanud nii ostjaid kui müüjaid.',
     ),

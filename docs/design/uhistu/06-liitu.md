@@ -3,7 +3,7 @@
 > **In brief:** Benefits of joining and the free membership form.
 | Area | uhistu |
 |---|---|
-| **Route** | `metsauhistu.eametsad.ee/liitu` |
+| **Route** | `metsauhistu.erametsad.ee/liitu` |
 | **Access** | public |
 | **In nav** | subsite header CTA button "Liitu"; hero form success link; detail-page form |
 
@@ -38,7 +38,7 @@ Mobile: benefits collapse into 2-col checklist grid then form; form gets sticky 
 
 ## Block-by-block spec
 1. **Header** — H1 + amber-tinted info banner: joining and membership are **free**; ühistu teenib teenustasudega (link to /toetused §Teenustasu), mitte liikmemaksuga.
-2. **Miks liituda** — 11-item benefits list (own draft, based on research §5): 1 Koolitused ja isiklik nõustamine; 2 Metsatoetuste taotlemine ühistaotlusega; 3 Raieõiguste oksjonikeskkond; 4 Metsakinnistute enampakkumised; 5 Metsauuendus- ja istutustööd korraldatult; 6 Maapinna ettevalmistus; 7 Noorendike ja metsataimede hooldus; 8 Metsavara kaitsmine ulukite ja kahjustuste eest; 9 Õigusabi metsaomamisega seotud vaidlustes; 10 Metsanduslik seadusnõustamine; 11 Abi metsatulude deklareerimisel. Items 3–4 cross-link to oksjonid.eametsad.ee; others anchor /teenused or /toetused.
+2. **Miks liituda** — 11-item benefits list (own draft, based on research §5): 1 Koolitused ja isiklik nõustamine; 2 Metsatoetuste taotlemine ühistaotlusega; 3 Raieõiguste oksjonikeskkond; 4 Metsakinnistute enampakkumised; 5 Metsauuendus- ja istutustööd korraldatult; 6 Maapinna ettevalmistus; 7 Noorendike ja metsataimede hooldus; 8 Metsavara kaitsmine ulukite ja kahjustuste eest; 9 Õigusabi metsaomamisega seotud vaidlustes; 10 Metsanduslik seadusnõustamine; 11 Abi metsatulude deklareerimisel. Items 3–4 cross-link to oksjonid.erametsad.ee; others anchor /teenused or /toetused.
 3. **Join form** (`form_name=liitu`) — fields with inline validation: nimi\* (text), isikukood\* (EE format checksum + clear error text), elukoht/postiaadress\* (text), telefon\* (tel, EE/LT/LV prefixes accepted), e-post\* (email), ConsentCheck\*: "Olen nõus, et Erametsad Metsaühistu MTÜ töötleb minu andmeid liitumistaotluse läbiviimiseks ja võtab minuga ühendust." — **visible, unchecked, required; no hidden pre-checked box** (explicit fix of the reference's GDPR flaw; the reference also misnamed the data controller). Below submit: link to põhikiri PDF (`LegalDocument`, new tab) + privaatsuspoliitika anchor. → `POST /api/leads`.
 4. **Mis edasi saab?** — `Steps`: 1) Võtame 1 tööpäeva jooksul ühendust → 2) Kinnitame liikmelisuse ja saadame põhikirja tingimused → 3) Koostame sinu metsa tegevuskava ja toetuste kalendri → 4) Vajadusel ühineks kohe esimese toetusvooruga.
 5. **`<ContactBand>`**.

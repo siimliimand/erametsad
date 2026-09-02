@@ -8,13 +8,13 @@ import { logoutAction } from '@/app/(portal)/_actions/logout'
 import type { PortalAuthState } from '@/app/(portal)/_lib/session'
 
 const marketingLinks = [
-  { label: 'Metsa müümine', href: 'https://eametsad.ee' },
-  { label: 'Raieõiguse müümine', href: 'https://eametsad.ee' },
-  { label: 'Kinnistu müük', href: 'https://eametsad.ee' },
-  { label: 'Päringud', href: 'https://eametsad.ee' },
-  { label: 'Hindamisaktid', href: 'https://eametsad.ee' },
-  { label: 'Metsateatis', href: 'https://eametsad.ee' },
-  { label: 'Metsaspetsialistid', href: 'https://eametsad.ee' },
+  { label: 'Metsa müümine', href: 'https://erametsad.ee' },
+  { label: 'Raieõiguse müümine', href: 'https://erametsad.ee' },
+  { label: 'Kinnistu müük', href: 'https://erametsad.ee' },
+  { label: 'Päringud', href: 'https://erametsad.ee' },
+  { label: 'Hindamisaktid', href: 'https://erametsad.ee' },
+  { label: 'Metsateatis', href: 'https://erametsad.ee' },
+  { label: 'Metsaspetsialistid', href: 'https://erametsad.ee' },
 ]
 
 const portalLinks = [
@@ -45,7 +45,7 @@ export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
       <div className="mx-auto w-full max-w-container-xl px-md md:px-lg">
         <div className="flex items-center gap-md py-sm">
           <Link href="/" className="flex flex-col leading-tight">
-            <span className="font-heading text-h4 font-extrabold text-primaryDark">Eametsad</span>
+            <span className="font-heading text-h4 font-extrabold text-primaryDark">Erametsad</span>
             <span className="text-label text-inkMuted">Oksjonid</span>
           </Link>
           <nav

@@ -8,7 +8,7 @@
 | **In nav** | sidebar "Juhtlõimed" |
 
 ## Purpose & user goals
-Work marketing form submissions (all eametsad.ee lead forms + newsletter indirectly) through a pipeline to contracts: triage new leads, assign specialists, track notes and next actions, respect SLA and consent records.
+Work marketing form submissions (all erametsad.ee lead forms + newsletter indirectly) through a pipeline to contracts: triage new leads, assign specialists, track notes and next actions, respect SLA and consent records.
 
 ## Wireframe (desktop)
 ```

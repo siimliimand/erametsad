@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 export const metadata = buildMetadata({
   title: 'Meist',
   description:
-    'Eametsad OÜ – kogemus, metsaspetsialistid ja läbipaistvad metsaoksjonid. Registriandmed, missioon ja kontaktid ühes kohas.',
+    'Erametsad OÜ – kogemus, metsaspetsialistid ja läbipaistvad metsaoksjonid. Registriandmed, missioon ja kontaktid ühes kohas.',
   path: '/meist',
 })
 

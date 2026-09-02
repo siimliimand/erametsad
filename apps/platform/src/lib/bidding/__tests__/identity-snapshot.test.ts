@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 
 import { parseIdentitySnapshot } from '../identity-snapshot'
 
-// Valid checksum codes reused from the @eametsad/types validator tests.
+// Valid checksum codes reused from the @erametsad/types validator tests.
 const PRIVATE_SNAPSHOT = JSON.stringify({
   name: 'Mari Maasikas',
   isikukood: '30000000003',

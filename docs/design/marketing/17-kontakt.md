@@ -34,7 +34,7 @@ Küsimusega või hooldusprobleemiga tulnud kasutaja leiab ettevõtte andmed, spe
 1. **Hero** — H1 (draft) "Võta ühendust"; intro: "Kirjuta või helista — vastame 1 tööpäeva jooksul."
 2. **Ettevõtte plokk (vasak)** — sama `Card` komponent mis 13-meist plokis 2 (juriidiline nimi, registrikood, KMKR, aadress, telefon, e-mail; andmed CMS globaalsest seadistusest — üks allikas). Täiendus: kaks otsecentral numbrit (kohatäited): **Müük ja konsultatsioon** `[+372 XXX XXXX]` (tel:) ning **Üldine / tehniline abi** `[+372 XXX XXXX]`.
 3. **Spetsialistide mini-rida** — 3 `SpecialistCard` (mini: foto, nimi, telefon) → `/meist/metsaspetsialistid`. Draft-lõik: "Ei tea, kelle poole pöörduda? Helista üldnumbrile — suuname õige inimese juurde."
-4. **LeadForm #1** (`kontakt-1`, `#kontaktvorm`) — täis LeadForm (vt 00). All väike tekst: press ja koostöö → `press@eametsad.ee` (kohatäide).
+4. **LeadForm #1** (`kontakt-1`, `#kontaktvorm`) — täis LeadForm (vt 00). All väike tekst: press ja koostöö → `press@erametsad.ee` (kohatäide).
 5. **Kaardiplokk** — `MapEstonia` (Leaflet + Maa-ameti ortofoto/WMS, vt README): üks kontorimarker; juhtnupud: klõps markerile → infoaken (aadress, link Maa-ameti kaardile ja Google Mapsi → `target=_blank rel=noopener`). Kaardil `loading="lazy"`, ei laadi kuni vaatevälja jõudmiseni (jõudlus). Interaktiivne kaart ei ole mobiilis lukus (üks sõrm puutetundlik).
 6. **ContactBand** — siin lehel sama sisu, aga CTA-link `#kontaktvorm` (ei välju lehelt).
 
@@ -47,7 +47,7 @@ Küsimusega või hooldusprobleemiga tulnud kasutaja leiab ettevõtte andmed, spe
 - Ettevõtte andmed: CMS `Settings` globaalne (sama mis 13/16).
 - Spetsialistid: `GET /api/specialists?limit=3&featured=true`.
 - Vorm: `POST /api/leads`, `form_name=kontakt-1` — CRM-is markeeritud kanal "kontakt" (vt admin/09).
-- Kaart: Leaflet + LMV WMS (vt EAMETSAD-PLAN §10 — soovitus Leaflet + Maa-amet, Google fallback).
+- Kaart: Leaflet + LMV WMS (vt ERAMETSAD-PLAN §10 — soovitus Leaflet + Maa-amet, Google fallback).
 
 ## States
 - Vormi edu: `Toast` + `EmptyState` edu ("Aitäh! Võtame ühendust 1 tööpäeva jooksul.") — vormi ei näidata uuesti (v.a "Saada veel" link).
@@ -58,7 +58,7 @@ Küsimusega või hooldusprobleemiga tulnud kasutaja leiab ettevõtte andmed, spe
 - H1: "Võta ühendust" · "Vastame 1 tööpäeva jooksul." · "Müük ja konsultatsioon" · "Üldine ja tehniline abi" · "Ei tea, kelle poole pöörduda?" · "Press ja koostöö" · kaardi lingid: "Vaata Google Mapsis", "Ava Maa-ameti kaardil".
 
 ## SEO & analytics
-- Title: "Kontakt | Eametsad"; desc: telefon, e-mail, aadress (NAP konsistents jalusega).
+- Title: "Kontakt | Erametsad"; desc: telefon, e-mail, aadress (NAP konsistents jalusega).
 - JSON-LD: `Organization` (kontaktPunkt: Müük, Teenindus; `ContactPoint` telefonid) — see on lehe peamine rikastus.
 - Sündmused: `lead_form_submit_start/complete`, `phone_click{sales|general}`, `email_click`, `specialist_mini_click{name}`, `map_marker_click`, `map_outbound_click{google|maaamet}`.
 

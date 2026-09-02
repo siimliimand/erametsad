@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, FormInput } from '@eametsad/ui'
+import { Btn, FormInput } from '@erametsad/ui'
 import { useEffect, useRef, useState } from 'react'
 
 import { ControlCodeScreen } from '../../login/_components/ControlCodeScreen'

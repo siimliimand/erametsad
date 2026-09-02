@@ -65,7 +65,7 @@ export function buildServiceJsonLd(
     areaServed: 'Eesti',
     provider: {
       '@type': 'Organization',
-      name: 'Eametsad',
+      name: 'Erametsad',
       url: marketingUrl('/'),
     },
     ...(input.url ? { url: input.url } : {}),
@@ -188,7 +188,7 @@ export function buildArticleJsonLd(
     mainEntityOfPage: marketingUrl(input.path),
     publisher: {
       '@type': 'Organization',
-      name: 'Eametsad',
+      name: 'Erametsad',
       url: marketingUrl('/'),
     },
   }

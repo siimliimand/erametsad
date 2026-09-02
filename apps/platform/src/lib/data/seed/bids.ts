@@ -8,9 +8,9 @@ const OBJECT_TYPES = ['raieoigus', 'kinnistu', 'kiire', 'pakett'] as const
 // the isikukood values seeded in users.ts so the ceremony shows the demo
 // identities after decryption.
 const ISIKUKOOD_BY_EMAIL: Record<string, string> = {
-  'guest@eametsad.ee': '10000000001',
-  'private@eametsad.ee': '10000000002',
-  'company@eametsad.ee': '10000000003',
+  'guest@erametsad.ee': '10000000001',
+  'private@erametsad.ee': '10000000002',
+  'company@erametsad.ee': '10000000003',
 }
 
 async function seedAuctionRights(
@@ -165,10 +165,10 @@ export async function seedBids(repos: CoreRepositories): Promise<void> {
   if (users.length === 0) throw new Error('No users found. Run seedUsers first.')
 
   const userByEmail = new Map(users.map((u) => [u.email, u] as const))
-  const privateUser = userByEmail.get('private@eametsad.ee')
-  const companyUser = userByEmail.get('company@eametsad.ee')
-  const guestUser = userByEmail.get('guest@eametsad.ee')
-  const superadminUser = userByEmail.get('superadmin@eametsad.ee')
+  const privateUser = userByEmail.get('private@erametsad.ee')
+  const companyUser = userByEmail.get('company@erametsad.ee')
+  const guestUser = userByEmail.get('guest@erametsad.ee')
+  const superadminUser = userByEmail.get('superadmin@erametsad.ee')
   if (!privateUser || !companyUser || !guestUser || !superadminUser) {
     throw new Error('Required seed users not found (private, company, guest, superadmin)')
   }

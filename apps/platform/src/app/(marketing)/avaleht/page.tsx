@@ -1,4 +1,4 @@
-import { Card, LeadForm, SpecialistCard, Testimonial, ArticleCard } from '@eametsad/ui';
+import { Card, LeadForm, SpecialistCard, Testimonial, ArticleCard } from '@erametsad/ui';
 import { BadgeCheck, ClipboardList, Gavel } from 'lucide-react';
 import Link from 'next/link';
 
@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic'
 // The default host rewrites '/' to this route (see host-areas.ts), so the
 // canonical URL is the site root, not '/avaleht'.
 export const metadata = buildMetadata({
-  title: 'Eametsad — metsa ja raieõiguse müük oksjonil',
+  title: 'Erametsad — metsa ja raieõiguse müük oksjonil',
   description:
     'Metsa müük oksjonil: müü raieõigus või metsakinnistu läbipaistval metsaoksjonil, kus konkureerivad pakkumised tagavad turuhinna. Tasuta konsultatsioon.',
   path: '/',
@@ -301,7 +301,7 @@ export default async function AvalehtPage() {
   ])
 
   const organizationJsonLd = buildOrganizationJsonLd({
-    name: settings?.orgName ?? 'Eametsad',
+    name: settings?.orgName ?? 'Erametsad',
     url: marketingUrl('/'),
     address: settings?.orgAddress ?? null,
     sameAs: SOCIAL_LINKS.flatMap((social) => (social.href ? [social.href] : [])),

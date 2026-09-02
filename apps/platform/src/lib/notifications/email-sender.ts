@@ -29,7 +29,7 @@ const UNSUBSCRIBE_MAILBOX = 'unsubscribe@erametsad.ww0.dev'
 
 /**
  * GDPR requires a working opt-out on direct-marketing email; purely
- * transactional mail is exempt. Every template in @eametsad/emails
+ * transactional mail is exempt. Every template in @erametsad/emails
  * (bid-placed, outbid, auction-won, auction-ended, contract-ready) is
  * transactional, so nothing sends these headers today. Any future
  * marketing template must pass `headers: marketingEmailHeaders()`.

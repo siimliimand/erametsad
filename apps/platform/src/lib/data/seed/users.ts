@@ -23,7 +23,7 @@ const DEMO_USERS: {
   }
 }[] = [
   {
-    email: 'guest@eametsad.ee',
+    email: 'guest@erametsad.ee',
     name: 'Külaline Kasutaja',
     role: 'guest',
     isikukood: '10000000001',
@@ -31,7 +31,7 @@ const DEMO_USERS: {
     authMethod: 'password',
   },
   {
-    email: 'private@eametsad.ee',
+    email: 'private@erametsad.ee',
     name: 'Eraklient Erika',
     role: 'private',
     isikukood: '10000000002',
@@ -43,7 +43,7 @@ const DEMO_USERS: {
     },
   },
   {
-    email: 'company@eametsad.ee',
+    email: 'company@erametsad.ee',
     name: 'Firma Esindaja',
     role: 'company',
     isikukood: '10000000003',
@@ -58,7 +58,7 @@ const DEMO_USERS: {
     },
   },
   {
-    email: 'seller@eametsad.ee',
+    email: 'seller@erametsad.ee',
     name: 'Müüja Malle',
     role: 'seller',
     isikukood: '10000000004',
@@ -66,7 +66,7 @@ const DEMO_USERS: {
     authMethod: 'password',
   },
   {
-    email: 'specialist@eametsad.ee',
+    email: 'specialist@erametsad.ee',
     name: 'Spetsialist Siim',
     role: 'specialist',
     isikukood: '10000000005',
@@ -74,7 +74,7 @@ const DEMO_USERS: {
     authMethod: 'password',
   },
   {
-    email: 'specialist2@eametsad.ee',
+    email: 'specialist2@erametsad.ee',
     name: 'Spetsialist Sirje',
     role: 'specialist',
     isikukood: '10000000006',
@@ -82,7 +82,7 @@ const DEMO_USERS: {
     authMethod: 'password',
   },
   {
-    email: 'admin@eametsad.ee',
+    email: 'admin@erametsad.ee',
     name: 'Admin Aare',
     role: 'admin',
     isikukood: '10000000007',
@@ -90,7 +90,7 @@ const DEMO_USERS: {
     authMethod: 'password',
   },
   {
-    email: 'superadmin@eametsad.ee',
+    email: 'superadmin@erametsad.ee',
     name: 'Superadmin Sander',
     role: 'superadmin',
     isikukood: '10000000008',

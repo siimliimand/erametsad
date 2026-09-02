@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn } from '@eametsad/ui'
+import { Btn } from '@erametsad/ui'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 

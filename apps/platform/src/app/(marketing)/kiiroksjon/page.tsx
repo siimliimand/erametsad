@@ -1,4 +1,4 @@
-import { LeadForm } from '@eametsad/ui'
+import { LeadForm } from '@erametsad/ui'
 import {
   Check,
   FileSignature,
@@ -45,7 +45,7 @@ const PROCESS_STEPS: ProcessStep[] = [
   {
     title: 'Sõlmime salajase piirhinna',
     description:
-      'Sinu ja Eametsadi vahel kokkulepitud minimaalne aktsepteeritav hind, mis jääb ostjatele nähtamatuks.',
+      'Sinu ja Erametsadi vahel kokkulepitud minimaalne aktsepteeritav hind, mis jääb ostjatele nähtamatuks.',
     icon: Lock,
   },
   {
@@ -63,7 +63,7 @@ const PROCESS_STEPS: ProcessStep[] = [
   {
     title: 'Garanteeritud varupakkumine',
     description:
-      'Kui pakkumisi piirhinnani ei jõua, teeb Eametsad OÜ ise ostupakkumise. Varupakkumine on kohustuslik tagatis.',
+      'Kui pakkumisi piirhinnani ei jõua, teeb Erametsad OÜ ise ostupakkumise. Varupakkumine on kohustuslik tagatis.',
     icon: ShieldCheck,
     emphasized: true,
   },

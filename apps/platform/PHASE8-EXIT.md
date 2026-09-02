@@ -2,15 +2,15 @@
 
 **Date:** 2026-08-30
 **Branch:** feature/option-b-cloudflare-only
-**Worker:** `https://eametsad-api.siim-liimand.workers.dev`
+**Worker:** `https://erametsad-api.siim-liimand.workers.dev`
 
 ## Evidence Table
 
 | # | Test | Endpoint | HTTP | Detail | Status |
 |---|------|----------|------|--------|--------|
 | 1 | Health check | `GET /api/health` | 200 | `{"status":"ok","env":"production"}` | PASS |
-| 2 | Login (admin) | `POST /api/v1/auth/login` | 200 | admin@eametsad.ee, role=admin, cookies set | PASS |
-| 3 | Login (private) | `POST /api/v1/auth/login` | 200 | private@eametsad.ee, role=private, cookies set | PASS |
+| 2 | Login (admin) | `POST /api/v1/auth/login` | 200 | admin@erametsad.ee, role=admin, cookies set | PASS |
+| 3 | Login (private) | `POST /api/v1/auth/login` | 200 | private@erametsad.ee, role=private, cookies set | PASS |
 | 4 | Token refresh | `POST /api/v1/auth/refresh` | 200 | New access_token issued | PASS |
 | 5 | Admin auctions list | `GET /admin/auctions` | 200 | 25 auctions listed (5 active, 5 ended, etc.) | PASS |
 | 6 | Admin auction detail | `GET /admin/auctions/{id}` | 200 | Full detail: prices, bids, dates, status | PASS |

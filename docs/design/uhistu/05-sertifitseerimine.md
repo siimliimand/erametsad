@@ -3,7 +3,7 @@
 > **In brief:** The PEFC certification document library.
 | Area | uhistu |
 |---|---|
-| **Route** | `metsauhistu.eametsad.ee/sertifitseerimine` |
+| **Route** | `metsauhistu.erametsad.ee/sertifitseerimine` |
 | **Access** | public |
 | **In nav** | subsite header "Sertifitseerimine" |
 

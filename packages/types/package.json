@@ -1,5 +1,5 @@
 {
-  "name": "@eametsad/types",
+  "name": "@erametsad/types",
   "version": "0.1.0",
   "private": true,
   "main": "./src/index.ts",
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@eametsad/config": "workspace:*",
+    "@erametsad/config": "workspace:*",
     "vitest": "^3.2.0"
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Btn, FormInput, Toast } from '@eametsad/ui';
+import { Btn, FormInput, Toast } from '@erametsad/ui';
 import { useState, type SyntheticEvent } from 'react';
 
 export interface NewsletterBlockProps {

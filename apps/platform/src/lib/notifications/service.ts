@@ -4,7 +4,7 @@ import {
   auctionWonTemplate,
   auctionEndedTemplate,
   contractReadyTemplate,
-} from '@eametsad/emails'
+} from '@erametsad/emails'
 
 import { sendEmail, type SendResult } from './email-sender'
 import { type DomainEvent, type DomainEventType, type EventBus } from './event-bus'

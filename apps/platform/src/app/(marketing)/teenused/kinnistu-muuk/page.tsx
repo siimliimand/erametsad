@@ -1,4 +1,4 @@
-import { LeadForm } from '@eametsad/ui'
+import { LeadForm } from '@erametsad/ui'
 import {
   Check,
   Coins,
@@ -123,7 +123,7 @@ const PROCESS_GROUPS: ProcessStepGroup[] = [
         title: 'Jälgime tehingu lõpuni',
         description: [
           'Jälgime, et kanded, maksmine ja kinnistu üleandmine peavad kinni lepingust.',
-          'Eametsad vastutab protsessi korrektsuse eest kuni tehingu lõpuni.',
+          'Erametsad vastutab protsessi korrektsuse eest kuni tehingu lõpuni.',
         ],
       },
     ],

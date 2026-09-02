@@ -40,11 +40,11 @@
 ## 7. Realtime & notifications
 
 - [x] 7.1 Emit all public SSE events: `bid:created` on accepted bids (anonymised), `auction:extended` on anti-snipe, `auction:published` on activation; my-stream `outbid`/`notification` pushes to the affected user <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/realtime/auction-stream.ts, apps/platform/src/lib/realtime/my-stream.ts, apps/platform/src/lib/bidding/anti-snipe.ts] -->
-- [x] 7.2 Notification dispatch: all emitted events carry userId; dispatcher started at bootstrap; email via Mailpit SMTP using nodemailer and `@eametsad/emails` templates; per-user+event dedupe; SMS stays a stub <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/notifications/service.ts, apps/platform/src/lib/notifications/event-bus.ts, packages/emails/src/index.ts, apps/platform/package.json] -->
+- [x] 7.2 Notification dispatch: all emitted events carry userId; dispatcher started at bootstrap; email via Mailpit SMTP using nodemailer and `@erametsad/emails` templates; per-user+event dedupe; SMS stays a stub <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/notifications/service.ts, apps/platform/src/lib/notifications/event-bus.ts, packages/emails/src/index.ts, apps/platform/package.json] -->
 
 ## 8. Forms & stats
 
-- [x] 8.1 Leads endpoint: 5/min/IP limiter, required-field validation with `@eametsad/types` validators (EE phone, email), no error leakage <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/api/leads/route.ts, apps/platform/src/lib/leads/ingestion.ts] -->
+- [x] 8.1 Leads endpoint: 5/min/IP limiter, required-field validation with `@erametsad/types` validators (EE phone, email), no error leakage <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/api/leads/route.ts, apps/platform/src/lib/leads/ingestion.ts] -->
 - [x] 8.2 Sealed completion backfills the statistics snapshot `eur` from the published finalPrice <!-- agent: fullstack-engineer.build, depends_on: [4.3], touches: [apps/platform/src/lib/bidding/sealed-opening.ts, apps/platform/src/lib/stats/aggregation.ts] -->
 
 ## 9. Seed, docs, verification

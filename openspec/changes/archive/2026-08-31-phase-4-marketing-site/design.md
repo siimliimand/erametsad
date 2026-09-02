@@ -71,7 +71,7 @@ client refresh (ticker 60s) or ISR (statistics 24h).
 
 ### D4: One consent cookie, one server log
 
-`eametsad_consent` (12 months) is the single client-side source of truth;
+`erametsad_consent` (12 months) is the single client-side source of truth;
 `use-consent.ts` reads it and gates analytics loading and `track()`. Every
 decision POSTs to `/api/v1/consent`, which appends to `consent_log` with a
 salted ip_hash. The `cookie_consent` event posts regardless of the

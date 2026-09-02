@@ -17,9 +17,9 @@ Resources that match the design doc, verified by API:
 
 | Resource     | Value                                           | Verified with                                      |
 | ------------ | ----------------------------------------------- | -------------------------------------------------- |
-| Queue        | `eametsad-jobs`                                 | `GET /accounts/{account_id}/queues`                |
+| Queue        | `erametsad-jobs`                                 | `GET /accounts/{account_id}/queues`                |
 | KV namespace | `5b67cd2c595f4d31b3b1be5db76e9bef` (title `KV`) | `GET /accounts/{account_id}/storage/kv/namespaces` |
-| R2 buckets   | `eametsad-media`, `eametsad-media-preview`      | `GET /accounts/{account_id}/r2/buckets`            |
+| R2 buckets   | `erametsad-media`, `erametsad-media-preview`      | `GET /accounts/{account_id}/r2/buckets`            |
 
 Zones the token can see (`GET /zones`): `pagepocket.app`, `painsignal.app`, `seoweb.ee`, `ww0.dev`. All are active. `erametsad.ee` is not among them.
 
@@ -109,10 +109,10 @@ not use `erametsad.ee`. All prototype email moves to the `ww0.dev` zone.
 
 | Role | Prototype host | Production host |
 | ---- | ------------------------------ | ----------------------- |
-| Marketing | `erametsad.ww0.dev` | `eametsad.ee` |
-| Portal | `oksjonid.erametsad.ww0.dev` | `oksjonid.eametsad.ee` |
-| API | `api.erametsad.ww0.dev` | `api.eametsad.ee` |
-| Admin | `admin.erametsad.ww0.dev` | `admin.eametsad.ee` |
+| Marketing | `erametsad.ww0.dev` | `erametsad.ee` |
+| Portal | `oksjonid.erametsad.ww0.dev` | `oksjonid.erametsad.ee` |
+| API | `api.erametsad.ww0.dev` | `api.erametsad.ee` |
+| Admin | `admin.erametsad.ww0.dev` | `admin.erametsad.ee` |
 
 No placeholder DNS records were created for these web hostnames. Workers
 custom domains attach at deploy time. A pre-existing record on the same name

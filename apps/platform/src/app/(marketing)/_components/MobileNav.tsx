@@ -1,6 +1,6 @@
 'use client'
 
-import { Accordion, Drawer } from '@eametsad/ui'
+import { Accordion, Drawer } from '@erametsad/ui'
 import { ExternalLink, Menu } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'

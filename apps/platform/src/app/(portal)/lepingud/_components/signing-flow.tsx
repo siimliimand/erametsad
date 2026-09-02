@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, FormCheck, FormInput, Steps, type StepItem } from '@eametsad/ui'
+import { Btn, FormCheck, FormInput, Steps, type StepItem } from '@erametsad/ui'
 import Link from 'next/link'
 import { useState } from 'react'
 

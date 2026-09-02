@@ -1,4 +1,4 @@
-import { Accordion } from '@eametsad/ui'
+import { Accordion } from '@erametsad/ui'
 import Link from 'next/link'
 import type { ReactElement, SVGProps } from 'react'
 

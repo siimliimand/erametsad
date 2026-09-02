@@ -186,7 +186,7 @@ export async function seedCms(repos: CoreRepositories): Promise<void> {
     { question: 'Kas Erametsad töötab mobiilis?', answer: 'Jah, Erametsad on täielikult mobiilisõbralik ja töötab suurepäraselt nii nutitelefonis kui tahvelarvutis.', categorySlug: 'tehniline', order: 2, slug: 'mobiil' },
     { question: 'Kuidas eID autentimine töötab?', answer: 'eID autentimine toimub Smart-ID, Mobile-ID või ID-kaardi abil. Vali sisselogimisel sobiv viis ja järgi ekraanil kuvatavaid juhiseid.', categorySlug: 'tehniline', order: 3, slug: 'eid' },
 
-    { question: 'Kuidas võtta ühendust klienditoega?', answer: 'Klienditoega saab ühendust e-posti teel info@eametsad.ee või telefoni teel +372 6000 000.', categorySlug: 'kontakt', order: 1, slug: 'klienditugi' },
+    { question: 'Kuidas võtta ühendust klienditoega?', answer: 'Klienditoega saab ühendust e-posti teel info@erametsad.ee või telefoni teel +372 6000 000.', categorySlug: 'kontakt', order: 1, slug: 'klienditugi' },
     { question: 'Kus asub teie kontor?', answer: 'Meie kontor asub Tallinnas, aadressil Toompuiestee 35, 10149 Tallinn.', categorySlug: 'kontakt', order: 2, slug: 'kontori-aadress' },
     { question: 'Millal on klienditugi avatud?', answer: 'Klienditugi on avatud E-R 9:00-17:00. Kiireloomulistes küsimustes võta ühendust e-posti teel.', categorySlug: 'kontakt', order: 3, slug: 'tooaeg' },
   ]

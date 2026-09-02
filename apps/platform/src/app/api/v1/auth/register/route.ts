@@ -1,4 +1,4 @@
-import { EEIsikukood, EEPhone } from '@eametsad/types'
+import { EEIsikukood, EEPhone } from '@erametsad/types'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 

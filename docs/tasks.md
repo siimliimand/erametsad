@@ -1,10 +1,10 @@
-# Eametsad — Prototype Implementation Task List
+# Erametsad — Prototype Implementation Task List
 
-> Detailed, ordered todo list for building the **first working prototype** of the Eametsad platform:
+> Detailed, ordered todo list for building the **first working prototype** of the Erametsad platform:
 > marketing site + auction portal + admin backend, with external integrations mocked.
 >
 > - Version: 0.1 · Created: 2026-08-27
-> - Sources: [EAMETSAD-PLAN.md](EAMETSAD-PLAN.md) · [design/README.md](design/README.md) (design system + page index) · all page specs in `design/{marketing,portal,admin,uhistu}/`
+> - Sources: [ERAMETSAD-PLAN.md](ERAMETSAD-PLAN.md) · [design/README.md](design/README.md) (design system + page index) · all page specs in `design/{marketing,portal,admin,uhistu}/`
 > - Working language of this file: English (Estonian kept for domain labels), same convention as the rest of `docs/`.
 
 **How to use this file**
@@ -55,7 +55,7 @@ A demoable, seeded, resettable system that proves the **full end-to-end story**:
 | DB production | Neon serverless Postgres via HTTP (`@neondatabase/serverless`) | Managed PostgreSQL |
 | Queue / cache prod | Cloudflare Queues + KV (native Workers platform, no Redis needed in prototype) | Upstash Redis or self-hosted (post-prototype) |
 | Media storage | Cloudflare R2 (S3‑compatible, free tier) | Same (production‑grade) |
-| Hosting | Cloudflare Pages + Workers via `@cloudflare/next-on-pages` (single deploy, path-prefixed areas) | Subdomain split: `eametsad.ee` / `oksjonid.` / `api.` / `admin.` |
+| Hosting | Cloudflare Pages + Workers via `@cloudflare/next-on-pages` (single deploy, path-prefixed areas) | Subdomain split: `erametsad.ee` / `oksjonid.` / `api.` / `admin.` |
 
 ### 1.4 Out of scope for the prototype (tracked as **[L]**)
 
@@ -311,7 +311,7 @@ Specs: [design/portal/](design/). Route prefix `/` of the portal area in the pro
 
 ---
 
-## Phase 4 — Marketing site (`eametsad.ee`)
+## Phase 4 — Marketing site (`erametsad.ee`)
 
 Specs: [design/00-global-shell.md](design/00-global-shell.md) + [design/marketing/](design/marketing/).
 

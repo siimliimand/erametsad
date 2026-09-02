@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { EEPhone } from '@eametsad/types';
+import { EEPhone } from '@erametsad/types';
 import { FormInput } from './FormInput';
 import { ConsentCheck } from './ConsentCheck';
 import { Btn } from '../Btn';

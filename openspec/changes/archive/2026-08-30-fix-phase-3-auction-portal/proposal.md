@@ -100,7 +100,7 @@ appears.
   `/contracts/framework` redirect strings in `contract-gate.ts` and
   `place-bid.ts`, county GeoJSON outlines on `MapEstonia`.
 - **Host routing**: host-aware middleware maps `oksjonid.erametsad.ww0.dev`
-  to the `(portal)` area on the existing `eametsad-api` Worker, with cookie
+  to the `(portal)` area on the existing `erametsad-api` Worker, with cookie
   domain handling; `api.` and `admin.` hostnames are documented as a
   follow-up, not built here.
 - **Docs**: Phase 3 checkboxes in `docs/tasks.md` are corrected to verified

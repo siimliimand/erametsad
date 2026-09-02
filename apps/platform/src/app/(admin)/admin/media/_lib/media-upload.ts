@@ -101,7 +101,7 @@ export interface MediaR2Bucket {
 
 declare global {
   interface CloudflareEnv {
-    /** R2 binding from wrangler.jsonc r2_buckets (eametsad-media). */
+    /** R2 binding from wrangler.jsonc r2_buckets (erametsad-media). */
     BUCKET?: MediaR2Bucket
   }
 }

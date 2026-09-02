@@ -1,1 +1,1 @@
-export { default } from '@eametsad/config/eslint.config.mjs'
+export { default } from '@erametsad/config/eslint.config.mjs'

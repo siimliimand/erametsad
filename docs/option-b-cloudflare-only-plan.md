@@ -5,7 +5,7 @@
 - Version: 0.1 (draft for decision)
 - Date: 2026-08-28
 - Status: **proposal — not yet approved for execution**
-- Companion docs: `EAMETSAD-PLAN.md` (product plan), `tasks.md` (current wave work)
+- Companion docs: `ERAMETSAD-PLAN.md` (product plan), `tasks.md` (current wave work)
 
 ---
 
@@ -200,7 +200,7 @@ Payload is abandoned wholesale under Option B — there is no supported way to r
 | Postgres | D1/SQLite rule | Notes |
 |---|---|---|
 | `numeric` money | **INTEGER cents** (`bid_amount_cents`) | Never `REAL` — floats corrupt money. Convert at API boundary. Audit every `amount` field. |
-| `enum` types | `TEXT` + `CHECK (col IN (…))` | Enum unions live in `@eametsad/types`, DB re-validates. |
+| `enum` types | `TEXT` + `CHECK (col IN (…))` | Enum unions live in `@erametsad/types`, DB re-validates. |
 | `jsonb` | `TEXT` with JSON parse in repository layer | Indexed JSON paths → denormalize columns if queried. |
 | `uuid` | `TEXT` (generated in app) | `crypto.randomUUID()` at insert time. |
 | `timestamptz` | `TEXT` ISO-8601 UTC or INTEGER epoch ms | Pick one (recommend TEXT ISO); D1 `DEFAULT CURRENT_TIMESTAMP` is UTC text. |
@@ -211,10 +211,10 @@ Payload is abandoned wholesale under Option B — there is no supported way to r
 
 | Resource | Name / ID | Status |
 |---|---|---|
-| Queue | `eametsad-jobs` | created |
+| Queue | `erametsad-jobs` | created |
 | KV namespace | id `5b67cd2c595f4d31b3b1be5db76e9bef` | created — **`wrangler.jsonc` currently has the `KV_NAMESPACE_ID` placeholder and needs this id restored** |
-| R2 bucket | `eametsad-media` | created |
-| R2 bucket | `eametsad-media-preview` | created |
+| R2 bucket | `erametsad-media` | created |
+| R2 bucket | `erametsad-media-preview` | created |
 | Email Service | — | not yet enabled (Phase 0 spike) |
 
 Under Option B the `NEON_DATABASE_URL` / `DATABASE_URL` plain-text bindings in `wrangler.jsonc` are replaced by a D1 binding.

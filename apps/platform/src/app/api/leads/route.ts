@@ -1,4 +1,4 @@
-import { validators } from '@eametsad/types'
+import { validators } from '@erametsad/types'
 import { NextResponse } from 'next/server'
 
 import { computeIpHash } from '@/lib/bidding/place-bid'

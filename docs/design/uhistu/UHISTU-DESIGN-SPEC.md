@@ -1,6 +1,6 @@
-# Eametsad Metsaühistu — Comprehensive UI/UX Design Specification for Designers
+# Erametsad Metsaühistu — Comprehensive UI/UX Design Specification for Designers
 
-> **Purpose:** This document provides a complete, screen-by-screen design specification for sketching and prototyping all pages of the **Eametsad Metsaühistu subsite** (`metsauhistu.eametsad.ee`). It details every wireframe layout, component hierarchy, form field, subsidy table, responsive breakpoint, micro-copy, and interaction state so a designer can create complete sketches in Figma, Sketch, or Penpot.
+> **Purpose:** This document provides a complete, screen-by-screen design specification for sketching and prototyping all pages of the **Erametsad Metsaühistu subsite** (`metsauhistu.erametsad.ee`). It details every wireframe layout, component hierarchy, form field, subsidy table, responsive breakpoint, micro-copy, and interaction state so a designer can create complete sketches in Figma, Sketch, or Penpot.
 
 ---
 
@@ -20,7 +20,7 @@
 
 ### 1.2 Association Brand Tokens
 
-The association shares the core aesthetic tokens of the Eametsad design system while expressing a distinct community and educational tone:
+The association shares the core aesthetic tokens of the Erametsad design system while expressing a distinct community and educational tone:
 
 | Token | Hex / Value | Usage on Metsaühistu Subsite |
 |---|---|---|
@@ -75,7 +75,7 @@ The association shares the core aesthetic tokens of the Eametsad design system w
   - `Kontakt` → `/kontakt`
   - Active item: `--primary` color with 2px bottom border indicator.
 - **Right Action Items:**
-  - External portal link: `"Oksjonikeskkond"` + `ExternalLink` icon ↗ (links to `oksjonid.eametsad.ee`, opens in new tab).
+  - External portal link: `"Oksjonikeskkond"` + `ExternalLink` icon ↗ (links to `oksjonid.erametsad.ee`, opens in new tab).
   - Primary CTA button: `[ LIITU ÜHISTUGA ]` (solid amber pill button `#F2A93B`, 40px height, links to `/liitu`).
 - **Mobile (<768px):** Hamburger menu triggers full-screen `Drawer` sliding in from right with grouped links, external auction link, and pinned "Liitu" button at the bottom.
 
@@ -87,7 +87,7 @@ The association shares the core aesthetic tokens of the Eametsad design system w
 - Light card container (`--bg-mist`), padding `40 px`, radius `12 px`.
 - 3 columns on desktop (stacked on mobile):
   1. *Telefon:* `☎ +372 XXX XXXX` (`tel:` link, icon `Phone`).
-  2. *E-post:* `✉ metsauhistu@eametsad.ee` (`mailto:` link, icon `Mail`).
+  2. *E-post:* `✉ metsauhistu@erametsad.ee` (`mailto:` link, icon `Mail`).
   3. *CTA-nupp:* `[ Jäta enda kontaktid → ]` (smooth scrolls to the page's lead form).
 
 #### 2. Association Footer (Dark Background `--primary-dark`)
@@ -96,7 +96,7 @@ The association shares the core aesthetic tokens of the Eametsad design system w
   1. *Metsaühistu:* MTÜ Erametsad Metsaühistu, reg kood, lühitutvustus, kontaktid.
   2. *Teenused:* Istutamine, Hooldusraied, Metsakavad, Nõustamine, Ulukitõrje.
   3. *Toetused & Info:* Käimasolevad toetused, PEFC sertifitseerimine, Põhikiri (PDF), Kasutustingimused.
-  4. *Oksjonid & Partnerid:* Oksjonikeskkond (`oksjonid.eametsad.ee`), Eametsad pealeht (`eametsad.ee`).
+  4. *Oksjonid & Partnerid:* Oksjonikeskkond (`oksjonid.erametsad.ee`), Erametsad pealeht (`erametsad.ee`).
 - Bottom bar: `© Erametsad Metsaühistu MTÜ · Kõik õigused kaitstud · Privaatsuspoliitika · Küpsiste seaded`.
 
 ---
@@ -250,7 +250,7 @@ The association shares the core aesthetic tokens of the Eametsad design system w
 ├─────────────────────────────────────────────────────────────────────────────────────────────┤
 │ 9. #oksjonid — Raieõiguste ja kinnistute enampakkumised (Eraldiseisev esiletõstetud riba)   │
 │    Müü oma raieõigus või kinnistu läbi Eesti juhtiva oksjonikeskkonna parima hinnaga.       │
-│    [ Ava oksjonikeskkond: oksjonid.eametsad.ee ↗ ]                                          │
+│    [ Ava oksjonikeskkond: oksjonid.erametsad.ee ↗ ]                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -263,7 +263,7 @@ The association shares the core aesthetic tokens of the Eametsad design system w
    - *Istutamine:* 3 sammuga horisontaalne voog (`Steps`: ettevalmistus → taimed → istutus).
    - *Nõustamine:* 2-veeruline visuaalne ruudustik 11 ametliku nõustamisteemaga + viide kutseregistrile.
    - *Taimekaitse:* 2 toote kaarti (`Trico` ja `Cervacol Extra`) koos kulumäärade ja toimeajaga.
-   - *Enampakkumised:* Tume spetsiaalne reklaamriba portaali `oksjonid.eametsad.ee` tutvustusega.
+   - *Enampakkumised:* Tume spetsiaalne reklaamriba portaali `oksjonid.erametsad.ee` tutvustusega.
 3. **Teenusepäringu külgsahtel (Inline Enquiry Drawer):**
    - Nupu `[ Soovin päringut ]` vajutamisel avaneb paremalt 480px laiune sahtel:
      - Päis: `"Teenusepäring: <Teenuse nimi>"`
@@ -521,14 +521,14 @@ The association shares the core aesthetic tokens of the Eametsad design system w
 │ │              Tegevjuht / Metsakonsulent  │ │ │ Registrikood: 80XXXXXX                   │ │
 │ │              Kutsetunnistus nr 184291    │ │ │ KMKR: EE10XXXXXXXX                       │ │
 │ │              📞 +372 521 9876            │ │ │ Juriidiline aadress: Metsa 12, Pärnu     │ │
-│ │              ✉ marit.vain@eametsad.ee    │ │ │                                          │ │
+│ │              ✉ marit.vain@erametsad.ee    │ │ │                                          │ │
 │ │              Tööpiirkond: Pärnu, Saare   │ │ │ KONTORID JA LAHTIOLEKUAJAD:              │ │
 │ └──────────────────────────────────────────┘ │ │ • Tallinn: E–R 09:00–17:00               │ │
 │ ┌─ SPETSIALISTI KAART ─────────────────────┐ │ │   (Eelregistreeritud külastused)         │ │
 │ │ [Foto 80px]  Kaire Mets                  │ │ │ • Pärnu: Kokkuleppel                     │ │
 │ │              Metsandusspetsialist        │ │ ├──────────────────────────────────────────┤ │
 │ │              📞 +372 514 2345            │ │ │ ℹ TÄHELEPANU KÜLASTAJALE:               │ │
-│ │              ✉ kaire.mets@eametsad.ee    │ │ │ Kuna konsulendid viibivad sageli metsas, │ │
+│ │              ✉ kaire.mets@erametsad.ee    │ │ │ Kuna konsulendid viibivad sageli metsas, │ │
 │ │              Tööpiirkond: Tartu, Võru    │ │ │ palume kontorikülastus eelnevalt telefoni│ │
 │ └──────────────────────────────────────────┘ │ │ või e-posti teel kokku leppida!          │ │
 │ (2×2 ruudustik spetsialistide kaartidest)    │ └──────────────────────────────────────────┘ │

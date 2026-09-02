@@ -17,7 +17,7 @@ Kahtlev omanik saab usalduse allika: kes me oleme (juridiline blokk, missioon, j
 │ HERO: H1 "Sul on metsa majandamist puudutav küsimus?" + LEADFORM #1  │
 ├──────────────────────────────────────────────────────────────────────┤
 │ ETTEVÕTTE BLOKK (Card, --bg-mist):                                   │
-│  Eametsad OÜ · Registrikood [koht] · KMKR [koht]                     │
+│  Erametsad OÜ · Registrikood [koht] · KMKR [koht]                     │
 │  telefon · e-mail · aadress [koht]                                   │
 ├──────────────────────────────────────────────────────────────────────┤
 │ MISSIJOON "Miks me seda teeme?" — tekst + 3 väikse pildi/proovi      │
@@ -35,8 +35,8 @@ Kahtlev omanik saab usalduse allika: kes me oleme (juridiline blokk, missioon, j
 
 ## Block-by-block spec
 1. **Hero** — foto + overlay; H1 (draft) "Sul on metsa majandamist puudutav küsimus?"; intro 1 lause ("Vastame metsa, hinna ja oksjoni kohta — tasuta."). Parem `LeadForm #1` (`meist-1`, ankur `#kontaktvorm`).
-2. **Ettevõtte blokk** — `Card` andmetega (kohatäited, kliendi täita): juriidiline nimi (Eametsad OÜ), registrikood, KMKR number, registreeritud aadress, telefon, e-mail. Välimus nagu ametlik teabekaart (monospace numbrid, väikene `Landmark` ikoon).
-3. **Missioon "Miks me seda teeme?"** — 2 lõiku (draft): Eametsad alustas veendumusest, et metsaomanik saab õiglase hinna vaid siis, kui pakkumised konkureerivad avatult; meie töö on teha sellest protsessist lihtne ja turvaline; meeskonnas kokku üle [N] aasta metsanduse kogemust (kohatäide).
+2. **Ettevõtte blokk** — `Card` andmetega (kohatäited, kliendi täita): juriidiline nimi (Erametsad OÜ), registrikood, KMKR number, registreeritud aadress, telefon, e-mail. Välimus nagu ametlik teabekaart (monospace numbrid, väikene `Landmark` ikoon).
+3. **Missioon "Miks me seda teeme?"** — 2 lõiku (draft): Erametsad alustas veendumusest, et metsaomanik saab õiglase hinna vaid siis, kui pakkumised konkureerivad avatult; meie töö on teha sellest protsessist lihtne ja turvaline; meeskonnas kokku üle [N] aasta metsanduse kogemust (kohatäide).
 4. **Juhi tsitaat** — suur tsitaat (Manrope 28px, jutumärgid `--accent`), juhi foto, nimi ja tiitel (kohatäited: "[Juhi nimi], tegevjuht"). Draft-tsitaat: "Mets on pikaajaline investeering — meie ülesanne on tagada, et selle võõrandamisel langetaks otsuseid teave, mitte ärevus."
 5. **Spetsialistide eelvaade** — 3 `SpecialistCard` (mini) → `/meist/metsaspetsialistid` (+ `Btn` "Vaata kõiki spetsialiste").
 6. **LeadForm #2** (`meist-2`) — "Kirjuta meile — vastame 1 tööpäevaga."
@@ -58,7 +58,7 @@ Kahtlev omanik saab usalduse allika: kes me oleme (juridiline blokk, missioon, j
 - H1: "Sul on metsa majandamist puudutav küsimus?" · "Miks me seda teeme?" · "Vaata kõiki spetsialiste" · "Kirjuta meile — vastame 1 tööpäevaga." · ettevõtte bloki väljade pealkirjad: "Registrikood", "Käibemaksukohustuslase nr", "Aadress".
 
 ## SEO & analytics
-- Title: "Meist | Eametsad"; desc mainigu usaldusmärke ("kogemus, spetsialistid, metsaoksjonid").
+- Title: "Meist | Erametsad"; desc mainigu usaldusmärke ("kogemus, spetsialistid, metsaoksjonid").
 - JSON-LD: `Organization` (registrikood, aadress, kontaktid — footeri `Organization`-iga sama, kasutada ühte) + `BreadcrumbList`.
 - Sündmused: `lead_form_submit_start/complete{form_name}`, `specialist_preview_click{name}`, `ceo_quote_view` (kesksele vaatele jõudmine).
 

@@ -31,7 +31,7 @@ import {
   StickyTOC,
   SearchableAccordion,
   LeadForm,
-} from '@eametsad/ui'
+} from '@erametsad/ui'
 import dynamic from 'next/dynamic'
 import { notFound } from 'next/navigation'
 import { Suspense, useState, useCallback } from 'react'
@@ -39,7 +39,7 @@ import { Suspense, useState, useCallback } from 'react'
 import '../../../../../packages/ui/src/styles/tokens.css'
 
 const MapEstonia = dynamic(
-  () => import('@eametsad/ui').then((m) => ({ default: m.MapEstonia })),
+  () => import('@erametsad/ui').then((m) => ({ default: m.MapEstonia })),
   { ssr: false },
 )
 
@@ -580,7 +580,7 @@ export default function StyleguidePage() {
       <Section title="SpecialistCard">
         <div className="flex flex-wrap gap-md">
           <div className="w-64">
-            <SpecialistCard name="Mari Mets" role="Metsaspetsialist" phone="+372 555 1234" email="mari@eametsad.ee" />
+            <SpecialistCard name="Mari Mets" role="Metsaspetsialist" phone="+372 555 1234" email="mari@erametsad.ee" />
           </div>
           <div className="w-64">
             <SpecialistCard name="Jaan Jänes" role="Konsultant" mini />
@@ -595,7 +595,7 @@ export default function StyleguidePage() {
           description="Võta ühendust"
           contacts={[
             { name: 'Mari Mets', role: 'Metsaspetsialist', phone: '+372 555 1234' },
-            { name: 'Jaan Jänes', role: 'Konsultant', email: 'jaan@eametsad.ee' },
+            { name: 'Jaan Jänes', role: 'Konsultant', email: 'jaan@erametsad.ee' },
           ]}
         />
       </Section>

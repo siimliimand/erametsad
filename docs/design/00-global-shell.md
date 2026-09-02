@@ -3,7 +3,7 @@
 > **In brief:** The shared frame around every marketing page — header navigation, footer, contact band, cookie consent and the 404/500 error pages.
 | Area | marketing |
 |---|---|
-| **Route** | kõik `eametsad.ee` leheküljed |
+| **Route** | kõik `erametsad.ee` leheküljed |
 | **Access** | public |
 | **In nav** | — (ümbritseb kõiki lehti) |
 
@@ -21,13 +21,13 @@
 │                        (lehe sisu)                                 │
 │                                                                    │
 ├────────────────────────────────────────────────────────────────────┤
-│ CONTACTBAND  ☎ +372 XXX XXXX · ✉ info@eametsad.ee · Jäta kontakt →│
+│ CONTACTBAND  ☎ +372 XXX XXXX · ✉ info@erametsad.ee · Jäta kontakt →│
 ├────────────────────────────────────────────────────────────────────┤
 │ FOOTER: Aktiivsed | Ajalugu | Artiklid | Kasulik teada | Jälgi    │
 │  oksjonid  | oksjonid | (uudised,   | (kasutusjuhend,  | meid     │
 │  (4 tüüpi) | (4 tüüpi)| kliendilood)| lepingud, tingim.,| (FB IG  │
 │            |          |             | privaatsus)      | YT)      │
-│ ── © Eametsad OÜ · registrikood · KMKR ·_PLL privaatsuspoliitika ── │
+│ ── © Erametsad OÜ · registrikood · KMKR ·_PLL privaatsuspoliitika ── │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -44,16 +44,16 @@
   - **Päringud** → `/paringud` + 3 alamlehte (kava, hooldusraie, istutamine)
   - **Uudised** → `/artiklid`
   - **Meist** → `/meist` + `/meist/metsaspetsialistid` (+ juhtkond, vt 13/14 fail)
-- Välised lingid (näevad välja nagu tekstilink + `ExternalLink` ikoon): **Metsaühistu** → `metsauhistu.eametsad.ee`, **Oksjonikeskkond** → `Btn`-cta → `oksjonid.eametsad.ee`.
+- Välised lingid (näevad välja nagu tekstilink + `ExternalLink` ikoon): **Metsaühistu** → `metsauhistu.erametsad.ee`, **Oksjonikeskkond** → `Btn`-cta → `oksjonid.erametsad.ee`.
 - Aktiivse lehe menüülink `--primary` + 2px alajoon. Skip-link "Otse sisuni" (WCAG).
 
 ### 2. Footer (5 veergu, taust `--primary-dark`, tekst `#FFFFFF`/`rgba(255,255,255,.72)`)
-1. **Aktiivsed oksjonid** — Raieõigused / Kinnistud / Paketid / Põllumaa → `oksjonid.eametsad.ee/{...}`
+1. **Aktiivsed oksjonid** — Raieõigused / Kinnistud / Paketid / Põllumaa → `oksjonid.erametsad.ee/{...}`
 2. **Oksjonite ajalugu** — samasugused 4 linki + `/ajalugu/...`
 3. **Artiklid** — `/artiklid/uudised`, `/artiklid/klientide-lood`
 4. **Kasulik teada** — Kasutusjuhend (PDF), `/lepingud`, `/artiklid/kasutustingimused`, privaatsuspoliitika
 5. **Jälgi meid** — Facebook, Instagram, YouTube (ikoonid + `aria-label`)
-- Jaluse alaveerg: © Eametsad OÜ · registrikood (koht) · KMKR (koht) · lingid privaatsuspoliitikale ja küpsiste seadetele (`#cookie-settings` modaal). Mobiilis veerud akordioonideks.
+- Jaluse alaveerg: © Erametsad OÜ · registrikood (koht) · KMKR (koht) · lingid privaatsuspoliitikale ja küpsiste seadetele (`#cookie-settings` modaal). Mobiilis veerud akordioonideks.
 
 ### 3. ContactBand (eel-jalus, igal lehel)
 `Card` taustaga `--bg-mist`, 3 veergu: telefon (tel: link), e-mail (mailto:), CTA-link "Jäta enda kontaktid" → ankur `#kontaktvorm` lehe esimese `LeadForm`-ini. Mobiilis virn.
@@ -61,7 +61,7 @@
 ### 4. CookieBanner
 - Ilmub alles pärast esimest interaktsiooni / kohe allservas, mitte modaalselt (ei blokeeri sisu — EU e-praktika). Taust valge `Card`, peal `--primary-dark` tekst.
 - Nupud: `Nõustun kõigiga` (Btn-cta) · `Ainult vajalikud` (Btn-secondary) · `Sätete muutmine` (ghost → Modal kategooriatega: vajalikud (lukus), statistika/analüütika, turundus).
-- Analüütika (GA4/Plausible) laaditakse AINULT nõusolekul; nõusolek salvestatakse (`eametsad_consent`, 12 kuu küpsis + serveripoolne logi consent-aega). Seadete taasavamise link jaluses.
+- Analüütika (GA4/Plausible) laaditakse AINULT nõusolekul; nõusolek salvestatakse (`erametsad_consent`, 12 kuu küpsis + serveripoolne logi consent-aega). Seadete taasavamise link jaluses.
 
 ### 5. Vealehed
 - **404** ("Lehekülge ei leitud"): illustratiivne metsafoto, H1, tekst, otsinguväli (lihtne tekstotsing CMS-artiklitest) + `Btn` "Avalehele". Sündmus `error_404{path}`.
@@ -71,7 +71,7 @@
 - Dropdown avaneb `mouseenter`/`focus` + klõps (puutetundlik), sulgub `Esc` + väljaklõps; fookuse lõks puudub (fokusubemenüü tab järjekorras).
 - Välimised lingid: `target="_blank" rel="noopener"`, visuaalne ↗ ikoon.
 - Sticky header kahandub skrollides 72→60px (desktop).
-- Kui `oksjonid.eametsad.ee` hooldusrežiimis, CTA viib ikka portaalile (portaal näitab enda hoolduslehte).
+- Kui `oksjonid.erametsad.ee` hooldusrežiimis, CTA viib ikka portaalile (portaal näitab enda hoolduslehte).
 
 ## Data & API
 - Menüü tuleb CMS-ist (`Page`/menüü-buuilder, vt admin/11) — staatilisse buildi SSG-aegselt.
@@ -97,5 +97,5 @@
 - **Delikaatsus:** nupp lukustub esitamise ajaks ("Saadan…"); topeltklõpsu kaitse; ei sisalda reCAPTCHA-t (honeypot + rate-limit piisavad Phase 1).
 
 ## Open questions
-- Logo/lõplik telefon/email (kohatäited `+372 XXX XXXX`, `info@eametsad.ee`).
+- Logo/lõplik telefon/email (kohatäited `+372 XXX XXXX`, `info@erametsad.ee`).
 - Kas "Juhtkond" eraldi leht või osa `/meist` (vt 13-meist.md otsus).

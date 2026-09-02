@@ -1,6 +1,6 @@
-# Eametsad — Demo design brief
+# Erametsad — Demo design brief
 
-> **In brief:** How Eametsad should **look**. A self-contained visual brief for the person designing the HTML demo pages — you don't need to read the full design system first. Where this document and a page spec (`marketing/*.md`) disagree, the page spec wins.
+> **In brief:** How Erametsad should **look**. A self-contained visual brief for the person designing the HTML demo pages — you don't need to read the full design system first. Where this document and a page spec (`marketing/*.md`) disagree, the page spec wins.
 
 Sources: [../README.md](../README.md) (full design system), [../00-global-shell.md](../00-global-shell.md), [../marketing/](../marketing/) (per-page specs with wireframes and draft copy).
 
@@ -8,7 +8,7 @@ Sources: [../README.md](../README.md) (full design system), [../00-global-shell.
 
 ## What the demo is
 
-Static HTML demo pages of the **marketing site (`eametsad.ee`)**, built to validate the visual direction before real implementation.
+Static HTML demo pages of the **marketing site (`erametsad.ee`)**, built to validate the visual direction before real implementation.
 
 - **Static** — plain HTML/CSS with minimal JS (accordions, tabs, mobile drawer). Forms, tickers and maps are non-functional mockups with realistic content.
 - **Estonian throughout** — use the draft copy from §7 and the page specs. No lorem ipsum anywhere.
@@ -155,7 +155,7 @@ The photography does more work than the palette — it is the emotional anchor.
 | Grading | Slightly desaturated (−5 saturation), warm white balance. No HDR crunch. |
 | Alt text | Descriptive Estonian on every image, no exceptions. |
 
-**Demo placeholders:** use real-looking Estonian forest photos (client-provided set if available, otherwise tasteful stock from Baltic/Nordic forests). Grey labelled boxes are acceptable for screenshots (metsateatis steps) and specialist headshots. Logo is not final — use the wordmark "Eametsad" set in Manrope 800, `--primary-dark`, as an SVG placeholder. Phone numbers `+372 XXX XXXX`, registry codes `[registrikood]`.
+**Demo placeholders:** use real-looking Estonian forest photos (client-provided set if available, otherwise tasteful stock from Baltic/Nordic forests). Grey labelled boxes are acceptable for screenshots (metsateatis steps) and specialist headshots. Logo is not final — use the wordmark "Erametsad" set in Manrope 800, `--primary-dark`, as an SVG placeholder. Phone numbers `+372 XXX XXXX`, registry codes `[registrikood]`.
 
 ---
 
@@ -215,10 +215,10 @@ Full per-page copy lives in each `marketing/*.md` spec (section "Copy").
 ├────────────────────────────────────────────────────────────────────┤
 │                          (page content)                            │
 ├────────────────────────────────────────────────────────────────────┤
-│ CONTACTBAND  ☎ +372 XXX XXXX · ✉ info@eametsad.ee · Jäta kontakt → │  mist card, 3 cols
+│ CONTACTBAND  ☎ +372 XXX XXXX · ✉ info@erametsad.ee · Jäta kontakt → │  mist card, 3 cols
 ├────────────────────────────────────────────────────────────────────┤
 │ FOOTER  5 link columns on --primary-dark, white text               │
-│         © Eametsad OÜ · registrikood · KMKR · privaatsuspoliitika  │
+│         © Erametsad OÜ · registrikood · KMKR · privaatsuspoliitika  │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -228,7 +228,7 @@ Full per-page copy lives in each `marketing/*.md` spec (section "Copy").
 
 **ContactBand** — pre-footer strip on `--bg-mist`, rounded card, 3 columns: phone (`tel:`), email (`mailto:`), link "Jäta enda kontaktid" → `#kontaktvorm`.
 
-**Footer** — `--primary-dark` background, white headings + `rgba(255,255,255,.72)` links, 5 columns: Aktiivsed oksjonid · Oksjonite ajalugu · Artiklid · Kasulik teada · Jälgi meid (FB/IG/YT icons). Bottom row: © Eametsad OÜ · registrikood · KMKR · privacy/cookie-settings links.
+**Footer** — `--primary-dark` background, white headings + `rgba(255,255,255,.72)` links, 5 columns: Aktiivsed oksjonid · Oksjonite ajalugu · Artiklid · Kasulik teada · Jälgi meid (FB/IG/YT icons). Bottom row: © Erametsad OÜ · registrikood · KMKR · privacy/cookie-settings links.
 
 **CookieBanner** — bottom-anchored, non-modal white card (never blocks content): short text + "Nõustun kõigiga" (amber), "Ainult vajalikud" (outline), "Sätete muutmine" (ghost → settings modal). Show it on at least one demo page.
 
@@ -372,6 +372,6 @@ Hero ("Võta ühendust") → 5/7 split: left — company card + two direct phone
 
 The same tokens and components extend to the other three surfaces, described in their own specs:
 
-- **Auction portal** (`oksjonid.eametsad.ee`, `portal/`) — light, data-dense: tabs + map + filter sidebar listing, lot detail with `BidPanel` and live countdowns.
-- **Admin** (`admin.eametsad.ee`, `admin/`) — functional: 280px sidebar layout, `DataTable` everywhere, KPI cards.
-- **Association** (`metsauhistu.eametsad.ee`, `uhistu/`) — friendlier marketing-style pages: subsidy card grids, service chips.
+- **Auction portal** (`oksjonid.erametsad.ee`, `portal/`) — light, data-dense: tabs + map + filter sidebar listing, lot detail with `BidPanel` and live countdowns.
+- **Admin** (`admin.erametsad.ee`, `admin/`) — functional: 280px sidebar layout, `DataTable` everywhere, KPI cards.
+- **Association** (`metsauhistu.erametsad.ee`, `uhistu/`) — friendlier marketing-style pages: subsidy card grids, service chips.

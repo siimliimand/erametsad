@@ -1,4 +1,4 @@
-# Eametsad — Design system
+# Erametsad — Design system
 
 One design spec per page or screen, covering **the marketing site, the auction portal (public and customer area), the admin backend, and the optional association subsite**.
 
@@ -6,14 +6,14 @@ One design spec per page or screen, covering **the marketing site, the auction p
 docs/design/
 ├── README.md            ← you are here: shared design system + index
 ├── 00-global-shell.md   ← header, footer, contact band, cookie banner, error pages
-├── marketing/           ← eametsad.ee (public)
-├── portal/              ← oksjonid.eametsad.ee (public + logged-in customer pages)
-├── admin/               ← admin.eametsad.ee (staff only, role-gated)
-└── uhistu/              ← metsauhistu.eametsad.ee (association subsite, Phase 5)
+├── marketing/           ← erametsad.ee (public)
+├── portal/              ← oksjonid.erametsad.ee (public + logged-in customer pages)
+├── admin/               ← admin.erametsad.ee (staff only, role-gated)
+└── uhistu/              ← metsauhistu.erametsad.ee (association subsite, Phase 5)
 ```
 
-Sources: `../EAMETSAD-PLAN.md` (master plan), `../research/*.md` (reference-site analysis).
-⚠️ Reference sites were analyzed for **functionality only** — all Eametsad layouts, copy and brand assets below are original drafts.
+Sources: `../ERAMETSAD-PLAN.md` (master plan), `../research/*.md` (reference-site analysis).
+⚠️ Reference sites were analyzed for **functionality only** — all Erametsad layouts, copy and brand assets below are original drafts.
 
 ---
 
@@ -119,7 +119,7 @@ The system is rooted in the Estonian forest — spruce green, fresh moss, dark s
 
 ### Motion
 
-Eametsad is calm, not frantic. Transitions are subtle and purposeful.
+Erametsad is calm, not frantic. Transitions are subtle and purposeful.
 
 | Context | Duration | Easing | Notes |
 |---|---|---|---|
@@ -306,7 +306,7 @@ All components are referenced by page specs using their `<ComponentName>` shorth
 ### 00 Global
 - [00-global-shell.md](00-global-shell.md) — Header, footer, contact band, cookie banner, 404/500
 
-### Marketing — `eametsad.ee`
+### Marketing — `erametsad.ee`
 
 | File | Page | In brief |
 |---|---|---|
@@ -328,7 +328,7 @@ All components are referenced by page specs using their `<ComponentName>` shorth
 | [16-lepingud.md](marketing/16-lepingud.md) | Lepingud | Contract template downloads. |
 | [17-kontakt.md](marketing/17-kontakt.md) | Kontakt | Contact page: company details, map, lead form. |
 
-### Auction portal — `oksjonid.eametsad.ee`
+### Auction portal — `oksjonid.erametsad.ee`
 
 | File | Page | In brief |
 |---|---|---|
@@ -346,7 +346,7 @@ All components are referenced by page specs using their `<ComponentName>` shorth
 | [12-user-profile.md](portal/12-user-profile.md) | 🔒 Minu profiil | Profile data, rights, security, GDPR export/delete. |
 | [13-contract-signing.md](portal/13-contract-signing.md) | 🔒 Lepingute allkirjastamine | Framework contract and per-auction contract signing via eID. |
 
-### Admin — `admin.eametsad.ee`
+### Admin — `admin.erametsad.ee`
 
 | File | Screen | In brief |
 |---|---|---|
@@ -365,7 +365,7 @@ All components are referenced by page specs using their `<ComponentName>` shorth
 | [13-settings.md](admin/13-settings.md) | Seaded | Fee configuration, anti-snipe defaults, notification templates, maintenance mode. |
 | [14-audit-log.md](admin/14-audit-log.md) | Auditlogi | Immutable audit log viewer with filters and export. |
 
-### Association — `metsauhistu.eametsad.ee` (Phase 5)
+### Association — `metsauhistu.erametsad.ee` (Phase 5)
 
 | File | Page | In brief |
 |---|---|---|

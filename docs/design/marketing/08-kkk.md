@@ -38,8 +38,8 @@ Kõigi küsimustega (oksjoni mehaanika, müük, hind, tulumaks, andmed, raie, ü
 2. **Kiip-kategooria nav** — 7 kiipi (draft nimed: "Oksjonid", "Müük", "Hind", "Tulumaks", "Metsaandmed", "Raie", "Metsaühistu"); aktiivne `--primary` valge tekstiga, ülejäänud outline. Hubil ükski pole aktiivne.
 3. **Kategooria leht `/kkk/<kategooria>`** — sama kate + kiip-nav; H2 kategooria nimi; `Accordion` elementidest:
    - iga element: küsimus (nupp), teaser (1 lause, alati nähtav), `Loe edasi…` → avab täisvastuse (H3 + lõigud + vajadusel lingid teenusele/kategooriatele).
-   - CMS mudel `FAQCategory → FAQItem(question, teaser, answer, sort)` (EAMETSAD-PLAN §4.5).
-   - Kategooriate sisu (draft teemad): **Oksjonid** — kuidas oksjon käib, mis on edukas oksjon, mida tehakse kui oksjon ebaõnnestub (müüjale maksust puudub, uus katse), miks mõned firmad oksjonit väldivad; **Müük** — kuidas alustada, mis dokumendid vaja, kas kaugelt müüa (e-notar); **Hind** — kuidas hind kujuneb, kas tasuta hindamine; **Tulumaks** — kas oksjonitulust tuleb tulumaks, metsa kasutushüvitis (viide Maksu- ja Tolliameti lehele, draft-juriidiline hoiatus); **Metsaandmed** — kust näen takseerandmeid, kataster, metsaportaal; **Raie** — raieliigid, metsateatis (link juhendile 05); **Metsaühistu** — üldised liikmelisuse küsimused → viide `metsauhistu.eametsad.ee`.
+   - CMS mudel `FAQCategory → FAQItem(question, teaser, answer, sort)` (ERAMETSAD-PLAN §4.5).
+   - Kategooriate sisu (draft teemad): **Oksjonid** — kuidas oksjon käib, mis on edukas oksjon, mida tehakse kui oksjon ebaõnnestub (müüjale maksust puudub, uus katse), miks mõned firmad oksjonit väldivad; **Müük** — kuidas alustada, mis dokumendid vaja, kas kaugelt müüa (e-notar); **Hind** — kuidas hind kujuneb, kas tasuta hindamine; **Tulumaks** — kas oksjonitulust tuleb tulumaks, metsa kasutushüvitis (viide Maksu- ja Tolliameti lehele, draft-juriidiline hoiatus); **Metsaandmed** — kust näen takseerandmeid, kataster, metsaportaal; **Raie** — raieliigid, metsateatis (link juhendile 05); **Metsaühistu** — üldised liikmelisuse küsimused → viide `metsauhistu.erametsad.ee`.
 4. **"Ei leidnud vastust?"** — lühikaart: kirjuta `/kontakt` või helista (ContactBand numbrid).
 
 ## Interactions & edge cases
@@ -59,7 +59,7 @@ Kõigi küsimustega (oksjoni mehaanika, müük, hind, tulumaks, andmed, raie, ü
 - H1: "Korduma kippuvad küsimused" · "Otsi küsimust…" (placeholder) · "Loe edasi…" · "Ei leidnud vastust? Kirjuta meile või helista."
 
 ## SEO & analytics
-- Title (hub): "KKK | Eametsad"; (kategooria): "KKK — <kategooria> | Eametsad". Desc sisaldab kategooria märksõnu.
+- Title (hub): "KKK | Erametsad"; (kategooria): "KKK — <kategooria> | Erametsad". Desc sisaldab kategooria märksõnu.
 - **JSON-LD `FAQPage`** igal kategooria lehel (küsimus + täisvastus, teaserist ei piisa) — hoitakse Google'i nõuete piires (mitte reklaam, ei logi sisse).
 - Sündmused: `faq_search{query_lenght_buckets}`, `faq_search_zero`, `chip_category_click{category}`, `faq_open{question_slug}`, `faq_deep_link_view`, `contact_fallback_click`.
 

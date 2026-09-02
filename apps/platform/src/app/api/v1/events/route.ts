@@ -7,7 +7,7 @@ import { eventsRateLimiter } from '@/lib/rate-limit'
 const MAX_NAME_LENGTH = 64
 const MAX_PROPS_KEYS = 32
 const MAX_PROPS_LENGTH = 4096
-const CONSENT_COOKIE = 'eametsad_consent'
+const CONSENT_COOKIE = 'erametsad_consent'
 
 function extractIp(request: Request): string {
   const raw = request.headers.get('x-forwarded-for')

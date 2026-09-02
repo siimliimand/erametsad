@@ -24,7 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="flex min-h-screen flex-col bg-bg-mist md:flex-row">
       <aside className="hidden w-sidebar shrink-0 flex-col bg-primaryDark text-ink-inverse md:flex">
         <div className="border-b border-white/10 px-md py-lg">
-          <p className="font-heading text-h4 font-extrabold">Eametsad</p>
+          <p className="font-heading text-h4 font-extrabold">Erametsad</p>
           <p className="text-label text-ink-inverse opacity-70">Halduspaneel</p>
         </div>
         <AdminNav />

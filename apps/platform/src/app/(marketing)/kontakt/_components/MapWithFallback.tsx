@@ -1,6 +1,6 @@
 'use client'
 
-import { MapEstonia, type MapPin } from '@eametsad/ui'
+import { MapEstonia, type MapPin } from '@erametsad/ui'
 import { MapPin as MapPinIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 

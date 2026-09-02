@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, FormCheck, Modal } from '@eametsad/ui'
+import { Btn, FormCheck, Modal } from '@erametsad/ui'
 import { useEffect, useState } from 'react'
 
 import {

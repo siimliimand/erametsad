@@ -107,7 +107,7 @@ The remote database needs a real `database_id` in `wrangler.jsonc`. Create it
 first if task 2.8 has not done so:
 
 ```
-pnpm exec wrangler d1 create eametsad-db
+pnpm exec wrangler d1 create erametsad-db
 ```
 
 Apply the schema, then load the generated SQL file:

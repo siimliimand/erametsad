@@ -10,7 +10,7 @@ a runnable demo platform.
 
 **Goals:**
 
-- Implement every Payload collection Eametsad needs (14+ collections).
+- Implement every Payload collection Erametsad needs (14+ collections).
 - Ship a server-authoritative bidding engine with transactional guarantees.
 - Build a demo eID simulator so the platform is testable without real Smart-ID/Mobile-ID.
 - Provide SSE streams for live auction and bid updates.

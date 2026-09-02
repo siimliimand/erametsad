@@ -1,4 +1,4 @@
-# Eametsad — Global design tokens
+# Erametsad — Global design tokens
 
 Extracted from `docs/design/README.md` — colors, type, spacing, layout, motion, imagery, icons only.
 

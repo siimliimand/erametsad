@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28
 **Branch:** feature/option-b-cloudflare-only
-**Worker:** eametsad-api (local wrangler dev, port 8787)
+**Worker:** erametsad-api (local wrangler dev, port 8787)
 
 ## Evidence Table
 
@@ -10,7 +10,7 @@
 |---|------|---------|--------|--------|
 | 1 | Worker build | `pnpm build:cf` | OpenNext build complete, worker.js generated | PASS |
 | 2 | App reachable | `curl http://localhost:8787/` | 200 OK | PASS |
-| 3 | Credential login | `POST /api/v1/auth/login` with `{"identifier":"private@eametsad.ee","password":"demo1234"}` | 200 OK, user returned, access_token + refresh_token cookies set | PASS |
+| 3 | Credential login | `POST /api/v1/auth/login` with `{"identifier":"private@erametsad.ee","password":"demo1234"}` | 200 OK, user returned, access_token + refresh_token cookies set | PASS |
 | 4 | Token refresh | `POST /api/v1/auth/refresh` with refresh_token cookie | 200 OK, new access_token + refresh_token issued | PASS |
 | 5 | Session persistence | `wrangler d1 execute DB --local --command "SELECT * FROM sessions"` | Session row exists with correct user_id, token_family, hashes, revoked_at=NULL | PASS |
 | 6 | Token-family rotation | Three consecutive refresh calls on same session | Each returned 200 OK with rotated tokens; D1 shows updated access_token_hash and refresh_token_hash after each rotation | PASS |
@@ -34,6 +34,6 @@ D1-backed sessions survive isolate restarts because the session state lives in D
 ## Notes
 
 - The D1 remote placeholder id (`REPLACE-WITH-REAL-D1-DATABASE-ID`) is still in wrangler.jsonc; local dev uses miniflare and ignores it.
-- Queue consumer is registered in wrangler.jsonc with `eametsad-jobs` producer and consumer bindings; wrangler dev includes the queue handler automatically.
+- Queue consumer is registered in wrangler.jsonc with `erametsad-jobs` producer and consumer bindings; wrangler dev includes the queue handler automatically.
 - The bid returned `status: pending_approval` because the test user's profile has `approvalStatus: pending` (under-start bid requires seller approval). This is correct business behavior.
 - No `/api/v1/auth/logout` route exists; logout is done via `DELETE /api/v1/my/sessions?id=<sessionId>` which revokes the session in D1 and clears cookies.

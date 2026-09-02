@@ -3,7 +3,7 @@
 > **In brief:** Staff cards, office locations and contact form.
 | Area | uhistu |
 |---|---|
-| **Route** | `metsauhistu.eametsad.ee/kontakt` |
+| **Route** | `metsauhistu.erametsad.ee/kontakt` |
 | **Access** | public |
 | **In nav** | subsite header "Kontakt"; every page's ContactBand |
 
@@ -33,7 +33,7 @@ Mobile: cards 1-col; org card above staff; map last, 16:10, full-width.
 
 ## Block-by-block spec
 1. **Header** — H1 "Võta ühendust", 1-line intro: "Kirjuta, helista või tule külla — kontorisse tulles broneeri eelnevalt aeg."
-2. **Staff cards** — grid of `<SpecialistCard>` from `Specialist` collection (filtered `showOnUhistu=true`): foto, nimi, roll (tegevjuht / atesteeritud metsakonsulent / metsanduskonsulent …), `tel:` link, mailto link (obfuscated alias per §5.4 pattern), **Tööpiirkond:** county list ("Üle Eesti", "Lääne-Eesti …" etc.). Cards link to full profile on eametsad.ee where present.
+2. **Staff cards** — grid of `<SpecialistCard>` from `Specialist` collection (filtered `showOnUhistu=true`): foto, nimi, roll (tegevjuht / atesteeritud metsakonsulent / metsanduskonsulent …), `tel:` link, mailto link (obfuscated alias per §5.4 pattern), **Tööpiirkond:** county list ("Üle Eesti", "Lääne-Eesti …" etc.). Cards link to full profile on erametsad.ee where present.
 3. **Ühistu block (Card, bg-mist)** — MTÜ legal data (CMS placeholders until client supplies): nimetus "MTÜ Erametsad Metsaühistu", registrikood, juriidiline aadress; **office hours** E–R 09–17; warning note (info-colored): "Kontorisse tulles palun eelnevalt aega broneerida — konsulendid on sageli metsas."; secondary office line with "ainult kokkuleppel".
 4. **LeadForm** (`form_name=kontakt`) — nimi\*, email\*, telefon, teema (Select: Liikmelisus / Toetused / Teenused / Sertifitseerimine / Muu), sõnum (textarea), ConsentCheck visible/unchecked/required ("Nõustun andmete töötlemisega ja kokkupuutega."). → `POST /api/leads`; teema routes auto-assignment in admin/10.
 5. **Map** — static Leaflet pin of main office (`MapEstonia` light variant, no layers), link "Ava Google Mapsis".
@@ -80,4 +80,4 @@ Mobile: cards 1-col; org card above staff; map last, 16:10, full-width.
 
 ## Open questions
 - Registry code, legal address, second office and staff list are all placeholders — confirm with MTÜ.
-- Should staff profiles live on the subsite or only on eametsad.ee (duplicate-content risk)? Default: link out, keep card summary only.
+- Should staff profiles live on the subsite or only on erametsad.ee (duplicate-content risk)? Default: link out, keep card summary only.

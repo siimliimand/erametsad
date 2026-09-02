@@ -244,7 +244,7 @@ export function ShellHeader({ profileName }: { profileName: string | null }) {
     <header className="rounded-card border border-border bg-bgPage shadow-card">
       <div className="flex items-center gap-md px-md py-sm">
         <Link href="/" className="flex flex-col leading-tight">
-          <span className="font-heading text-h4 font-extrabold text-primaryDark">Eametsad</span>
+          <span className="font-heading text-h4 font-extrabold text-primaryDark">Erametsad</span>
           <span className="text-label text-inkMuted">Oksjonid</span>
         </Link>
         <form

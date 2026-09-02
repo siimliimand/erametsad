@@ -1,6 +1,6 @@
-# Eametsad — Architecture
+# Erametsad — Architecture
 
-Eametsad is an Estonian forest-transaction platform that lets forest owners sell cutting rights and forest properties by auction, and lets vetted buyers bid on them. The system has three deployment units: a public marketing site, a customer-facing auction portal, and an admin backend, all served by a shared API.
+Erametsad is an Estonian forest-transaction platform that lets forest owners sell cutting rights and forest properties by auction, and lets vetted buyers bid on them. The system has three deployment units: a public marketing site, a customer-facing auction portal, and an admin backend, all served by a shared API.
 
 <!-- TOC -->
 
@@ -34,7 +34,7 @@ Eametsad is an Estonian forest-transaction platform that lets forest owners sell
 ## 1. Project Structure
 
 ```
-eametsad/
+erametsad/
 ├── .agents/              # Agent skills and infrastructure
 ├── .codegraph/           # Code intelligence index
 ├── .opencode/            # OpenCode configuration, harness, agents, plugins
@@ -49,14 +49,14 @@ eametsad/
 │   └── ui/               # Design-system component library (Phase 1)
 ├── docs/
 │   ├── README.md         # Plain-language project overview for all audiences
-│   ├── EAMETSAD-PLAN.md  # Master build plan: features, architecture, data model, timeline
+│   ├── ERAMETSAD-PLAN.md  # Master build plan: features, architecture, data model, timeline
 │   ├── design/
 │   │   ├── README.md     # Design system: colors, typography, spacing, components
 │   │   ├── 00-global-shell.md
-│   │   ├── marketing/    # Page specs for eametsad.ee (17 pages)
-│   │   ├── portal/       # Page specs for oksjonid.eametsad.ee (13 screens)
-│   │   ├── admin/        # Page specs for admin.eametsad.ee (14 screens)
-│   │   └── uhistu/       # Page specs for metsauhistu.eametsad.ee (Phase 5)
+│   │   ├── marketing/    # Page specs for erametsad.ee (17 pages)
+│   │   ├── portal/       # Page specs for oksjonid.erametsad.ee (13 screens)
+│   │   ├── admin/        # Page specs for admin.erametsad.ee (14 screens)
+│   │   └── uhistu/       # Page specs for metsauhistu.erametsad.ee (Phase 5)
 │   └── research/         # Competitive analysis of timber.ee
 ├── openspec/             # OpenSpec change management
 ├── AGENTS.md             # Agent operating guide
@@ -66,7 +66,7 @@ eametsad/
 └── skills-lock.json      # Installed agent skills manifest
 ```
 
-The monorepo is under active implementation. `apps/platform` holds the core backend: a Next.js 15 App Router application running on Cloudflare Workers via OpenNext, with Cloudflare D1 (SQLite) for storage, Drizzle ORM for the data layer, Durable Objects for bid serialization and rate limiting, a Cloudflare queue for background jobs, and a custom admin UI. Remaining phases are defined in `docs/EAMETSAD-PLAN.md`.
+The monorepo is under active implementation. `apps/platform` holds the core backend: a Next.js 15 App Router application running on Cloudflare Workers via OpenNext, with Cloudflare D1 (SQLite) for storage, Drizzle ORM for the data layer, Durable Objects for bid serialization and rate limiting, a Cloudflare queue for background jobs, and a custom admin UI. Remaining phases are defined in `docs/ERAMETSAD-PLAN.md`.
 
 ---
 
@@ -74,7 +74,7 @@ The monorepo is under active implementation. `apps/platform` holds the core back
 
 ```
                       ┌──────────────────────────────────────────────┐
-                      │           eametsad.ee (public)               │
+                      │           erametsad.ee (public)               │
                       │  Marketing site: SSG/ISR + lead forms        │
                       │  (Next.js - static where possible)           │
                       └──────────────┬───────────────────────────────┘
@@ -82,7 +82,7 @@ The monorepo is under active implementation. `apps/platform` holds the core back
          ┌───────────────────────────┼───────────────────────────────┐
          ▼                           ▼                               ▼
 ┌──────────────────┐      ┌──────────────────────────┐     ┌──────────────────────┐
-│ oksjonid.eametsad│      │  api.eametsad.ee (core)   │     │ admin.eametsad.ee    │
+│ oksjonid.erametsad│      │  api.erametsad.ee (core)   │     │ admin.erametsad.ee    │
 │ .ee — SPA portal │────▶│  Auction engine, auth,    │◀────│ Custom admin UI      │
 │ Bids, my pages   │      │  contracts, notifications │     │ (role-gated, Next.js)│
 │ Map, filters     │      │  users, leads, CMS content│     │                      │
@@ -100,9 +100,9 @@ The monorepo is under active implementation. `apps/platform` holds the core back
 
 | Deployment | Role | Tech |
 |---|---|---|
-| `eametsad.ee` | Public marketing & SEO site | Next.js 15 (SSG/ISR), static where possible |
-| `oksjonid.eametsad.ee` | Auction portal SPA | React SPA or Next.js client-heavy routes |
-| `api.eametsad.ee` + `admin.eametsad.ee` | Core backend + role-gated admin | Next.js on Cloudflare Workers (via OpenNext) |
+| `erametsad.ee` | Public marketing & SEO site | Next.js 15 (SSG/ISR), static where possible |
+| `oksjonid.erametsad.ee` | Auction portal SPA | React SPA or Next.js client-heavy routes |
+| `api.erametsad.ee` + `admin.erametsad.ee` | Core backend + role-gated admin | Next.js on Cloudflare Workers (via OpenNext) |
 
 **Prototype domains (ww0.dev):** Under the `ww0.dev` zone, the prototype runs at `erametsad.ww0.dev`, `oksjonid.erametsad.ww0.dev`, `api.erametsad.ww0.dev`, and `admin.erametsad.ww0.dev`. The production `.ee` cutover is a separate future step.
 
@@ -114,7 +114,7 @@ The monorepo is under active implementation. `apps/platform` holds the core back
 
 | Attribute | Value |
 |---|---|
-| **URL** | `eametsad.ee` |
+| **URL** | `erametsad.ee` |
 | **Audience** | Forest owners, buyers (public, no auth) |
 | **Stack** | Next.js 15 App Router `(marketing)` route group in the shared platform app. Static content pages use ISR (`revalidate = 3600`); CMS-backed pages render per request until build-time D1 seeding exists |
 | **Content** | Pages, articles, FAQ categories, specialists, testimonials, partner services — all from D1-backed CMS content tables |
@@ -129,7 +129,7 @@ Host routing lives in `apps/platform/src/lib/routing/host-areas.ts` plus applica
 
 | Attribute | Value |
 |---|---|
-| **URL** | `oksjonid.eametsad.ee` |
+| **URL** | `oksjonid.erametsad.ee` |
 | **Audience** | Bidders & sellers (public browse + authenticated customer area) |
 | **Stack** | Next.js 15 App Router `(portal)` route group in the shared platform app (owns `/` and `/lepingud` on its host) |
 | **Key public pages** | Listing (`/`), lot detail open/sealed (`/oksjon/:id`), archive (`/ajalugu`), login, register, select-profile |
@@ -141,10 +141,10 @@ Host routing lives in `apps/platform/src/lib/routing/host-areas.ts` plus applica
 
 | Attribute | Value |
 |---|---|
-| **URL** | `api.eametsad.ee` |
+| **URL** | `api.erametsad.ee` |
 | **Stack** | Next.js 15 App Router on Cloudflare Workers (via OpenNext) |
 | **Primary storage** | Cloudflare D1 (SQLite) via Drizzle ORM |
-| **Background jobs** | Cloudflare queue `eametsad-jobs` with DLQ `eametsad-dlq` (max_retries 3). Cron sweep wakes evicted Durable Objects. |
+| **Background jobs** | Cloudflare queue `erametsad-jobs` with DLQ `erametsad-dlq` (max_retries 3). Cron sweep wakes evicted Durable Objects. |
 | **Realtime** | SSE for live bid/countdown updates |
 | **Bid serialization** | `AuctionDO` (Durable Object, one per auction) owns bid admission, alarms, anti-snipe, end transitions, and SSE event hub |
 | **Rate limiting** | `RateLimiterDO` (Durable Object) owns rate-limit counters; in-memory fallback outside Workers |
@@ -166,8 +166,8 @@ Host routing lives in `apps/platform/src/lib/routing/host-areas.ts` plus applica
 
 | Attribute | Value |
 |---|---|
-| **URL** | `admin.eametsad.ee` |
-| **Audience** | Eametsad staff (role-gated) |
+| **URL** | `admin.erametsad.ee` |
+| **Audience** | Erametsad staff (role-gated) |
 | **Stack** | Custom Next.js `(admin)/` route group with Estonian labels |
 | **Modules** | Dashboard, auction management, bid monitoring, users & rights, contracts, CRM (leads), service request routing, CMS content, statistics, settings, audit log |
 
@@ -179,11 +179,11 @@ The admin is a separate Next.js route group with role-based access control. It i
 
 ### Key user journey: forest owner sells cutting rights
 
-1. Owner lands on `eametsad.ee`, reads service page, submits lead form.
+1. Owner lands on `erametsad.ee`, reads service page, submits lead form.
 2. Lead POSTs to `POST /api/v1/leads` → stored in D1 → notification sent to assigned specialist.
 3. Specialist contacts owner, prepares forest data, creates auction lot via admin.
 4. Lot published → status `draft → scheduled → active`.
-5. Buyers browse on `oksjonid.eametsad.ee`, place bids.
+5. Buyers browse on `oksjonid.erametsad.ee`, place bids.
 6. Anti-sniping extends end time if bid within last 5 minutes.
 7. At end time, AuctionDO alarm fires → transitions `active → ended` → computes outcome.
 8. Winner invited to sign contract via eID provider → contract stored.
@@ -213,7 +213,7 @@ Buyer submits bid
 | Durable Objects | Stateful compute | `AuctionDO`: serialized bid admission, alarms, anti-snipe, end transitions, SSE event hub. `RateLimiterDO`: rate-limit counters. |
 | Cloudflare R2 | Object storage | Media uploads (images, documents) |
 | Cloudflare KV | Key-value cache | Ephemeral cache where needed |
-| Cloudflare queue | Job queue | Background jobs: `eametsad-jobs` producer, `eametsad-dlq` dead-letter queue (max_retries 3). Cron sweep wakes evicted DOs. |
+| Cloudflare queue | Job queue | Background jobs: `erametsad-jobs` producer, `erametsad-dlq` dead-letter queue (max_retries 3). Cron sweep wakes evicted DOs. |
 
 ### Core entities
 
@@ -248,7 +248,7 @@ Schema source: `apps/platform/src/lib/data/schema/`. The repository layer at `ap
 | **ORM** | Drizzle ORM | Schema definition, migrations, type-safe queries. 33 tables in `apps/platform/src/lib/data/schema/`. |
 | **Bid serialization** | Durable Objects (`AuctionDO`) | Single-threaded per auction — owns bid admission, alarms, anti-snipe, end transitions, SSE hub |
 | **Rate limiting** | Durable Objects (`RateLimiterDO`) | Per-identifier rate-limit counters |
-| **Queue** | Cloudflare queues (`eametsad-jobs`) | Background jobs with DLQ (`eametsad-dlq`, max_retries 3). Cron sweep wakes evicted DOs. |
+| **Queue** | Cloudflare queues (`erametsad-jobs`) | Background jobs with DLQ (`erametsad-dlq`, max_retries 3). Cron sweep wakes evicted DOs. |
 | **Email** | Cloudflare Email Service (beta) | EMAIL binding + REST API. Sending subdomain `erametsad.ww0.dev`. |
 | **Frontend** | React, TypeScript, Tailwind CSS | Component library shared across marketing site, portal, admin |
 | **Realtime** | SSE | Live bid and countdown updates |
@@ -266,9 +266,9 @@ The application runs on Cloudflare Workers via OpenNext. All stateful components
 | Concern | Approach |
 |---|---|
 | **Runtime** | Cloudflare Workers (nodejs_compat flag) |
-| **Database** | Cloudflare D1 (`eametsad-db`) — single writer per database, SQLite dialect |
-| **Object storage** | Cloudflare R2 (`eametsad-media`) |
-| **Queue** | Cloudflare queues (`eametsad-jobs` → `eametsad-dlq`, max_retries 3) |
+| **Database** | Cloudflare D1 (`erametsad-db`) — single writer per database, SQLite dialect |
+| **Object storage** | Cloudflare R2 (`erametsad-media`) |
+| **Queue** | Cloudflare queues (`erametsad-jobs` → `erametsad-dlq`, max_retries 3) |
 | **Durable Objects** | `AuctionDO` (one per auction), `RateLimiterDO` (per-identifier) |
 | **Email** | Cloudflare Email Service (beta, sending subdomain `erametsad.ww0.dev`) |
 | **Build** | Turborepo + pnpm monorepo |
@@ -409,7 +409,7 @@ All suites run under `pnpm test`. Schema lint enforces data conventions (no REAL
 
 | Attribute | Value |
 |---|---|
-| **Name** | Eametsad |
+| **Name** | Erametsad |
 | **Type** | Greenfield — Estonian forest-transaction auction platform |
 | **Primary language** | TypeScript (Next.js, Drizzle ORM, React) |
 | **Database** | Cloudflare D1 (SQLite) |
@@ -435,7 +435,7 @@ All suites run under `pnpm test`. Schema lint enforces data conventions (no REAL
 | Lead | Päring (muud)/Juhtlõim (CRM) | A form submission or contact enquiry |
 | Service request | Päring (teenus) | A request forwarded to a partner company for services |
 | Forest notification | Metsateatis | A logging notification filed with the state environmental board |
-| Specialist | Metsaspetsialist | An Eametsad staff member who manages forest owner relationships |
+| Specialist | Metsaspetsialist | An Erametsad staff member who manages forest owner relationships |
 | Association | Metsaühistu | Forest owners' cooperative (optional Phase 5) |
 
 <!-- Last updated: 2026-08-30 -->

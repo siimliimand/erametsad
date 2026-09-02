@@ -1,6 +1,6 @@
 'use client'
 
-import { LotCard, type LotCardProps } from '@eametsad/ui'
+import { LotCard, type LotCardProps } from '@erametsad/ui'
 import { useRouter } from 'next/navigation'
 import {
   useCallback,

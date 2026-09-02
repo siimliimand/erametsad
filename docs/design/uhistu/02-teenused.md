@@ -3,7 +3,7 @@
 > **In brief:** All association services in one scrolling page.
 | Area | uhistu |
 |---|---|
-| **Route** | `metsauhistu.eametsad.ee/teenused` (+ anchors `#istutamine` …) |
+| **Route** | `metsauhistu.erametsad.ee/teenused` (+ anchors `#istutamine` …) |
 | **Access** | public |
 | **In nav** | subsite header "Teenused"; home service chips link to anchors |
 
@@ -27,7 +27,7 @@ Owner wants to know which forestry works the association coordinates and what a 
 │ H2 #kavad Metsamajandamiskavad                                  │
 │ H2 #taimede-hooldus Metsataimede hooldamine                     │
 │ H2 #maapind Maapinna ettevalmistus                              │
-│ H2 #oksjonid Enampakkumised → oksjonid.eametsad.ee (external band)│
+│ H2 #oksjonid Enampakkumised → oksjonid.erametsad.ee (external band)│
 ├──────────────────────────────────────────────────────────────────┤
 │ <ContactBand>                                                   │
 └──────────────────────────────────────────────────────────────────┘
@@ -46,7 +46,7 @@ Mobile: sections full-width, päring CTA becomes sticky bottom bar after 2nd sec
    - **Metsamajandamiskavad**: "metsa pass", 10-aastane plaan, takseerandmed; link to main site kava päring.
    - **Metsataimede hooldamine**: umbrohutõrje/noorendike niitmine.
    - **Maapinna ettevalmistus**: harvendusraie-järgne pinna ettevalmistus (kaevukulturistid/kobestus).
-   - **Enampakkumised**: distinct band (bg-mist) cross-selling `oksjonid.eametsad.ee` — raieõiguste ja kinnistute oksjonid; CTA external.
+   - **Enampakkumised**: distinct band (bg-mist) cross-selling `oksjonid.erametsad.ee` — raieõiguste ja kinnistute oksjonid; CTA external.
 4. **Inline päring drawer** — one shared `<Drawer>` (not per-section forms): fields nimi, telefon, email, metsa asukoht (text), teenus (prefilled from clicked section, `Select` w/ 9 options), message optional, ConsentCheck (visible, unchecked, required). → `POST /api/leads` (`form_name=teenused-paering`, `page=/teenused`, `service=<slug>`).
 5. **`<ContactBand>`**.
 

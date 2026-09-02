@@ -4,11 +4,11 @@ import { useEffect } from 'react'
 
 // The boundary renders client-side and Settings is a server-side,
 // admin-guarded repository, so contact data is a static fallback matching
-// the seeded FAQ copy (klienditugi): info@eametsad.ee / +372 6000 000.
+// the seeded FAQ copy (klienditugi): info@erametsad.ee / +372 6000 000.
 // Revisit if the shell exposes public contact settings.
 const CONTACT_PHONE = '+372 6000 000'
 const CONTACT_PHONE_HREF = 'tel:+3726000000'
-const CONTACT_EMAIL = 'info@eametsad.ee'
+const CONTACT_EMAIL = 'info@erametsad.ee'
 
 export default function GlobalError({
   error,

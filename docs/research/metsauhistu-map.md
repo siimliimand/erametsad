@@ -1,6 +1,6 @@
 # metsauhistu.timber.ee — Structural & Functional Map
 
-> **In brief (for the client):** this maps the reference's forest-owners' association site — an optional later phase for Eametsad. It confirms a content-heavy subsidies module (deadlines, €/ha rates, eligibility) drives the value. One flaw we will not repeat: the reference uses hidden, pre-ticked consent checkboxes, which is a GDPR risk we fix everywhere.
+> **In brief (for the client):** this maps the reference's forest-owners' association site — an optional later phase for Erametsad. It confirms a content-heavy subsidies module (deadlines, €/ha rates, eligibility) drives the value. One flaw we will not repeat: the reference uses hidden, pre-ticked consent checkboxes, which is a GDPR risk we fix everywhere.
 
 
 Scraped 2026-08-27. Stack: **Gatsby 5.16.1** static site, Tailwind CSS (theme color `#4ABB5D` green), no client-side framework for content (all markup server-rendered). Language: Estonian only, `lang="et"`.

@@ -15,7 +15,7 @@ The repo SHALL define the packages `ui`, `types`, `config`, and `emails`.
 Each package SHALL be wired as an importable workspace package.
 
 #### Scenario: Packages resolve
-- **WHEN** `apps/platform` imports from `@eametsad/config`
+- **WHEN** `apps/platform` imports from `@erametsad/config`
 - **THEN** the import resolves without a relative path
 
 ### Requirement: Lint and type config

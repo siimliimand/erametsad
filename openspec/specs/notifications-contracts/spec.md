@@ -8,7 +8,7 @@ Domain events SHALL carry the affected `userId` so dispatch can reach the
 user. Dispatch SHALL run in the Cloudflare Queues consumer worker (one
 message per user and channel), not in an in-process dispatcher started by
 application bootstrap. Email SHALL be sent through the Email Service
-transport chain (`email-sender.ts`) with the `@eametsad/emails`
+transport chain (`email-sender.ts`) with the `@erametsad/emails`
 templates and stored as Notification rows with per-recipient delivery
 status; SMS stays a log stub. Duplicate dispatch per user and event SHALL
 be deduplicated through `dedupeKey`.
@@ -44,7 +44,7 @@ SHALL backfill the auction's `eur` contribution from the published
 
 ### Requirement: Lead ingestion endpoint
 `POST /api/leads` SHALL rate-limit by IP at 5 requests/minute, require
-the consent timestamp, validate contact fields with `@eametsad/types`
+the consent timestamp, validate contact fields with `@erametsad/types`
 validators (Estonian phone, email), keep the `company_website` honeypot,
 and record the source. Honeypot hits SHALL return a fake success without
 storing anything.

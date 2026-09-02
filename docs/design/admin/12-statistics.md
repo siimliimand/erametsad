@@ -40,7 +40,7 @@ Business intelligence from auction outcomes and the lead funnel: sell-through, p
 5. **Lõhtr (funnel)** — Juhtlõimed → Võetud ühendust → Kvalifitseeritud → Leping; horizontal funnel with counts + conversion % per stage; data from Lead statuses + contract link; period-consistent (leads created in range, statuses as of now — footnoted).
 6. **Teenustasu kuude kaupa** — bar/line fees by month, cumulative line; hover shows contract count behind each month.
 7. **Avaliku statistika kuraator** — panel listing aggregate groups (kokkumüüdud €/ha/m³ per tüüp ja aasta, oksjonite arv, edu-%): toggle each "avalik / varjatud"; preview link to public stats page; changes saved via 13 audit. Superadmin only.
-8. **Ekspord** — CSV (raw rows behind each chart) and XLSX (workbook, one sheet per chart). Filename `eametsad-statistika-{filters}-{date}`.
+8. **Ekspord** — CSV (raw rows behind each chart) and XLSX (workbook, one sheet per chart). Filename `erametsad-statistika-{filters}-{date}`.
 
 ## Interactions & edge cases
 - Charts redraw on filter change with 300ms debounce; server aggregates from StatisticsSnapshot (daily) + live queries for current month (badge "käesolev kuu: reaalajas").
@@ -73,7 +73,7 @@ Panel rows: { aggregate group: kogusumma €, oksjonite arv, kesk €/ha, kesk �
 
 ## Export detail
 - CSV: one file per chart selected or "kõik" zip; columns mirror tables; UTF-8 BOM (Excel-EE).
-- XLSX: workbook `eametsad-statistika.xlsx`, sheets: Kokkuvõte, Kuud, Hinnad, Lõhtr, Tasud; header styling; filters encoded in a Metadata sheet.
+- XLSX: workbook `erametsad-statistika.xlsx`, sheets: Kokkuvõte, Kuud, Hinnad, Lõhtr, Tasud; header styling; filters encoded in a Metadata sheet.
 - Exports respect suppression rules (suppressed cells blank + footnote).
 
 ## Data-minimisation & suppression rules

@@ -24,7 +24,7 @@ describe('buildMetadata', () => {
       title: 'Küsimused ja vastused',
       description: 'Kõige sagedasemad küsimused.',
       url: `${ORIGIN}/kkk`,
-      siteName: 'Eametsad',
+      siteName: 'Erametsad',
       locale: 'et_EE',
       type: 'website',
     })
@@ -32,7 +32,7 @@ describe('buildMetadata', () => {
 
   it('canonicalizes the site root to the bare origin', () => {
     const metadata = buildMetadata({
-      title: 'Eametsad — metsa ja raieõiguse müük oksjonil',
+      title: 'Erametsad — metsa ja raieõiguse müük oksjonil',
       description: 'Metsa müük oksjonil.',
       path: '/',
     })
@@ -49,13 +49,13 @@ describe('buildMetadata', () => {
     expect(templated.title).toBe('Kontakt')
 
     const absolute = buildMetadata({
-      title: 'Eametsad — metsa ja raieõiguse müük oksjonil',
+      title: 'Erametsad — metsa ja raieõiguse müük oksjonil',
       description: 'Metsa müük oksjonil.',
       path: '/',
       absoluteTitle: true,
     })
     expect(absolute.title).toEqual({
-      absolute: 'Eametsad — metsa ja raieõiguse müük oksjonil',
+      absolute: 'Erametsad — metsa ja raieõiguse müük oksjonil',
     })
   })
 

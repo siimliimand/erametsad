@@ -2,7 +2,7 @@ import type { DbDatabase } from '../lib/db'
 import type { EmailSenderBinding } from '../lib/notifications/email-sender'
 
 /**
- * Message body for the `eametsad-jobs` queue consumer. Producers send one
+ * Message body for the `erametsad-jobs` queue consumer. Producers send one
  * message per user and channel: the notification row already carries both,
  * so the consumer only delivers it.
  */

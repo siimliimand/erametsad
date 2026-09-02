@@ -1,6 +1,6 @@
 'use client'
 
-import { Steps, type StepItem } from '@eametsad/ui'
+import { Steps, type StepItem } from '@erametsad/ui'
 import { useState } from 'react'
 
 import { AccessRequestFlow } from './AccessRequestFlow'

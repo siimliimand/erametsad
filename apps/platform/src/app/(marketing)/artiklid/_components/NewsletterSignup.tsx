@@ -1,6 +1,6 @@
 'use client'
 
-import { Toast } from '@eametsad/ui'
+import { Toast } from '@erametsad/ui'
 import { useState, type SyntheticEvent } from 'react'
 
 // Local minimal newsletter form for the articles hub. Task 3.1 owns the

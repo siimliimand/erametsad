@@ -8,7 +8,7 @@
 | **In nav** | sidebar "Sisu" |
 
 ## Purpose & user goals
-Manage every marketing-site collection (eametsad.ee): build pages from blocks, write articles with SEO control, maintain FAQ/testimonials/legal/redirects/menus and the media library — with draft/preview/publish workflow and revisions.
+Manage every marketing-site collection (erametsad.ee): build pages from blocks, write articles with SEO control, maintain FAQ/testimonials/legal/redirects/menus and the media library — with draft/preview/publish workflow and revisions.
 
 ## Wireframe (desktop)
 ```

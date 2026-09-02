@@ -1,4 +1,4 @@
-# EAMETSAD — Full Project Build Plan
+# ERAMETSAD — Full Project Build Plan
 
 **Estonian forest-transaction platform: marketing site + auction environment + owner services, with customer portal and admin backend**
 
@@ -7,7 +7,7 @@
 - Based on: competitive structural analysis of timber.ee ecosystem (3 sites, 23 pages mapped + reverse-engineered platform APIs) — see `research/*.md`
 - Language of the product: **Estonian** (terms below kept in Estonian where they are domain labels)
 
-> ⚖️ **Legal posture:** this plan replicates *functionality and structure*, not content, branding, or visual design. All copy, imagery, layout and brand assets for Eametsad must be created fresh. Auction terms & conditions, contracts and privacy documents need review by Estonian legal counsel before launch.
+> ⚖️ **Legal posture:** this plan replicates *functionality and structure*, not content, branding, or visual design. All copy, imagery, layout and brand assets for Erametsad must be created fresh. Auction terms & conditions, contracts and privacy documents need review by Estonian legal counsel before launch.
 
 ---
 
@@ -15,17 +15,17 @@
 
 > For the forest-owner client, the buyer, and anyone who wants the "what and why" without the technical detail. The rest of this document is the full build plan.
 
-**What Eametsad is.** A place to sell Estonian forest — cutting rights (_raieõigus_) and forest properties (_metsakinnistu_) — by auction, and for vetted buyers to bid on it. The promise to the owner is simple: the auction finds the market price, and you only pay if the sale succeeds.
+**What Erametsad is.** A place to sell Estonian forest — cutting rights (_raieõigus_) and forest properties (_metsakinnistu_) — by auction, and for vetted buyers to bid on it. The promise to the owner is simple: the auction finds the market price, and you only pay if the sale succeeds.
 
 **What we build:**
 
 | Product | In one sentence |
 |---|---|
-| `eametsad.ee` | The public website — explains the service, answers questions, collects enquiries. |
-| `oksjonid.eametsad.ee` | The auction platform — browse lots on a map, place bids, sell your own forest, sign contracts. |
-| `admin.eametsad.ee` | The staff control room — manage auctions, bidders, leads, contracts and content. |
+| `erametsad.ee` | The public website — explains the service, answers questions, collects enquiries. |
+| `oksjonid.erametsad.ee` | The auction platform — browse lots on a map, place bids, sell your own forest, sign contracts. |
+| `admin.erametsad.ee` | The staff control room — manage auctions, bidders, leads, contracts and content. |
 
-**How Eametsad earns money:** a **3% + VAT success fee** on the final price, paid only when the auction completes. Secondary income comes from **valuation reports** (from €480 + VAT) and **48-hour quick auctions** (_kiiroksjon_) where Eametsad itself backs the lot with a purchase offer if no buyer wins.
+**How Erametsad earns money:** a **3% + VAT success fee** on the final price, paid only when the auction completes. Secondary income comes from **valuation reports** (from €480 + VAT) and **48-hour quick auctions** (_kiiroksjon_) where Erametsad itself backs the lot with a purchase offer if no buyer wins.
 
 **The experience for a forest owner:**
 1. Leave your details on the website → a free consultation, no obligation.
@@ -45,11 +45,11 @@
 
 The reference (AS Timber / timber.ee) runs a three-property ecosystem:
 
-| Property | Role | Stack (reference) | Eametsad equivalent |
+| Property | Role | Stack (reference) | Erametsad equivalent |
 |---|---|---|---|
-| `timber.ee` | Marketing + SEO + lead-gen (256 URLs) | Gatsby + Contentful | `eametsad.ee` — marketing site |
-| `oksjonid.timber.ee` | Auction platform (2,660 lots run to date; 36 active) | React SPA + **Payload CMS** backend (`backend.timber.ee`) | `oksjonid.eametsad.ee` — auction environment |
-| `metsauhistu.timber.ee` | Forest-owners' association (MTÜ) subsite (21 URLs) | Gatsby + Contentful | `metsauhistu.eametsad.ee` — association subsite (optional Phase 5) |
+| `timber.ee` | Marketing + SEO + lead-gen (256 URLs) | Gatsby + Contentful | `erametsad.ee` — marketing site |
+| `oksjonid.timber.ee` | Auction platform (2,660 lots run to date; 36 active) | React SPA + **Payload CMS** backend (`backend.timber.ee`) | `oksjonid.erametsad.ee` — auction environment |
+| `metsauhistu.timber.ee` | Forest-owners' association (MTÜ) subsite (21 URLs) | Gatsby + Contentful | `metsauhistu.erametsad.ee` — association subsite (optional Phase 5) |
 
 **Business model being replicated:** free consultation for forest owners → sell cutting rights (`raieõigus`) / forest property (`metsakinnistu`) / packages via auction → **success fee 3% + VAT** of final price; side revenue from valuation reports (`hindamisakt`, from €480), 48h quick auctions (`kiiroksjon`) with house backup offer, and a service-request marketplace (`päringud`) forwarding leads to partner companies.
 
@@ -84,11 +84,11 @@ The reference (AS Timber / timber.ee) runs a three-property ecosystem:
 
 ---
 
-## 3. Eametsad system architecture
+## 3. Erametsad system architecture
 
 ```
                     ┌──────────────────────────────────────────────┐
-                    │              eametsad.ee (public)             │
+                    │              erametsad.ee (public)             │
                     │  Marketing + SEO + lead forms + articles      │
                     │  (SSG/ISR — no dynamic state)                 │
                     └───────────────┬──────────────────────────────┘
@@ -96,7 +96,7 @@ The reference (AS Timber / timber.ee) runs a three-property ecosystem:
         ┌───────────────────────────┼───────────────────────────┐
         ▼                           ▼                           ▼
 ┌───────────────────┐   ┌───────────────────────────┐  ┌────────────────────┐
-│ oksjonid.eametsad │   │   api.eametsad.ee (core)   │  │ admin.eametsad.ee  │
+│ oksjonid.erametsad │   │   api.erametsad.ee (core)   │  │ admin.erametsad.ee  │
 │ .ee — SPA portal  │──▶│  auction engine, auth,     │◀─│ admin panel        │
 │ bids, my pages    │   │  contracts, notifications, │  │ (same backend,     │
 │ map, filters      │   │  users, leads, CMS content │  │  role-gated)       │
@@ -148,7 +148,7 @@ The reference (AS Timber / timber.ee) runs a three-property ecosystem:
 ```
 
 ### 4.2 Global layout
-- **Header nav** (dropdowns): *Metsa müümine* (5 sub-items) · *KKK* · *Kiiroksjonid* · *Päringud* (3 sub) · *Uudised* · *Meist* (2 sub) · *Metsaühistu* (external) · CTA button **"Oksjonikeskkond"** → `oksjonid.eametsad.ee`.
+- **Header nav** (dropdowns): *Metsa müümine* (5 sub-items) · *KKK* · *Kiiroksjonid* · *Päringud* (3 sub) · *Uudised* · *Meist* (2 sub) · *Metsaühistu* (external) · CTA button **"Oksjonikeskkond"** → `oksjonid.erametsad.ee`.
 - **Footer** (5 columns): Aktiivsed oksjonid (by type) · Oksjonite ajalugu (by type) · Artiklid · Kasulik teada (kasutusjuhend PDF, lepingud, kasutustingimused, privaatsuspoliitika) · Jälgi meid (FB/IG/YT).
 - **Pre-footer contact band on every page:** phone, e-mail, "Jäta enda kontaktid" anchor → page's lead form.
 - Cookie banner + explicit analytics consent (reference has none — we do it properly).
@@ -223,7 +223,7 @@ draft → scheduled → active → ended → appraisal(seller accepts top bid or
 | `field` | Põllumaa | sealed | |
 | `package` | Kinnistute pakett | sealed | propertyCount + package table |
 
-Quick auction (`kiiroksjon`): flag on any lot — 48h duration, €1 start, secret reserve (piirhind), if no bids ≥ reserve → house backup offer from Eametsad OÜ itself.
+Quick auction (`kiiroksjon`): flag on any lot — 48h duration, €1 start, secret reserve (piirhind), if no bids ≥ reserve → house backup offer from Erametsad OÜ itself.
 
 ### 5.4 Lot (auction) — complete data model
 
@@ -316,7 +316,7 @@ Field inventory (matches everything the reference exposes, organized):
 
 ## 7. Admin backend
 
-Access via `admin.eametsad.ee` (role-gated screens on the same core API).
+Access via `admin.erametsad.ee` (role-gated screens on the same core API).
 
 ### 7.1 Modules
 1. **Dashboard:** active auctions ending today, bids today, pending approvals (companies, alapakkumised), new leads, signed contracts, revenue (fees) MTD.
@@ -443,15 +443,15 @@ Forms: `POST /api/leads`, `POST /api/service-requests`, `POST /api/newsletter`.
 
 ## 14. Open questions for the client
 
-1. **Company & legal entity** for Eametsad (name OÜ? registrikood, KMKR) — needed for contracts, T&C, fee invoices.
+1. **Company & legal entity** for Erametsad (name OÜ? registrikood, KMKR) — needed for contracts, T&C, fee invoices.
 2. **Fee model** — replicate 3% + VAT success fee? Deposits (tagatisraha) instead of/in addition to contracts? (Reference uses contracts only.)
 3. **eID/signing provider** preference and budget (per-signature pricing matters at volume).
 4. **Buyer acquisition plan** — the reference's moat is 200 vetted buyers; bidding-side liquidity is the make-or-break. Do they bring a buyer network?
 5. **Specialists** — who creates lots (admin-only at start vs specialist accounts from day 1)?
-6. **Kiiroksjon backup offer** — will Eametsad commit its own capital as buyer of last resort?
+6. **Kiiroksjon backup offer** — will Erametsad commit its own capital as buyer of last resort?
 7. **Association subsite** in scope now or later?
 8. **Languages** — ET only at launch, or ET+EN?
-9. **Existing brand assets** for Eametsad (logo, palette) or do we design fresh?
+9. **Existing brand assets** for Erametsad (logo, palette) or do we design fresh?
 10. Hosting/data-residency requirements (public-sector-adjacent clients often ask for EE/EU hosting).
 
 ---
@@ -461,4 +461,4 @@ Forms: `POST /api/leads`, `POST /api/service-requests`, `POST /api/newsletter`.
 - `research/oksjonid-map.md` — auction platform: mechanics, complete field inventory, Payload data model, auth flows
 - `research/metsauhistu-map.md` — association subsite: subsidies content model, membership mechanics
 
-*Scraped 2026-08-27 for competitive analysis. All Eametsad content, design and copy to be produced original.*
+*Scraped 2026-08-27 for competitive analysis. All Erametsad content, design and copy to be produced original.*

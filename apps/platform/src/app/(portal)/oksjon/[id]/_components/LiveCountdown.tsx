@@ -1,6 +1,6 @@
 'use client'
 
-import { Countdown } from '@eametsad/ui'
+import { Countdown } from '@erametsad/ui'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 

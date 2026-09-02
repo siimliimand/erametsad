@@ -8,7 +8,7 @@ importers:
 
   .:
     devDependencies:
-      '@eametsad/config':
+      '@erametsad/config':
         specifier: workspace:*
         version: link:packages/config
       '@typescript-eslint/eslint-plugin':
@@ -38,13 +38,13 @@ importers:
 
   apps/platform:
     dependencies:
-      '@eametsad/emails':
+      '@erametsad/emails':
         specifier: workspace:*
         version: link:../../packages/emails
-      '@eametsad/types':
+      '@erametsad/types':
         specifier: workspace:*
         version: link:../../packages/types
-      '@eametsad/ui':
+      '@erametsad/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       drizzle-orm:
@@ -72,7 +72,7 @@ importers:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.8.71
         version: 0.8.71(@vitest/runner@3.2.7)(@vitest/snapshot@3.2.7)(vitest@3.2.7(@types/node@20.19.43)(jiti@1.21.7)(jsdom@26.1.0)(sass@1.77.4)(terser@5.16.9)(tsx@4.23.13)(yaml@2.9.0))
-      '@eametsad/config':
+      '@erametsad/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@opennextjs/cloudflare':
@@ -153,7 +153,7 @@ importers:
 
   packages/emails:
     devDependencies:
-      '@eametsad/config':
+      '@erametsad/config':
         specifier: workspace:*
         version: link:../config
 
@@ -163,7 +163,7 @@ importers:
         specifier: ^3.23.0
         version: 3.25.76
     devDependencies:
-      '@eametsad/config':
+      '@erametsad/config':
         specifier: workspace:*
         version: link:../config
       vitest:
@@ -172,7 +172,7 @@ importers:
 
   packages/ui:
     dependencies:
-      '@eametsad/types':
+      '@erametsad/types':
         specifier: workspace:*
         version: link:../types
       leaflet:
@@ -191,7 +191,7 @@ importers:
         specifier: ^3.4.0
         version: 3.4.19(tsx@4.23.13)(yaml@2.9.0)
     devDependencies:
-      '@eametsad/config':
+      '@erametsad/config':
         specifier: workspace:*
         version: link:../config
       '@testing-library/jest-dom':

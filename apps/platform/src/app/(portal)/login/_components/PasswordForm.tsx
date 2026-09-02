@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, FormInput } from '@eametsad/ui'
+import { Btn, FormInput } from '@erametsad/ui'
 import Link from 'next/link'
 import { useState, type SyntheticEvent } from 'react'
 

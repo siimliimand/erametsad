@@ -38,7 +38,7 @@ Mobile: steps stack; method cards full width; `<Steps>` becomes progress bar "Sa
      - company **not yet registered** → profile created with `approval_status: pending` → step 3.
      - company **already registered** → access-request branch: "See ettevõte on juba registreeritud. Ligipääsu saamiseks saada taotlus." → `POST /api/v1/business/request-access` → **pending screen** "Sinu taotlus on ülevaatamisel. Võtame Sinuga ühendust läbivaatuse jooksul." → dead-end state (e-mail on decision).
 3. **Step 3 — Andmed ja nõusolekud** — editable: e-mail, telefon, aadress (from eID/lookup). `<ConsentCheck>` ×3 (unchecked, required where marked): ☐ Kasutustingimused (link) — kohustuslik; ☐ Privaatsuspoliitika — kohustuslik; ☐ Soovin teavitusi uutest oksjonitest — valikuline. Submit `GET/POST /api/profiles`.
-4. **Step 4 — Valmis** — success `<Card>`: "Konto on loodud." + role clarity copy: "Pakkumiste tegemiseks vajad vastava oksjonitüübi õigusi — kirjuta info@eametsad.ee või allkirjasta raamleping esimese pakkumise juures." CTAs: "Jätka pakkumisteni" (`next` or `/`), "Allkirjasta raamleping".
+4. **Step 4 — Valmis** — success `<Card>`: "Konto on loodud." + role clarity copy: "Pakkumiste tegemiseks vajad vastava oksjonitüübi õigusi — kirjuta info@erametsad.ee või allkirjasta raamleping esimese pakkumise juures." CTAs: "Jätka pakkumisteni" (`next` or `/`), "Allkirjasta raamleping".
 5. **Pending-company state page** — persistent banner across portal: "Ettevõtte profiil on ülevaatamisel" until approved/rejected.
 
 ## Interactions & edge cases
@@ -60,11 +60,11 @@ No caching. No realtime.
 
 ## States
 - Per-step loading; eID pending/rejected/expired (as login).
-- Existing-account detected; already-registered company; pending approval; rejected approval (e-mail decision, banner state "Taotlus lükati tagasi — võta ühendust info@eametsad.ee").
+- Existing-account detected; already-registered company; pending approval; rejected approval (e-mail decision, banner state "Taotlus lükati tagasi — võta ühendust info@erametsad.ee").
 - Generic error with retry; validation errors inline per field.
 
 ## Copy (Estonian, draft)
-"Registreerimine" · "Tuvasta end" · "Vali profiili tüüp" · "Eraisik" · "Ettevõte" · "Äriregistri kood" · "See ettevõte on juba registreeritud. Ligipääsu saamiseks saada taotlus." · "Sinu taotlus on ülevaatamisel. Eametsadi meeskond võtab Sinuga ühendust." · "Konto on loodud" · "Nõustun kasutustingimustega" · "Soovin teavitusi uutest oksjonitest (valikuline)"
+"Registreerimine" · "Tuvasta end" · "Vali profiili tüüp" · "Eraisik" · "Ettevõte" · "Äriregistri kood" · "See ettevõte on juba registreeritud. Ligipääsu saamiseks saada taotlus." · "Sinu taotlus on ülevaatamisel. Erametsadi meeskond võtab Sinuga ühendust." · "Konto on loodud" · "Nõustun kasutustingimustega" · "Soovin teavitusi uutest oksjonitest (valikuline)"
 
 ## SEO & analytics
 noindex. Events: register_started, register_eid_success, register_company_lookup, access_request_sent, register_completed.

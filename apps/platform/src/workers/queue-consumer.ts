@@ -244,7 +244,7 @@ async function markProcessed(env: QueueConsumerEnv, key: string): Promise<void> 
 }
 
 /**
- * Queue consumer entry point for the `eametsad-jobs` queue. One message per
+ * Queue consumer entry point for the `erametsad-jobs` queue. One message per
  * user and channel; per-message failures retry instead of failing the batch.
  */
 export async function queue(

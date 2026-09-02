@@ -1,4 +1,4 @@
-import { LeadForm, SpecialistCard } from '@eametsad/ui'
+import { LeadForm, SpecialistCard } from '@erametsad/ui'
 import Link from 'next/link'
 
 import { CompanyCard } from '../_components/CompanyCard'
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
 export const metadata = buildMetadata({
   title: 'Kontakt',
   description:
-    'Eametsad OÜ kontaktandmed, metsaspetsialistide otsenumbrid ja päringuvorm. Kirjuta või helista — vastame 1 tööpäeva jooksul.',
+    'Erametsad OÜ kontaktandmed, metsaspetsialistide otsenumbrid ja päringuvorm. Kirjuta või helista — vastame 1 tööpäeva jooksul.',
   path: '/kontakt',
 })
 
@@ -87,10 +87,10 @@ export default async function KontaktPage() {
           <p className="mt-md font-body text-bodySm text-inkMuted">
             Press ja koostöö:{' '}
             <a
-              href="mailto:press@eametsad.ee"
+              href="mailto:press@erametsad.ee"
               className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
             >
-              press@eametsad.ee
+              press@erametsad.ee
             </a>
           </p>
         </section>

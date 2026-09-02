@@ -86,7 +86,7 @@ Replace `--base` with the deployed URL and `--d1 remote` for setup/verify:
 
 ```bash
 pnpm exec tsx scripts/loadtest/loadtest.ts run \
-  --base https://api.eametsad.ee --auction <id> --vus 50 --burst 300 \
+  --base https://api.erametsad.ee --auction <id> --vus 50 --burst 300 \
   --skip-contracts
 pnpm exec tsx scripts/loadtest/loadtest.ts verify --d1 remote
 ```

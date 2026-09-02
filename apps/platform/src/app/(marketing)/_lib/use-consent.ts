@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 
 import { track } from '@/lib/analytics/track'
 
-export const CONSENT_COOKIE = 'eametsad_consent'
-export const CONSENT_CHANGE_EVENT = 'eametsad:consent-change'
+export const CONSENT_COOKIE = 'erametsad_consent'
+export const CONSENT_CHANGE_EVENT = 'erametsad:consent-change'
 
 // 12 months, per the marketing-shell spec.
 const CONSENT_MAX_AGE_SECONDS = 60 * 60 * 24 * 365

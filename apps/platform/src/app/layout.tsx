@@ -24,7 +24,7 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Eametsad',
+  title: 'Erametsad',
   description: 'Eesti metsatehingute platvorm',
 }
 

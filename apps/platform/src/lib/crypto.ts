@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import { concatBytes, fromHex, toHex, utf8Decode } from './bytes'
 
 const ALGORITHM = 'aes-256-gcm'
-const SALT = 'eametsad-isikukood-v1'
+const SALT = 'erametsad-isikukood-v1'
 
 function getKey(): Uint8Array {
   const raw = process.env.ISIKUKOOD_ENCRYPTION_KEY

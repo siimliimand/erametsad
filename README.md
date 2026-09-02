@@ -1,6 +1,6 @@
-# Eametsad
+# Erametsad
 
-Eametsad is an Estonian forest transaction platform. Forest owners sell
+Erametsad is an Estonian forest transaction platform. Forest owners sell
 cutting rights and forest property by auction. Vetted buyers bid on them.
 
 ## Prerequisites
@@ -39,7 +39,7 @@ the local Docker services. Change `PAYLOAD_SECRET` to a random string at least
 ## Project structure
 
 ```
-eametsad/
+erametsad/
 ├── apps/
 │   └── platform/         Next.js 15 app with Payload CMS 3
 ├── packages/
@@ -86,7 +86,7 @@ Mailpit captures all outgoing email in development. Open
 
 ```bash
 # Apply Payload migrations
-pnpm --filter @eametsad/platform run payload migrate
+pnpm --filter @erametsad/platform run payload migrate
 
 # Reset local database (drop and re-create)
 docker compose down -v && docker compose up -d

@@ -1,4 +1,4 @@
-# Project History — Eametsad
+# Project History — Erametsad
 
 **Greenfield project — pre-development state**
 
@@ -8,7 +8,7 @@
 
 ## What exists
 
-1. **Master build plan** (`docs/EAMETSAD-PLAN.md`, 464 lines) — complete spec covering marketing site, auction portal, admin backend, data model, API surface, delivery phases, and open client questions.
+1. **Master build plan** (`docs/ERAMETSAD-PLAN.md`, 464 lines) — complete spec covering marketing site, auction portal, admin backend, data model, API surface, delivery phases, and open client questions.
 2. **Design system** (`docs/design/README.md`, 378 lines) — full design language: colour palette (16 tokens), typography (Manrope/Inter/JetBrains Mono), spacing scale (8 tokens), layout grid, motion, imagery, iconography (Lucide React), and component library (30+ components).
 3. **Page specs** — 40+ page/screen specs across marketing (17 pages), portal (13 screens), admin (14 screens), and association subsite (7 pages).
 4. **Competitive research** — structural analysis of timber.ee (3 sites, 23 pages, reverse-engineered APIs).
@@ -18,7 +18,7 @@
 ## Key decisions already made
 
 - Tech stack: Next.js 15 + Payload CMS 3 + PostgreSQL 16 + Redis (recommended); Laravel alternative noted
-- Subdomain strategy: `eametsad.ee`, `oksjonid.`, `api.`, `admin.`, optional `metsauhistu.`
+- Subdomain strategy: `erametsad.ee`, `oksjonid.`, `api.`, `admin.`, optional `metsauhistu.`
 - Revenue model: 3% + VAT success fee, valuation reports (from €480), 48h quick auctions
 - Delivery: 5 phases, ~20-28 weeks full scope, ~10-12 weeks to MVP
 - Design philosophy: calm, authentic Estonian forest, trustworthy, accessible (WCAG 2.1 AA)

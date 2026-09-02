@@ -2,7 +2,7 @@
 
 ## Why
 
-Eametsad is a greenfield platform with a fully specified plan and design
+Erametsad is a greenfield platform with a fully specified plan and design
 system, but no code exists yet. Phase 0 establishes the repository, tooling,
 CMS foundation, and Cloudflare deployment path that every later phase builds
 on. Getting the foundation right first prevents rework across the marketing

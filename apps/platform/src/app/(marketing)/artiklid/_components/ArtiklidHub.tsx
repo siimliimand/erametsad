@@ -1,4 +1,4 @@
-import { ArticleCard, EmptyState } from '@eametsad/ui'
+import { ArticleCard, EmptyState } from '@erametsad/ui'
 import { Newspaper } from 'lucide-react'
 import Link from 'next/link'
 

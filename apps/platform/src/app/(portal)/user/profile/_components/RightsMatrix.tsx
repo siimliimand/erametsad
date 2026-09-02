@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn } from '@eametsad/ui'
+import { Btn } from '@erametsad/ui'
 import { useEffect, useState } from 'react'
 
 import { ApiError, requestJson } from './api'

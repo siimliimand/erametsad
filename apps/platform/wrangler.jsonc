@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "eametsad-api",
+  "name": "erametsad-api",
   // Entry shim: re-exports the OpenNext fetch handler from .open-next/worker.js
   // plus the DO classes and the queue consumer, because OpenNext's generated
   // entry cannot export them itself.
@@ -15,7 +15,7 @@
   // hostname oksjonid.erametsad.ww0.dev maps to the (portal) route group in
   // src/middleware.ts on this same Worker — no extra Worker exists for it.
   // Attaching that hostname is a one-time dashboard step (Workers & Pages →
-  // eametsad-api → Settings → Domains & Routes → Add custom domain); see
+  // erametsad-api → Settings → Domains & Routes → Add custom domain); see
   // docs/runbooks/cutover-cloudflare-only.md §4. The api. and admin.
   // hostnames are a documented follow-up: the middleware mapping table
   // no-ops on them until their areas join the table.
@@ -26,7 +26,7 @@
     { "binding": "KV", "id": "5b67cd2c595f4d31b3b1be5db76e9bef" }
   ],
   "r2_buckets": [
-    { "binding": "BUCKET", "bucket_name": "eametsad-media", "preview_bucket_name": "eametsad-media-preview" }
+    { "binding": "BUCKET", "bucket_name": "erametsad-media", "preview_bucket_name": "erametsad-media-preview" }
   ],
   // Email Sending beta (task 4.2): sending subdomain erametsad.ww0.dev is
   // onboarded on zone ww0.dev, which permits any local part and any
@@ -51,14 +51,14 @@
   // Producer binding for the jobs queue; the consumer below drains it.
   "queues": {
     "producers": [
-      { "binding": "QUEUE", "queue": "eametsad-jobs" }
+      { "binding": "QUEUE", "queue": "erametsad-jobs" }
     ],
     // The consumer lives in its own Worker (src/workers/wrangler.jsonc) because
     // wrangler cannot statically detect the `queue` export through the OpenNext
     // shim's re-export chain (deploy fails with code 11001). Create the queues
     // once from apps/platform:
-    //   pnpm exec wrangler queues create eametsad-jobs
-    //   pnpm exec wrangler queues create eametsad-dlq
+    //   pnpm exec wrangler queues create erametsad-jobs
+    //   pnpm exec wrangler queues create erametsad-dlq
     // DLQ-depth alerting lives in the Cloudflare dashboard (account-level queue
     // alerts), not in wrangler config; this comment is the wiring record.
   },
@@ -70,12 +70,12 @@
   },
   // TODO(task 2.8): the CI wrangler token lacks D1 write permission, so remote creation failed
   // (Authentication error, code 10000). A user with D1 access must run once from apps/platform:
-  //   pnpm exec wrangler d1 create eametsad-db
+  //   pnpm exec wrangler d1 create erametsad-db
   // then replace the placeholder database_id below with the returned uuid. Local dev ignores the id.
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "eametsad-db",
+      "database_name": "erametsad-db",
       "database_id": "6ffb35ca-6a2d-4447-9559-4dbc00b9a6c8",
       "migrations_dir": "drizzle"
     }

@@ -1,6 +1,6 @@
 'use client'
 
-import { FormCheck } from '@eametsad/ui'
+import { FormCheck } from '@erametsad/ui'
 import { useState } from 'react'
 
 import { requestJson } from './api'

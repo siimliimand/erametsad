@@ -1,4 +1,4 @@
-import { SpecialistCard } from '@eametsad/ui'
+import { SpecialistCard } from '@erametsad/ui'
 
 import { CompanyCard } from '../../_components/CompanyCard'
 import { buildMetadata } from '../../_lib/seo'

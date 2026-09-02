@@ -26,10 +26,10 @@ drive this design (source plan, section 2):
   emails/month included, daily quota ramp on new accounts, 5 MiB cap.
 - Durable Objects require the same Workers Paid plan.
 
-Provisioned resources (account `29f50b2c...`): queue `eametsad-jobs`, KV
+Provisioned resources (account `29f50b2c...`): queue `erametsad-jobs`, KV
 namespace `5b67cd2c595f4d31b3b1be5db76e9bef` (id missing from
-`wrangler.jsonc` today), R2 buckets `eametsad-media` and
-`eametsad-media-preview`. Email Service is not yet enabled.
+`wrangler.jsonc` today), R2 buckets `erametsad-media` and
+`erametsad-media-preview`. Email Service is not yet enabled.
 
 ## Goals / Non-Goals
 
@@ -83,7 +83,7 @@ goal, but the fallback stays open until the Phase 0 gate.
 | Postgres | D1/SQLite rule | Notes |
 |---|---|---|
 | `numeric` money | INTEGER cents (`bid_amount_cents`) | Never `REAL`. Convert at the API boundary. |
-| `enum` types | TEXT plus `CHECK (col IN (...))` | Enum unions stay in `@eametsad/types`. |
+| `enum` types | TEXT plus `CHECK (col IN (...))` | Enum unions stay in `@erametsad/types`. |
 | `jsonb` | TEXT, parsed in the repository layer | Indexed JSON paths become denormalized columns when queried. |
 | `uuid` | TEXT generated in the app | `crypto.randomUUID()` at insert time. |
 | `timestamptz` | TEXT ISO-8601 UTC | One format everywhere; D1 `DEFAULT CURRENT_TIMESTAMP` is UTC text. |
@@ -213,10 +213,10 @@ under the Cloudflare-hosted zone `ww0.dev`:
 
 | Production host | Prototype host |
 |---|---|
-| eametsad.ee | erametsad.ww0.dev |
-| oksjonid.eametsad.ee | oksjonid.erametsad.ww0.dev |
-| api.eametsad.ee | api.erametsad.ww0.dev |
-| admin.eametsad.ee | admin.erametsad.ww0.dev |
+| erametsad.ee | erametsad.ww0.dev |
+| oksjonid.erametsad.ee | oksjonid.erametsad.ww0.dev |
+| api.erametsad.ee | api.erametsad.ww0.dev |
+| admin.erametsad.ee | admin.erametsad.ww0.dev |
 
 Email sending uses the subdomain `erametsad.ww0.dev` on the `ww0.dev`
 zone; the prototype sender becomes `noreply@erametsad.ww0.dev`. Placeholder

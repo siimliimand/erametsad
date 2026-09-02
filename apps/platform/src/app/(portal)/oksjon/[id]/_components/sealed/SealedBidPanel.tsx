@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, Modal } from '@eametsad/ui'
+import { Btn, Modal } from '@erametsad/ui'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, type SyntheticEvent } from 'react'

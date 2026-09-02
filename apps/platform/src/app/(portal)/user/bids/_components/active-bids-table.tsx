@@ -1,4 +1,4 @@
-import { Countdown } from '@eametsad/ui'
+import { Countdown } from '@erametsad/ui'
 import Link from 'next/link'
 
 import { AutobidderInline } from './autobidder-inline'

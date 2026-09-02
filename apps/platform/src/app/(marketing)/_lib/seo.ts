@@ -9,7 +9,7 @@ export interface BuildMetadataInput {
   description: string
   /** Root-relative path ('/', '/kkk'); canonical and og:url resolve to the marketing host. */
   path: string
-  /** Bypasses the layout's '%s | Eametsad' template (home page). */
+  /** Bypasses the layout's '%s | Erametsad' template (home page). */
   absoluteTitle?: boolean
   ogType?: OpenGraphType
 }
@@ -35,7 +35,7 @@ export function buildMetadata({
       title,
       description,
       url,
-      siteName: 'Eametsad',
+      siteName: 'Erametsad',
       locale: 'et_EE',
       type: ogType,
     },

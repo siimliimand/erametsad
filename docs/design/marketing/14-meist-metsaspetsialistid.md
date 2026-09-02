@@ -63,7 +63,7 @@ Omanik valib enda piirkonna spetsialisti, kellega otse rääkida (telefon/e-mail
 - H1: "Meie metsaspetsialistid" · "Igas maakonnas oma inimene." · "Loe lähemalt" · profiili CTA: "Küsi [nimi] käest — esimene nõu on tasuta." · "Metsad, mida [nimi] müüb" · "Teised spetsialistid".
 
 ## SEO & analytics
-- Title: "Metsaspetsialistid | Eametsad"; profiilil "[Nimi], [roll] | Eametsad".
+- Title: "Metsaspetsialistid | Erametsad"; profiilil "[Nimi], [roll] | Erametsad".
 - JSON-LD: profiilil `Person` (töökoht, kontakt) + `BreadcrumbList`.
 - Sündmused: `specialist_card_click{name}`, `specialist_phone_click{name}`, `specialist_email_click{name}`, `specialist_profile_lot_click{lot_id}`, `lead_form_submit{form_name, with_prefill:true|false}`.
 

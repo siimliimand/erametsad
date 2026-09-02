@@ -125,7 +125,7 @@ describe('DemoEidProvider with seeded users', () => {
       docs: [
         {
           id: 'user-2',
-          email: 'private@eametsad.ee',
+          email: 'private@erametsad.ee',
           name: 'Eraklient Erika',
           role: 'private',
           status: 'active',
@@ -144,7 +144,7 @@ describe('DemoEidProvider with seeded users', () => {
     expect(await provider.status(sessionRef)).toEqual({ status: 'pending' })
     const finalStatus = await provider.status(sessionRef)
     expect(finalStatus.status).toBe('completed')
-    expect(finalStatus.user).toMatchObject({ email: 'private@eametsad.ee' })
+    expect(finalStatus.user).toMatchObject({ email: 'private@erametsad.ee' })
     await expect(provider.complete(sessionRef)).resolves.toHaveProperty(
       'isikukood',
       seededIsikukood,
@@ -156,7 +156,7 @@ describe('DemoEidProvider with seeded users', () => {
       docs: [
         {
           id: 'user-2',
-          email: 'private@eametsad.ee',
+          email: 'private@erametsad.ee',
           role: 'private',
           status: 'suspended',
         },

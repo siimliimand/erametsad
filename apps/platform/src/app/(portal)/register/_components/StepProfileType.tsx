@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, FormInput } from '@eametsad/ui'
+import { Btn, FormInput } from '@erametsad/ui'
 import { useState, type SVGProps } from 'react'
 
 import { lookupCompany, type CompanyLookupResult } from './register-client'

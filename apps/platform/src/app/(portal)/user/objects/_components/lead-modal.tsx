@@ -1,7 +1,7 @@
 'use client'
 
-import { EEPhone } from '@eametsad/types'
-import { Btn, ConsentCheck, FormInput, Modal } from '@eametsad/ui'
+import { EEPhone } from '@erametsad/types'
+import { Btn, ConsentCheck, FormInput, Modal } from '@erametsad/ui'
 import { useState, type SyntheticEvent } from 'react'
 
 import { ApiError, requestJson } from './api'

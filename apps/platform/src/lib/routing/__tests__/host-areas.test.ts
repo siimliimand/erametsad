@@ -39,7 +39,7 @@ describe('resolveHostArea', () => {
   it('returns null for every other hostname', () => {
     expect(resolveHostArea('api.erametsad.ww0.dev')).toBeNull()
     expect(resolveHostArea('admin.erametsad.ww0.dev')).toBeNull()
-    expect(resolveHostArea('eametsad-api.example.workers.dev')).toBeNull()
+    expect(resolveHostArea('erametsad-api.example.workers.dev')).toBeNull()
     expect(resolveHostArea('localhost')).toBeNull()
     expect(resolveHostArea(null)).toBeNull()
   })
@@ -99,7 +99,7 @@ describe('resolveHostRedirect', () => {
   it('no-ops for every unmapped hostname', () => {
     expect(resolveHostRedirect('api.erametsad.ww0.dev', '/login')).toBeNull()
     expect(resolveHostRedirect('admin.erametsad.ww0.dev', '/admin')).toBeNull()
-    expect(resolveHostRedirect('eametsad-api.example.workers.dev', '/')).toBeNull()
+    expect(resolveHostRedirect('erametsad-api.example.workers.dev', '/')).toBeNull()
     expect(resolveHostRedirect('localhost:3000', '/oksjon/1')).toBeNull()
     expect(resolveHostRedirect(null, '/login')).toBeNull()
   })

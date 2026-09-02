@@ -42,7 +42,7 @@ Omanik esitab metsamajanduskava koostamise päringu; päring edastatakse partner
 ## Block-by-block spec
 1. **Vahekaardid (Tabs)** — 3 teenust (Metsamajanduskava / Istutamine / Hooldusraie) → lingid `/paringud/metsa-istutamine`, `/paringud/hooldusraie` (päris navigeerimine, mitte SPA-olek — SEO jaoks eraldi lehed). Aktiivne `--primary` täis.
 2. **Sisuveerg** — H2 "Mis on metsamajanduskava?" (draft): kava on 10 aastaks koostatud tegevuskava, raieliikide ja mahudega; vajalik raieluba-taolisteks toiminguteks ja toetuste taotlemiseks (link `/kkk/metsaandmed`). H2 "Mis ajakava oodata?" — pakkujad võtavad ühendust kuni 7 päeva jooksul; kava koostamine 2–6 nädalat (oleneb pakkujast).
-3. **Päringuvorm (Card)** — väljad (vastavalt EAMETSAD-PLAN §4.3 tabelile):
+3. **Päringuvorm (Card)** — väljad (vastavalt ERAMETSAD-PLAN §4.3 tabelile):
    - `nimi` (kohustuslik), `telefon` (kohustuslik), `email` (kohustuslik) — `FormInput`
    - `katastritunnus(ed)` (kohustuslik siin — kava on katastripõhine; mitu numbrit komaga; vihjevorming)
    - `☐ Soovin lisaks kava paberkandjal` (`FormCheck`, valikuline)
@@ -69,7 +69,7 @@ Omanik esitab metsamajanduskava koostamise päringu; päring edastatakse partner
 - H1: "Metsamajanduskava koostamise päring" · "Mis on metsamajanduskava?" · väljade labels: "Sinu nimi", "Telefoninumber", "E-mail", "Metsamaa katastritunnus(ed)", "Soovin lisaks kava paberkandjal", "Lisa kommentaar", nõusolek: "Nõustun, et minu andmed edastatakse metsamajanduskava teenuse pakkujatele, kes võivad minuga ühendust võtta." · "SAADA" · "Pakkujad vastavad 7 päeva jooksul."
 
 ## SEO & analytics
-- Title: "Metsamajanduskava koostamise päring | Eametsad"; desc: "metsamajanduskava, koostamine, päring, pakkumused, 7 päeva".
+- Title: "Metsamajanduskava koostamise päring | Erametsad"; desc: "metsamajanduskava, koostamine, päring, pakkumused, 7 päeva".
 - JSON-LD: `Service` + `BreadcrumbList` (Päringud → Kava).
 - Sündmused: `tab_switch{to}`, `service_request_start`, `service_request_validation_error{field}`, `service_request_complete{routed_count_bucket}`, `faq_link_click`.
 

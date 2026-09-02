@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, Modal } from '@eametsad/ui'
+import { Btn, Modal } from '@erametsad/ui'
 
 export interface BidConfirmModalProps {
   isOpen: boolean

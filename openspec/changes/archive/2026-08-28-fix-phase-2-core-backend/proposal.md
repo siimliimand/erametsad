@@ -77,7 +77,7 @@ Blocking defects:
 - **Realtime & notifications**: all four public SSE events emitted;
   my-stream outbid/notification events; dispatcher started; email sent
   through Mailpit SMTP (adds `nodemailer`); SMS stays a log stub.
-- **Forms & stats**: leads endpoint at 5/min/IP with `@eametsad/types`
+- **Forms & stats**: leads endpoint at 5/min/IP with `@erametsad/types`
   validation; sealed completion backfills the statistics snapshot from
   `finalPrice`.
 - **Seed & docs**: sealed auctions flagged `type: 'sealed'`; sealed bids

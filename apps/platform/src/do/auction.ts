@@ -18,7 +18,7 @@ import { centsToEuros, eurosToCents } from '../lib/data/repositories/money'
 import * as schema from '../lib/data/schema'
 import type { DbDatabase, SqlStatement } from '../lib/db'
 
-/** Minimal producer shape of the `eametsad-jobs` Cloudflare Queue binding. */
+/** Minimal producer shape of the `erametsad-jobs` Cloudflare Queue binding. */
 export interface QueueProducerBinding {
   send(message: unknown): Promise<void>
 }

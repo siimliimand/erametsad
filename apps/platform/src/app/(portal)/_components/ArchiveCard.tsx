@@ -1,4 +1,4 @@
-import { Card, StatusPill } from '@eametsad/ui'
+import { Card, StatusPill } from '@erametsad/ui'
 import Link from 'next/link'
 
 // CSP allows only 'self' data: blob: for images, so lots without media get

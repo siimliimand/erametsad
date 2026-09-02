@@ -1,4 +1,4 @@
-import { Card } from '@eametsad/ui'
+import { Card } from '@erametsad/ui'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 

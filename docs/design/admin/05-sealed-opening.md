@@ -52,7 +52,7 @@ Ceremonial, tamper-evident reveal of sealed bids after endTime: verify precondit
    - Invalid bids (identity validation failed): greyed, marked "kehtetu", excluded with reason.
 6. **Võitja kinnitamine** — highlighted top row; comparison to piirhind:
    - Top ≥ reserve → [Kinnita võitja ja avalda lõpphind]: final confirm modal (shows winner, price, fee estimate €) → atomic action: finalPrice published, winner status=won (contract generation queued, template version pinned), losers queued "ei võitnud" notifications, lot → status=contract. Audit entry with full before/after.
-   - Top < reserve → "Jäi piirhinnale alla" branch: choices = märgi müümata (→ unsold, seller notified with re-list/kiiroksjon-backup options) or (kiiroksjon) käivita varupakkumise töövoog (Eametsad house offer, superadmin only).
+   - Top < reserve → "Jäi piirhinnale alla" branch: choices = märgi müümata (→ unsold, seller notified with re-list/kiiroksjon-backup options) or (kiiroksjon) käivita varupakkumise töövoog (Erametsad house offer, superadmin only).
 7. **Tühistamine (abort/void)** — available until winner confirm: typed reason mandatory + superadmin; outcomes: `voided` (all bids void, bidders notified "Oksjon tühistati", no fee), lot returns to draft for re-list. Post-confirm voiding happens in 08 (contract void), not here.
 
 ## Interactions & edge cases

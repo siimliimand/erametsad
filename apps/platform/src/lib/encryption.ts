@@ -11,7 +11,7 @@ import { createCipheriv, createDecipheriv, pbkdf2Sync } from 'node:crypto'
 import { concatBytes } from './bytes'
 
 const ALGORITHM = 'aes-256-gcm'
-const SALT = 'eametsad-sealed-bid-v1'
+const SALT = 'erametsad-sealed-bid-v1'
 const PBKDF2_ITERATIONS = 600_000
 const IV_BYTES = 12
 const TAG_BYTES = 16

@@ -59,7 +59,7 @@ Ostjad ja müüjad (ning nende nõustajad) laadivad alla lepingu mallid (oksjoni
 - H1: "Lepingute mallid" · veerud: "Tüüp", "Versioon", "Kuupäev", "Formaat" · "Laadi alla" · "Saadame teate, kui mall uueneb." · hoiatus: "Mallid on näidised — oksjonil osalemiseks kehtib allkirjastatud leping."
 
 ## SEO & analytics
-- Title: "Lepingute mallid | Eametsad"; desc: "oksjonileping, raamleping, metsa müügi leping, mallid, allalaadimine".
+- Title: "Lepingute mallid | Erametsad"; desc: "oksjonileping, raamleping, metsa müügi leping, mallid, allalaadimine".
 - JSON-LD: `ItemList` dokumentidest; ei ole `Product`.
 - Sündmused (ainult nõusolekul, vt 00 CookieBanner — lehe külastuse näitaja laieneb ka ilma): `document_download{type, version}`, `version_notify_signup`, `legal_notice_click`.
 

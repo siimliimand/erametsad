@@ -57,7 +57,7 @@ link without content SHALL not render.
 The CookieBanner SHALL be non-modal with three buttons: "Nõustun kõigiga",
 "Ainult vajalikud", and "Sätete muutmine" opening a granular Modal with
 necessary consent locked, statistics, and marketing. Consent SHALL be
-stored in the `eametsad_consent` cookie for 12 months and POSTed to
+stored in the `erametsad_consent` cookie for 12 months and POSTed to
 `/api/v1/consent`. Analytics SHALL load only after statistics consent. The
 decision SHALL reopen from the footer link.
 

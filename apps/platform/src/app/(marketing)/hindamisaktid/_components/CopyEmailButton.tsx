@@ -1,6 +1,6 @@
 'use client';
 
-import { Toast } from '@eametsad/ui';
+import { Toast } from '@erametsad/ui';
 import { Check, Copy } from 'lucide-react';
 import { useCallback, useState } from 'react';
 

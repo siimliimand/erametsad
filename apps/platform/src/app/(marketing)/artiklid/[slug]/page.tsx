@@ -1,4 +1,4 @@
-import { ArticleCard, StickyTOC } from '@eametsad/ui'
+import { ArticleCard, StickyTOC } from '@erametsad/ui'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'

@@ -11,6 +11,6 @@ export function newsletterConfirmationTemplate(params: { confirmUrl: string }): 
     'Link kehtib ühe korra. Kui te ei ole Eametsa uudiskirja tellinud, ignoreerige seda kirja.',
     '',
     'Lugupidamisega',
-    'Eametsad',
+    'Erametsad',
   ].join('\n')
 }

@@ -38,10 +38,10 @@ export function SuspendedBanner() {
         Portaali sisenemine on peatatud konto korral keelatud. Küsimuste korral võta
         ühendust aadressil{' '}
         <a
-          href="mailto:info@eametsad.ee"
+          href="mailto:info@erametsad.ee"
           className="font-semibold text-primary underline-offset-2 hover:underline"
         >
-          info@eametsad.ee
+          info@erametsad.ee
         </a>
         .
       </p>

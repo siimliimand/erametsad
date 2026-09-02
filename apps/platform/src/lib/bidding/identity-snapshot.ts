@@ -1,4 +1,4 @@
-import { EEEmail, EEIsikukood, EERegistrikood } from '@eametsad/types'
+import { EEEmail, EEIsikukood, EERegistrikood } from '@erametsad/types'
 import { z } from 'zod'
 
 // Wire shape produced by sealedIdentitySnapshot() in the sealed-bid panel:

@@ -27,14 +27,14 @@ function resetEmailBody(resetLink: string): string {
   return [
     'Tere!',
     '',
-    'Taotlesite Eametsad oksjonikeskkonnas parooli lähtestamist.',
+    'Taotlesite Erametsad oksjonikeskkonnas parooli lähtestamist.',
     '',
     `Parooli lähtestamiseks avage järgmine link (kehtib 2 tundi): ${resetLink}`,
     '',
     'Kui te parooli lähtestamist ei taotlenud, ignoreerige seda kirja.',
     '',
     'Lugupidamisega',
-    'Eametsad',
+    'Erametsad',
   ].join('\n')
 }
 

@@ -44,7 +44,7 @@ Mobile: single column; BidPanel collapses to a sticky bottom sheet (peek bar: cu
 4. **Full field table** (`<DataTable>` static, label→value): Katastritunnused `cadastres[]`; Kinnistu register nr `registryNumbers[]`; Maakond/Vald/Aadress; Pindala `area` ha; Raiemahu `volume` m³; Puuliik `forestType[]` (24 codes, tooltip full names); Raieliik `loggingType[]`; Eraldised `loggingCompartments[]`; Metsateatise nr `forestNotifications[]`; Raie teostamise tähtaeg `loggingDeadline`; Väljaveo tähtaeg `removalDeadline`; Kooskõlastused (ladustamiskohad) `storageLocationApproval` → "Kooskõlastab ostja"; Väljaveoteed `removalRoads`; Üürileping `hasRentalAgreement` + `rentalAgreementDeadline`; Alghind `minBid`; Pakkumise samm `bidStep`. Rows hidden when field empty.
 5. **Rich-text info blocks** — `extraInfo` ("Oksjoni info ja erisused") and `secondaryInfo` ("Lisainfo") rendered in `<Card>`s; headings preserved.
 6. **Files** — `files[]` PDFs (takseer, metsateatised): filename, size, download via signed URL.
-7. **SpecialistCard** — photo, nimi, amet, telefon, e-mail + per-lot anonymized alias `email` ("Küsimused oksjoni kohta: {alias}@oksjonid.eametsad.ee") with copy-to-clipboard.
+7. **SpecialistCard** — photo, nimi, amet, telefon, e-mail + per-lot anonymized alias `email` ("Küsimused oksjoni kohta: {alias}@oksjonid.erametsad.ee") with copy-to-clipboard.
 8. **BidPanel** (variants, see States) — leading bid ("Hetkel kõrgeim: X €", `leadingBidAmount` if visible), amount input prefilled = current+`bidStep` with `[−]/[+]` stepping by `bidStep` (minus allowed below minBid only when alapakkumine enabled → toggle "Alapakkumine (vajab müüja nõusolekut)" with explanatory footnote from `secondaryInfo`); autobidder max input ("Seadista automaatpakkuja — pakub automaatselt kuni sinu maksimumini"); submit Btn "Tee pakkumine"; confirm `<Modal>`: "Kas oled kindel, et soovid teha pakkumist {sum} €? Järgmisena pakutakse {next} €, kui sinu pakkumine ei ole juba kõrgeim." Notice chips: "Teenustasu rakendub vaid oksjoni võitmise korral" · "Automaatselt pikenev lõpp" (when `antiSnipingEnabled`).
 9. **Framework-contract gate** — if open forest auction and user has no signed raamleping: submit redirects to `/lepingud/raamleping?next=/oksjon/:id` (see 13-contract-signing.md); message "Enampakkumise tegemiseks tuleb esmalt allkirjastada raamleping."
 10. **Bid list** — authed: rows "#N {amount} € · Pakkuja #k · suhteline aeg" (anonymized labels, ordered desc); highlight own bids ("Sinu pakkumine"). Guest: "Pakkumusi: 12, viimane 2 min eest" — no amounts. Live prepend on SSE `bid:created`.
@@ -72,7 +72,7 @@ Caching: lot page SSR/cached until first bid; after that client-fresh via SSE.
 
 ## States
 - **Guest**: BidPanel shows "Logi sisse pakkumise tegemiseks" `<Btn cta>` + "või registreeri"; bid list anonymized (count+times).
-- **Authed, no rights for objectType**: "Sul puuduvad õigused teha selle tüübi oksjonil pakkumisi. Kirjuta info@eametsad.ee õiguste saamiseks." Bid list visible with amounts.
+- **Authed, no rights for objectType**: "Sul puuduvad õigused teha selle tüübi oksjonil pakkumisi. Kirjuta info@erametsad.ee õiguste saamiseks." Bid list visible with amounts.
 - **Authed with rights, no raamleping**: bid form visible, submit → gate (block 8/9).
 - **Full**: form + autobidder + alapakkumine toggle (if enabled).
 - **Loading** skeleton; **error** retry; **ended** (see archive detail: finalPrice, "Oksjon on lõppenud"); **outbid**, **leading**, **pending approval**, **not started** ("Oksjon algab {time}" — form disabled).
@@ -81,7 +81,7 @@ Caching: lot page SSR/cached until first bid; after that client-fresh via SSE.
 "Oksjon lõppeb" · "Aega jäänud" · "Hetkel kõrgeim pakkumine" · "Pakkumise samm" · "Tee pakkumine" · "Seadista automaatpakkuja" · "Alapakkumine" · "vajab müüja nõusolekut" · "Automaatselt pikenev lõpp: pakkumine viimase 5 minuti jooksul pikendab oksjoni lõppu 5 minuti võrra." · "Sinu pakkumine on hetkel kõrgeim" · "Pakkumise tegemiseks logi sisse"
 
 ## SEO & analytics
-Title: "{name} — raieõiguse oksjon | Eametsad". SSR until first bid (then noindex, dynamic). JSON-LD `Product`+`Offer` variant for lot. Events: bid_submitted, autobidder_set, outbid_view, file_download, specialist_contact_click.
+Title: "{name} — raieõiguse oksjon | Erametsad". SSR until first bid (then noindex, dynamic). JSON-LD `Product`+`Offer` variant for lot. Events: bid_submitted, autobidder_set, outbid_view, file_download, specialist_contact_click.
 
 ## Open questions
 - Show leading bid to all authed users or only bidders? (Recommend: all authed, drives competition.)

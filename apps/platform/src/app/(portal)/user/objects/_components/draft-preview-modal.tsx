@@ -1,6 +1,6 @@
 'use client'
 
-import { Modal } from '@eametsad/ui'
+import { Modal } from '@erametsad/ui'
 
 import { formatDateTime, formatEur, statusLabel, TYPE_LABELS } from './format'
 import type { SellerAuctionRow } from './seller-data'

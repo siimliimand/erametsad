@@ -147,7 +147,7 @@ async function runCommand(values: CliValues): Promise<number> {
   const pool = str(
     values,
     'pool',
-    'guest@eametsad.ee,private@eametsad.ee,company@eametsad.ee',
+    'guest@erametsad.ee,private@erametsad.ee,company@erametsad.ee',
   ).split(',')
   const password = str(values, 'password', 'demo1234')
   const trickle = Math.max(0, num(values, 'trickle', 25))

@@ -1,6 +1,6 @@
 'use client'
 
-import { SpecialistCard } from '@eametsad/ui'
+import { SpecialistCard } from '@erametsad/ui'
 import { useState } from 'react'
 
 interface SellerContactProps {

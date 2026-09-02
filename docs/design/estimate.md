@@ -1,4 +1,4 @@
-# Eametsad — Development Time Estimate
+# Erametsad — Development Time Estimate
 **Scope:** All design documents 
 **Estimate for:** 1 full-stack developer
 **Tech stack:** Next.js 15 App Router · Cloudflare Workers/D1/Durable Objects · Drizzle ORM · React SPA · TypeScript
@@ -13,10 +13,10 @@
 | Area | Screens / Items | Hours |
 |---|---|---:|
 | **Foundation & Infrastructure** | Monorepo, DB schema, auth, SSE, shared components | **80** |
-| **Marketing Site** (`eametsad.ee`) | 17 pages + global shell + CMS content model | **120** |
-| **Auction Portal** (`oksjonid.eametsad.ee`) | 13 screens incl. realtime bidding | **130** |
-| **Admin Panel** (`admin.eametsad.ee`) | 14 screens incl. sealed-bid ceremony, audit log | **160** |
-| **Association Subsite** (`metsauhistu.eametsad.ee`) | 7 pages (Phase 5) | **55** |
+| **Marketing Site** (`erametsad.ee`) | 17 pages + global shell + CMS content model | **120** |
+| **Auction Portal** (`oksjonid.erametsad.ee`) | 13 screens incl. realtime bidding | **130** |
+| **Admin Panel** (`admin.erametsad.ee`) | 14 screens incl. sealed-bid ceremony, audit log | **160** |
+| **Association Subsite** (`metsauhistu.erametsad.ee`) | 7 pages (Phase 5) | **55** |
 | **Integration & QA** | eID, contracts, email/SMS, end-to-end tests | **65** |
 | **TOTAL** | | **~610 h** |
 
@@ -40,7 +40,7 @@ These are horizontal concerns that every surface depends on. They must be built 
 
 ---
 
-## 2. Marketing Site (`eametsad.ee`) — 120 h
+## 2. Marketing Site (`erametsad.ee`) — 120 h
 
 ### 2.1 Global Shell — 14 h
 
@@ -80,7 +80,7 @@ These are horizontal concerns that every surface depends on. They must be built 
 
 ---
 
-## 3. Auction Portal (`oksjonid.eametsad.ee`) — 130 h
+## 3. Auction Portal (`oksjonid.erametsad.ee`) — 130 h
 
 | File | Screen | h |
 |---|---|---:|
@@ -101,7 +101,7 @@ These are horizontal concerns that every surface depends on. They must be built 
 
 ---
 
-## 4. Admin Panel (`admin.eametsad.ee`) — 160 h
+## 4. Admin Panel (`admin.erametsad.ee`) — 160 h
 
 This is the most complex surface. Every screen has multiple states, role-gating, and audit hooks.
 
@@ -136,7 +136,7 @@ This is the most complex surface. Every screen has multiple states, role-gating,
 
 ---
 
-## 5. Association Subsite (`metsauhistu.eametsad.ee`) — 55 h
+## 5. Association Subsite (`metsauhistu.erametsad.ee`) — 55 h
 *Phase 5 — distinct brand tokens, separate nav, MTÜ context.*
 
 | File | Page | h |

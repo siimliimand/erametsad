@@ -1,4 +1,4 @@
-import { DocumentLink, MapEstonia, StatusPill } from '@eametsad/ui'
+import { DocumentLink, MapEstonia, StatusPill } from '@erametsad/ui'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 

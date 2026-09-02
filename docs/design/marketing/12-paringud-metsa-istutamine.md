@@ -38,7 +38,7 @@ Omanik, kellel on raiest tühi maa või istutamiskohustus (3-aastane taastamist�
 ## Block-by-block spec
 1. **Vahekaardid (Tabs)** — samad 3, aktiivne "Istutamine".
 2. **Sisuveerg** — H2 "Millal mets uuesti istutada?" (draft): pärast raie tekib seadusest tulenev taastamiskohustus — istutada tavaliselt 3 aasta jooksul (viide KKK raie/metsaandmed; juriidiline hoiatus, et tähtaeg sõltub raieliigist ja otsusest). H2 "Mis hinnapäring sisaldab?" — pakkujad hindavad kas osaliselt või tervikuna: mulla ettevalmistus (külvikorrastus, võsarõve), istikute valik (puuliik, päritolu, arv), istutamistöö ise; hooldus järgnevatel aastatel (viide `/paringud/hooldusraie`).
-3. **Päringuvorm (Card)** — väljad EAMETSAD-PLAN §4.3 järgi:
+3. **Päringuvorm (Card)** — väljad ERAMETSAD-PLAN §4.3 järgi:
    - `nimi`, `telefon`, `email` (kohustuslikud)
    - `maakond` — `FormSelect` (15, kohustuslik)
    - `katastritunnus` (kohustuslik, üks või mitu)
@@ -64,7 +64,7 @@ Omanik, kellel on raiest tühi maa või istutamiskohustus (3-aastane taastamist�
 - H1: "Metsa istutamise päring" · "Millal mets uuesti istutada?" · "Mis hinnapäring sisaldab?" · väljad: "Sinu nimi", "Telefoninumber", "E-mail", "Maakond", "Katastritunnus", "Eraldis/eraldised", "Maapinna ettevalmistus", "Istikud", "Istutamine", "Lisa kommentaar (nt pindala hektarites)", nõusolek: "Nõustun, et minu andmed edastatakse metsa istutamise teenuse pakkujatele, kes võivad minuga ühendust võtta." · "SAADA" · "Pakkujad vastavad 7 päeva jooksul."
 
 ## SEO & analytics
-- Title: "Metsa istutamise päring — istutamine, istikud | Eametsad"; desc: "metsa istutamine, istikud, maapinna ettevalmistus, päring, taastamine".
+- Title: "Metsa istutamise päring — istutamine, istikud | Erametsad"; desc: "metsa istutamine, istikud, maapinna ettevalmistus, päring, taastamine".
 - JSON-LD: `Service` + `BreadcrumbList`.
 - Sündmused: `tab_switch{to}`, `service_request_start`, `service_request_validation_error{field}`, `checkbox_combination{services}` (milliseid osasid pakutakse — äriinfo), `service_request_complete`, `cross_link_click{hooldusraie}`.
 

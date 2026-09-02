@@ -1,4 +1,4 @@
-import { EmptyState } from '@eametsad/ui'
+import { EmptyState } from '@erametsad/ui'
 import { FileText, Scale } from 'lucide-react'
 
 import { buildItemListJsonLd, toJsonLdScript } from '../../_lib/jsonld'

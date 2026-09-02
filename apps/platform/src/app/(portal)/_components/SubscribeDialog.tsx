@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, ConsentCheck, FormInput, FormSelect, Modal } from '@eametsad/ui'
+import { Btn, ConsentCheck, FormInput, FormSelect, Modal } from '@erametsad/ui'
 import { useEffect, useMemo, useState } from 'react'
 
 import { type ListingFilterState } from '../_lib/filter-params'

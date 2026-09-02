@@ -64,7 +64,7 @@ Caching: heavily cacheable (immutable history) — 24 h edge cache, purge on arc
 "Oksjonite ajalugu" · "Lõppenud oksjonid" · "Lõpphind" · "Lõppes" · "Müümata jäi" · "Edukalt lõppenud oksjoneid" · "Avalikustame ainult lõpphinda — võitja andmeid ei avaldata." · "Tühjenda"
 
 ## SEO & analytics
-High-value SEO surface. Title "{Type} oksjonite ajalugu | Eametsad"; SSR all tab landing pages + first page per year filter (landing pages per year+county possible Phase 2). JSON-LD `Dataset` for statistics band. Events: archive_tab_switch, archive_filter, archive_card_click, stats_band_view.
+High-value SEO surface. Title "{Type} oksjonite ajalugu | Erametsad"; SSR all tab landing pages + first page per year filter (landing pages per year+county possible Phase 2). JSON-LD `Dataset` for statistics band. Events: archive_tab_switch, archive_filter, archive_card_click, stats_band_view.
 
 ## Open questions
 - Publish unsold lots in archive (transparency) or hide (optics)? Recommend publish with "Müümata" tag.

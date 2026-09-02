@@ -1,6 +1,6 @@
 'use client'
 
-import { SearchableAccordion, type SearchableItem } from '@eametsad/ui'
+import { SearchableAccordion, type SearchableItem } from '@erametsad/ui'
 import { useEffect } from 'react'
 
 /**

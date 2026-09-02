@@ -66,19 +66,19 @@ Caching: page cacheable until end (no bid data in response).
 
 ## States
 - **Guest**: "Pakkumise esitamiseks logi sisse" CTA + explanation copy still shown.
-- **Authed, no rights**: "Sul puuduvad õigused seda tüüpi oksjonil pakkumist teha. Pöördu info@eametsad.ee poole."
+- **Authed, no rights**: "Sul puuduvad õigused seda tüüpi oksjonil pakkumist teha. Pöördu info@erametsad.ee poole."
 - **Authed, not submitted**: full form.
 - **Submitted**: locked card "Pakkumine on esitatud {dd.mm.aaaa hh:mm}. Pakkumist ei saa enne avamist vaadata." (+ revision button if allowed).
 - **Ended, not opened**: "Tähtaeg on möödas. Pakkumised avatakse — tulemus teatatakse e-postiga."
 - **Ended, opened**: public: "Lõpphind {finalPrice} €" — no winner identity anywhere. Loser (authed own view): "Sinu pakkumine ei olnud edukaim." Winner: banner + link to `/lepingud/oksjonileping/:auctionId` contract flow.
-- **Unsold** (top bid < reserve): "Oksjon jäi müümata." (+ kiiroksjon variant: "Eametsad esitab varupakkumise" handled by admin flow).
+- **Unsold** (top bid < reserve): "Oksjon jäi müümata." (+ kiiroksjon variant: "Erametsad esitab varupakkumise" handled by admin flow).
 - Loading skeleton / error retry as usual.
 
 ## Copy (Estonian, draft)
 "Pimepakkumine" · "Kõik saabunud pakkumised avatakse üheaegselt peale tähtaja lõppemist." · "Esita pimepakkumine" · "Pakkumine on esitatud" · "Pakkumine on siduv" · "Lõpphind" · "Oksjon jäi müümata" · "Sinu pakkumine ei olnud edukaim"
 
 ## SEO & analytics
-SSR fully (no dynamic data until end). Title "{name} — {metskinnistu/põllumaa/pakett} oksjon | Eametsad". Events: sealed_bid_submitted, sealed_form_validation_error, result_viewed.
+SSR fully (no dynamic data until end). Title "{name} — {metskinnistu/põllumaa/pakett} oksjon | Erametsad". Events: sealed_bid_submitted, sealed_form_validation_error, result_viewed.
 
 ## Open questions
 - Show live bid *count* or hide entirely until end? (Reference shows nothing; count builds trust — recommend showing count only.)

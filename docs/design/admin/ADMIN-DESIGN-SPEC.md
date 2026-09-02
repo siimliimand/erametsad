@@ -1,6 +1,6 @@
-# Eametsad Admin — Comprehensive UI/UX Design Specification for Designers
+# Erametsad Admin — Comprehensive UI/UX Design Specification for Designers
 
-> **Purpose:** This document provides a complete, screen-by-screen design specification for sketching and prototyping all pages of the **Eametsad Admin Platform** (`admin.eametsad.ee`). Every view, component, data table, modal, drawer, state, and interaction pattern is specified in full detail to allow immediate sketching in Figma, Sketch, or Penpot.
+> **Purpose:** This document provides a complete, screen-by-screen design specification for sketching and prototyping all pages of the **Erametsad Admin Platform** (`admin.erametsad.ee`). Every view, component, data table, modal, drawer, state, and interaction pattern is specified in full detail to allow immediate sketching in Figma, Sketch, or Penpot.
 
 ---
 
@@ -69,7 +69,7 @@
 
 ```
 ┌──────┬─────────────────────────────────────────────────────────────────────────────┐
-│ ◉ LOG│ [PROD]  Eametsad haldus  ──  [ 🔍 Otsi kõike... (⌘K) ]        🔔 [3] 👤 Marit ▾│
+│ ◉ LOG│ [PROD]  Erametsad haldus  ──  [ 🔍 Otsi kõike... (⌘K) ]        🔔 [3] 👤 Marit ▾│
 ├──────┼─────────────────────────────────────────────────────────────────────────────┤
 │ ⌂ 01 │  ⚠ VAADELD KASUTAJANA: Jaan Torn (sessioon lõpeb 14:32)   [ LÕPETA VAATLUS ]│
 │ ▤ 02 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -87,7 +87,7 @@
 ```
 
 #### 1. Left Icon Rail (Fixed `56 px` width, full height)
-- **Top:** Eametsad Monogram / Spruce logo mark (`32 × 32 px`, forest green `#012d1d` on light background).
+- **Top:** Erametsad Monogram / Spruce logo mark (`32 × 32 px`, forest green `#012d1d` on light background).
 - **Navigation Icons (Lucide Icons, 20px, vertically centered in 40×40px target):**
   1. `LayoutDashboard` → **Töölaud** (Dashboard)
   2. `Gavel` → **Oksjonid** (Auctions list)
@@ -113,7 +113,7 @@
   - `PROD` (Green `#E8F6ED` / `#1B6338`)
   - `STAGE` (Amber `#FEF5E7` / `#8F590A`)
   - `DEV` (Red `#FBEAE9` / `#B3261E`)
-  - Platform Title: `Eametsad haldus` (Public Sans 600, 15px).
+  - Platform Title: `Erametsad haldus` (Public Sans 600, 15px).
 - **Center:** Global Search Input Bar (width `420 px`, height `36 px`, radius `8 px`, bg `#f4f2ff`, placeholder: `"Otsi oksjoneid, kasutajaid, juhtlõimi... (⌘K)"`, icon `Search` left, shortcut badge `⌘K` right).
 - **Right:**
   - Notification Bell (`Bell` icon, unread counter pill `3`, click opens popover with recent events).
@@ -313,7 +313,7 @@
    - Teenustasu ülekaal (%): Ainult Admin/Superadmin rollile (tühi = süsteemi vaikimisi 3%).
 6. **Step 5: Sisu ja meedia:**
    - Oksjoni pealkiri (automaatne soovitus katastrijärgsest nimest).
-   - Automaatselt genereeritud unikaalne alias e-post (`mt27082601@oksjonid.eametsad.ee`).
+   - Automaatselt genereeritud unikaalne alias e-post (`mt27082601@oksjonid.erametsad.ee`).
    - Vastutav metsaspetsialist (rippmenüü töötajatest).
    - Avalik kirjeldus ja Täiendav info (Rich Text redaktor: H2, H3, paks, loendid, lingid, tabel).
    - Fotod: Päisefoto (Hero image) + galerii. Piltide lohistamine järjekorra muutmiseks, fookuspunkti valija (focal point), **kohustuslik alt-teksti väli igale pildile**.
@@ -448,7 +448,7 @@
      1. Lõpphind avalikustatakse portaalis.
      2. Võitjale genereeritakse leping ja saadetakse allkirjastamise kutse.
      3. Kaotajatele saadetakse neutraalne teavitus (teiste pakkumiste summasid ei avaldata).
-   - *Kui piirhinda ei saavutatud:* Valikud: `[ Märgi müümata ]` või kiiroksjoni puhul `[ Käivita Eametsad varupakkumise ostutöövoog ]`.
+   - *Kui piirhinda ei saavutatud:* Valikud: `[ Märgi müümata ]` või kiiroksjoni puhul `[ Käivita Erametsad varupakkumise ostutöövoog ]`.
 
 ---
 
@@ -841,7 +841,7 @@ EDASTAMISE AJALUGU:
 ```
 
 #### Detailed Blocks per Section:
-1. **Üldandmed:** Ettevõtte ärinimi, registrikood, KMKR number, aadress, ametlik alias-domeen (`oksjonid.eametsad.ee`), ametlik klienditoe telefon ja e-post.
+1. **Üldandmed:** Ettevõtte ärinimi, registrikood, KMKR number, aadress, ametlik alias-domeen (`oksjonid.erametsad.ee`), ametlik klienditoe telefon ja e-post.
 2. **Teenustasud:** Vaikimisi tasu %, käibemaksu määr, kiiroksjoni tasu erisus, näidiskalkulaator. Iga salvestus nõuab põhjendust.
 3. **Oksjonireeglid:**
    - Anti-snipe vaikimisi minutid (`1–30 min`, vaikimisi 5).

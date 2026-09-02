@@ -1,6 +1,6 @@
 'use client'
 
-import { Countdown } from '@eametsad/ui'
+import { Countdown } from '@erametsad/ui'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {

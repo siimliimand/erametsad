@@ -1,4 +1,4 @@
-import { Card, LeadForm } from '@eametsad/ui'
+import { Card, LeadForm } from '@erametsad/ui'
 import Link from 'next/link'
 
 import { ScreenshotSteps, type TutorialStep } from './_components/ScreenshotSteps'

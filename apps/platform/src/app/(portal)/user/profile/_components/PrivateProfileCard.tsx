@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, FormInput } from '@eametsad/ui'
+import { Btn, FormInput } from '@erametsad/ui'
 import { useEffect, useState, type SyntheticEvent } from 'react'
 
 import { requestJson } from './api'

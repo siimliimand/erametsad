@@ -36,7 +36,7 @@ Omanik (või pärija/pank/notar), kes vajab ametlikku maa ja metsa hindamisakti,
 3. **Hinna mõjutegurid (H2 2)** — Card-ruudustik (6 kaarti, ikoon + pealkiri + 1 lause, draft): asukoht ja ligipääs; puuliigi koosseis; puistu vanus ja mahud; mullaproduktiivsus; piirangud (kaitsealad, veekaitsed); metsamaterjali turuhinnad.
 4. **Andmeallikad (H2 3)** — nimekiri: takseerandmed metsamajanduskavadest; Maa-ameti avalikud kaardi- ja ortofotoandmed; AI-põhine metsainventuur; avalikud põlluandmed. Viimane täpsustatud: "kasutame automaatset metsainventuuri andmeid, mida võrdleme takseeriga".
 5. **Hind (H2 4)** — hinnaskaart: **"alates 480 € + km"**, sõltub kinnistute arvust ja suurusest; väikene hindamateRiskide tabel (1 kinnistu / mitme kinnistu allahindlus — kohatäited).
-6. **Tellimine (H2 5)** — `Btn` "Saada tellimus e-postile" → `mailto:hindamisakt@eametsad.ee?subject=Hindamisakti tellimus` (draft aadress) + juhend: kirjuta katastritunnus(ed) ja kontaktandmed. All hoiatus: "Hindamisakt ei ole tasuta konsultatsioon — tasuta on suuline lähtehindamine" (viide `/teenused/metsa-hindamine`).
+6. **Tellimine (H2 5)** — `Btn` "Saada tellimus e-postile" → `mailto:hindamisakt@erametsad.ee?subject=Hindamisakti tellimus` (draft aadress) + juhend: kirjuta katastritunnus(ed) ja kontaktandmed. All hoiatus: "Hindamisakt ei ole tasuta konsultatsioon — tasuta on suuline lähtehindamine" (viide `/teenused/metsa-hindamine`).
 7. **LeadForm #1** (`hindamisaktid-1`, `#kontaktvorm`) — "Ei tea, kas akt on sul vaja? Kirjuta."
 8. **Külgmenüü** — kleebuv (top: header kõrgus + 24px), numbrid ①–⑤ ringides (`--primary`), aktiivne jaotis `--accent` rõhutatud; klõps → sujuv scroll (`scroll-margin-top` headeri võrra).
 
@@ -56,7 +56,7 @@ Omanik (või pärija/pank/notar), kes vajab ametlikku maa ja metsa hindamisakti,
 - H1: "Hindamisaktid metsa- ja põllumaale" · "Hindamisakti koostamise hind" → "Alates 480 € + km. Lõpphind sõltub kinnistute arvust ja kaugusest." · "Hindamisakti tellimine" · "Saada tellimus e-postile" · "Ei tea, kas akt on sul vaja? Kirjuta — vastame 1 tööpäevaga."
 
 ## SEO & analytics
-- Title: "Hindamisaktid — metsa ja põllumaa hindamisakt | Eametsad"; desc: "hindamisakt, maa hindamine, metsa hindamisakt, alates 480 €".
+- Title: "Hindamisaktid — metsa ja põllumaa hindamisakt | Erametsad"; desc: "hindamisakt, maa hindamine, metsa hindamisakt, alates 480 €".
 - JSON-LD: `Service` (offers: 480 EUR + KM) + `BreadcrumbList`.
 - Sündmused: `sidenav_click{section}`, `mailto_click`, `copy_email_click`, `price_section_view`, `lead_form_submit_start/complete`.
 

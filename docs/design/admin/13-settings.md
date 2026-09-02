@@ -27,7 +27,7 @@ Central configuration for the whole platform: identity defaults, fees, auction m
 ```
 
 ## Block-by-block spec
-1. **Üldine** — ettevõtte andmed (juriidiline nimi, registrikood, KMKR, aadress — feeds contract placeholders), alias e-posti domeen (`oksjonid.eametsad.ee`, validation: DNS MX check button), vaikimisi ajavöönd (locked Europe/Tallinn), toetus-e-post/telefon.
+1. **Üldine** — ettevõtte andmed (juriidiline nimi, registrikood, KMKR, aadress — feeds contract placeholders), alias e-posti domeen (`oksjonid.erametsad.ee`, validation: DNS MX check button), vaikimisi ajavöönd (locked Europe/Tallinn), toetus-e-post/telefon.
 2. **Tasud** — vaikimisi teenustasu % (decimal, 0–10), KM määr %, kiiroksjoni erinev tasu, min tasu € (optional floor), näidis-arvutus live: "100 000 € → tasu 3 000 € + KM 660 €". Per-lot overrides remain in 03.
 3. **Oksjonid** — anti-snipe vaikimisi minutid (1–30) + lubatud vahemik; automaatpakkuja sisse/välja (globaalne gate); alapakkumine: vaikimisi lubatud/lubamata uutel lottidel + müüja kinnitamise tähtaeg päevades; min oksjoni kestus; kiiroksjoni kestus (default 48h, allowed 24–72); sulenud pakkumiste paranduste arv (N revisions, default 0); kahe-osalise avamise reegel (kinnitaja roll: superadmin / teine admin).
 4. **Teavitused** — mallide editor: list of templates per event (new-matching-lot, outbid, won, lost, ending-24h, alapakkumine-decision, company-approved/rejected, contract-ready, kiiroksjon-result) × channel (e-post, SMS). Editor: subject + body, variable inserter ({{user.name}}, {{lot.name}}, {{amount}}, {{endTime}}, …), test-send to own address (uses dummy data), versioon + viimati muudetud. SMS counter (160-char segments).

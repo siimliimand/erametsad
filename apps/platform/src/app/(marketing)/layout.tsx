@@ -1,4 +1,4 @@
-import { ContactBand, type ContactBandContact } from '@eametsad/ui'
+import { ContactBand, type ContactBandContact } from '@erametsad/ui'
 import type { Metadata } from 'next'
 
 import { CookieBanner } from './_components/CookieBanner'
@@ -12,8 +12,8 @@ import { getRepositories } from '@/lib/data/runtime'
 export const metadata: Metadata = {
   metadataBase: new URL(MARKETING_BASE_URL),
   title: {
-    default: 'Eametsad',
-    template: '%s | Eametsad',
+    default: 'Erametsad',
+    template: '%s | Erametsad',
   },
   description: 'Eesti metsatehingute platvorm',
 }

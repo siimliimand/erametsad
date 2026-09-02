@@ -1,6 +1,6 @@
 'use client'
 
-import { ChipNav, DataTable, Btn, type Column } from '@eametsad/ui'
+import { ChipNav, DataTable, Btn, type Column } from '@erametsad/ui'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, type ReactNode } from 'react'

@@ -1,6 +1,6 @@
 'use client'
 
-import { Modal } from '@eametsad/ui'
+import { Modal } from '@erametsad/ui'
 import { useState } from 'react'
 
 export interface TutorialStepLink {

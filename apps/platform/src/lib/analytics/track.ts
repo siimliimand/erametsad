@@ -1,4 +1,4 @@
-const CONSENT_COOKIE = 'eametsad_consent'
+const CONSENT_COOKIE = 'erametsad_consent'
 
 // Same value shape the events route reads: URL-encoded JSON per the shell
 // spec, written by the CookieBanner (task 2.4). Necessary is always granted

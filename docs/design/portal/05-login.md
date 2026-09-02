@@ -13,7 +13,7 @@ Any user (bidder, seller, specialist) authenticates via eID or isikukood+parool 
 ## Wireframe (desktop)
 ```
 ┌──────────────────────────────────────────────────────┐
-│              EAMETSAD OKSJONID                        │
+│              ERAMETSAD OKSJONID                        │
 │        ┌──────────────────────────────┐              │
 │        │  MÄNGI ID-GA SISSE           │              │
 │        │ ┌──────────┐ ┌──────────┐   │              │
@@ -66,7 +66,7 @@ No caching (no-store). No realtime besides status polling.
 - Default (method grid + fallback).
 - eID pending / approved / rejected / expired (above).
 - Wrong credentials; rate-limited; generic error "Sisselogimine ei õnnestunud. Proovi uuesti või kasuta Smart-ID-d."
-- **Account suspended**: "Sinu konto on peatatud. Võta ühendust info@eametsad.ee."
+- **Account suspended**: "Sinu konto on peatatud. Võta ühendust info@erametsad.ee."
 - **Company profile pending**: login succeeds for private profile; banner on next page "Sinu ettevõtte profiili taotlus on ülevaatamisel."
 - Loading states per button (spinner, disabled).
 - Already logged in visiting /login: immediate redirect to `next` or `/`.

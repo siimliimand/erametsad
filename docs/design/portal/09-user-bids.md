@@ -11,7 +11,7 @@
 A logged-in bidder checks the state of their auction participation at a glance: which of their active bids currently lead, which have been outbid, what their autobidder ceiling is, and how past auctions resolved (won / lost / unsold) with next steps (contract signing). It is the bidder's "home" screen.
 
 ## Portal shell (SHARED — defined once here, referenced by 10/11/12/13)
-Persistent layout for all `/user/*` routes on `oksjonid.eametsad.ee`:
+Persistent layout for all `/user/*` routes on `oksjonid.erametsad.ee`:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐

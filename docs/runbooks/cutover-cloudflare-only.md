@@ -1,6 +1,6 @@
 # Cutover runbook — Cloudflare-only stack
 
-Change: `option-b-cloudflare-only` · Worker: `eametsad-api`
+Change: `option-b-cloudflare-only` · Worker: `erametsad-api`
 Branch: `feature/option-b-cloudflare-only`
 
 ## 1. Prerequisites
@@ -20,17 +20,17 @@ Branch: `feature/option-b-cloudflare-only`
 - [ ] D1 database created — run once from `apps/platform`:
 
   ```bash
-  pnpm exec wrangler d1 create eametsad-db
+  pnpm exec wrangler d1 create erametsad-db
   ```
 
   Copy the returned `database_id` into `wrangler.jsonc` → `d1_databases[0].database_id`, replacing `REPLACE-WITH-REAL-D1-DATABASE-ID`.
 - [ ] DLQ queue exists:
 
   ```bash
-  pnpm exec wrangler queues create eametsad-dlq
+  pnpm exec wrangler queues create erametsad-dlq
   ```
 
-  (`eametsad-jobs` is created by `wrangler deploy` if missing, but create it explicitly to confirm permissions.)
+  (`erametsad-jobs` is created by `wrangler deploy` if missing, but create it explicitly to confirm permissions.)
 - [ ] Email Service enabled for sending subdomain `erametsad` on zone `ww0.dev` (id `8761a52640daef70b6cf6f14d38e6dd9`). Onboarding creates SPF/DKIM records automatically.
 - [ ] eID Easy sandbox (or production) credentials ready: `EIDEASY_CLIENT_ID`, `EIDEASY_SECRET`. Optionally `EIDEASY_API_URL` if not using the default `https://id.eideasy.com`.
 
@@ -80,7 +80,7 @@ Seed or import data (decision tree: `scripts/migrate-pg-to-d1/README.md`):
 - **No production Postgres data** (expected): `pnpm seed:reset` for local; for remote use `pnpm migrate:pg:import` with `--remote`.
 - **Production Postgres data exists:** follow the export → transform → import path in the README.
 
-Queue consumers (`eametsad-jobs`, `max_retries: 3`, DLQ `eametsad-dlq`) deploy with the Worker config — active immediately after `wrangler deploy`. Cron trigger (`* * * * *`) runs the auction-ending safety sweep.
+Queue consumers (`erametsad-jobs`, `max_retries: 3`, DLQ `erametsad-dlq`) deploy with the Worker config — active immediately after `wrangler deploy`. Cron trigger (`* * * * *`) runs the auction-ending safety sweep.
 
 ## 4. DNS
 
@@ -88,7 +88,7 @@ All prototype hostnames attach as Workers custom domains — no pre-existing DNS
 
 ### Web hostnames
 
-From the Cloudflare dashboard → Workers → `eametsad-api` → Settings → Domains & Routes → Add:
+From the Cloudflare dashboard → Workers → `erametsad-api` → Settings → Domains & Routes → Add:
 
 | Route | Custom domain |
 |---|---|
@@ -124,7 +124,7 @@ curl -s https://erametsad.ww0.dev/api/health
 # Login and extract token
 TOKEN=$(curl -s -X POST https://api.erametsad.ww0.dev/api/v1/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"identifier":"private@eametsad.ee","password":"demo1234"}' \
+  -d '{"identifier":"private@erametsad.ee","password":"demo1234"}' \
   | jq -r '.access_token')
 
 # List auctions
@@ -149,11 +149,11 @@ curl -sN https://api.erametsad.ww0.dev/api/v1/auctions/stream?auctionId=<AUCTION
 pnpm exec wrangler rollback
 ```
 
-Or dashboard: Workers & Pages → `eametsad-api` → Deployments → previous version → Rollback.
+Or dashboard: Workers & Pages → `erametsad-api` → Deployments → previous version → Rollback.
 
 ### Queue consumer disable
 
-Remove consumer block from `wrangler.jsonc` and redeploy, or disable in dashboard under Queues → `eametsad-jobs` → Consumers.
+Remove consumer block from `wrangler.jsonc` and redeploy, or disable in dashboard under Queues → `erametsad-jobs` → Consumers.
 
 ### DNS revert
 

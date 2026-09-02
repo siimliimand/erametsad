@@ -1,5 +1,5 @@
 {
-  "name": "eametsad",
+  "name": "erametsad",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
     "test": "turbo test"
   },
   "devDependencies": {
-    "@eametsad/config": "workspace:*",
+    "@erametsad/config": "workspace:*",
     "@typescript-eslint/eslint-plugin": "^8.68.0",
     "@typescript-eslint/parser": "^8.68.0",
     "eslint": "^10.9.1",

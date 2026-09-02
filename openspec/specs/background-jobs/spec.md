@@ -4,7 +4,7 @@
 TBD - created by archiving change option-b-cloudflare-only. Update Purpose after archive.
 ## Requirements
 ### Requirement: Queue consumer worker
-A queue consumer worker SHALL process the `eametsad-jobs` queue:
+A queue consumer worker SHALL process the `erametsad-jobs` queue:
 notification fan-out with one message per user and channel (idempotent
 through the existing `dedupeKey`), email sending, and contract PDF
 generation into R2. Request latency SHALL not include this work.

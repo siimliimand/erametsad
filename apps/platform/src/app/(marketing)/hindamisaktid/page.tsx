@@ -1,4 +1,4 @@
-import { Card, LeadForm } from '@eametsad/ui'
+import { Card, LeadForm } from '@erametsad/ui'
 import {
   Layers,
   MapPin,
@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic'
 
 // Draft address from docs/design/marketing/06-hindamisaktid.md until a
 // settings seed defines the final alias.
-const ORDER_EMAIL = 'hindamisakt@eametsad.ee'
+const ORDER_EMAIL = 'hindamisakt@erametsad.ee'
 const ORDER_MAILTO = `mailto:${ORDER_EMAIL}?subject=${encodeURIComponent('Hindamisakti tellimus')}`
 
 const SECTIONS = [

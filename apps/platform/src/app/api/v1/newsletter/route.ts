@@ -1,5 +1,5 @@
-import { newsletterConfirmationTemplate } from '@eametsad/emails'
-import { validators } from '@eametsad/types'
+import { newsletterConfirmationTemplate } from '@erametsad/emails'
+import { validators } from '@erametsad/types'
 import { NextResponse } from 'next/server'
 import { createHash } from 'node:crypto'
 

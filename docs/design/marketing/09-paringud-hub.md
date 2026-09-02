@@ -40,7 +40,7 @@ Omanik, kes vajab metsamajanduskava, hooldusraiet või istutamist, mõistab pär
    - Hooldusraie → `/paringud/hooldusraie`
    - Metsa istutamine → `/paringud/metsa-istutamine`
    Kaardi hover: äär `--primary`, vari süveneb.
-3. **Kuidas see toimib** — 3 nummerdatud sammu (draft): 1. "Täida ja saada päring" (1 minut) · 2. "Päring läheb kõigile pakkujatele" (edastuslogi, vt admin/10) · 3. "Võrdle pakkumisi ja vali" (otsus jääb täielikult sinu kätte; Eametsad vahendajaks, leping sõlmid otse firmaga).
+3. **Kuidas see toimib** — 3 nummerdatud sammu (draft): 1. "Täida ja saada päring" (1 minut) · 2. "Päring läheb kõigile pakkujatele" (edastuslogi, vt admin/10) · 3. "Võrdle pakkumisi ja vali" (otsus jääb täielikult sinu kätte; Erametsad vahendajaks, leping sõlmid otse firmaga).
 4. **Partnerite info** — lühitekst: mitu registreeritud pakkujat teenuse kohta (arv CMS-ist/administ); selgitus, et edastamine on omanikule tasuta (ärimudeli läbipaistvus). "Oled teenusepakkuja? Vaata liitumist" → `/liitu` (kui Phase 5 puudub, link peidetud).
 
 ## Interactions & edge cases
@@ -60,7 +60,7 @@ Omanik, kes vajab metsamajanduskava, hooldusraiet või istutamist, mõistab pär
 - H1: "Teenuste päringud" · "Esita päring" · "Pakkujad vastavad 7 päeva jooksul." · kaardid: "Metsamajanduskava — kava on raiete ja toetuste alus." / "Hooldusraie — hooldus- ja valgusraie korraldamine." / "Metsa istutamine — maa ettevalmistus, istikud, istutamine." · "Kuidas see toimib?"
 
 ## SEO & analytics
-- Title: "Teenuste päringud — kava, raie, istutamine | Eametsad"; desc: "metsamajanduskava, hooldusraie, istutamine, päring, pakkumused".
+- Title: "Teenuste päringud — kava, raie, istutamine | Erametsad"; desc: "metsamajanduskava, hooldusraie, istutamine, päring, pakkumused".
 - JSON-LD: `ItemList` (3 teenust) + `BreadcrumbList`.
 - Sündmused: `service_card_click{service}`, `how_it_works_view`, `partner_info_view`, `join_provider_click`.
 

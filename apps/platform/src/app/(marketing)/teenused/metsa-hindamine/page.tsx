@@ -91,7 +91,7 @@ const ARTICLE_SECTIONS: SeoArticleSection[] = [
     heading: 'Kuidas oksjon hinna kujundab',
     paragraphs: [
       'Oksjoni mõte on lihtne: sama objekti näevad korraga paljud ostjad ja pakkumised konkureerivad omavahel. Nii kujuneb hind turu põhjal, mitte ühe ostja hinnangul, ja müüja näeb, kui palju tema mets tegelikult väärt on.',
-      'Eametsad korraldab müügi algusest lõpuni: hindame metsa tasuta, valmistame dokumendid ning foto- ja kaardimaterjali, paneme paika alghinna ja teavitame kontrollitud ostjate võrgustikku. Pakkumised on anonüümsed — nähtavad on summad ja ajad, mitte pakkujate nimed.',
+      'Erametsad korraldab müügi algusest lõpuni: hindame metsa tasuta, valmistame dokumendid ning foto- ja kaardimaterjali, paneme paika alghinna ja teavitame kontrollitud ostjate võrgustikku. Pakkumised on anonüümsed — nähtavad on summad ja ajad, mitte pakkujate nimed.',
       'Edukustasu on 3% käibemaksuga võiduhinnast ja seda tasutakse ainult pärast edukat müüki. Kui oksjon jääb müümata, ei maksa müüja midagi ja müügi võib korrata.',
     ],
   },

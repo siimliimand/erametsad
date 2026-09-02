@@ -50,14 +50,14 @@ describe('buildOrganizationJsonLd', () => {
   })
 
   it('omits address when null and sameAs when empty', () => {
-    const org = buildOrganizationJsonLd({ name: 'Eametsad', url: `${ORIGIN}/`, address: null, sameAs: [] })
+    const org = buildOrganizationJsonLd({ name: 'Erametsad', url: `${ORIGIN}/`, address: null, sameAs: [] })
     expect(org).not.toHaveProperty('address')
     expect(org).not.toHaveProperty('sameAs')
   })
 })
 
 describe('buildServiceJsonLd', () => {
-  it('fills the Eametsad provider and Eesti areaServed, keeping optional fields only when set', () => {
+  it('fills the Erametsad provider and Eesti areaServed, keeping optional fields only when set', () => {
     expect(
       buildServiceJsonLd({
         name: 'Raieõiguse müük',
@@ -71,7 +71,7 @@ describe('buildServiceJsonLd', () => {
       name: 'Raieõiguse müük',
       description: 'Müü raieõigus oksjonil',
       areaServed: 'Eesti',
-      provider: { '@type': 'Organization', name: 'Eametsad', url: ORIGIN },
+      provider: { '@type': 'Organization', name: 'Erametsad', url: ORIGIN },
       url: `${ORIGIN}/teenused/raieoiguse-muuk`,
       offers: { '@type': 'Offer', price: 0, priceCurrency: 'EUR', description: 'Tasuta konsultatsioon' },
     })
@@ -201,7 +201,7 @@ describe('buildArticleJsonLd', () => {
       datePublished: '2026-03-01T00:00:00.000Z',
       author: { '@type': 'Person', name: 'Mari Mets' },
       mainEntityOfPage: `${ORIGIN}/artiklid/metsa-hind`,
-      publisher: { '@type': 'Organization', name: 'Eametsad', url: ORIGIN },
+      publisher: { '@type': 'Organization', name: 'Erametsad', url: ORIGIN },
     })
 
     const minimal = buildArticleJsonLd({ headline: 'Uudis', path: '/artiklid/uudis' })
@@ -209,7 +209,7 @@ describe('buildArticleJsonLd', () => {
     expect(minimal).not.toHaveProperty('author')
     expect(minimal.publisher).toEqual({
       '@type': 'Organization',
-      name: 'Eametsad',
+      name: 'Erametsad',
       url: ORIGIN,
     })
   })

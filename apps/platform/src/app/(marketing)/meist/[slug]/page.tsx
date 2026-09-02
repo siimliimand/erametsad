@@ -4,7 +4,7 @@ import {
   LeadForm,
   LotCard,
   type LotCardProps,
-} from '@eametsad/ui'
+} from '@erametsad/ui'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, permanentRedirect } from 'next/navigation'

@@ -1,4 +1,4 @@
-import { Card } from '@eametsad/ui'
+import { Card } from '@erametsad/ui'
 import type { ComponentType } from 'react'
 
 export type FeeCardIcon = ComponentType<{ className?: string }>

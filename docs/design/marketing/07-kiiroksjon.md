@@ -39,10 +39,10 @@ Omanik, kes tahab kiiresti raha (pärisus, laen, ootamatu kulu), mõistab 48-tun
 2. **LeadForm #1** (`kiiroksjon-1`, `#kontaktvorm`) — kõrval 3 punkti: vastame samal päeval; oksjon algab 24h jooksul; eelhindamine tasuta.
 3. **Kuidas kiiroksjon toimib?** — `Steps` (5 sammu, meie originaalsed pealkirjad):
    1. **"Võta ühendust"** — kõne või vorm; spetsialist hindab metsa põhiandmetest.
-   2. **"Sõlmime salajase piirhinna"** — sinu ja Eametsad'i vahel kokkulepitud minimaalne aktsepteeritav hind, ostjatele nähtamatu.
+   2. **"Sõlmime salajase piirhinna"** — sinu ja Erametsad'i vahel kokkulepitud minimaalne aktsepteeritav hind, ostjatele nähtamatu.
    3. **"48 tundi pakkumisi, alates 1 €"** — oksjon avaldatakse portaalis; madal alghind tõmbab maksimaalselt pakkujaid.
    4. **"Notariaalne tehe"** — piirhind ületatud → tehing; teenustasu 3% + km lõpphinnast.
-   5. **"Garanteeritud varupakkumine"** — kui pakkumisi piirhinnani ei jõua, teeb ostupakkumise Eametsad OÜ ise (kohustuslik tagatis — vt EAMETSAD-PLAN §14/6).
+   5. **"Garanteeritud varupakkumine"** — kui pakkumisi piirhinnani ei jõua, teeb ostupakkumise Erametsad OÜ ise (kohustuslik tagatis — vt ERAMETSAD-PLAN §14/6).
 4. **Miks kiiroksjon?** — ✓-nimekiri (Lucide `Check` `--accent`-is, mitte emoji): "Alustamine tasuta", "Ei ole eelkulud", "Kiirus — nädala jooksul raha juures", "Ostjad eelkontrollitud", "Läbipaistev protsess portaalis", "Varupakkumine tagatud".
 5. **Kiiroksjon sobib sulle, kui:** — `--bg-mist` sektsioon, tingimused: "Mets on müügivalmis (kava/teatis olemas või võimalik)", "Soovid kindlat tähtaega", "Hind kiiremini kui maksimum", "Müüdav mahud kuni ~X m³" (küsi kliendilt piir — vt Open questions). Kui ei sobi → viide `/teenused/raieoiguse-muuk` ("Klassikaline oksjon annab tavaliselt kõrgema hinna").
 6. **LeadForm #2** (`kiiroksjon-2`) — H2 "Räägime täna läbi" + `tel:` link.
@@ -62,7 +62,7 @@ Omanik, kes tahab kiiresti raha (pärisus, laen, ootamatu kulu), mõistab 48-tun
 - H1: "48 tunniga reaalsed pakkumised sinu metsale" · "Kuidas kiiroksjon toimib?" · "Miks kiiroksjon on metsaomanikule hea lahendus?" · "Kiiroksjon sobib sulle, kui:" · "Räägime täna läbi" · "Soovid 48 tunniga pakkumised oma metsale?"
 
 ## SEO & analytics
-- Title: "Kiiroksjon — metsa müük 48 tunniga | Eametsad"; desc: "kiiroksjon, metsa kiirmüük, 48 tundi, metsa müük, ostupakkumine".
+- Title: "Kiiroksjon — metsa müük 48 tunniga | Erametsad"; desc: "kiiroksjon, metsa kiirmüük, 48 tundi, metsa müük, ostupakkumine".
 - JSON-LD: `Service` + `HowTo` (5 sammu) + `BreadcrumbList`.
 - Sündmused: `hero_cta_click`, `step_view{index}`, `step5_view`, `benefit_list_view`, `suitability_check_fail → raieoiguse_link_click` (nimi lihtsustatud: `alt_offer_click`), `lead_form_submit_start/complete{form_name}`, `phone_click`.
 
@@ -74,7 +74,7 @@ Omanik, kes tahab kiiresti raha (pärisus, laen, ootamatu kulu), mõistab 48-tun
 
 ## Open questions
 - Mahu ülempiir sobivuse jaoks (hetkel kohatühi "X m³")?
-- Kas varupakkumise tingimused (hinna alammäär, mis Eametsad ise pakub) avalikustada?
+- Kas varupakkumise tingimused (hinna alammäär, mis Erametsad ise pakub) avalikustada?
 
 ## Dependencies & change log
 - Sõltub: 00-global-shell (kate, LeadForm, CookieBanner), README tokenid.

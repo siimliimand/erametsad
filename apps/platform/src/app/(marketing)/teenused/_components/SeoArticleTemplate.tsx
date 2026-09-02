@@ -1,4 +1,4 @@
-import { LeadForm, StickyTOC, type TOCSection } from '@eametsad/ui'
+import { LeadForm, StickyTOC, type TOCSection } from '@erametsad/ui'
 
 import { HomeTicker, type TickerLotSummary } from '../../_components/HomeTicker'
 

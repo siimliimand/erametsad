@@ -10,14 +10,14 @@ license: MIT
 
 ## Architecture Constraints
 
-- Three deployment units share one monorepo: marketing site (`eametsad.ee`), auction portal (`oksjonid.eametsad.ee`), and core backend + admin (`api.eametsad.ee` / `admin.eametsad.ee`). Do not split them into separate repositories.
-- Use subdomain routing per the established pattern: `eametsad.ee` (marketing), `oksjonid.eametsad.ee` (portal), `api.eametsad.ee` (API), `admin.eametsad.ee` (admin), optional `metsauhistu.eametsad.ee` (Phase 5). Prototype runs under `ww0.dev` (`erametsad.ww0.dev`, `oksjonid.erametsad.ww0.dev`, `api.erametsad.ww0.dev`, `admin.erametsad.ww0.dev`). Production `.ee` cutover is a separate future step.
+- Three deployment units share one monorepo: marketing site (`erametsad.ee`), auction portal (`oksjonid.erametsad.ee`), and core backend + admin (`api.erametsad.ee` / `admin.erametsad.ee`). Do not split them into separate repositories.
+- Use subdomain routing per the established pattern: `erametsad.ee` (marketing), `oksjonid.erametsad.ee` (portal), `api.erametsad.ee` (API), `admin.erametsad.ee` (admin), optional `metsauhistu.erametsad.ee` (Phase 5). Prototype runs under `ww0.dev` (`erametsad.ww0.dev`, `oksjonid.erametsad.ww0.dev`, `api.erametsad.ww0.dev`, `admin.erametsad.ww0.dev`). Production `.ee` cutover is a separate future step.
 - The backend is a Next.js 15 App Router application on Cloudflare Workers (via OpenNext) with Cloudflare D1 (SQLite) via Drizzle ORM. The data layer uses a repository pattern (`apps/platform/src/lib/data/`) with 33 schema tables (including the append-only `consent_log`, `newsletter_subscribers`, `analytics_events`), access guards (`guards.ts`), and runtime helpers (`runtime.ts`). Do not use Payload CMS 3.
 - Auction timing is server-authoritative only. End-of-auction transitions are DO-alarm-driven with a cron sweep safety net, never triggered by a client request.
 - Bids are append-only. Corrections use compensating entries, not deletions or updates. Sealed bids are encrypted at rest until the admin opening ceremony.
 - The marketing site uses SSG/ISR where possible, with live data fetched client-side (auction ticker, form submissions).
 - Host routing lives in `apps/platform/src/lib/routing/host-areas.ts` + middleware: the default host serves `(marketing)` + `/admin` + `/styleguide`, the portal host serves `(portal)`. New portal routes must be added to the middleware portal allowlist or the default host treats them as marketing 404. Default-host rewrites: `/` -> `/avaleht`, `/lepingud` -> `/lepingud/dokumendid`. Static marketing pages use `revalidate = 3600`; DB-backed pages use `dynamic = 'force-dynamic'` because the build has no D1 (flip to ISR only when build-time D1 seeding exists).
-- Consent is one cookie, one server log: `eametsad_consent` holds URL-encoded JSON `{necessary, statistics, marketing}` (12 months); `track()` gates on `statistics` except `cookie_consent`; every decision POSTs to `/api/v1/consent`.
+- Consent is one cookie, one server log: `erametsad_consent` holds URL-encoded JSON `{necessary, statistics, marketing}` (12 months); `track()` gates on `statistics` except `cookie_consent`; every decision POSTs to `/api/v1/consent`.
 
 ## Naming Conventions
 

@@ -1,5 +1,5 @@
 {
-  "extends": "@eametsad/config/tsconfig.json",
+  "extends": "@erametsad/config/tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2022"]
   },

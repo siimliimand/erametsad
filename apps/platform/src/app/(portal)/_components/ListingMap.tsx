@@ -1,6 +1,6 @@
 'use client'
 
-import { MapEstonia, type MapPin } from '@eametsad/ui'
+import { MapEstonia, type MapPin } from '@erametsad/ui'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 

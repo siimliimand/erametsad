@@ -1,6 +1,6 @@
 'use client'
 
-import { DataTable, type Column } from '@eametsad/ui'
+import { DataTable, type Column } from '@erametsad/ui'
 
 export interface DossierRow {
   label: string

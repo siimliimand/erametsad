@@ -1,4 +1,4 @@
-import { EmptyState, type SearchableItem } from '@eametsad/ui'
+import { EmptyState, type SearchableItem } from '@erametsad/ui'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'

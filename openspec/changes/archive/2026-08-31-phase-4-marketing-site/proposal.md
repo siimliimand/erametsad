@@ -7,7 +7,7 @@ and the auction portal. The public face that starts the funnel does not
 exist yet. A forest owner has no page to land on, no way to leave a lead,
 and no content that explains the service. Demo story 1 ("forest owner
 leaves a lead on the marketing site -> it lands in the admin Leads CRM")
-is blocked on this phase. Phase 4 builds the marketing site (`eametsad.*`)
+is blocked on this phase. Phase 4 builds the marketing site (`erametsad.*`)
 as a new `(marketing)` route group on top of the existing design system,
 CMS repositories, and lead API.
 
