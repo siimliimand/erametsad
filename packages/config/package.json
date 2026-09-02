@@ -2,10 +2,13 @@
   "name": "@erametsad/config",
   "version": "0.1.0",
   "private": true,
+  "tsconfig": "./tsconfig.json",
   "exports": {
     "./eslint.config.mjs": "./eslint.config.mjs",
     "./prettier.config.mjs": "./prettier.config.mjs",
-    "./tsconfig.json": "./tsconfig.json"
+    "./tsconfig.json": "./tsconfig.json",
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "lint": "eslint .",
