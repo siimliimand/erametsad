@@ -3,6 +3,13 @@
 // the OpenNext fetch handler re-exported alongside the DO classes, the queue
 // consumer, and the cron sweep, giving one Worker for HTTP, DOs, queues, and
 // cron triggers.
+// The .open-next import target is written only after a completed build:
+// absent on clean builds, present on rebuilds. That is why this is ts-ignore
+// and not ts-expect-error, which would flag as unused on rebuilds. Wrangler
+// and vitest resolve the real file at bundle time.
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore generated .open-next output, see above
+import openNextWorker from '../../.open-next/worker.js'
 import { sweepDueAuctions } from '../lib/workers/auction-ending'
 import type {
   CronController,
@@ -10,13 +17,6 @@ import type {
   SweepExecutionContext,
 } from '../lib/workers/auction-ending'
 
-// The .open-next import target is written only after a completed build:
-// absent on clean builds, present on rebuilds. That is why this is ts-ignore
-// and not ts-expect-error, which would flag as unused on rebuilds. Wrangler
-// and vitest resolve the real file at bundle time.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore generated .open-next output, see above
-export { default } from '../../.open-next/worker.js'
 export { AuctionDO } from './auction'
 export { RateLimiterDO } from './rate-limiter'
 
@@ -34,3 +34,10 @@ export function scheduled(
   void controller
   ctx.waitUntil(sweepDueAuctions(env, ctx))
 }
+
+// Cloudflare registers cron handlers from the default ExportedHandler object
+// (its version metadata listed only `fetch` while a bare named `scheduled`
+// export sat in the bundle, and every tick threw "Handler does not export a
+// scheduled() function"). Attaching scheduled to the default export puts it
+// in the handler table; the named export above stays for tests and local dev.
+export default Object.assign(openNextWorker, { scheduled })

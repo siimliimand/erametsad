@@ -9,7 +9,13 @@ import { RateLimiterDO } from '../rate-limiter'
 // handler (loadable only after `build:cf`, so asserted as source wiring
 // below) alongside the DO classes, the queue consumer, and the cron sweep.
 test('shim wires fetch, both DO classes, queue consumer, and cron sweep', () => {
-  expect(shimSource).toContain("export { default } from '../../.open-next/worker.js'")
+  expect(shimSource).toContain("import openNextWorker from '../../.open-next/worker.js'")
+  // Cloudflare registers cron handlers from the default ExportedHandler
+  // object: with scheduled only as a bare named export, the version metadata
+  // listed `fetch` alone and every tick threw "Handler does not export a
+  // scheduled() function" (2026-09-02 incident). The default export must
+  // carry scheduled.
+  expect(shimSource).toContain('export default Object.assign(openNextWorker, { scheduled })')
   expect(shimSource).toContain("export { AuctionDO } from './auction'")
   expect(shimSource).toContain("export { RateLimiterDO } from './rate-limiter'")
   // The cron handler must be DEFINED in the shim, not re-exported: wrangler's

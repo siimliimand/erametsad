@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "build:cf": "opennextjs-cloudflare build",
-    "deploy:cf": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "deploy:cf": "opennextjs-cloudflare build && wrangler deploy",
     "lint": "next lint && tsx scripts/lint-schema.ts",
     "lint:schema": "tsx scripts/lint-schema.ts",
     "migrate:pg:export": "tsx scripts/migrate-pg-to-d1/export-pg.ts",
