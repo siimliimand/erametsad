@@ -1,8 +1,8 @@
 'use client'
 
+import { DataTable, type Column } from '@erametsad/ui'
 import { Fragment } from 'react'
 
-import { DataTable, type Column } from '@erametsad/ui'
 
 export interface DossierRow {
   label: string

@@ -1,14 +1,14 @@
 import crypto from 'node:crypto'
-
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/data/runtime', () => ({
   getRepositories: vi.fn(),
 }))
 
+import { prepareContract, signContract } from '../service'
+
 import { getRepositories } from '@/lib/data/runtime'
 
-import { prepareContract, signContract } from '../service'
 
 const OWNER_ID = 'user-1'
 const AUCTION_ID = 'auction-1'

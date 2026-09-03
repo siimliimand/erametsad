@@ -43,6 +43,7 @@ vi.mock('@/app/(portal)/_lib/use-auction-stream', () => ({
 }))
 
 import { LiveListing, type LiveListingProps, type LiveLotState } from '../LiveListing'
+
 import type { AuctionListResult, AuctionSummary } from '@/lib/auction/queries'
 
 function lot(overrides: Partial<AuctionSummary> = {}): AuctionSummary {

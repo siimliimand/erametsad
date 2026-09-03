@@ -34,6 +34,7 @@ vi.mock('@/app/(portal)/_lib/use-auction-stream', () => ({
 }))
 
 import { BidList, type BidListProps } from '../BidList'
+
 import type { AuctionBidView, BidListRow } from '@/lib/auction/queries'
 
 function row(overrides: Partial<BidListRow> = {}): BidListRow {

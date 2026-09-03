@@ -1,7 +1,5 @@
-import crypto from 'node:crypto'
-
 import { NextRequest } from 'next/server'
-
+import crypto from 'node:crypto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/data/runtime', () => ({
@@ -13,6 +11,7 @@ vi.mock('@/lib/auth/jwt', () => ({
 }))
 
 import { POST as completeRoute } from '../route'
+
 import { verifyAccessToken } from '@/lib/auth/jwt'
 import { getRepositories } from '@/lib/data/runtime'
 
