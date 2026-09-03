@@ -182,6 +182,36 @@ describe('PendingApprovalChip', () => {
     const html = renderToString(createElement(PendingApprovalChip))
     expect(html).toContain('Alapakkumine ootab müüja kinnitust')
   })
+
+  it('shows the pending chip from the server snapshot after a reload', () => {
+    const html = render(
+      baseProps({
+        viewer: {
+          hasBid: true,
+          isLeading: false,
+          hasRights: true,
+          hasRaamleping: true,
+          hasPendingUnderStart: true,
+        },
+      }),
+    )
+    expect(html).toContain('Alapakkumine ootab müüja kinnitust')
+  })
+
+  it('hides the pending chip without the server flag or an in-session pending bid', () => {
+    const html = render(
+      baseProps({
+        viewer: {
+          hasBid: true,
+          isLeading: false,
+          hasRights: true,
+          hasRaamleping: true,
+          hasPendingUnderStart: false,
+        },
+      }),
+    )
+    expect(html).not.toContain('Alapakkumine ootab müüja kinnitust')
+  })
 })
 
 describe('minimumNextAmount', () => {

@@ -2,16 +2,30 @@ import { createElement } from 'react'
 import { renderToString } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
+// Mutable so individual tests can point the panel at a URL with filters.
+const mocks = vi.hoisted(() => ({ searchParams: new URLSearchParams('') }))
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }),
   usePathname: () => '/',
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => mocks.searchParams,
 }))
 
+import {
+  countActiveFilters,
+  DEFAULT_LISTING_FILTERS,
+  parseListingFilters,
+  serializeListingFilters,
+} from '../../_lib/filter-params'
 import { ListingFilters } from '../ListingFilters'
 
 function render(tab: string): string {
   return renderToString(createElement(ListingFilters, { tab }))
+}
+
+function renderWithQuery(tab: string, query: string): string {
+  mocks.searchParams = new URLSearchParams(query)
+  return render(tab)
 }
 
 describe('ListingFilters subscription entry', () => {
@@ -59,4 +73,30 @@ describe('ListingFilters mobile disclosure', () => {
   // Clicking the toggle cannot be exercised here: this suite renders with
   // renderToString and has no DOM runner, so the opened state stays a
   // browser check for now.
+})
+
+describe('ListingFilters quick search (q)', () => {
+  it('counts the q term in the active badge and shows Tühjenda', () => {
+    const html = renderWithQuery('mets', 'q=metskits')
+    expect(html).toContain('Tühjenda')
+    expect(html).toMatch(/rounded-pill bg-primary[^>]*>1</)
+  })
+
+  it('keeps the badge empty and Tühjenda hidden without q', () => {
+    const html = renderWithQuery('mets', '')
+    expect(html).not.toContain('Tühjenda')
+    expect(html).not.toMatch(/rounded-pill bg-primary[^>]*>\d+</)
+  })
+
+  it('parses, counts and serializes the q term', () => {
+    const state = parseListingFilters(new URLSearchParams('q=metskits'))
+    expect(state.q).toBe('metskits')
+    expect(countActiveFilters(state)).toBe(1)
+    expect(serializeListingFilters(state, 'mets')).toContain('q=metskits')
+  })
+
+  it('drops q when the state clears back to defaults', () => {
+    expect(serializeListingFilters({ ...DEFAULT_LISTING_FILTERS }, 'mets')).not.toContain('q=')
+    expect(countActiveFilters({ ...DEFAULT_LISTING_FILTERS })).toBe(0)
+  })
 })

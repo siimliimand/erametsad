@@ -140,6 +140,11 @@ describe('parseAuctionSearchParams', () => {
     expect(filters.limit).toBe(100)
     expect(parseAuctionSearchParams(new URLSearchParams('limit=-5')).limit).toBe(1)
   })
+
+  it('reads a trimmed free-text q and defaults to empty', () => {
+    expect(parseAuctionSearchParams(new URLSearchParams('q=%20metskits%20')).q).toBe('metskits')
+    expect(parseAuctionSearchParams(new URLSearchParams('')).q).toBe('')
+  })
 })
 
 describe('listAuctions filters', () => {
@@ -180,6 +185,72 @@ describe('listAuctions filters', () => {
   it('accepts the Estonian species name as the token', async () => {
     const result = await listAuctions(repos, new URLSearchParams('species=m%C3%A4nd'))
     expect(result.total).toBe(2)
+  })
+})
+
+describe('listAuctions free-text search (q)', () => {
+  beforeEach(async () => {
+    await seedUser('seller-1')
+    await seedCounty('c1', 'Harjumaa', 'HH')
+    await seedCounty('c2', 'Tartumaa', 'TA')
+    await seedAuction('a-metskits', {
+      status: 'active',
+      title: 'Metskitsede talvitumisala raieõigus',
+      countyId: 'c1',
+      endsAt: '2026-09-10T00:00:00.000Z',
+    })
+    await seedAuction('a-kataster', {
+      status: 'active',
+      title: 'Metsamaa Võtmes',
+      cadastres: ['12345:678:9012'],
+      registryNumbers: ['98765432'],
+      countyId: 'c2',
+      endsAt: '2026-09-05T00:00:00.000Z',
+    })
+    await seedAuction('a-muu', {
+      status: 'active',
+      title: 'Kuusepuidu müük',
+      countyId: 'c2',
+      endsAt: '2026-09-01T00:00:00.000Z',
+    })
+  })
+
+  it('matches a title substring case-insensitively', async () => {
+    // Both "Metskitsede…" and "Metsamaa…" fold to lowercase "mets".
+    const result = await listAuctions(repos, new URLSearchParams('q=METS'))
+    expect(result.auctions.map((a) => a.id)).toEqual(['a-kataster', 'a-metskits'])
+  })
+
+  it('matches a cadastre or registry number token', async () => {
+    const byCadastre = await listAuctions(
+      repos,
+      new URLSearchParams('q=12345:678:9012'),
+    )
+    expect(byCadastre.auctions.map((a) => a.id)).toEqual(['a-kataster'])
+
+    const byRegistry = await listAuctions(repos, new URLSearchParams('q=98765432'))
+    expect(byRegistry.auctions.map((a) => a.id)).toEqual(['a-kataster'])
+  })
+
+  it('folds diacritics so q without õ/ä still matches', async () => {
+    const result = await listAuctions(repos, new URLSearchParams('q=raieoigus'))
+    expect(result.auctions.map((a) => a.id)).toEqual(['a-metskits'])
+  })
+
+  it('combines q with the county filter', async () => {
+    const both = await listAuctions(repos, new URLSearchParams('q=mets&county=HH'))
+    expect(both.auctions.map((a) => a.id)).toEqual(['a-metskits'])
+
+    const disjoint = await listAuctions(repos, new URLSearchParams('q=metskits&county=TA'))
+    expect(disjoint.total).toBe(0)
+  })
+
+  it('leaves the result unchanged when q is absent or blank', async () => {
+    const absent = await listAuctions(repos, new URLSearchParams(''))
+    expect(absent.total).toBe(3)
+
+    const blank = await listAuctions(repos, new URLSearchParams('q=%20'))
+    expect(blank.total).toBe(3)
   })
 })
 
@@ -558,10 +629,39 @@ describe('getAuctionDossier', () => {
       hasBid: true,
       hasAutobidder: false,
       isLeading: false,
+      hasPendingUnderStart: false,
     })
 
     const guestDossier = await getAuctionDossier(repos, 'a-open', null)
     expect(guestDossier?.leadingBidAmount).toBeNull()
     expect(guestDossier?.participation).toBeNull()
+  })
+
+  it('flags an own pending alapakkumine bid in the viewer snapshot', async () => {
+    await seedUser('bidder-1')
+    await seedUser('bidder-2')
+    await seedAuction('a-open', { status: 'active' })
+    await seedBid('bid-pending', {
+      auctionId: 'a-open',
+      userId: 'bidder-1',
+      amountCents: 8_000,
+      status: 'pending_approval',
+    })
+    await seedBid('bid-other-pending', {
+      auctionId: 'a-open',
+      userId: 'bidder-2',
+      amountCents: 7_000,
+      status: 'pending_approval',
+    })
+
+    const dossier = await getAuctionDossier(repos, 'a-open', viewer('bidder-1'))
+    expect(dossier?.participation?.hasPendingUnderStart).toBe(true)
+
+    // Another viewer's pending bid does not leak into the snapshot.
+    const otherDossier = await getAuctionDossier(repos, 'a-open', viewer('bidder-2'))
+    expect(otherDossier?.participation?.hasPendingUnderStart).toBe(true)
+
+    const third = await getAuctionDossier(repos, 'a-open', viewer('seller-1'))
+    expect(third?.participation?.hasPendingUnderStart).toBe(false)
   })
 })

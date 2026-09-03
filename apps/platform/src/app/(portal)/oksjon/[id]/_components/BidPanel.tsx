@@ -38,6 +38,13 @@ export interface BidPanelViewerFlags {
    */
   hasAutobidder?: boolean | null
   /**
+   * Server snapshot of the caller's own `pending_approval` (alapakkumine)
+   * bid on this auction (dossier `participation.hasPendingUnderStart`), so
+   * the pending chip survives a reload. Defaults to false when the page
+   * cannot derive it; the in-session pending state ORs on top.
+   */
+  hasPendingUnderStart?: boolean | null
+  /**
    * The caller's autobidder row when the page can supply it. Without the
    * row the control falls back to the POST upsert and hides "Eemalda".
    */
@@ -415,6 +422,8 @@ export function BidPanel({
       ? { id: viewer.autobidderId, maxAmount: viewer.autobidderMaxAmount }
       : null
   const hasAutobidder = existingAutobidder !== null || viewer.hasAutobidder === true
+  // Pending alapakkumine chip: server snapshot OR a bid pended in-session.
+  const hasPendingBid = pendingAmount !== null || viewer.hasPendingUnderStart === true
 
   function openConfirm(event: SyntheticEvent): void {
     event.preventDefault()
@@ -530,7 +539,7 @@ export function BidPanel({
         <p className="text-bodySm text-inkMuted">Oksjon lõpeb: {endsAtLabel}</p>
       )}
 
-      {pendingAmount !== null && <PendingApprovalChip />}
+      {hasPendingBid && <PendingApprovalChip />}
 
       <form onSubmit={openConfirm} className="flex flex-col gap-xs">
         <label htmlFor="bid-amount" className="text-label font-semibold text-ink">
