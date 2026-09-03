@@ -3,7 +3,7 @@ import { validators } from '@erametsad/types'
 import { NextResponse } from 'next/server'
 import { createHash } from 'node:crypto'
 
-import { env } from '@/env'
+import { MARKETING_BASE_URL } from '@/app/(marketing)/_lib/base-url'
 import { getRepositories } from '@/lib/data/runtime'
 import { validateHoneypot } from '@/lib/leads/ingestion'
 import { marketingEmailHeaders, sendEmail } from '@/lib/notifications/email-sender'
@@ -67,10 +67,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       },
     })
 
-    const confirmUrl = `${env.NEXT_PUBLIC_APP_URL}/api/v1/newsletter/confirm?token=${encodeURIComponent(token)}`
+    const confirmUrl = `${MARKETING_BASE_URL}/api/v1/newsletter/confirm?token=${encodeURIComponent(token)}`
     try {
       await sendEmail({
-        from: env.SMTP_FROM,
+        // Lazy read: empty falls back to email-sender's DEFAULT_FROM.
+        ...(process.env.SMTP_FROM ? { from: process.env.SMTP_FROM } : {}),
         to: email,
         subject: 'Kinnitage uudiskirja tellimus',
         html: newsletterConfirmationTemplate({ confirmUrl }),

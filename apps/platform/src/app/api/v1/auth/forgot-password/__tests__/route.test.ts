@@ -4,22 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { sendMailMock } = vi.hoisted(() => ({ sendMailMock: vi.fn() }))
-
-vi.mock('nodemailer', () => ({
-  default: { createTransport: vi.fn(() => ({ sendMail: sendMailMock })) },
-}))
-
-vi.mock('@/env', () => ({
-  env: {
-    SMTP_HOST: 'localhost',
-    SMTP_PORT: 1025,
-    SMTP_USER: '',
-    SMTP_PASS: '',
-    SMTP_FROM: 'noreply@erametsad.ee',
-    NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
-  },
-}))
+const { sendBindingMock } = vi.hoisted(() => ({ sendBindingMock: vi.fn() }))
 
 vi.mock('@/lib/data/runtime', () => ({
   getRepositories: vi.fn(),
@@ -40,6 +25,7 @@ import {
 } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 import { setD1ForTests } from '@/lib/db'
+import { setEmailBindingForTests } from '@/lib/notifications/email-sender'
 
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'forgot-password-route-test-jwt-secret'
 
@@ -76,20 +62,23 @@ function forgotRequest(identifier: string, ip = '10.0.0.1'): NextRequest {
   })
 }
 
-function sentEmail(): { to?: string; subject?: string; text?: string } {
-  expect(sendMailMock).toHaveBeenCalledTimes(1)
-  return (sendMailMock.mock.calls[0] as [{ to?: string; subject?: string; text?: string }])[0]
+function sentEmail(): { to?: string; subject?: string; html?: string } {
+  expect(sendBindingMock).toHaveBeenCalledTimes(1)
+  return (
+    sendBindingMock.mock.calls[0] as [{ to?: string; subject?: string; html?: string }]
+  )[0]
 }
 
 function sentLink(): URL {
-  const link = sentEmail().text?.match(/https?:\/\/\S+/)?.[0]
+  const link = sentEmail().html?.match(/https?:\/\/[^"\s<]+/)?.[0]
   if (!link) throw new Error('reset email contains no link')
   return new URL(link)
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  sendMailMock.mockResolvedValue({})
+  sendBindingMock.mockResolvedValue({ messageId: 'test-message-id' })
+  setEmailBindingForTests({ send: sendBindingMock })
   testDb = createSqliteTestDb()
   repos = createCoreRepositories(testDb.database, {
     isikukoodCodec: nodeIsikukoodCodec,
@@ -100,6 +89,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  setEmailBindingForTests(null)
   setD1ForTests(null)
   testDb.close()
 })
@@ -115,7 +105,7 @@ describe('POST /api/v1/auth/forgot-password reset link', () => {
       message: 'Kui konto on olemas, saadeti parooli lähtestamise link e-posti aadressile',
     })
 
-    expect(sentEmail().to).toBe(email)
+    expect(sentEmail().to).toEqual([email])
     const url = sentLink()
 
     // Regression: the token is a path segment, never a query parameter.
@@ -143,6 +133,6 @@ describe('POST /api/v1/auth/forgot-password reset link', () => {
     expect(await response.json()).toEqual({
       message: 'Kui konto on olemas, saadeti parooli lähtestamise link e-posti aadressile',
     })
-    expect(sendMailMock).not.toHaveBeenCalled()
+    expect(sendBindingMock).not.toHaveBeenCalled()
   })
 })

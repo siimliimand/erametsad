@@ -61,11 +61,14 @@ pnpm exec wrangler secret put EIDEASY_CLIENT_ID
 pnpm exec wrangler secret put EIDEASY_SECRET
 pnpm exec wrangler secret put EIDEASY_API_URL        # optional, defaults to https://id.eideasy.com
 
-# Schema-required (env.ts validation; DATABASE_URL and REDIS_URL are dead code on Workers)
+# Public app URL (reset links, newsletter confirm links, canonical URLs)
 pnpm exec wrangler secret put NEXT_PUBLIC_APP_URL
-pnpm exec wrangler secret put DATABASE_URL            # set to https://unused
-pnpm exec wrangler secret put REDIS_URL               # set to redis://unused
 ```
+
+`DATABASE_URL` and `REDIS_URL` are not needed: the app reads D1 through the
+`DB` binding and rate limiting is in-memory or DO-backed. An earlier version
+of this runbook set placeholder values for them to satisfy the removed
+module-scope validation in `src/env.ts`; that validation no longer exists.
 
 ## 3. Deploy
 

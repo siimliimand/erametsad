@@ -6,10 +6,6 @@ vi.mock('../email-sender', () => ({
   sendEmail: sendEmailMock,
 }))
 
-vi.mock('@/env', () => ({
-  env: { SMTP_FROM: 'noreply@erametsad.ee' },
-}))
-
 vi.mock('@/lib/data/runtime', () => ({
   getRepositories: vi.fn(),
 }))
@@ -26,6 +22,8 @@ import {
 import { getRepositories } from '@/lib/data/runtime'
 
 process.env.ISIKUKOOD_ENCRYPTION_KEY = process.env.ISIKUKOOD_ENCRYPTION_KEY ?? 'integration-test-key'
+// dispatchEmail reads this per send; empty would fall back to DEFAULT_FROM.
+process.env.SMTP_FROM = 'noreply@erametsad.ee'
 
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 

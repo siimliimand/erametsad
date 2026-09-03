@@ -81,8 +81,7 @@ export function formatFileSize(bytes: number | null | undefined): string {
 }
 
 // Minimal local R2 surface (same local-declaration approach as the DO
-// namespaces in api/v1/bids/create/route.ts; src/lib/storage.ts declares a
-// narrower global R2Bucket without a readable body).
+// namespaces in api/v1/bids/create/route.ts).
 export interface MediaR2Object {
   body?: ReadableStream<Uint8Array> | undefined
   size: number

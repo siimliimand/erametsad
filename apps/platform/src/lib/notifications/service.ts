@@ -9,7 +9,6 @@ import {
 import { sendEmail, type SendResult } from './email-sender'
 import { type DomainEvent, type DomainEventType, type EventBus } from './event-bus'
 
-import { env } from '@/env'
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 
@@ -156,7 +155,8 @@ async function dispatchEmail(userId: string | number, event: DomainEvent, body: 
     errorCode = 'E_NO_RECIPIENT'
   } else {
     result = await sendEmail({
-      from: env.SMTP_FROM,
+      // Lazy read: empty falls back to email-sender's DEFAULT_FROM.
+      ...(process.env.SMTP_FROM ? { from: process.env.SMTP_FROM } : {}),
       to,
       subject: eventTitles[event.type],
       html: body,

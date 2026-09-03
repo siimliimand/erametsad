@@ -1,7 +1,7 @@
 // Minimal ambient types for the `cloudflare:workers` module. The full
-// @cloudflare/workers-types package conflicts with src/lib/storage.ts's own
-// R2 declarations, so src/do declares only the runtime shapes it uses (same
-// approach as the spike env types under spikes/*/spike-env.d.ts).
+// @cloudflare/workers-types package conflicts with the other local minimal
+// declarations in src, so src/do declares only the runtime shapes it uses
+// (same approach as the spike env types under spikes/*/spike-env.d.ts).
 declare module 'cloudflare:workers' {
   export interface DurableObjectId {
     readonly name: string | undefined

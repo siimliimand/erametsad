@@ -27,9 +27,9 @@ export type JobPayload = NotificationFanoutJob | ContractPdfJob
 
 // Minimal runtime shapes for the queue handler entry point and the KV/R2
 // bindings, declared locally for the same reason as DbDatabase in
-// src/lib/db.ts: @cloudflare/workers-types conflicts with the R2
-// declarations in src/lib/storage.ts. The real runtime bindings satisfy
-// these structurally.
+// src/lib/db.ts: @cloudflare/workers-types conflicts with the other local
+// minimal declarations in src. The real runtime bindings satisfy these
+// structurally.
 
 export interface QueueMessage<Body = JobPayload> {
   /** Stable across redeliveries of the same message. */

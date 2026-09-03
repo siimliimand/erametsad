@@ -4,13 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { sendEmailMock } = vi.hoisted(() => ({ sendEmailMock: vi.fn() }))
 
-vi.mock('@/env', () => ({
-  env: {
-    SMTP_FROM: 'noreply@erametsad.ee',
-    NEXT_PUBLIC_APP_URL: 'https://erametsad.ww0.dev',
-  },
-}))
-
 vi.mock('@/lib/notifications/email-sender', () => ({
   sendEmail: sendEmailMock,
   marketingEmailHeaders: () => ({
@@ -40,6 +33,9 @@ import { getRepositories } from '@/lib/data/runtime'
 import { setD1ForTests } from '@/lib/db'
 
 const BASE = 'http://localhost:3000/api/v1/newsletter'
+
+// The route reads this per send; empty would fall back to DEFAULT_FROM.
+process.env.SMTP_FROM = 'noreply@erametsad.ee'
 
 let testDb: SqliteTestDb
 let repos: CoreRepositories

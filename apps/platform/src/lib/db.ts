@@ -2,8 +2,8 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 
 /**
  * Minimal D1 runtime surface for direct SQL. Declared locally because the
- * full @cloudflare/workers-types package conflicts with src/lib/storage.ts's
- * own R2 declarations (same approach as the spike env types).
+ * full @cloudflare/workers-types package conflicts with the other local
+ * minimal declarations in src (same approach as the spike env types).
  */
 export type SqlParam = string | number | boolean | null
 export type SqlParams = readonly SqlParam[]

@@ -1,50 +1,46 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import nodemailer, { type Transporter } from 'nodemailer'
 
-import { env } from '@/env'
+import { MARKETING_BASE_URL } from '@/app/(marketing)/_lib/base-url'
 import { createResetToken } from '@/lib/auth/reset-tokens'
 import { hash } from '@/lib/crypto'
 import { getRepositories } from '@/lib/data/runtime'
+import { sendEmail } from '@/lib/notifications/email-sender'
 import { authRateLimiter } from '@/lib/rate-limit'
 
 const NEUTRAL_MESSAGE =
   'Kui konto on olemas, saadeti parooli lähtestamise link e-posti aadressile'
 
-let transporter: Transporter | null = null
-
-function getTransporter(): Transporter {
-  transporter ??= nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: env.SMTP_PORT,
-    secure: false,
-    auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
-  })
-  return transporter
-}
-
-function resetEmailBody(resetLink: string): string {
+function resetEmailHtml(resetLink: string): string {
   return [
-    'Tere!',
+    '<p>Tere!</p>',
     '',
-    'Taotlesite Erametsad oksjonikeskkonnas parooli lähtestamist.',
+    '<p>Taotlesite Erametsad oksjonikeskkonnas parooli lähtestamist.</p>',
     '',
-    `Parooli lähtestamiseks avage järgmine link (kehtib 2 tundi): ${resetLink}`,
+    `<p>Parooli lähtestamiseks avage järgmine link (kehtib 2 tundi): <a href="${resetLink}">${resetLink}</a></p>`,
     '',
-    'Kui te parooli lähtestamist ei taotlenud, ignoreerige seda kirja.',
+    '<p>Kui te parooli lähtestamist ei taotlenud, ignoreerige seda kirja.</p>',
     '',
-    'Lugupidamisega',
-    'Erametsad',
+    '<p>Lugupidamisega,<br>Erametsad</p>',
   ].join('\n')
 }
 
+// sendEmail walks the EMAIL binding → Cloudflare API → SMTP chain and
+// reports failures as results; transport errors must not leak whether the
+// account exists, so a failed send only logs.
 async function sendResetEmail(email: string, resetLink: string): Promise<void> {
-  await getTransporter().sendMail({
-    from: env.SMTP_FROM,
+  const result = await sendEmail({
+    // Lazy read: empty falls back to email-sender's DEFAULT_FROM.
+    ...(process.env.SMTP_FROM ? { from: process.env.SMTP_FROM } : {}),
     to: email,
     subject: 'Parooli lähtestamine',
-    text: resetEmailBody(resetLink),
+    html: resetEmailHtml(resetLink),
   })
+  if (!result.success) {
+    console.error(
+      `[AUTH] Reset email send failed via ${result.transport} (code ${result.error?.code ?? 'unknown'}): ${result.error?.message ?? 'unknown error'}`,
+    )
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -95,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     if (email) {
       const token = await createResetToken(userId)
-      const resetLink = `${env.NEXT_PUBLIC_APP_URL}/reset-password/${token}`
+      const resetLink = `${MARKETING_BASE_URL}/reset-password/${token}`
 
       try {
         await sendResetEmail(email, resetLink)
