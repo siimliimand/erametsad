@@ -1,5 +1,7 @@
 'use client'
 
+import { Fragment } from 'react'
+
 import { DataTable, type Column } from '@erametsad/ui'
 
 export interface DossierRow {
@@ -20,7 +22,12 @@ const columns: Column<DossierRow>[] = [
     key: 'value',
     label: 'Väärtus',
     sortable: false,
-    render: (row) => <span className="whitespace-normal text-ink">{row.value}</span>,
+    render: (row) =>
+      row.label === 'Puuliigid' ? (
+        <SpeciesListCell value={row.value} />
+      ) : (
+        <span className="whitespace-normal text-ink">{row.value}</span>
+      ),
   },
 ]
 
@@ -51,16 +58,30 @@ function normalizeKey(key: string): string {
   return key.toLowerCase().replace(/[^a-z0-9äöüõ]/g, '')
 }
 
-// Same code set as SPECIES_CODE_NAMES in lib/auction/queries.ts (kept
-// module-private there and server-only, so this client-safe copy maps the
-// short codes to the full Estonian species names shown in the tooltip).
+// Code set is the shared TreeSpecies taxonomy in packages/types; keys are
+// the lowercase 2-letter codes stored in package rows and dossier values.
+// PP, LV, TP, KE, SM, KR have no name established in the repo, so they
+// pass through verbatim without a tooltip.
 const SPECIES_FULL_NAMES: Readonly<Record<string, string>> = {
   ma: 'Mänd',
   ku: 'Kuusk',
   ks: 'Kask',
   ha: 'Haab',
-  sa: 'Sanglepp',
+  hb: 'Haab',
+  hl: 'Hall lepp',
+  lm: 'Lehis',
   ta: 'Tamm',
+  sa: 'Sanglepp',
+  ja: 'Jaapani lehis',
+  pn: 'Pärn',
+  va: 'Vaher',
+  tk: 'Toomingas',
+  ph: 'Pihlakas',
+  re: 'Remmelgas',
+  nu: 'Nulud',
+  ts: 'Harilik tsuuga',
+  lh: 'Läänemänd',
+  kp: 'Kanada pappel',
 }
 
 function isSpeciesColumn(keys: readonly string[]): boolean {
@@ -81,6 +102,25 @@ function SpeciesCell({ value, species }: { value: string; species: boolean }) {
   return (
     <span className="whitespace-normal" title={fullName}>
       {value}
+    </span>
+  )
+}
+
+/** Dossier species row: page.tsx passes codes comma-joined, so split and
+ * tooltip each token instead of rendering the joined text bare. */
+function SpeciesListCell({ value }: { value: string }) {
+  const tokens = value
+    .split(',')
+    .map((token) => token.trim())
+    .filter((token) => token !== '')
+  return (
+    <span className="whitespace-normal text-ink">
+      {tokens.map((token, index) => (
+        <Fragment key={`${token}-${String(index)}`}>
+          {index > 0 ? ', ' : ''}
+          <SpeciesCell value={token} species />
+        </Fragment>
+      ))}
     </span>
   )
 }

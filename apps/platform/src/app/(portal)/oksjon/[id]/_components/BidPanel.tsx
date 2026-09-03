@@ -402,10 +402,10 @@ export function BidPanel({
       <section className={PANEL_CLASSES}>
         <h2 className="font-heading text-h4 text-ink">Pakkumine</h2>
         <p className="text-body text-inkMuted">
-          Sul ei ole õigust selle objektitüübi pakkumiste tegemiseks.
+          Sul puuduvad õigused teha selle tüübi oksjonil pakkumisi.
         </p>
         <p className="text-bodySm text-inkMuted">
-          Pakkumisõiguse saamiseks pöördu müüja poole.
+          Kirjuta info@erametsad.ee õiguste saamiseks.
         </p>
       </section>
     )
@@ -644,8 +644,7 @@ export function BidPanel({
 
       <div className="flex flex-col gap-2xs rounded-card bg-bgMist p-xs">
         <p className="text-bodySm text-inkMuted">
-          Teenustasu 3% + käibemaks lisandub võidetud hinnale ja makstakse tehingu
-          lõpuleviimisel.
+          Teenustasu rakendub vaid oksjoni võitmise korral
         </p>
         {antiSnipeMinutes !== null && antiSnipeMinutes > 0 && (
           <p className="text-bodySm text-inkMuted">
