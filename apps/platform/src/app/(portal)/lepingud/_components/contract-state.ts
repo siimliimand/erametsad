@@ -122,6 +122,25 @@ export async function loadContractSnapshot(
   }
 }
 
+/**
+ * Lists the caller's in-progress (prepared/sent) contracts for the /lepingud
+ * list. Prepare binds the owner at creation, so signedBy scopes live rows the
+ * same way as signed ones.
+ */
+export async function loadUserSigningContracts(
+  repositories: CoreRepositories,
+  userId: string,
+): Promise<Contract[]> {
+  const result = await repositories.find({
+    collection: 'contracts',
+    where: {
+      and: [{ signedBy: { equals: userId } }, { status: { in: ['prepared', 'sent'] } }],
+    },
+    sort: '-createdAt',
+  })
+  return result.docs
+}
+
 async function templateVersionOf(
   repositories: CoreRepositories,
   templates: readonly { id: string; version: string }[],
