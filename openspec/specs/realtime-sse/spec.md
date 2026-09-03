@@ -9,14 +9,20 @@ TBD - created by archiving change phase-2-core-backend. Update Purpose after arc
 `bid:created`, each fanned out from the `AuctionDO` hub at the moment
 the corresponding domain action commits: publication/activation,
 anti-snipe extension, alarm-driven ending, and accepted bid.
-`bid:created` payloads SHALL be anonymised (amount and relative time
-only, never bidder identity). A 30-second comment heartbeat SHALL keep
-the connection alive.
+`bid:created` payloads SHALL carry `auctionId` and `placedAt` only and
+SHALL NOT carry `amount`; guests MUST NOT be able to recover bid amounts
+from public stream frames. Authenticated viewers obtain amounts through
+authenticated endpoints or the authenticated user stream. A 30-second
+comment heartbeat SHALL keep the connection alive.
 
-#### Scenario: Bid event reaches subscribers
+#### Scenario: Bid event reaches subscribers without amounts
 - **WHEN** a bid is accepted on a public auction
-- **THEN** all stream subscribers receive `bid:created` with the amount
-  and no bidder identity
+- **THEN** all stream subscribers receive `bid:created` with `auctionId`
+  and `placedAt` and no amount field
+
+#### Scenario: Guest cannot recover amounts from frames
+- **WHEN** a guest subscribes to the public stream and reads raw frames
+- **THEN** no bid amount appears in any `bid:created` payload
 
 #### Scenario: Extension event reaches subscribers
 - **WHEN** an anti-snipe extension extends an auction
@@ -48,3 +54,4 @@ the client disconnects or the server terminates it.
 - **WHEN** a new SSE connection is opened to the worker
 - **THEN** the connection is established successfully and the first
   heartbeat arrives within 30 seconds
+

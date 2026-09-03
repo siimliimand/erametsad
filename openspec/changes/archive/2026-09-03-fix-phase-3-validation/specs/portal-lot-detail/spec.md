@@ -3,9 +3,9 @@
 ## MODIFIED Requirements
 
 ### Requirement: Alapakkumine toggle
-When `settings.alapakkumineEnabled` is true and the auction is open and
-active, the panel SHALL offer the under-start toggle labeled "nõuab müüja
-nõusolekut". Submitting below start price SHALL set the bid to
+The panel SHALL offer the under-start toggle labeled "nõuab müüja
+nõusolekut" when `settings.alapakkumineEnabled` is true and the auction is
+open and active. Submitting below start price SHALL set the bid to
 `pending_seller_approval` and show the pending chip "Alapakkumine ootab
 müüja kinnitust". The chip state SHALL be server-backed: the viewer
 snapshot SHALL expose whether the caller has a pending under-start bid on
