@@ -70,6 +70,14 @@ export async function POST(
         { error: 'Bid is not pending approval', status: decision.status },
         { status: 409 },
       )
+    case 'higher_bid_exists':
+      return NextResponse.json(
+        {
+          error: 'A higher leading bid exists on this auction',
+          code: 'higher_bid_exists',
+        },
+        { status: 409 },
+      )
     case 'auction_not_active':
       return NextResponse.json({ error: 'Auction is not active' }, { status: 409 })
     case 'bid_not_found':

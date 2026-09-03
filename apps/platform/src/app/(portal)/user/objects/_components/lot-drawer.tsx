@@ -45,8 +45,15 @@ function AutobidMarker() {
   )
 }
 
+function isHigherBidConflict(raw: string): boolean {
+  return raw.toLowerCase().includes('higher')
+}
+
 function conflictMessage(raw: string): string {
   const lowered = raw.toLowerCase()
+  if (isHigherBidConflict(raw)) {
+    return 'Oksjonil on nüüd kõrgem juhtiv pakkumine — seda alapakkumist ei saa enam kinnitada.'
+  }
   if (lowered.includes('not active')) {
     return 'Oksjon ei ole enam aktiivne. Alapakkumist ei saa enam kinnitada ega tagasi lükata.'
   }
@@ -94,6 +101,9 @@ export function LotDrawer({ row, onClose }: LotDrawerProps) {
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setConflict(conflictMessage(err.message))
+        if (isHigherBidConflict(err.message)) {
+          router.refresh()
+        }
       } else {
         setError(
           err instanceof ApiError
