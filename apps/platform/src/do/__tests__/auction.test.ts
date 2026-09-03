@@ -503,7 +503,7 @@ test('accepted bid fans out bid:created to the subscriber URLs', async () => {
   expect(payload.auctionId).toBe(auctionId)
   expect(payload.data).toEqual({
     auctionId,
-    placedAt: expect.any(String),
+    placedAt: expect.any(String) as string,
   })
   expect('amount' in payload.data).toBe(false)
 
@@ -903,7 +903,7 @@ test('a bid broadcast reaches two subscribers identically, then only the remaini
   expect(payload.auctionId).toBe(auctionId)
   expect(payload.data).toEqual({
     auctionId,
-    placedAt: expect.any(String),
+    placedAt: expect.any(String) as string,
   })
   expect('amount' in payload.data).toBe(false)
 
@@ -927,7 +927,7 @@ test('a bid broadcast reaches two subscribers identically, then only the remaini
   expect(secondPayload.type).toBe('bid:created')
   expect(secondPayload.data).toEqual({
     auctionId,
-    placedAt: expect.any(String),
+    placedAt: expect.any(String) as string,
   })
   expect('amount' in secondPayload.data).toBe(false)
 })
