@@ -91,7 +91,7 @@ function apiResponse(status: number, body: unknown): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
-    json: async () => body,
+    json: () => Promise.resolve(body),
   } as unknown as Response
 }
 
@@ -136,7 +136,7 @@ function lotNode(id: string): HTMLElement | null {
 }
 
 function text(): string {
-  return container.textContent ?? ''
+  return container.textContent
 }
 
 function cardIds(): string[] {
@@ -168,16 +168,18 @@ describe('LiveListing initial render', () => {
 
 describe('LiveListing auction:published', () => {
   it('prepends the fetched lot with a highlight that fades after 6 seconds', async () => {
-    const fetchMock = vi.fn(async () =>
-      apiResponse(
-        200,
-        listResult([
-          lot({
-            id: 'new-1',
-            title: 'Uus raieõigus',
-            endsAt: '2026-10-10T10:00:00.000Z',
-          }),
-        ]),
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        apiResponse(
+          200,
+          listResult([
+            lot({
+              id: 'new-1',
+              title: 'Uus raieõigus',
+              endsAt: '2026-10-10T10:00:00.000Z',
+            }),
+          ]),
+        ),
       ),
     )
     vi.stubGlobal('fetch', fetchMock)
@@ -197,7 +199,7 @@ describe('LiveListing auction:published', () => {
     expect(text()).toContain('Uus oksjon lisandus.')
     expect(nav.refresh).not.toHaveBeenCalled()
 
-    await act(async () => {
+    act(() => {
       vi.advanceTimersByTime(6_000)
     })
     expect(lotNode('new-1')?.textContent).not.toContain('| HL')
@@ -205,7 +207,7 @@ describe('LiveListing auction:published', () => {
   })
 
   it('falls back to router.refresh when the lot is not in the fetched page', async () => {
-    const fetchMock = vi.fn(async () => apiResponse(200, listResult([])))
+    const fetchMock = vi.fn(() => Promise.resolve(apiResponse(200, listResult([]))))
     vi.stubGlobal('fetch', fetchMock)
     await mount({ lots: [lot()], query: 'tab=koik' })
 

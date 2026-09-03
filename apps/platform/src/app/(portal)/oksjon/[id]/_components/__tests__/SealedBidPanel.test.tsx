@@ -91,7 +91,7 @@ function apiResponse(status: number, body: unknown): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
-    json: async () => body,
+    json: () => Promise.resolve(body),
   } as unknown as Response
 }
 
@@ -117,12 +117,12 @@ async function mount(props: SealedBidPanelProps): Promise<void> {
 async function typeInto(selector: string, value: string): Promise<void> {
   const input = container.querySelector<HTMLInputElement>(selector)
   if (input === null) throw new Error(`missing input: ${selector}`)
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(
+  await Promise.resolve()
+  act(() => {
+    Object.getOwnPropertyDescriptor(
       HTMLInputElement.prototype,
       'value',
-    )?.set
-    setter?.call(input, value)
+    )?.set?.call(input, value)
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
 }
@@ -140,7 +140,7 @@ function modalButton(label: string): HTMLButtonElement {
   const buttons = [...document.body.querySelectorAll('button')].filter(
     (button) => button.closest('[role="dialog"]') !== null,
   )
-  const found = buttons.find((button) => button.textContent?.includes(label))
+  const found = buttons.find((button) => button.textContent.includes(label))
   if (found === undefined) {
     throw new Error(`modal button not found: ${label}`)
   }
@@ -155,12 +155,12 @@ async function confirmModal(): Promise<void> {
 }
 
 function text(): string {
-  return plain(container.textContent ?? '')
+  return plain(container.textContent)
 }
 
 async function clickButton(label: string): Promise<void> {
   const buttons = [...container.querySelectorAll('button')]
-  const found = buttons.find((button) => button.textContent?.includes(label))
+  const found = buttons.find((button) => button.textContent.includes(label))
   if (found === undefined) throw new Error(`button not found: ${label}`)
   await act(async () => {
     found.click()
@@ -224,7 +224,7 @@ describe('SealedBidPanel count-only states', () => {
     expect(text()).toContain(plain(eur(1000)))
     expect(text()).toContain(`Vähim lubatud pakkumine: ${inputAmount(1000)} €`)
     const submit = [...container.querySelectorAll('button')].find((button) =>
-      button.textContent?.includes('Esita pakkumine'),
+      button.textContent.includes('Esita pakkumine'),
     )
     expect(submit).toBeDefined()
     expect(text()).not.toContain('Esita täienduspakkumine')
@@ -237,7 +237,7 @@ describe('SealedBidPanel count-only states', () => {
 
 describe('SealedBidPanel locked card after submission', () => {
   it('submits a revision through the confirm modal and swaps to the locked card', async () => {
-    const fetchMock = vi.fn(async () => apiResponse(201, { id: 'b2' }))
+    const fetchMock = vi.fn(() => Promise.resolve(apiResponse(201, { id: 'b2' })))
     vi.stubGlobal('fetch', fetchMock)
     await mount(
       baseProps({
@@ -256,9 +256,9 @@ describe('SealedBidPanel locked card after submission', () => {
     await submitForm()
 
     expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
-    expect(plain(document.body.textContent ?? '')).toContain('Kinnita siduv pakkumine')
-    expect(plain(document.body.textContent ?? '')).toContain(plain(eur(1800)))
-    expect(plain(document.body.textContent ?? '')).toContain(
+    expect(plain(document.body.textContent)).toContain('Kinnita siduv pakkumine')
+    expect(plain(document.body.textContent)).toContain(plain(eur(1800)))
+    expect(plain(document.body.textContent)).toContain(
       'Uus pakkumine asendab sinu eelmise pakkumise.',
     )
     expect(fetchMock).not.toHaveBeenCalled()
@@ -269,7 +269,7 @@ describe('SealedBidPanel locked card after submission', () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('/api/v1/bids/create')
     expect(init.method).toBe('POST')
-    const body = JSON.parse(String(init.body)) as Record<string, unknown>
+    const body = JSON.parse(init.body as string) as Record<string, unknown>
     expect(body.type).toBe('sealed')
     expect(body.amount).toBe(1800)
 
@@ -290,7 +290,7 @@ describe('SealedBidPanel locked card after submission', () => {
     // Documents current behavior: with ownBidCount 0 the locked card gate
     // (participant) does not engage until router.refresh() delivers a new
     // viewer snapshot; see production-bug note in the task summary.
-    const fetchMock = vi.fn(async () => apiResponse(201, { id: 'b1' }))
+    const fetchMock = vi.fn(() => Promise.resolve(apiResponse(201, { id: 'b1' })))
     vi.stubGlobal('fetch', fetchMock)
     await mount(baseProps({ viewer: baseViewer() }))
 
@@ -300,7 +300,7 @@ describe('SealedBidPanel locked card after submission', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
-    const body = JSON.parse(String(init.body)) as Record<string, unknown>
+    const body = JSON.parse(init.body as string) as Record<string, unknown>
     expect(body.type).toBe('sealed')
     expect(body.amount).toBe(1500)
     expect(nav.refresh).toHaveBeenCalledTimes(1)
@@ -345,11 +345,13 @@ describe('SealedBidPanel locked card after submission', () => {
   })
 
   it('locks the form permanently after the API answers revision_cap_exceeded', async () => {
-    const fetchMock = vi.fn(async () =>
-      apiResponse(400, {
-        error: 'Täienduspakkumiste limiit on täis.',
-        code: 'revision_cap_exceeded',
-      }),
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        apiResponse(400, {
+          error: 'Täienduspakkumiste limiit on täis.',
+          code: 'revision_cap_exceeded',
+        }),
+      ),
     )
     vi.stubGlobal('fetch', fetchMock)
     await mount(
@@ -378,7 +380,7 @@ describe('SealedBidPanel locked card after submission', () => {
     const amount = container.querySelector<HTMLInputElement>('#sealed-bid-amount')
     expect(amount?.disabled).toBe(true)
     const submit = [...container.querySelectorAll('button')].find((button) =>
-      button.textContent?.includes('Esita täienduspakkumine'),
+      button.textContent.includes('Esita täienduspakkumine'),
     )
     expect(submit?.disabled).toBe(true)
     expect(text()).not.toContain('Katkesta muutmine')

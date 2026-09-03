@@ -78,7 +78,7 @@ function apiResponse(status: number, body: unknown): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
-    json: async () => body,
+    json: () => Promise.resolve(body),
   } as unknown as Response
 }
 
@@ -112,7 +112,7 @@ async function emitBidCreated(payload: {
 }
 
 function text(): string {
-  return plain(container.textContent ?? '')
+  return plain(container.textContent)
 }
 
 function rowNodes(): HTMLElement[] {
@@ -245,10 +245,10 @@ describe('BidList outbid derivation', () => {
         ],
       }),
     ]
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn(() => {
       const body = responses.shift()
-      if (body === undefined) throw new Error('unexpected fetch')
-      return apiResponse(200, body)
+      if (body === undefined) return Promise.reject(new Error('unexpected fetch'))
+      return Promise.resolve(apiResponse(200, body))
     })
     vi.stubGlobal('fetch', fetchMock)
 
