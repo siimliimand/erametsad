@@ -70,6 +70,7 @@ export async function loadContractSnapshot(
       and: [
         { template: { in: templateIds } },
         { status: { in: ['prepared', 'sent'] } },
+        { signedBy: { equals: userId } },
         ...lotScope,
       ],
     },

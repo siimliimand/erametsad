@@ -46,6 +46,7 @@ const SIGNING_EXPIRY_MS = 15 * 60 * 1000
 export async function prepareContract(
   auctionId: string,
   type: 'framework' | 'auction',
+  userId: string,
 ): Promise<Contract> {
   const repos = await getRepositories()
 
@@ -108,6 +109,7 @@ export async function prepareContract(
       lot: auctionId,
       status: 'prepared',
       renderedHtml: rendered.html,
+      signedBy: userId,
     },
   })
 
@@ -128,6 +130,13 @@ export async function signContract(
   const contract = contractResult.docs[0] as Record<string, unknown> | undefined
   if (!contract) {
     throw new Error('Contract not found')
+  }
+
+  // The contract row is bound to its preparing user; only that user may
+  // complete the signing session. Checked before status/expiry so a foreign
+  // caller can neither probe state nor trigger the expiry voiding.
+  if (contract.signedBy !== signerId) {
+    throw new Error('Contract belongs to another user')
   }
 
   if (contract.status !== 'prepared') {
