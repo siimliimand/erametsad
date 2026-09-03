@@ -2,16 +2,24 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 import { verifyAccessToken } from '@/lib/auth/jwt'
+import { resolveAccessTokenSession } from '@/lib/auth/session'
 import type { NotificationDoc } from '@/lib/data/repositories/registry'
 import type { WhereClause } from '@/lib/data/repositories/where'
 import { getRepositories } from '@/lib/data/runtime'
 
 const PAGE_SIZE = 25
 
-function authenticate(request: NextRequest): string | null {
+async function authenticate(request: NextRequest): Promise<string | null> {
   const token = request.cookies.get('access_token')?.value
   if (!token) return null
-  return verifyAccessToken(token)?.userId ?? null
+
+  const payload = verifyAccessToken(token)
+  if (!payload) return null
+
+  const ref = await resolveAccessTokenSession(token)
+  if (ref.state === 'revoked') return null
+
+  return payload.userId
 }
 
 function toNotificationDto(doc: NotificationDoc) {
@@ -29,7 +37,7 @@ function toNotificationDto(doc: NotificationDoc) {
 }
 
 export async function GET(request: NextRequest) {
-  const userId = authenticate(request)
+  const userId = await authenticate(request)
   if (!userId) {
     return NextResponse.json({ error: 'Autentimine ebaõnnestus' }, { status: 401 })
   }
