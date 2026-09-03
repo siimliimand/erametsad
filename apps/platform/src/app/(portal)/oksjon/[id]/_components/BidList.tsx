@@ -14,8 +14,8 @@ import type { AuctionBidView } from '@/lib/auction/queries'
 // Authed viewers get "#N {amount} € · Pakkuja #k · relative time" rows in
 // descending order with own-bid highlight and autobid marker; guests get
 // the count and latest time only (the API enforces the split, task 1.3).
-// bid:created SSE events prepend a live row instantly and trigger a quiet
-// refetch that reconciles labels, ordering, and the outbid state.
+// bid:created SSE frames carry no amount, so authed viewers reconcile new
+// bids through a quiet refetch; guests bump the optimistic count.
 
 // ── Formatting ──────────────────────────────────────────────────────────
 
@@ -76,12 +76,6 @@ function isLeadingNow(view: AuctionBidView): boolean {
 
 // ── Row model ───────────────────────────────────────────────────────────
 
-interface LiveRow {
-  key: string
-  amount: number
-  createdAt: string
-}
-
 interface DisplayRow {
   key: string
   amount: number
@@ -105,7 +99,6 @@ export function BidList({ auctionId, initialView }: BidListProps) {
   const { subscribe } = useAuctionStream()
 
   const [view, setView] = useState<AuctionBidView>(initialView)
-  const [liveRows, setLiveRows] = useState<LiveRow[]>([])
   const [hasLed, setHasLed] = useState(() => isLeadingNow(initialView))
   const [now, setNow] = useState(() => Date.now())
 
@@ -116,7 +109,6 @@ export function BidList({ auctionId, initialView }: BidListProps) {
   // authoritative; adopt it over the locally mutated view.
   useEffect(() => {
     setView(initialView)
-    setLiveRows([])
   }, [initialView])
 
   // A leading streak in this session arms the outbid banner; it clears once
@@ -147,7 +139,6 @@ export function BidList({ auctionId, initialView }: BidListProps) {
       const payload: unknown = await response.json()
       if (!isBidView(payload)) return
       setView(payload)
-      setLiveRows([])
     } catch {
       // Keep the current view (with live rows) until a later event retries.
     }
@@ -171,18 +162,9 @@ export function BidList({ auctionId, initialView }: BidListProps) {
         }
         return current
       })
+      // Public frames carry no amount, so authed rows come from the
+      // authoritative refetch rather than the event payload.
       if (viewRef.current.kind !== 'authed') return
-      // Optimistic prepend: the new bid is normally the new highest amount.
-      // The refetch below replaces it with the labeled authoritative row.
-      const key = `live:${payload.placedAt}:${String(payload.amount)}`
-      setLiveRows((current) =>
-        current.some((row) => row.key === key)
-          ? current
-          : [
-              ...current,
-              { key, amount: payload.amount, createdAt: payload.placedAt },
-            ],
-      )
       void refetch()
     }
 
@@ -191,19 +173,6 @@ export function BidList({ auctionId, initialView }: BidListProps) {
 
   const rows = useMemo<DisplayRow[]>(() => {
     if (view.kind !== 'authed') return []
-    const stamp = (row: { createdAt: string; amount: number }): string =>
-      `${String(Date.parse(row.createdAt))}:${String(row.amount)}`
-    const known = new Set(view.bids.map(stamp))
-    const live: DisplayRow[] = liveRows
-      .filter((row) => !known.has(stamp(row)))
-      .map((row) => ({
-        key: row.key,
-        amount: row.amount,
-        createdAt: row.createdAt,
-        label: null,
-        isAutobid: false,
-        isOwn: false,
-      }))
     const shaped: DisplayRow[] = view.bids.map((row) => ({
       key: row.id,
       amount: row.amount,
@@ -212,8 +181,8 @@ export function BidList({ auctionId, initialView }: BidListProps) {
       isAutobid: row.source === 'autobidder',
       isOwn: row.isOwn,
     }))
-    return [...live, ...shaped].sort((a, b) => b.amount - a.amount)
-  }, [view, liveRows])
+    return shaped.sort((a, b) => b.amount - a.amount)
+  }, [view])
 
   // ── Guest variant: count + latest time only ────────────────────────────
 

@@ -497,11 +497,15 @@ test('accepted bid fans out bid:created to the subscriber URLs', async () => {
   const payload = JSON.parse(deliveries[0] ?? '{}') as {
     type: string
     auctionId: string
-    data: { amount: number }
+    data: Record<string, unknown>
   }
   expect(payload.type).toBe('bid:created')
   expect(payload.auctionId).toBe(auctionId)
-  expect(payload.data.amount).toBe(150)
+  expect(payload.data).toEqual({
+    auctionId,
+    placedAt: expect.any(String),
+  })
+  expect('amount' in payload.data).toBe(false)
 
   await fetchRoute(auctionId, '/unsubscribe', {
     method: 'POST',
@@ -893,11 +897,15 @@ test('a bid broadcast reaches two subscribers identically, then only the remaini
   const payload = JSON.parse(deliveriesA[0] ?? '{}') as {
     type: string
     auctionId: string
-    data: { amount: number }
+    data: Record<string, unknown>
   }
   expect(payload.type).toBe('bid:created')
   expect(payload.auctionId).toBe(auctionId)
-  expect(payload.data.amount).toBe(150)
+  expect(payload.data).toEqual({
+    auctionId,
+    placedAt: expect.any(String),
+  })
+  expect('amount' in payload.data).toBe(false)
 
   await fetchRoute(auctionId, '/unsubscribe', {
     method: 'POST',
@@ -914,10 +922,14 @@ test('a bid broadcast reaches two subscribers identically, then only the remaini
   expect(deliveriesB).toHaveLength(2)
   const secondPayload = JSON.parse(deliveriesB[1] ?? '{}') as {
     type: string
-    data: { amount: number }
+    data: Record<string, unknown>
   }
   expect(secondPayload.type).toBe('bid:created')
-  expect(secondPayload.data.amount).toBe(200)
+  expect(secondPayload.data).toEqual({
+    auctionId,
+    placedAt: expect.any(String),
+  })
+  expect('amount' in secondPayload.data).toBe(false)
 })
 
 test('an anti-snipe bid reschedules the near-due alarm and the end transition runs exactly once with a same-tick bid', async () => {

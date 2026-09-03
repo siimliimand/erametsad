@@ -20,8 +20,6 @@ import {
 // still narrow values before use.
 export interface AuctionStreamBidCreatedPayload {
   auctionId: string
-  /** Winning amount in EUR. */
-  amount: number
   placedAt: string
 }
 
