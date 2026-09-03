@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { ContractPill } from './_components/contract-pill'
+import { loadUserSigningContracts } from './_components/contract-state'
 
 import { requirePortalSession } from '@/app/(portal)/_lib/session'
 import { getRepositories } from '@/lib/data/runtime'
@@ -41,16 +42,23 @@ export default async function LepingudPage() {
   const { session } = await requirePortalSession('/lepingud')
 
   // Contract rows carry no owner on the mock service except signedBy, so the
-  // list scopes to the caller's signed contracts; in-progress flows resume
-  // from their signing page. Auction and template lookups run as system
-  // context because the guard's published-only filter would hide ended lots.
+  // list scopes to the caller's rows: prepare binds the owner at creation, so
+  // in-progress (prepared/sent) contracts list above signed ones. Auction and
+  // template lookups run as system context because the guard's published-only
+  // filter would hide ended lots.
   const systemRepos = await getRepositories()
-  const contractsResult = await systemRepos.find({
+  const inProgressContracts = await loadUserSigningContracts(systemRepos, session.userId)
+  const signedResult = await systemRepos.find({
     collection: 'contracts',
-    where: { signedBy: { equals: session.userId } },
+    where: {
+      and: [
+        { signedBy: { equals: session.userId } },
+        { status: { equals: 'signed' } },
+      ],
+    },
     sort: '-createdAt',
   })
-  const contracts = contractsResult.docs
+  const contracts = [...inProgressContracts, ...signedResult.docs]
 
   const templateIds = [...new Set(contracts.map((contract) => contract.templateId))]
   const templates =
@@ -141,7 +149,7 @@ export default async function LepingudPage() {
       {rows.length === 0 ? (
         <div className="rounded-card border border-border bg-white p-lg text-center">
           <p className="font-body text-body text-inkMuted">
-            Sul ei ole veel allkirjastatud lepinguid.
+            Sul ei ole veel lepinguid.
           </p>
         </div>
       ) : (
@@ -157,40 +165,43 @@ export default async function LepingudPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-b border-border last:border-b-0">
-                  <td className="px-md py-sm font-label font-semibold text-ink">{row.typeLabel}</td>
-                  <td className="px-md py-sm">
-                    {row.lotId !== null ? (
+              {rows.map((row) => {
+                const inProgress = row.status === 'prepared' || row.status === 'sent'
+                return (
+                  <tr key={row.id} className="border-b border-border last:border-b-0">
+                    <td className="px-md py-sm font-label font-semibold text-ink">{row.typeLabel}</td>
+                    <td className="px-md py-sm">
+                      {row.lotId !== null ? (
+                        <Link
+                          href={`/oksjon/${row.lotId}`}
+                          className="font-body text-bodySm text-ink transition-colors duration-hover hover:text-primary"
+                        >
+                          {row.auctionTitle ?? 'Vaata oksjonit'}
+                        </Link>
+                      ) : (
+                        <span className="text-inkMuted">—</span>
+                      )}
+                    </td>
+                    <td className="px-md py-sm font-mono text-bodySm text-ink">
+                      {row.version ?? '—'}
+                    </td>
+                    <td className="px-md py-sm">
+                      <ContractPill status={row.status} />
+                    </td>
+                    <td className="px-md py-sm font-body text-bodySm text-inkMuted">
+                      {fmtDate(row.signedAt) ?? '—'}
+                    </td>
+                    <td className="px-md py-sm">
                       <Link
-                        href={`/oksjon/${row.lotId}`}
-                        className="font-body text-bodySm text-ink transition-colors duration-hover hover:text-primary"
+                        href={row.href}
+                        className="inline-flex h-8 items-center justify-center rounded-button border border-primary px-3 text-label font-semibold text-primary transition-colors duration-hover hover:bg-primaryLight"
                       >
-                        {row.auctionTitle ?? 'Vaata oksjonit'}
+                        {inProgress ? 'Jätka' : 'Vaata'}
                       </Link>
-                    ) : (
-                      <span className="text-inkMuted">—</span>
-                    )}
-                  </td>
-                  <td className="px-md py-sm font-mono text-bodySm text-ink">
-                    {row.version ?? '—'}
-                  </td>
-                  <td className="px-md py-sm">
-                    <ContractPill status={row.status} />
-                  </td>
-                  <td className="px-md py-sm font-body text-bodySm text-inkMuted">
-                    {fmtDate(row.signedAt) ?? '—'}
-                  </td>
-                  <td className="px-md py-sm">
-                    <Link
-                      href={row.href}
-                      className="inline-flex h-8 items-center justify-center rounded-button border border-primary px-3 text-label font-semibold text-primary transition-colors duration-hover hover:bg-primaryLight"
-                    >
-                      Vaata
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

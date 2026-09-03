@@ -796,6 +796,8 @@ export default async function AuctionPage({
                         hasRights: null,
                         hasRaamleping,
                         hasAutobidder: auction.participation?.hasAutobidder ?? false,
+                        hasPendingUnderStart:
+                          auction.participation?.hasPendingUnderStart ?? false,
                         autobidderId: ownAutobidder?.id ?? null,
                         autobidderMaxAmount: ownAutobidder?.maxAmount ?? null,
                       }

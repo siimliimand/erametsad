@@ -52,6 +52,7 @@ export type UnderbidFailure =
   | { outcome: 'bid_not_found' }
   | { outcome: 'auction_not_found' }
   | { outcome: 'auction_not_active' }
+  | { outcome: 'higher_bid_exists' }
 
 export type ApproveDecision =
   | {
@@ -102,14 +103,21 @@ export async function approveAlapakkumine(
   const amount = centsToEuros(bid.amountCents as number)
   const bidderId = relationValue(bid.userId)
 
-  // Per spec the approval wins the lead even over a higher legitimate
-  // bid; the displaced leader is demoted in the same atomic D1 batch.
+  // The approval takes the lead only over an equal or lower leader; a
+  // higher regular leader blocks the promotion outright (spec: 409
+  // higher_bid_exists, nothing mutated).
   const leading = await findDoc(repos, 'bids', {
     and: [
       { auction: { equals: auctionId } },
       { status: { equals: 'leading' } },
     ],
   })
+  if (
+    leading &&
+    (leading.amountCents as number) > (bid.amountCents as number)
+  ) {
+    return { outcome: 'higher_bid_exists' }
+  }
 
   const results = await db.batch([
     ...(leading

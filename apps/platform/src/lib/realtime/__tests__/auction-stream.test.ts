@@ -103,10 +103,10 @@ describe('createAuctionStream event piping', () => {
     const events = [
       {
         type: 'bid:created',
-        data: { auctionId: 'auction-1', amount: 250, placedAt: '2024-06-15T12:00:00.000Z' },
+        data: { auctionId: 'auction-1', placedAt: '2024-06-15T12:00:00.000Z' },
         raw:
           'event: bid:created\n' +
-          'data: {"auctionId":"auction-1","amount":250,"placedAt":"2024-06-15T12:00:00.000Z"}\n\n',
+          'data: {"auctionId":"auction-1","placedAt":"2024-06-15T12:00:00.000Z"}\n\n',
       },
       {
         type: 'auction:extended',
@@ -160,9 +160,15 @@ describe('createAuctionStream event piping', () => {
 
     ingestAuctionEvent(subscriptionId, {
       type: 'bid:created',
-      data: { auctionId: 'auction-1', amount: 250, placedAt: '2024-06-15T12:00:00.000Z' },
+      data: { auctionId: 'auction-1', placedAt: '2024-06-15T12:00:00.000Z' },
     })
     const raw = await readChunk(reader)
+    // The frame carries exactly auctionId + placedAt: no amount field.
+    expect(raw).toBe(
+      'event: bid:created\n' +
+        'data: {"auctionId":"auction-1","placedAt":"2024-06-15T12:00:00.000Z"}\n\n',
+    )
+    expect(raw).not.toContain('amount')
     expect(raw).not.toContain('bidder')
     expect(raw).not.toContain('user')
 
@@ -200,7 +206,7 @@ describe('createAuctionStream event piping', () => {
     expect(
       ingestAuctionEvent(subscriptionId, {
         type: 'bid:created',
-        data: { auctionId: 'auction-1', amount: 1 },
+        data: { auctionId: 'auction-1', placedAt: '2024-06-15T12:00:00.000Z' },
       }),
     ).toBe(false)
   })
@@ -244,7 +250,7 @@ describe('createAuctionFeedStream merged stream', () => {
 
     ingestAuctionEvent(first, {
       type: 'bid:created',
-      data: { auctionId: 'auction-1', amount: 100, placedAt: '2024-06-15T12:00:00.000Z' },
+      data: { auctionId: 'auction-1', placedAt: '2024-06-15T12:00:00.000Z' },
     })
     expect(await readChunk(reader)).toContain('"auctionId":"auction-1"')
 

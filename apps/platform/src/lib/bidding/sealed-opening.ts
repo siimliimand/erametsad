@@ -274,7 +274,7 @@ export async function confirmWinner(
   // eur contribution from the published finalPrice.
   await upsertSnapshot(repos, { objectType, eur: winningAmount })
 
-  await prepareContract(auctionId, 'auction')
+  await prepareContract(auctionId, 'auction', target.user)
 
   const loserUserIds = [
     ...new Set(

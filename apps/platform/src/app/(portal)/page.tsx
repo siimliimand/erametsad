@@ -63,7 +63,7 @@ function buildTabQuery(
     search.set('objectType', objectTypes.join(','))
   }
   search.set('auctionStatus', 'active')
-  for (const key of ['county', 'parish', 'species', 'loggingType', 'sort', 'order']) {
+  for (const key of ['county', 'parish', 'species', 'loggingType', 'sort', 'order', 'q']) {
     const value = params[key]
     if (value === undefined) continue
     for (const entry of Array.isArray(value) ? value : [value]) search.append(key, entry)

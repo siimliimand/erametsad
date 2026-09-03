@@ -264,7 +264,7 @@ Specs: [design/portal/](design/). Route prefix `/` of the portal area in the pro
 
 ### 3.2 Listing — [01-listing.md](design/portal/01-listing.md)
 - [x] Type tabs with counters + summary sentence ("Hetkel on aktiivseid … N, kokku X ha … Y m³ ja Z € väärtuses") **[M]**
-- [x] Grid ↔ `MapEstonia` view toggle; pin popups (area/price/registry nr/end) **[M]**
+- [x] Map (always visible above grid, no toggle per 2026-08-31 listing redesign) with pin popups (area/price/registry nr/end) **[M]**
 - [x] `FilterPanel` wired to URL params: maakond→vald cascade, puuliigid, raieliigid, pindala/mahu vahemik, hind; "Tühjenda" + active-count **[M]**
 - [x] Sorting (alghind/lõpphind asc-desc, varem/hiljem lõppevad) + server-side pagination **[M]**
 - [x] "Telli teavitus" saved-search subscription (email + consent, frequency) **[S]**
@@ -274,7 +274,7 @@ Specs: [design/portal/](design/). Route prefix `/` of the portal area in the pro
 - [x] Header (name, StatusPill, server-synced Countdown), gallery lightbox **[M]**
 - [x] `MapEstonia` pin + external links (ky.kataster.ee, register.metsad.ee) **[M]**
 - [x] Full field DataTable (§5.4 dossier: cadastres, species, compartments, deadlines, storage, rental…) + package table for pakett **[M]**
-- [x] Rich-text cards (extraInfo/secondaryInfo), file downloads (signed URLs), SpecialistCard w/ per-lot alias email **[M]**
+- [x] Rich-text cards (extraInfo/secondaryInfo), file downloads (public media route; signed URLs deferred — see Phase 2 media pipeline [S]), SpecialistCard w/ per-lot alias email **[M]**
 
 ### 3.4 Open-auction bidding — [02-lot-detail-open.md](design/portal/02-lot-detail-open.md)
 - [x] `BidPanel`: leading bid (authed only), bid input with ± step buttons, confirm Modal, "Teenustasu rakendub vaid võitmise korral" notice **[M]**
@@ -304,10 +304,10 @@ Specs: [design/portal/](design/). Route prefix `/` of the portal area in the pro
 
 ### 3.8 Customer area (Minu keskkond)
 - [x] **Minu pakkumised** [09](design/portal/09-user-bids.md): tabs Aktiivsed/Lõppenud/Automaatpakkuja; leading/outbid/pending states, countdowns, inline autobidder edit; ended tab w/ result + "Allkirjasta leping" link; CSV export **[S]** (deferred — see deferrals); live outbid toast **[M]**
-- [x] **Minu müügid** [10](design/portal/10-user-objects.md): lot table (view/bid counts, leading price), alapakkumine approval banner + drawer queue (approve/reject w/ 409 race handling), bid log (anonymized, autobid marker), relist-request **[M]** (stats mini-chart **[S]**, deferred — see deferrals)
+- [x] **Minu müügid** [10](design/portal/10-user-objects.md): lot table (bid counts, leading price; view counts not implemented — column placeholder), alapakkumine approval banner + drawer queue (approve/reject w/ 409 race handling), bid log (anonymized, autobid marker), relist-request **[M]** (stats mini-chart **[S]**, deferred — see deferrals)
 - [x] **Teavitused** [11](design/portal/11-user-notifications.md): cursor-paginated inbox w/ category chips + deep links, mark read; preference matrix (8 events × email/SMS); saved-search cards CRUD + token unsubscribe **[M]** (digest scheduling **[L]**)
 - [x] **Minu profiil** [12](design/portal/12-user-profile.md): profile data (isikukood locked when eID-verified), company re-lookup, rights matrix + rights request, password modal, sessions list, consents log **[M]** (GDPR export/delete jobs **[L]**)
-- [x] **Lepingute allkirjastamine** [13](design/portal/13-contract-signing.md): full-page Steps flow — raamleping (data → review PDF + read-checkbox → mock eID sign w/ PIN2 control code → complete) and oksjonileping (lot data, fee, deadline countdown); contracts list; version-bump no-force-resign logic **[M]**
+- [x] **Lepingute allkirjastamine** [13](design/portal/13-contract-signing.md): full-page Steps flow — raamleping (data → review PDF + read-checkbox → mock eID sign w/ PIN2 control code → complete) and oksjonileping (lot data, deadline countdown; fee display not implemented); contracts list; version-bump no-force-resign logic **[M]**
 
 ---
 

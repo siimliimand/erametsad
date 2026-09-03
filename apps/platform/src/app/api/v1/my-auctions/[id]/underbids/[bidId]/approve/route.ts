@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 import { isAdminRole, verifyAccessToken } from '@/lib/auth/jwt'
+import { resolveAccessTokenSession } from '@/lib/auth/session'
 import { approveAlapakkumine } from '@/lib/bidding/alapakkumine'
 import { getRepositories } from '@/lib/data/runtime'
 import { pushNotification, pushOutbid } from '@/lib/realtime/my-stream'
@@ -17,6 +18,11 @@ export async function POST(
 
   const tokenPayload = verifyAccessToken(accessToken)
   if (!tokenPayload) {
+    return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+  }
+
+  const sessionRef = await resolveAccessTokenSession(accessToken)
+  if (sessionRef.state === 'revoked') {
     return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
   }
 
@@ -68,6 +74,14 @@ export async function POST(
     case 'not_pending':
       return NextResponse.json(
         { error: 'Bid is not pending approval', status: decision.status },
+        { status: 409 },
+      )
+    case 'higher_bid_exists':
+      return NextResponse.json(
+        {
+          error: 'A higher leading bid exists on this auction',
+          code: 'higher_bid_exists',
+        },
         { status: 409 },
       )
     case 'auction_not_active':

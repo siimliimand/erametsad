@@ -1074,11 +1074,12 @@ export class AuctionDO extends DurableObject<Env> {
       await this.ctx.storage.setAlarm(Date.parse(extended.endsAt))
     }
 
+    // Public frames carry no amount: guests subscribe to this stream and
+    // must not be able to recover bid amounts from raw frames.
     events.push({
       type: 'bid:created',
       data: {
         auctionId: input.auctionId,
-        amount: centsToEuros(storageAmountCents),
         placedAt: now,
       },
     })

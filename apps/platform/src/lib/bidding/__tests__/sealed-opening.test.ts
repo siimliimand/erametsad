@@ -384,7 +384,7 @@ describe('confirmWinner', () => {
       winningBid: 'bid-a',
       finalPriceCents: 15_000_000,
     })
-    expect(prepareContract).toHaveBeenCalledWith(auctionId, 'auction')
+    expect(prepareContract).toHaveBeenCalledWith(auctionId, 'auction', 'user-a')
     expect(auditCreateActions()).toContain('winner_confirmed')
   })
 

@@ -56,8 +56,7 @@ export function BidConfirmModal({
           </p>
         )}
         <p className="text-bodySm text-inkMuted">
-          Pakkumine on siduv. Teenustasu 3% + käibemaks lisandub võidetud hinnale ja
-          makstakse tehingu lõpuleviimisel.
+          Pakkumine on siduv. Teenustasu rakendub vaid oksjoni võitmise korral
         </p>
         <div className="mt-2xs flex flex-col gap-xs sm:flex-row">
           <Btn variant="outline" onClick={onClose} disabled={isSubmitting}>

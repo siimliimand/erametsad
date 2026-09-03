@@ -117,8 +117,8 @@ describe('BidPanel states', () => {
         viewer: { hasBid: false, isLeading: false, hasRights: false, hasRaamleping: true },
       }),
     )
-    expect(html).toContain('Sul ei ole õigust selle objektitüübi pakkumiste tegemiseks.')
-    expect(html).toContain('Pakkumisõiguse saamiseks pöördu müüja poole.')
+    expect(html).toContain('Sul puuduvad õigused teha selle tüübi oksjonil pakkumisi.')
+    expect(html).toContain('Kirjuta info@erametsad.ee õiguste saamiseks.')
     expect(html).not.toContain('<form')
   })
 })
@@ -145,6 +145,7 @@ describe('BidPanel active state', () => {
     expect(html).toContain('aria-label="Vähenda pakkumist sammu võrra"')
     expect(html).toContain('aria-label="Suurenda pakkumist sammu võrra"')
     expect(html).toContain('Esita pakkumine')
+    expect(html).toContain('Teenustasu rakendub vaid oksjoni võitmise korral')
   })
 
   it('leaves the step buttons enabled when a bid step is defined', () => {
@@ -181,6 +182,36 @@ describe('PendingApprovalChip', () => {
   it('renders the seller-approval chip text', () => {
     const html = renderToString(createElement(PendingApprovalChip))
     expect(html).toContain('Alapakkumine ootab müüja kinnitust')
+  })
+
+  it('shows the pending chip from the server snapshot after a reload', () => {
+    const html = render(
+      baseProps({
+        viewer: {
+          hasBid: true,
+          isLeading: false,
+          hasRights: true,
+          hasRaamleping: true,
+          hasPendingUnderStart: true,
+        },
+      }),
+    )
+    expect(html).toContain('Alapakkumine ootab müüja kinnitust')
+  })
+
+  it('hides the pending chip without the server flag or an in-session pending bid', () => {
+    const html = render(
+      baseProps({
+        viewer: {
+          hasBid: true,
+          isLeading: false,
+          hasRights: true,
+          hasRaamleping: true,
+          hasPendingUnderStart: false,
+        },
+      }),
+    )
+    expect(html).not.toContain('Alapakkumine ootab müüja kinnitust')
   })
 })
 

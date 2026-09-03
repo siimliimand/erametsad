@@ -413,7 +413,17 @@ export async function generateContractAction(formData: FormData): Promise<void> 
   let failure: string | null = null
   let contractId = ''
   try {
-    const contract = await prepareContract(auctionId, 'auction')
+    // Bind the contract to the winning bidder, not the admin: the winner
+    // completes the signing session on the portal side.
+    const winningBidId = typeof auction.winningBid === 'string' ? auction.winningBid : null
+    const winningBid = winningBidId
+      ? await repositories.findByID({ collection: 'bids', id: winningBidId })
+      : null
+    const winnerUserId = typeof winningBid?.userId === 'string' ? winningBid.userId : null
+    if (!winnerUserId) {
+      throw new Error('Oksjoni võitja puudub')
+    }
+    const contract = await prepareContract(auctionId, 'auction', winnerUserId)
     contractId = contract.id
     await audit(repositories, {
       actorId: session.userId,

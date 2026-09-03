@@ -1,4 +1,5 @@
 import { verifyAccessToken } from '@/lib/auth/jwt'
+import { resolveAccessTokenSession } from '@/lib/auth/session'
 import { createMyStream } from '@/lib/realtime/my-stream'
 
 const SSE_HEADERS = {
@@ -18,6 +19,13 @@ export async function GET(request: Request) {
 
   const payload = verifyAccessToken(token)
   if (!payload) {
+    return new Response('Unauthorized', { status: 401 })
+  }
+
+  // Revoked session check happens before the stream opens: the client must
+  // get a plain 401, never a stream that closes immediately.
+  const sessionRef = await resolveAccessTokenSession(token)
+  if (sessionRef.state === 'revoked') {
     return new Response('Unauthorized', { status: 401 })
   }
 

@@ -66,7 +66,7 @@ describe('approveAlapakkumine', () => {
             id: 'lead-1',
             auctionId: 'auction-1',
             userId: 'user-2',
-            amountCents: 10000,
+            amountCents: 6000,
             status: 'leading',
           },
         ],
@@ -84,7 +84,7 @@ describe('approveAlapakkumine', () => {
       })
       expect(decision.displacedLeader).toEqual({
         userId: 'user-2',
-        amount: 100,
+        amount: 60,
       })
     }
     expect(statements.length).toBe(2)
@@ -121,7 +121,7 @@ describe('approveAlapakkumine', () => {
     ).toBe(false)
   })
 
-  it('emits bid.approved and outbid events with userId after the write', async () => {
+  it('returns higher_bid_exists without writing when a higher regular bid leads', async () => {
     const emitSpy = vi.spyOn(eventBus, 'emit')
     mockRepos.find
       .mockResolvedValueOnce({ docs: [pendingBid] })
@@ -133,6 +133,74 @@ describe('approveAlapakkumine', () => {
             auctionId: 'auction-1',
             userId: 'user-2',
             amountCents: 10000,
+            status: 'leading',
+          },
+        ],
+      })
+
+    const decision = await approveAlapakkumine('auction-1', 'bid-1')
+
+    expect(decision).toEqual({ outcome: 'higher_bid_exists' })
+    expect(statements.length).toBe(0)
+    expect(emitSpy).not.toHaveBeenCalled()
+    emitSpy.mockRestore()
+  })
+
+  it('still promotes when the leading amount ties the under-start bid', async () => {
+    mockRepos.find
+      .mockResolvedValueOnce({ docs: [pendingBid] })
+      .mockResolvedValueOnce({ docs: [activeAuction] })
+      .mockResolvedValueOnce({
+        docs: [
+          {
+            id: 'lead-1',
+            auctionId: 'auction-1',
+            userId: 'user-2',
+            amountCents: 8000,
+            status: 'leading',
+          },
+        ],
+      })
+
+    const decision = await approveAlapakkumine('auction-1', 'bid-1')
+
+    expect(decision.outcome).toBe('approved')
+    if (decision.outcome === 'approved') {
+      expect(decision.displacedLeader).toEqual({
+        userId: 'user-2',
+        amount: 80,
+      })
+    }
+    expect(
+      statements.some(
+        (statement) =>
+          statement.sql.startsWith('update bids') &&
+          statement.params.includes('outbid') &&
+          statement.params.includes('lead-1'),
+      ),
+    ).toBe(true)
+    expect(
+      statements.some(
+        (statement) =>
+          statement.sql.startsWith('update bids') &&
+          statement.params.includes('leading') &&
+          statement.params.includes('bid-1'),
+      ),
+    ).toBe(true)
+  })
+
+  it('emits bid.approved and outbid events with userId after the write', async () => {
+    const emitSpy = vi.spyOn(eventBus, 'emit')
+    mockRepos.find
+      .mockResolvedValueOnce({ docs: [pendingBid] })
+      .mockResolvedValueOnce({ docs: [activeAuction] })
+      .mockResolvedValueOnce({
+        docs: [
+          {
+            id: 'lead-1',
+            auctionId: 'auction-1',
+            userId: 'user-2',
+            amountCents: 6000,
             status: 'leading',
           },
         ],

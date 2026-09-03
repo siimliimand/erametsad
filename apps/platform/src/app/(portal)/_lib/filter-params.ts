@@ -1,5 +1,5 @@
 // Round-trips the query params that parseAuctionSearchParams in
-// @/lib/auction/queries accepts: county, parish, species, loggingType,
+// @/lib/auction/queries accepts: county, parish, species, loggingType, q,
 // areaMin/areaMax, volumeMin/volumeMax, priceMin/priceMax, sort, order.
 // The server parser stays the single source of truth; this module only
 // mirrors its param names and defaults so panel state survives reload.
@@ -17,6 +17,8 @@ export interface ListingFilterState {
   parish: string[]
   species: string[]
   loggingTypes: string[]
+  /** Free-text quick-search term from the shell header; '' disables it. */
+  q: string
   areaMin?: number | undefined
   areaMax?: number | undefined
   volumeMin?: number | undefined
@@ -32,6 +34,7 @@ export const DEFAULT_LISTING_FILTERS: ListingFilterState = {
   parish: [],
   species: [],
   loggingTypes: [],
+  q: '',
   sortField: DEFAULT_SORT_FIELD,
   sortDirection: DEFAULT_SORT_DIRECTION,
 }
@@ -91,6 +94,7 @@ export function parseListingFilters(bag: SearchParamBag): ListingFilterState {
     parish: csvTokens(bag, 'parish'),
     species: csvTokens(bag, 'species'),
     loggingTypes: csvTokens(bag, 'loggingType'),
+    q: (bag.get('q') ?? '').trim(),
     areaMin: numberToken(bag, 'areaMin'),
     areaMax: numberToken(bag, 'areaMax'),
     volumeMin: numberToken(bag, 'volumeMin'),
@@ -134,6 +138,7 @@ export function serializeListingFilters(
   for (const [key, values] of csvEntries) {
     if (values.length > 0) search.set(key, values.join(','))
   }
+  if (state.q !== '') search.set('q', state.q)
   setRange(search, 'area', state.areaMin, state.areaMax, AREA_RANGE)
   setRange(search, 'volume', state.volumeMin, state.volumeMax, VOLUME_RANGE)
   setRange(search, 'price', state.priceMin, state.priceMax, PRICE_RANGE)
@@ -154,6 +159,7 @@ export function countActiveFilters(state: ListingFilterState): number {
   if (state.parish.length > 0) count += 1
   if (state.species.length > 0) count += 1
   if (state.loggingTypes.length > 0) count += 1
+  if (state.q !== '') count += 1
   if (state.areaMin !== undefined || state.areaMax !== undefined) count += 1
   if (state.volumeMin !== undefined || state.volumeMax !== undefined) count += 1
   if (state.priceMin !== undefined || state.priceMax !== undefined) count += 1

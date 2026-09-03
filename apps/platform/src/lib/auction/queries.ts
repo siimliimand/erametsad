@@ -58,6 +58,8 @@ export interface AuctionFilters {
   parishTokens: string[]
   species: string[]
   loggingTypes: string[]
+  /** Free-text quick-search term; empty string disables the filter. */
+  q: string
   area: AuctionRangeFilter
   volume: AuctionRangeFilter
   price: AuctionRangeFilter
@@ -164,6 +166,7 @@ export function parseAuctionSearchParams(params: URLSearchParams): AuctionFilter
     parishTokens: csvTokens(params, 'parish'),
     species: csvTokens(params, 'species'),
     loggingTypes: csvTokens(params, 'loggingType'),
+    q: (params.get('q') ?? '').trim(),
     area: rangeParams(params, 'areaMin', 'areaMax', 'Vale pindala'),
     volume: rangeParams(params, 'volumeMin', 'volumeMax', 'Vale maht'),
     price: rangeParams(params, 'priceMin', 'priceMax', 'Vale hind'),
@@ -336,6 +339,43 @@ function matchesRange(value: number | null, range: AuctionRangeFilter): boolean 
   return true
 }
 
+// Quick search folds case and Estonian diacritics: NFD splitting plus
+// combining-mark stripping maps õ/ä/ö/ü/š/ž onto their base letters, so
+// "METS" and "mets" both match a "Metskitsade" title.
+function foldText(value: string): string {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+function searchTokens(q: string): string[] {
+  return q
+    .split(/[\s,]+/)
+    .map((token) => token.trim())
+    .filter((token) => token !== '')
+}
+
+/**
+ * Free-text quick search over the auction title (substring) and the
+ * cadastre/registry numbers (token compare). Tokens are OR-combined;
+ * an empty q never filters.
+ */
+function matchesFreeText(doc: AuctionDoc, q: string): boolean {
+  const tokens = searchTokens(q)
+  if (tokens.length === 0) return true
+  const title = foldText(doc.title)
+  const numberTokens = new Set(
+    [...stringList(doc.cadastres), ...stringList(doc.registryNumbers)].flatMap((value) =>
+      value
+        .split(/[\s,;]+/)
+        .filter((part) => part !== '')
+        .map((part) => foldText(part)),
+    ),
+  )
+  return tokens.some((token) => {
+    const folded = foldText(token)
+    return title.includes(folded) || numberTokens.has(folded)
+  })
+}
+
 function matchesFilters(doc: AuctionDoc, filters: AuctionFilters): boolean {
   const totals = packageTotals(doc.packageRows)
   if (filters.price.min !== undefined && doc.minBidCents < eurosToCents(filters.price.min)) {
@@ -345,6 +385,7 @@ function matchesFilters(doc: AuctionDoc, filters: AuctionFilters): boolean {
     return false
   }
   return (
+    matchesFreeText(doc, filters.q) &&
     matchesRange(totals.area, filters.area) &&
     matchesRange(totals.volume, filters.volume) &&
     matchesSpecies(doc.species, filters.species) &&
@@ -863,6 +904,11 @@ export interface AuctionViewerParticipation {
   hasBid: boolean
   hasAutobidder: boolean
   isLeading: boolean
+  /**
+   * The viewer has an own `pending_approval` (alapakkumine) bid on this
+   * auction, so the lot page can keep the pending chip across reloads.
+   */
+  hasPendingUnderStart: boolean
 }
 
 function packageColumnLabels(value: unknown): string[] {
@@ -981,6 +1027,9 @@ export async function getAuctionDossier(
       hasBid: bids.some((bid) => bid.userId === viewer.userId && bid.status !== 'rejected'),
       hasAutobidder: hasAutobidderDocs.docs.length > 0,
       isLeading: leading !== null && leading.userId === viewer.userId,
+      hasPendingUnderStart: bids.some(
+        (bid) => bid.userId === viewer.userId && bid.status === 'pending_approval',
+      ),
     }
   }
 

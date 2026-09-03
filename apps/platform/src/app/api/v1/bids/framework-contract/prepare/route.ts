@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const contract = await prepareContract(auctionId, 'framework')
+    const contract = await prepareContract(auctionId, 'framework', tokenPayload.userId)
     return NextResponse.json(contract, { status: 201 })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to prepare contract'
