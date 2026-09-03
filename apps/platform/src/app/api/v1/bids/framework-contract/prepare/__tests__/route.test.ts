@@ -74,10 +74,12 @@ function prepareRequest(body: Record<string, unknown>, cookie?: string): NextReq
 
 // Mock order mirrors prepareContract reads: template lookup, then auction.
 function mockPrepareRepos(signedBy: string): void {
-  mockRepos.find.mockImplementation(async (args: { collection: string }) => {
-    if (args.collection === 'contract-templates') return { docs: [activeTemplate] }
-    if (args.collection === 'auctions') return { docs: [auction] }
-    return { docs: [] }
+  mockRepos.find.mockImplementation((args: { collection: string }) => {
+    if (args.collection === 'contract-templates') {
+      return Promise.resolve({ docs: [activeTemplate] })
+    }
+    if (args.collection === 'auctions') return Promise.resolve({ docs: [auction] })
+    return Promise.resolve({ docs: [] })
   })
   mockRepos.create.mockResolvedValueOnce(createdContractRow(signedBy))
 }
@@ -137,7 +139,7 @@ describe('POST /api/v1/bids/framework-contract/prepare', () => {
           status: 'prepared',
           lot: AUCTION_ID,
           signedBy: CALLER_ID,
-        }),
+        }) as unknown,
       }),
     )
   })

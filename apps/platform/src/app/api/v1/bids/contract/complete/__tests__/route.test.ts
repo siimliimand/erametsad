@@ -66,9 +66,11 @@ function completeRequest(body: Record<string, unknown>, cookie?: string): NextRe
 }
 
 function mockFindContract(row: Record<string, unknown>): void {
-  mockRepos.find.mockImplementation(async (args: { collection: string }) => {
-    if (args.collection === 'contracts') return { docs: [row] }
-    return { docs: [] }
+  mockRepos.find.mockImplementation((args: { collection: string }) => {
+    if (args.collection === 'contracts') {
+      return Promise.resolve({ docs: [row] })
+    }
+    return Promise.resolve({ docs: [] })
   })
 }
 
@@ -97,10 +99,12 @@ describe('POST /api/v1/bids/contract/complete', () => {
     vi.mocked(verifyAccessToken).mockReturnValueOnce({ userId: OWNER_ID, role: 'private' })
     const row = preparedRow()
     mockFindContract(row)
-    mockRepos.update.mockImplementation(async (args: { data: Record<string, unknown> }) => ({
-      ...row,
-      ...args.data,
-    }))
+    mockRepos.update.mockImplementation((args: { data: Record<string, unknown> }) =>
+      Promise.resolve({
+        ...row,
+        ...args.data,
+      }),
+    )
 
     const response = await completeRoute(
       completeRequest({ contractId: CONTRACT_ID }, `access_token=t.${OWNER_ID}.x`),

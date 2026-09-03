@@ -75,11 +75,13 @@ function prepareRequest(body: Record<string, unknown>, cookie?: string): NextReq
 // Mock order mirrors the route and service reads: winner gate (bids), then
 // template and auction lookups inside prepareContract.
 function mockHappyPathRepos(): void {
-  mockRepos.find.mockImplementation(async (args: { collection: string }) => {
-    if (args.collection === 'bids') return { docs: [wonBid] }
-    if (args.collection === 'contract-templates') return { docs: [activeTemplate] }
-    if (args.collection === 'auctions') return { docs: [auction] }
-    return { docs: [] }
+  mockRepos.find.mockImplementation((args: { collection: string }) => {
+    if (args.collection === 'bids') return Promise.resolve({ docs: [wonBid] })
+    if (args.collection === 'contract-templates') {
+      return Promise.resolve({ docs: [activeTemplate] })
+    }
+    if (args.collection === 'auctions') return Promise.resolve({ docs: [auction] })
+    return Promise.resolve({ docs: [] })
   })
   mockRepos.create.mockResolvedValueOnce(createdContractRow)
 }
@@ -154,7 +156,7 @@ describe('POST /api/v1/bids/contract/prepare', () => {
     expect(mockRepos.create).toHaveBeenCalledWith(
       expect.objectContaining({
         collection: 'contracts',
-        data: expect.objectContaining({ signedBy: CALLER_ID, status: 'prepared' }),
+        data: expect.objectContaining({ signedBy: CALLER_ID, status: 'prepared' }) as unknown,
       }),
     )
   })

@@ -61,8 +61,8 @@ beforeEach(() => {
 // The service reads the collection name from each find call, so routing the
 // mock by collection keeps the responses independent of call order.
 function mockFindDocs(docsByCollection: Record<string, Record<string, unknown>[]>): void {
-  mockRepos.find.mockImplementation(async (args: { collection: string }) => {
-    return { docs: docsByCollection[args.collection] ?? [] }
+  mockRepos.find.mockImplementation((args: { collection: string }) => {
+    return Promise.resolve({ docs: docsByCollection[args.collection] ?? [] })
   })
 }
 
@@ -82,7 +82,7 @@ describe('prepareContract', () => {
           lot: AUCTION_ID,
           status: 'prepared',
           signedBy: OWNER_ID,
-        }),
+        }) as unknown,
       }),
     )
     expect(contract.signedBy).toBe(OWNER_ID)
@@ -94,10 +94,12 @@ describe('signContract', () => {
   it('lets the owning user sign and stamps signedAt', async () => {
     const row = contractRow()
     mockFindDocs({ contracts: [row] })
-    mockRepos.update.mockImplementation(async (args: { data: Record<string, unknown> }) => ({
-      ...row,
-      ...args.data,
-    }))
+    mockRepos.update.mockImplementation((args: { data: Record<string, unknown> }) =>
+      Promise.resolve({
+        ...row,
+        ...args.data,
+      }),
+    )
 
     const contract = await signContract(CONTRACT_ID, OWNER_ID)
 
@@ -111,7 +113,7 @@ describe('signContract', () => {
         data: expect.objectContaining({
           status: 'signed',
           signedBy: OWNER_ID,
-        }),
+        }) as unknown,
       }),
     )
   })
@@ -150,10 +152,12 @@ describe('signContract', () => {
       createdAt: new Date(Date.now() - 14 * 60 * 1000).toISOString(),
     })
     mockFindDocs({ contracts: [fresh] })
-    mockRepos.update.mockImplementation(async (args: { data: Record<string, unknown> }) => ({
-      ...fresh,
-      ...args.data,
-    }))
+    mockRepos.update.mockImplementation((args: { data: Record<string, unknown> }) =>
+      Promise.resolve({
+        ...fresh,
+        ...args.data,
+      }),
+    )
 
     const contract = await signContract(CONTRACT_ID, OWNER_ID)
     expect(contract.status).toBe('signed')
@@ -162,10 +166,12 @@ describe('signContract', () => {
   it('records the sha256 hash of the rendered content on the signed row', async () => {
     const row = contractRow()
     mockFindDocs({ contracts: [row] })
-    mockRepos.update.mockImplementation(async (args: { data: Record<string, unknown> }) => ({
-      ...row,
-      ...args.data,
-    }))
+    mockRepos.update.mockImplementation((args: { data: Record<string, unknown> }) =>
+      Promise.resolve({
+        ...row,
+        ...args.data,
+      }),
+    )
 
     const contract = await signContract(CONTRACT_ID, OWNER_ID)
 
