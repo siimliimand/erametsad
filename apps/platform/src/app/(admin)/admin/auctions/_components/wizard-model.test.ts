@@ -2,15 +2,22 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildAuctionPayload,
+  mediaStateFrom,
+  packageRowSums,
+  packageRowsStateFrom,
+  parsePackageRowsCsv,
   quickAuctionPatch,
+  reviewIssues,
+  sanitizeRichText,
   stepForField,
   validateAuctionDraft,
+  validateWizardForSubmit,
   type AuctionWizardInitial,
   type AuctionWizardState,
 } from './wizard-model'
 import { auctionInputSchema } from '../_lib/auction-schema'
 
-const options = { canFeeOverride: true }
+const options = { canFeeOverride: true, canReassignSpecialist: true }
 
 const baseState: AuctionWizardState = {
   title: 'Harjumaa raieõigus',
@@ -44,12 +51,20 @@ const baseState: AuctionWizardState = {
   removalDeadline: '2028-03-31',
   leaseDeadline: '',
   propertyCount: null,
+  specialistId: 'spec-1',
+  descriptionPublic: 'Avalik info',
+  descriptionSecondary: 'Täiendav info',
+  media: [{ url: 'https://cdn.example/hero.jpg', alt: 'Mets' }],
+  packageHeader: '',
+  packageRows: [],
 }
 
 const createInitial: AuctionWizardInitial = {
   auctionId: null,
   mechanicsLocked: false,
   hasReserve: false,
+  aliasEmail: null,
+  guestPreviewHref: null,
   state: baseState,
 }
 
@@ -104,6 +119,147 @@ describe('buildAuctionPayload', () => {
       options,
     )
     expect(payload.cadastres).toEqual(['34801:001:0217'])
+  })
+
+  it('carries the step 5 content fields through sanitisation', () => {
+    const payload = buildAuctionPayload(
+      createInitial,
+      {
+        ...baseState,
+        descriptionPublic: 'Rida 1\r\nRida 2\u0000kustunud',
+        descriptionSecondary: 'Tühi',
+        media: [
+          { url: 'https://cdn.example/hero.jpg', alt: 'Mets' },
+          { url: 'https://cdn.example/g.jpg', alt: '', focalX: 0.5, focalY: 0.25 },
+        ],
+      },
+      options,
+    )
+    expect(payload.descriptionPublic).toBe('Rida 1\nRida 2kustunud')
+    expect(payload.descriptionSecondary).toBe('Tühi')
+    expect(payload.media).toEqual([
+      { url: 'https://cdn.example/hero.jpg', alt: 'Mets' },
+      { url: 'https://cdn.example/g.jpg', alt: '', focalX: 0.5, focalY: 0.25 },
+    ])
+  })
+
+  it('sends the specialist only when the operator may reassign', () => {
+    const withPermission = buildAuctionPayload(createInitial, baseState, options)
+    expect(withPermission.specialistId).toBe('spec-1')
+    const withoutPermission = buildAuctionPayload(createInitial, baseState, {
+      ...options,
+      canReassignSpecialist: false,
+    })
+    expect(withoutPermission.specialistId).toBeUndefined()
+  })
+
+  it('caps sanitised copy at the schema limit and normalises line endings', () => {
+    expect(sanitizeRichText('a'.repeat(20001)).length).toBe(20000)
+    expect(sanitizeRichText('siia\rtuleb\nreavahetus')).toBe('siia\ntuleb\nreavahetus')
+    expect(sanitizeRichText('rida 1\r\nrida 2')).toBe('rida 1\nrida 2')
+  })
+
+  it('drops control characters from sanitised copy', () => {
+    expect(sanitizeRichText('ok\u0000bad')).toBe('okbad')
+  })
+
+  it('maps stored media and package rows into editable state', () => {
+    const media = mediaStateFrom([
+      { url: 'https://cdn.example/a.jpg', alt: 'A', focalX: 0.1 },
+      { url: '', alt: 'broken' },
+      'junk',
+    ])
+    expect(media).toEqual([{ url: 'https://cdn.example/a.jpg', alt: 'A', focalX: 0.1 }])
+
+    const rows = packageRowsStateFrom([
+      { cadastre: '34801:001:0217', registryNumber: 150934, areaHa: 5.5, minBidEur: 1000 },
+    ])
+    expect(rows).toEqual([
+      { cadastre: '34801:001:0217', registryNumber: '150934', county: '', areaHa: '5.5', minBidEur: '1000' },
+    ])
+  })
+
+  it('parses pasted CSV rows and sums their numbers', () => {
+    const rows = parsePackageRowsCsv(
+      '34801:001:0217;150934;Harjumaa;5,5;1000\n34801:001:0218;150935;Harjumaa;6,9;2000\n',
+    )
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toMatchObject({ cadastre: '34801:001:0217', areaHa: '5,5' })
+    expect(packageRowSums(rows)).toEqual({ areaHa: 12.4, minBidEur: 3000 })
+  })
+
+  it('includes package fields only for package lots', () => {
+    const packageState: AuctionWizardState = {
+      ...baseState,
+      objectType: 'pakett',
+      auctionType: 'sealed',
+      bidStepEur: '',
+      propertyCount: 2,
+      packageHeader: 'Kaks katastrit',
+      packageRows: [
+        { cadastre: '34801:001:0217', registryNumber: '150934', county: 'Harjumaa', areaHa: '5,5', minBidEur: '1500' },
+        { cadastre: '34801:001:0218', registryNumber: '', county: '', areaHa: '6,9', minBidEur: '' },
+      ],
+      volumeM3: '',
+    }
+    const payload = buildAuctionPayload(createInitial, packageState, options)
+    expect(payload.packageHeader).toBe('Kaks katastrit')
+    expect(payload.packageRows).toEqual([
+      { cadastre: '34801:001:0217', registryNumber: '150934', county: 'Harjumaa', areaHa: 5.5, minBidEur: 1500 },
+      { cadastre: '34801:001:0218', areaHa: 6.9 },
+    ])
+    expect(payload.propertyCount).toBe(2)
+    const parsed = auctionInputSchema.safeParse(payload)
+    expect(parsed.success).toBe(true)
+
+    const plainPayload = buildAuctionPayload(createInitial, baseState, options)
+    expect(plainPayload.packageHeader).toBeUndefined()
+    expect(plainPayload.packageRows).toBeUndefined()
+  })
+
+  it('lists a missing alt text as a blocking Sisu issue', () => {
+    const issues = reviewIssues(
+      createInitial,
+      { ...baseState, media: [{ url: 'https://cdn.example/hero.jpg', alt: '' }] },
+      options,
+    )
+    const altIssue = issues.find((issue) => issue.field.startsWith('media['))
+    expect(altIssue).toMatchObject({ step: 5, severity: 'error' })
+    const submitErrors = validateWizardForSubmit(
+      createInitial,
+      { ...baseState, media: [{ url: 'https://cdn.example/hero.jpg', alt: '' }] },
+      options,
+    )
+    expect(Object.keys(submitErrors).some((key) => key.startsWith('media['))).toBe(true)
+  })
+
+  it('warns when the package row count disagrees with propertyCount', () => {
+    const packageState: AuctionWizardState = {
+      ...baseState,
+      objectType: 'pakett',
+      auctionType: 'sealed',
+      bidStepEur: '',
+      propertyCount: 3,
+      packageHeader: '',
+      packageRows: [
+        { cadastre: '34801:001:0217', registryNumber: '', county: '', areaHa: '5', minBidEur: '' },
+      ],
+      volumeM3: '',
+    }
+    const issues = reviewIssues(createInitial, packageState, options)
+    const blockages = issues.filter((issue) => issue.severity === 'error')
+    expect(
+      blockages.filter((issue) => stepForField(issue.field) === 6),
+    ).toEqual([])
+  })
+
+  it('keeps a masked stored reserve out of the gate failures', () => {
+    const issues = reviewIssues(
+      { ...createInitial, hasReserve: true },
+      { ...baseState, isQuickAuction: true, auctionType: 'open' },
+      options,
+    )
+    expect(issues.some((issue) => issue.field === 'reservePrice')).toBe(false)
   })
 })
 
@@ -185,6 +341,13 @@ describe('stepForField', () => {
     expect(stepForField('countyId')).toBe(2)
     expect(stepForField('cadastres')).toBe(3)
     expect(stepForField('reservePriceEur')).toBe(4)
-    expect(stepForField('descriptionPublic')).toBeNull()
+    expect(stepForField('reservePrice')).toBe(4)
+    expect(stepForField('title')).toBe(5)
+    expect(stepForField('descriptionPublic')).toBe(5)
+    expect(stepForField('specialistId')).toBe(5)
+    expect(stepForField('media[1].alt')).toBe(5)
+    expect(stepForField('media.0.alt')).toBe(5)
+    expect(stepForField('propertyCount')).toBe(6)
+    expect(stepForField('packageRows.0.cadastre')).toBe(6)
   })
 })

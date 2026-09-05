@@ -1,12 +1,13 @@
 'use client'
 
 import { useCallback, useMemo, useState } from 'react'
+import type { SyntheticEvent } from 'react'
 
-import { wizardSteps } from './steps'
+import { visibleWizardSteps, wizardSteps } from './steps'
 import {
   buildAuctionPayload,
   stepForField,
-  validateAuctionDraft,
+  validateWizardForSubmit,
 } from './wizard-model'
 import type {
   AuctionWizardInitial,
@@ -14,7 +15,6 @@ import type {
   AuctionWizardState,
 } from './wizard-model'
 import {
-  inputClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../../../_components/FormField'
@@ -22,8 +22,9 @@ import {
 /**
  * Client shell for the lot editor wizard (docs/design/admin/03). One schema,
  * one state: every step edits the same AuctionWizardState and the form posts
- * the whole payload on save, so partial saves never lose data. Steps 5-7 stay
- * registered in steps.tsx as placeholders until task 2.5 replaces them.
+ * the whole payload on save, so partial saves never lose data. Buttons with
+ * `data-skip-validation` (alias regenerate) bypass the gate; the publish
+ * button and the plain submit both run it.
  */
 export function AuctionWizard({
   action,
@@ -43,12 +44,14 @@ export function AuctionWizard({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [showErrors, setShowErrors] = useState(false)
 
+  const visible = visibleWizardSteps(state.objectType)
+
   const patch = useCallback(
     (partial: Partial<AuctionWizardState>) => {
       const next = { ...state, ...partial }
       setState(next)
       if (showErrors) {
-        setErrors(validateAuctionDraft(initial, next, options))
+        setErrors(validateWizardForSubmit(initial, next, options))
       }
     },
     [state, initial, options, showErrors],
@@ -59,8 +62,13 @@ export function AuctionWizard({
     [initial, state, options],
   )
 
-  const step = wizardSteps[stepIndex] ?? wizardSteps[0]
+  // The Pakett step disappears for non-package lots; keep the index in range
+  // while the canonical numbering stays stable for validation jumps.
+  const effectiveIndex = Math.min(stepIndex, visible.length - 1)
+  const step = visible[effectiveIndex]
   if (step === undefined) return null
+  const canonicalStepNumber =
+    wizardSteps.findIndex((entry) => entry.id === step.id) + 1
 
   function firstStepWithIssues(found: Record<string, string>): number | null {
     let lowest: number | null = null
@@ -69,20 +77,39 @@ export function AuctionWizard({
       if (stepNumber === null) continue
       if (lowest === null || stepNumber < lowest) lowest = stepNumber
     }
-    return lowest === null ? null : lowest - 1
+    if (lowest === null) return null
+    const target = visible.findIndex(
+      (entry) => wizardSteps.findIndex((candidate) => candidate.id === entry.id) + 1 === lowest,
+    )
+    return target >= 0 ? target : null
   }
 
   function issueCountForStep(stepNumber: number): number {
     return Object.keys(errors).filter((field) => stepForField(field) === stepNumber).length
   }
 
-  const context = { state, patch, errors, initial, options }
+  function goToStep(canonical: number): void {
+    const target = visible.findIndex(
+      (entry) => wizardSteps.findIndex((candidate) => candidate.id === entry.id) + 1 === canonical,
+    )
+    if (target >= 0) setStepIndex(target)
+  }
+
+  function shouldSkipValidation(event: SyntheticEvent<HTMLFormElement>): boolean {
+    const nativeEvent = event.nativeEvent
+    if (!(nativeEvent instanceof SubmitEvent)) return false
+    const submitter = nativeEvent.submitter
+    return submitter instanceof HTMLButtonElement && submitter.dataset.skipValidation === 'true'
+  }
+
+  const context = { state, patch, errors, initial, options, goToStep }
 
   return (
     <form
       action={action}
       onSubmit={(event) => {
-        const found = validateAuctionDraft(initial, state, options)
+        if (shouldSkipValidation(event)) return
+        const found = validateWizardForSubmit(initial, state, options)
         if (Object.keys(found).length === 0) return
         event.preventDefault()
         setErrors(found)
@@ -97,66 +124,20 @@ export function AuctionWizard({
       ) : null}
       <input type="hidden" name="payload" value={payloadJson} />
 
-      <div className="rounded-card border border-border bg-bgPage p-md">
-        <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="wizard-title" className="text-label font-semibold text-ink">
-              Pealkiri<span className="text-danger"> *</span>
-            </label>
-            <input
-              id="wizard-title"
-              value={state.title}
-              onChange={(event) => {
-                patch({ title: event.target.value })
-              }}
-              className={`${inputClass} ${errors.title !== undefined ? 'border-danger' : ''}`}
-            />
-            {errors.title !== undefined ? (
-              <p role="alert" className="text-bodySm font-medium text-danger">
-                {errors.title}
-              </p>
-            ) : null}
-          </div>
-          {initial.auctionId === null ? (
-            <div className="flex flex-col gap-1">
-              <label htmlFor="wizard-slug" className="text-label font-semibold text-ink">
-                URL-nimi
-              </label>
-              <input
-                id="wizard-slug"
-                value={state.slug}
-                placeholder="harju-maa-raieoigus-2026"
-                onChange={(event) => {
-                  patch({ slug: event.target.value })
-                }}
-                className={`${inputClass} ${errors.slug !== undefined ? 'border-danger' : ''}`}
-              />
-              <p className="text-bodySm text-inkMuted">
-                Valikuline — tühjana tekib pealkirjast.
-              </p>
-              {errors.slug !== undefined ? (
-                <p role="alert" className="text-bodySm font-medium text-danger">
-                  {errors.slug}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 gap-md lg:grid-cols-[240px_1fr]">
         <nav aria-label="Sammud">
           <ol className="flex flex-row flex-wrap gap-xs lg:flex-col">
-            {wizardSteps.map((entry, index) => {
-              const issueCount = issueCountForStep(index + 1)
-              const current = index === stepIndex
+            {visible.map((entry) => {
+              const canonical = wizardSteps.findIndex((candidate) => candidate.id === entry.id) + 1
+              const issueCount = issueCountForStep(canonical)
+              const current = entry.id === step.id
               return (
                 <li key={entry.id}>
                   <button
                     type="button"
                     aria-current={current ? 'step' : undefined}
                     onClick={() => {
-                      setStepIndex(index)
+                      setStepIndex(visible.indexOf(entry))
                     }}
                     className={`flex w-full items-center justify-between gap-xs rounded-input border px-sm py-xs text-label font-semibold transition-colors duration-hover ease-hover ${
                       current
@@ -165,7 +146,7 @@ export function AuctionWizard({
                     }`}
                   >
                     <span>
-                      {String(index + 1)}. {entry.label}
+                      {String(canonical)}. {entry.label}
                     </span>
                     {issueCount > 0 ? (
                       <span className="rounded-pill bg-dangerLight px-2 text-bodySm text-danger">
@@ -181,7 +162,7 @@ export function AuctionWizard({
 
         <section className="rounded-card border border-border bg-bgPage p-md">
           <h2 className="text-h4 font-bold text-ink">
-            Samm {String(stepIndex + 1)} / {String(wizardSteps.length)} — {step.label}
+            Samm {String(canonicalStepNumber)} / {String(wizardSteps.length)} — {step.label}
           </h2>
           <div className="mt-sm">
             {step.render(context)}

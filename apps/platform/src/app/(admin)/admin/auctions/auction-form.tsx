@@ -4,7 +4,10 @@ import type {
   AuctionWizardOptions,
   AuctionWizardState,
 } from './_components/wizard-model'
+import { mediaStateFrom, packageRowsStateFrom } from './_components/wizard-model'
 import { loggingTypeCodes, speciesCodes } from './_lib/auction-schema'
+import { createGuestPreviewToken } from '../../../(portal)/oksjon/esivaade/_lib/preview-token'
+import { regenerateAliasEmailAction, publishAuctionAction } from '../../_actions/auctions'
 import { requireAdminRepositories } from '../../_lib/admin'
 import { can } from '../../_lib/permissions'
 import { utcIsoToTallinnInputValue } from '../content/_components/scheduled-publish'
@@ -133,6 +136,12 @@ function emptyWizardState(options: AuctionFormOptions): AuctionWizardState {
     removalDeadline: '',
     leaseDeadline: '',
     propertyCount: null,
+    specialistId: '',
+    descriptionPublic: '',
+    descriptionSecondary: '',
+    media: [],
+    packageHeader: '',
+    packageRows: [],
   }
 }
 
@@ -181,6 +190,12 @@ function wizardStateFromAuction(
     removalDeadline: recordString(deadlines, 'removalDeadline'),
     leaseDeadline: recordString(deadlines, 'leaseDeadline'),
     propertyCount: recordNumber(deadlines, 'propertyCount'),
+    specialistId: auction.specialistId ?? '',
+    descriptionPublic: auction.descriptionPublic ?? '',
+    descriptionSecondary: auction.descriptionSecondary ?? '',
+    media: mediaStateFrom(auction.media),
+    packageHeader: auction.packageHeader ?? '',
+    packageRows: packageRowsStateFrom(auction.packageRows),
   }
 }
 
@@ -201,6 +216,9 @@ export async function AuctionForm({
   const wizardOptions: AuctionWizardOptions = {
     ...options,
     canFeeOverride: can(session.role, 'auctions:fee-override'),
+    canReassignSpecialist: can(session.role, 'auctions:reassign-specialist'),
+    regenerateAliasEmail: regenerateAliasEmailAction,
+    publishAuction: publishAuctionAction,
   }
 
   const initial: AuctionWizardInitial =
@@ -209,12 +227,18 @@ export async function AuctionForm({
           auctionId: null,
           mechanicsLocked: false,
           hasReserve: false,
+          aliasEmail: null,
+          guestPreviewHref: null,
           state: emptyWizardState(options),
         }
       : {
           auctionId: auction.id,
           mechanicsLocked: auction.status === 'active' || auction.status === 'scheduled',
           hasReserve: typeof auction.reservePriceCents === 'number',
+          aliasEmail: auction.aliasEmail ?? null,
+          // Signed 24h draft token; the portal route verifies it without
+          // storage (no preview-token column exists in the auctions schema).
+          guestPreviewHref: `/oksjon/esivaade/${await createGuestPreviewToken(auction.id)}`,
           state: wizardStateFromAuction(auction, options),
         }
 

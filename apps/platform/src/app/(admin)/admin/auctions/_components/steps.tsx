@@ -4,14 +4,19 @@ import type { ReactNode } from 'react'
 
 import { StepLandForest } from './StepLandForest'
 import { StepLocation } from './StepLocation'
+import { StepPakett } from './StepPakett'
 import { StepPricing } from './StepPricing'
+import { StepSisu } from './StepSisu'
 import { StepTypeMechanics } from './StepTypeMechanics'
+import { StepUlevaade } from './StepUlevaade'
 import type { WizardStepContext } from './wizard-model'
 
+import type { AuctionObjectType } from '@/lib/data/schema'
+
 /**
- * The wizard's step registry — the extension point for task 2.5 (Sisu,
- * Pakett, Ülevaade): add real renderers in place of the placeholders and
- * extend AuctionWizardState with the fields those steps own.
+ * The wizard's step registry (docs/design/admin/03, seven steps). Step
+ * numbers are canonical and stable; the Pakett entry stays out of the
+ * visible list for non-package lots (see `visibleWizardSteps`).
  */
 export interface WizardStepDefinition {
   id: string
@@ -19,21 +24,17 @@ export interface WizardStepDefinition {
   render: (context: WizardStepContext) => ReactNode
 }
 
-function StepPlaceholder({ label }: { label: string }) {
-  return (
-    <p className="rounded-card border border-dashed border-border bg-bgMist p-md text-bodySm text-inkMuted">
-      Samm “{label}” on veel arendamisel (ülesanne 2.5). Andmed siit sammust ei lähe praegu
-      salvestusse.
-    </p>
-  )
-}
-
 export const wizardSteps: readonly WizardStepDefinition[] = [
   { id: 'type', label: 'Tüüp ja mehaanika', render: (context) => <StepTypeMechanics {...context} /> },
   { id: 'location', label: 'Asukoht', render: (context) => <StepLocation {...context} /> },
   { id: 'land', label: 'Maa ja mets', render: (context) => <StepLandForest {...context} /> },
   { id: 'pricing', label: 'Hind', render: (context) => <StepPricing {...context} /> },
-  { id: 'content', label: 'Sisu', render: () => <StepPlaceholder label="Sisu" /> },
-  { id: 'package', label: 'Pakett', render: () => <StepPlaceholder label="Pakett" /> },
-  { id: 'review', label: 'Ülevaade', render: () => <StepPlaceholder label="Ülevaade" /> },
+  { id: 'content', label: 'Sisu', render: (context) => <StepSisu {...context} /> },
+  { id: 'package', label: 'Pakett', render: (context) => <StepPakett {...context} /> },
+  { id: 'review', label: 'Ülevaade', render: (context) => <StepUlevaade {...context} /> },
 ]
+
+/** Step 6 renders only for package lots (docs 03: "Step 6 hidden unless objectType=package"). */
+export function visibleWizardSteps(objectType: AuctionObjectType): readonly WizardStepDefinition[] {
+  return objectType === 'pakett' ? wizardSteps : wizardSteps.filter((step) => step.id !== 'package')
+}
