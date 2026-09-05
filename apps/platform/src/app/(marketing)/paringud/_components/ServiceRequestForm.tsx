@@ -76,6 +76,8 @@ export interface ServiceRequestFormLabels {
   cadastres?: string;
   county?: string;
   provisions?: string;
+  /** Hint under the provisions field (e.g. "nt 5, 7 — eraldise numbrid"). */
+  provisionsHint?: string;
   paperCopy?: string;
   comment?: string;
   file?: string;
@@ -568,6 +570,7 @@ export function ServiceRequestForm({
             label={merged.provisions}
             name="provisions"
             required
+            {...(merged.provisionsHint ? { hint: merged.provisionsHint } : {})}
             value={fields.provisions}
             onChange={updateTextField('provisions')}
             {...(errors.provisions ? { error: errors.provisions } : {})}
