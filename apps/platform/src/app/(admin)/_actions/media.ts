@@ -7,6 +7,8 @@ import { requireAdminRepositories } from '../_lib/admin'
 import {
   buildR2Key,
   getMediaBucket,
+  getMediaQueue,
+  initialRenditionsFor,
   mediaUrlFor,
   validateMediaUpload,
 } from '../admin/media/_lib/media-upload'
@@ -75,6 +77,7 @@ export async function uploadMediaAction(formData: FormData): Promise<void> {
         alt: readOptionalText(formData, 'alt'),
         r2Key: key,
         url: mediaUrlFor(id),
+        renditions: initialRenditionsFor(file.type),
         status: 'published',
       },
     })
@@ -88,6 +91,26 @@ export async function uploadMediaAction(formData: FormData): Promise<void> {
     }
   }
   if (failure) redirectWithError(mediaPath, `Üleslaadimine ebaõnnestus: ${failure}`)
+
+  // Rendition jobs ride the erametsad-jobs queue (design D6). The upload
+  // stands on its own: a failed enqueue keeps the row's `pending` marker and
+  // is recovered by re-enqueueing, never by failing the upload.
+  if (initialRenditionsFor(file.type)) {
+    const queue = await getMediaQueue()
+    if (queue) {
+      try {
+        await queue.send({
+          type: 'media-renditions',
+          mediaId: id,
+          dedupeKey: `media-renditions:${id}`,
+        })
+      } catch (error) {
+        console.error(`[media] rendition enqueue failed for ${id}`, error)
+      }
+    } else {
+      console.error(`[media] QUEUE binding unavailable; renditions for ${id} stay pending`)
+    }
+  }
 
   revalidatePath(mediaPath)
   redirect(mediaPath)

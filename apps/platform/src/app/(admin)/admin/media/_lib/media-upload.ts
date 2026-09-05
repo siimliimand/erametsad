@@ -21,19 +21,8 @@ export function isAllowedMimeType(mimeType: string): boolean {
   return allowedMediaMimeTypes.includes(mimeType)
 }
 
-/** ASCII-only, path-free, length-capped key segment for an R2 object key. */
-export function sanitizeFilename(filename: string): string {
-  const base = filename.split(/[\\/]/).pop() ?? ''
-  const sanitized = base
-    .normalize('NFKD')
-    .replace(/[^A-Za-z0-9.-]+/g, '-')
-    .replace(/-{2,}/g, '-')
-    .replace(/^[-.]+/, '')
-    .replace(/[-.]+$/, '')
-    .slice(0, 80)
-    .replace(/[-.]+$/, '')
-  return sanitized.length > 0 ? sanitized : 'fail'
-}
+// sanitizeFilename moved to src/lib/media/renditions.ts (shared with the
+// rendition keys) and is re-exported below for this module's consumers.
 
 /** Estonian validation message, or null when the upload is acceptable. */
 export function validateMediaUpload(input: {
@@ -159,43 +148,58 @@ export function attachmentTagFrom(value: unknown): AttachmentTag {
     : 'muu'
 }
 
-// Renditions are DECLARED sizes only. The worker runtime has no image
-// decoder (sharp cannot run on Cloudflare Workers) and wrangler.jsonc binds
-// no Cloudflare Image Resizing or upload queue, so no in-repo mechanism can
-// produce the bytes today; the media table also has no renditions column to
-// store variant metadata in. These specs are the single source of truth for
-// whichever mechanism (Image Resizing transform on the streaming route, or
-// a queue consumer) lands later.
-export interface RenditionSpec {
-  name: 'hero' | 'gallery' | 'thumb'
-  width: number
-  height: number
-}
+// Renditions are produced by the `erametsad-jobs` queue consumer
+// (media-renditions job): the upload action enqueues the job and stores a
+// `pending` marker in the media row's `renditions` column; the consumer
+// decodes the original, center-crops and resizes each spec, writes the
+// variants to R2, and flips the column to `ready` (or `failed` with a
+// reason). The specs, stored-JSON shape, key builder, and the pure crop/
+// plan pipeline live in src/lib/media/renditions.ts and are re-exported
+// here so the admin UI keeps a single import surface.
+export {
+  buildRenditionKey,
+  failedRenditionsJson,
+  isRenditionName,
+  parseRenditions,
+  pendingRenditionsJson,
+  readyRenditionsJson,
+  type GeneratedRendition,
+  type MediaRenditionsJson,
+  type RenditionCodecs,
+  type RenditionImage,
+  type RenditionName,
+  type RenditionSpec,
+  type RenditionVariant,
+  RENDITION_SPECS,
+  sanitizeFilename,
+} from '../../../../../lib/media/renditions'
 
-export const RENDITION_SPECS: readonly RenditionSpec[] = [
-  { name: 'hero', width: 1600, height: 1000 },
-  { name: 'gallery', width: 1200, height: 750 },
-  { name: 'thumb', width: 350, height: 175 },
-]
-
-export function buildRenditionKey(
-  id: string,
-  filename: string,
-  name: RenditionSpec['name'],
-): string {
-  return `media/${id}-${name}-${sanitizeFilename(filename)}`
-}
+import {
+  buildRenditionKey,
+  pendingRenditionsJson,
+  sanitizeFilename,
+  RENDITION_SPECS,
+  type MediaRenditionsJson,
+  type RenditionSpec,
+} from '../../../../../lib/media/renditions'
 
 /**
- * Declared variant metadata for a media row: target sizes plus the R2 keys
- * the generating mechanism would write. Nothing consumes these keys yet —
- * see the gap note above RENDITION_SPECS.
+ * Declared variant metadata for a media row before generation runs: target
+ * sizes plus the R2 keys the queue consumer will write.
  */
 export function declaredRenditions(
   id: string,
   filename: string,
 ): (RenditionSpec & { key: string })[] {
   return RENDITION_SPECS.map((spec) => ({ ...spec, key: buildRenditionKey(id, filename, spec.name) }))
+}
+
+/**
+ * The renditions column value an editor image starts with: the consumer
+ * owns the transition out of `pending`.
+ */
+export function initialRenditionsFor(mimeType: string): MediaRenditionsJson | null {
+  return isEditorImageMimeType(mimeType) ? pendingRenditionsJson() : null
 }
 
 export function formatFileSize(bytes: number | null | undefined): string {
@@ -232,7 +236,14 @@ declare global {
   interface CloudflareEnv {
     /** R2 binding from wrangler.jsonc r2_buckets (erametsad-media). */
     BUCKET?: MediaR2Bucket
+    /** Queue producer from wrangler.jsonc queues.producers (erametsad-jobs). */
+    QUEUE?: MediaQueueProducer
   }
+}
+
+/** Minimal producer surface of the QUEUE binding (queues.send envelope). */
+export interface MediaQueueProducer {
+  send(body: unknown): Promise<void>
 }
 
 /** The BUCKET binding for the current invocation, or null when absent. */
@@ -241,6 +252,17 @@ export async function getMediaBucket(): Promise<MediaR2Bucket | null> {
     const { getCloudflareContext } = await import('@opennextjs/cloudflare')
     const context = await getCloudflareContext({ async: true })
     return context.env.BUCKET ?? null
+  } catch {
+    return null
+  }
+}
+
+/** The QUEUE producer binding for the current invocation, or null when absent. */
+export async function getMediaQueue(): Promise<MediaQueueProducer | null> {
+  try {
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare')
+    const context = await getCloudflareContext({ async: true })
+    return context.env.QUEUE ?? null
   } catch {
     return null
   }

@@ -568,7 +568,7 @@ export const contentCollections: Readonly<Record<ContentCollectionSlug, Reposito
     media: {
       table: media,
       aliases: {},
-      jsonFields: {},
+      jsonFields: { renditions: 'json' },
       isikukood: false,
       templateActivation: false,
     },

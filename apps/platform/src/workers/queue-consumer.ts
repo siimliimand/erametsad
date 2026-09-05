@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import type {
   ContractPdfJob,
   JobPayload,
+  MediaRenditionsJob,
   NotificationFanoutJob,
   QueueConsumerEnv,
   QueueExecutionContext,
@@ -17,6 +18,16 @@ import {
 } from '../lib/data/repositories'
 import * as schema from '../lib/data/schema'
 import type { DbDatabase } from '../lib/db'
+import {
+  PermanentRenditionError,
+  failedRenditionsJson,
+  generateRenditionVariants,
+  isRenditionSourceMimeType,
+  readyRenditionsJson,
+  type RenditionCodecs,
+  type RenditionName,
+  type RenditionVariant,
+} from '../lib/media/renditions'
 import type { SendEmailOptions, SendResult } from '../lib/notifications/email-sender'
 
 type NotificationDoc = DocFor<'notifications'>
@@ -31,6 +42,8 @@ interface RecipientResult {
 export interface QueueConsumerDeps {
   /** Test seam; defaults to the sendEmail chain from task 4.1. */
   sendEmail?: (options: SendEmailOptions) => Promise<SendResult>
+  /** Test seam; defaults to the @jsquash wasm codecs (workerd only). */
+  renditions?: RenditionCodecs
 }
 
 const DEDUPE_KEY_PREFIX = 'queue-dedupe:'
@@ -61,6 +74,18 @@ async function resolveSendEmail(
   const { sendEmail, setEmailBindingForTests } = await import('../lib/notifications/email-sender')
   setEmailBindingForTests(env.EMAIL ?? null)
   return sendEmail
+}
+
+let renditionCodecsImpl: RenditionCodecs | null = null
+
+async function resolveRenditionCodecs(): Promise<RenditionCodecs> {
+  // Loaded lazily so email-only batches (and tests with injected codecs)
+  // never evaluate the @jsquash wasm modules.
+  if (!renditionCodecsImpl) {
+    const { createRenditionCodecs } = await import('./renditions')
+    renditionCodecsImpl = createRenditionCodecs()
+  }
+  return renditionCodecsImpl
 }
 
 // Mirrors recipientStatus in src/lib/notifications/service.ts (task 4.3)
@@ -198,10 +223,94 @@ async function handleContractPdf(
   })
 }
 
+/**
+ * Generates the hero/gallery/thumb renditions for one editor image: reads
+ * the original from R2, writes the variant objects next to it, and records
+ * the outcome in the media row's `renditions` column. Permanent conditions
+ * (missing row, undecodable bytes) are marked on the row and acked; R2 and
+ * encode failures throw so the queue retry policy owns them.
+ */
+async function handleMediaRenditions(
+  payload: MediaRenditionsJob,
+  env: QueueConsumerEnv,
+  injectedCodecs?: RenditionCodecs,
+): Promise<void> {
+  const repos = createRepositories(env.DB)
+  const media = await repos.findByID({ collection: 'media', id: payload.mediaId })
+  if (!media) {
+    // Permanent condition: the row cannot appear by retrying.
+    console.error(`[queue-consumer] media ${payload.mediaId} not found; message dropped`)
+    return
+  }
+  const mimeType = typeof media.mimeType === 'string' ? media.mimeType : ''
+  if (!isRenditionSourceMimeType(mimeType)) {
+    // PDFs and media-library formats never had a job enqueued; a stray
+    // message is a permanent no-op.
+    console.error(
+      `[queue-consumer] media ${payload.mediaId} mime type "${mimeType}" has no renditions; message dropped`,
+    )
+    return
+  }
+  if (!env.BUCKET) {
+    throw new Error('R2 binding "BUCKET" not available; cannot generate renditions')
+  }
+  const r2Key = typeof media.r2Key === 'string' ? media.r2Key : ''
+  if (r2Key.length === 0) {
+    await repos.update({
+      collection: 'media',
+      id: media.id,
+      data: { renditions: failedRenditionsJson('media row has no R2 object key') },
+    })
+    return
+  }
+
+  const object = await env.BUCKET.get(r2Key)
+  if (!object) {
+    await repos.update({
+      collection: 'media',
+      id: media.id,
+      data: { renditions: failedRenditionsJson('original object missing from R2') },
+    })
+    return
+  }
+
+  const original = await object.arrayBuffer()
+  const codecs = injectedCodecs ?? (await resolveRenditionCodecs())
+  let result
+  try {
+    result = await generateRenditionVariants(original, mimeType, media.filename, media.id, codecs)
+  } catch (error) {
+    if (error instanceof PermanentRenditionError) {
+      await repos.update({
+        collection: 'media',
+        id: media.id,
+        data: { renditions: failedRenditionsJson(error.message) },
+      })
+      return
+    }
+    throw error
+  }
+
+  const variants: Partial<Record<RenditionName, RenditionVariant>> = {}
+  for (const variant of result.variants) {
+    await env.BUCKET.put(variant.key, variant.bytes, {
+      httpMetadata: { contentType: variant.mimeType },
+    })
+    const { name, key, width, height, size, mimeType: variantMime } = variant
+    variants[name] = { key, width, height, size, mimeType: variantMime }
+  }
+  await repos.update({
+    collection: 'media',
+    id: media.id,
+    data: { renditions: readyRenditionsJson(variants) },
+  })
+}
+
 async function dispatch(
   payload: JobPayload,
   env: QueueConsumerEnv,
   send: (options: SendEmailOptions) => Promise<SendResult>,
+  renditions?: RenditionCodecs,
 ): Promise<void> {
   switch (payload.type) {
     case 'notification-fanout':
@@ -209,6 +318,9 @@ async function dispatch(
       return
     case 'contract-pdf':
       await handleContractPdf(payload, env)
+      return
+    case 'media-renditions':
+      await handleMediaRenditions(payload, env, renditions)
       return
     default:
       // Unknown types are permanent poison; dropped until the DLQ (task 6.3).
@@ -261,7 +373,7 @@ export async function queue(
         message.ack()
         continue
       }
-      await dispatch(message.body, env, send)
+      await dispatch(message.body, env, send, deps.renditions)
       await markProcessed(env, key)
       message.ack()
     } catch (error) {

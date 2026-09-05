@@ -13,9 +13,11 @@ import {
   buildRenditionKey,
   declaredRenditions,
   formatFileSize,
+  initialRenditionsFor,
   isAllowedMimeType,
   isEditorImageMimeType,
   mediaUrlFor,
+  parseRenditions,
   sanitizeFilename,
   validateEditorAttachmentUpload,
   validateEditorImageUpload,
@@ -269,5 +271,38 @@ describe('formatFileSize', () => {
     expect(formatFileSize(1536)).toBe('1,5 kB')
     expect(formatFileSize(5 * 1024 * 1024)).toBe('5 MB')
     expect(formatFileSize(3 * 1024 * 1024 * 1024)).toBe('3 GB')
+  })
+})
+
+describe('initialRenditionsFor', () => {
+  it('starts pending for editor image formats', () => {
+    expect(initialRenditionsFor('image/jpeg')).toEqual({ status: 'pending' })
+    expect(initialRenditionsFor('image/png')).toEqual({ status: 'pending' })
+    expect(initialRenditionsFor('image/webp')).toEqual({ status: 'pending' })
+  })
+
+  it('stays null for formats without a rendition job', () => {
+    expect(initialRenditionsFor('application/pdf')).toBeNull()
+    expect(initialRenditionsFor('image/gif')).toBeNull()
+    expect(initialRenditionsFor('image/avif')).toBeNull()
+  })
+})
+
+describe('parseRenditions (re-exported from the renditions module)', () => {
+  it('reads stored column JSON back', () => {
+    const stored = JSON.stringify({
+      status: 'ready',
+      variants: {
+        thumb: { key: 'media/k', width: 350, height: 175, size: 12, mimeType: 'image/webp' },
+      },
+    })
+    const parsed = parseRenditions(stored)
+    expect(parsed?.status).toBe('ready')
+    expect(parsed?.variants?.thumb?.key).toBe('media/k')
+  })
+
+  it('degrades junk column values to null', () => {
+    expect(parseRenditions('{oops')).toBeNull()
+    expect(parseRenditions(null)).toBeNull()
   })
 })

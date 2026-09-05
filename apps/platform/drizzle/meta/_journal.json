@@ -71,6 +71,13 @@
       "when": 1788590313577,
       "tag": "0009_past_firebrand",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788629172040,
+      "tag": "0010_stiff_outlaw_kid",
+      "breakpoints": true
     }
   ]
 }
