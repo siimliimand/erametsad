@@ -7,9 +7,11 @@ import { PromiseBand } from '../_components/PromiseBand'
 import { RequestTabs } from '../_components/RequestTabs'
 import { ServiceRequestForm } from '../_components/ServiceRequestForm'
 
-// Static shell: the page renders no server-side data, and the shared
-// layout's contact band degrades to empty without a D1 binding.
-export const revalidate = 3600
+// force-dynamic, not ISR: the shared (marketing) layout reads D1 at
+// render, and prerendering would start the OpenNext remote-binding proxy,
+// which fails a CI build without CLOUDFLARE_API_TOKEN (repo rule: DB-backed
+// pages go dynamic until build-time D1 seeding exists).
+export const dynamic = 'force-dynamic'
 
 export const metadata = buildMetadata({
   title: 'Hooldusraie päring — hooldus- ja valgusraie',

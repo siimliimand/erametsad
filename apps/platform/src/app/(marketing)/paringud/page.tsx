@@ -8,10 +8,12 @@ import { SERVICES, ServiceCards, type ServiceCounts } from './_components/Servic
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 
-// Spec 09: content caching via ISR. Partner counts degrade to zero when a
-// build runs without a seeded D1 (cards render disabled), so prerendering
-// is safe and runtime revalidation picks up the live counts.
-export const revalidate = 3600
+// force-dynamic, not ISR: the hub reads partner counts from D1 and the
+// shared (marketing) layout reads D1 at render. Prerendering would start
+// the OpenNext remote-binding proxy, which fails a CI build without
+// CLOUDFLARE_API_TOKEN (repo rule: DB-backed pages go dynamic until
+// build-time D1 seeding exists).
+export const dynamic = 'force-dynamic'
 
 export const metadata = buildMetadata({
   title: 'Teenuste päringud — kava, raie, istutamine',
