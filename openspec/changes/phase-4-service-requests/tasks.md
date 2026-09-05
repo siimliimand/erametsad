@@ -30,7 +30,7 @@ Annotation format: `<!-- agent: <name>.<tier>, depends_on: [<ids>], touches: [<g
 
 ## 6. SEO, sitemap, analytics
 
-- [ ] 6.1 Metadata (title/desc/OG/canonical) for the four pages via the shared seo helpers, sitemap entries for `/paringud` and the three form routes, `track()` wiring for the spec'd event names, cache tiers: hub `revalidate = 3600`, form pages static shells <!-- agent: fullstack-engineer.fast, depends_on: [3.1, 4.2, 4.3, 4.4], touches: [apps/platform/src/app/sitemap.ts, apps/platform/src/app/(marketing)/paringud/] -->
+- [x] 6.1 Metadata (title/desc/OG/canonical) for the four pages via the shared seo helpers, sitemap entries for `/paringud` and the three form routes, `track()` wiring for the spec'd event names, cache tiers: hub `revalidate = 3600`, form pages static shells <!-- agent: fullstack-engineer.fast, depends_on: [3.1, 4.2, 4.3, 4.4], touches: [apps/platform/src/app/sitemap.ts, apps/platform/src/app/(marketing)/paringud/] -->
 
 ## 7. Tests and verification
 
