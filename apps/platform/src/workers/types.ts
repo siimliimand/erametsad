@@ -23,7 +23,18 @@ export interface ContractPdfJob {
   dedupeKey?: string
 }
 
-export type JobPayload = NotificationFanoutJob | ContractPdfJob
+/**
+ * Message body for editor-image rendition generation (design D6). The media
+ * row carries `r2Key` and the `renditions` column; the consumer writes the
+ * variant objects into R2 and flips the column to `ready`/`failed`.
+ */
+export interface MediaRenditionsJob {
+  type: 'media-renditions'
+  mediaId: string
+  dedupeKey?: string
+}
+
+export type JobPayload = NotificationFanoutJob | ContractPdfJob | MediaRenditionsJob
 
 // Minimal runtime shapes for the queue handler entry point and the KV/R2
 // bindings, declared locally for the same reason as DbDatabase in
@@ -58,7 +69,14 @@ export interface QueueR2Bucket {
     value: string | ReadableStream | ArrayBuffer,
     options?: { httpMetadata?: { contentType?: string } },
   ): Promise<unknown>
-  get(key: string): Promise<{ key: string; size: number } | null>
+  get(key: string): Promise<QueueR2Object | null>
+}
+
+/** R2 GET result; the body bytes are read through arrayBuffer(). */
+export interface QueueR2Object {
+  key: string
+  size: number
+  arrayBuffer(): Promise<ArrayBuffer>
 }
 
 export interface QueueConsumerEnv {

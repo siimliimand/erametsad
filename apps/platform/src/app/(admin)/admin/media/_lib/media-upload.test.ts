@@ -1,12 +1,26 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  MAX_EDITOR_IMAGE_BYTES,
+  MAX_EDITOR_PDF_BYTES,
   MAX_UPLOAD_BYTES,
+  MIN_EDITOR_IMAGE_WIDTH,
+  RENDITION_SPECS,
+  attachmentTagFrom,
+  attachmentTagLabels,
+  attachmentTags,
   buildR2Key,
+  buildRenditionKey,
+  declaredRenditions,
   formatFileSize,
+  initialRenditionsFor,
   isAllowedMimeType,
+  isEditorImageMimeType,
   mediaUrlFor,
+  parseRenditions,
   sanitizeFilename,
+  validateEditorAttachmentUpload,
+  validateEditorImageUpload,
   validateMediaUpload,
 } from './media-upload'
 
@@ -88,6 +102,146 @@ describe('validateMediaUpload', () => {
   })
 })
 
+describe('isEditorImageMimeType', () => {
+  it('accepts only jpg, png and webp', () => {
+    for (const mimeType of ['image/jpeg', 'image/png', 'image/webp']) {
+      expect(isEditorImageMimeType(mimeType)).toBe(true)
+    }
+  })
+
+  it('rejects gif, avif, pdf and arbitrary types', () => {
+    for (const mimeType of ['image/gif', 'image/avif', 'application/pdf', 'image/svg+xml', '']) {
+      expect(isEditorImageMimeType(mimeType)).toBe(false)
+    }
+  })
+})
+
+describe('validateEditorImageUpload', () => {
+  const valid = { filename: 'pilt.jpg', mimeType: 'image/jpeg', size: 1024 }
+
+  it('accepts an in-range image', () => {
+    expect(validateEditorImageUpload(valid)).toBeNull()
+  })
+
+  it('accepts a file exactly at the 15 MB cap', () => {
+    expect(validateEditorImageUpload({ ...valid, size: MAX_EDITOR_IMAGE_BYTES })).toBeNull()
+  })
+
+  it('rejects a file above the 15 MB cap', () => {
+    expect(validateEditorImageUpload({ ...valid, size: MAX_EDITOR_IMAGE_BYTES + 1 })).toBe(
+      'Pildi maksimaalne suurus on 15 MB.',
+    )
+  })
+
+  it('rejects non-editor mime types even when the library allows them', () => {
+    expect(validateEditorImageUpload({ ...valid, mimeType: 'image/gif' })).toBe(
+      'Pilt peab olema JPEG, PNG või WebP-vormingus.',
+    )
+    expect(validateEditorImageUpload({ ...valid, mimeType: 'application/pdf' })).toBe(
+      'Pilt peab olema JPEG, PNG või WebP-vormingus.',
+    )
+  })
+
+  it('accepts a width exactly at the minimum', () => {
+    expect(validateEditorImageUpload({ ...valid, width: MIN_EDITOR_IMAGE_WIDTH })).toBeNull()
+  })
+
+  it('rejects a width below the minimum', () => {
+    expect(validateEditorImageUpload({ ...valid, width: MIN_EDITOR_IMAGE_WIDTH - 1 })).toBe(
+      'Pildi laius peab olema vähemalt 1200 pikslit.',
+    )
+  })
+
+  it('skips the width rule when no width was measured', () => {
+    expect(
+      validateEditorImageUpload({ filename: valid.filename, mimeType: valid.mimeType, size: valid.size }),
+    ).toBeNull()
+  })
+
+  it('rejects an empty file and a missing filename', () => {
+    expect(validateEditorImageUpload({ ...valid, size: 0 })).toBe('Fail on tühi.')
+    expect(validateEditorImageUpload({ ...valid, filename: ' ' })).toBe('Failinimi puudub.')
+  })
+})
+
+describe('validateEditorAttachmentUpload', () => {
+  const valid = { filename: 'takseer.pdf', mimeType: 'application/pdf', size: 1024 }
+
+  it('accepts an in-range pdf', () => {
+    expect(validateEditorAttachmentUpload(valid)).toBeNull()
+  })
+
+  it('accepts a pdf exactly at the 25 MB cap', () => {
+    expect(validateEditorAttachmentUpload({ ...valid, size: MAX_EDITOR_PDF_BYTES })).toBeNull()
+  })
+
+  it('rejects a pdf above the 25 MB cap', () => {
+    expect(validateEditorAttachmentUpload({ ...valid, size: MAX_EDITOR_PDF_BYTES + 1 })).toBe(
+      'Manuse maksimaalne suurus on 25 MB.',
+    )
+  })
+
+  it('rejects non-pdf files', () => {
+    expect(validateEditorAttachmentUpload({ ...valid, mimeType: 'image/png' })).toBe(
+      'Manused peavad olema PDF-failid.',
+    )
+  })
+
+  it('rejects an empty file and a missing filename', () => {
+    expect(validateEditorAttachmentUpload({ ...valid, size: 0 })).toBe('Fail on tühi.')
+    expect(validateEditorAttachmentUpload({ ...valid, filename: '' })).toBe('Failinimi puudub.')
+  })
+})
+
+describe('attachmentTags', () => {
+  it('exposes the three design-doc tags with Estonian labels', () => {
+    expect([...attachmentTags]).toEqual(['takseer', 'metsateatised', 'muu'])
+    expect(attachmentTagLabels).toEqual({
+      takseer: 'Takseer',
+      metsateatised: 'Metsateatised',
+      muu: 'Muu',
+    })
+  })
+
+  it('coerces stored values onto a valid tag', () => {
+    expect(attachmentTagFrom('takseer')).toBe('takseer')
+    expect(attachmentTagFrom('metsateatised')).toBe('metsateatised')
+    expect(attachmentTagFrom('teadmata')).toBe('muu')
+    expect(attachmentTagFrom(undefined)).toBe('muu')
+    expect(attachmentTagFrom(42)).toBe('muu')
+  })
+})
+
+describe('RENDITION_SPECS', () => {
+  it('declares the design-doc crop sizes in order', () => {
+    expect(RENDITION_SPECS).toEqual([
+      { name: 'hero', width: 1600, height: 1000 },
+      { name: 'gallery', width: 1200, height: 750 },
+      { name: 'thumb', width: 350, height: 175 },
+    ])
+  })
+})
+
+describe('buildRenditionKey', () => {
+  it('namespaces the variant between the id and the sanitized filename', () => {
+    expect(buildRenditionKey('2b1c', 'Metsa pilt.png', 'thumb')).toBe(
+      'media/2b1c-thumb-Metsa-pilt.png',
+    )
+  })
+
+  it('cannot smuggle path separators into the key', () => {
+    expect(buildRenditionKey('2b1c', '../../evil.png', 'hero')).toBe('media/2b1c-hero-evil.png')
+  })
+})
+
+describe('declaredRenditions', () => {
+  it('returns one key per declared spec', () => {
+    const renditions = declaredRenditions('2b1c', 'pilt.png')
+    expect(renditions.map((rendition) => rendition.name)).toEqual(['hero', 'gallery', 'thumb'])
+    expect(renditions.every((rendition) => rendition.key.startsWith('media/2b1c-'))).toBe(true)
+  })
+})
+
 describe('buildR2Key', () => {
   it('places the sanitized filename under the media prefix', () => {
     expect(buildR2Key('2b1c', 'Metsa pilt.png')).toBe('media/2b1c-Metsa-pilt.png')
@@ -117,5 +271,38 @@ describe('formatFileSize', () => {
     expect(formatFileSize(1536)).toBe('1,5 kB')
     expect(formatFileSize(5 * 1024 * 1024)).toBe('5 MB')
     expect(formatFileSize(3 * 1024 * 1024 * 1024)).toBe('3 GB')
+  })
+})
+
+describe('initialRenditionsFor', () => {
+  it('starts pending for editor image formats', () => {
+    expect(initialRenditionsFor('image/jpeg')).toEqual({ status: 'pending' })
+    expect(initialRenditionsFor('image/png')).toEqual({ status: 'pending' })
+    expect(initialRenditionsFor('image/webp')).toEqual({ status: 'pending' })
+  })
+
+  it('stays null for formats without a rendition job', () => {
+    expect(initialRenditionsFor('application/pdf')).toBeNull()
+    expect(initialRenditionsFor('image/gif')).toBeNull()
+    expect(initialRenditionsFor('image/avif')).toBeNull()
+  })
+})
+
+describe('parseRenditions (re-exported from the renditions module)', () => {
+  it('reads stored column JSON back', () => {
+    const stored = JSON.stringify({
+      status: 'ready',
+      variants: {
+        thumb: { key: 'media/k', width: 350, height: 175, size: 12, mimeType: 'image/webp' },
+      },
+    })
+    const parsed = parseRenditions(stored)
+    expect(parsed?.status).toBe('ready')
+    expect(parsed?.variants?.thumb?.key).toBe('media/k')
+  })
+
+  it('degrades junk column values to null', () => {
+    expect(parseRenditions('{oops')).toBeNull()
+    expect(parseRenditions(null)).toBeNull()
   })
 })

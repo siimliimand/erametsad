@@ -18,6 +18,9 @@ export const media = sqliteTable(
     // and public URL instead of a local path.
     r2Key: text('r2_key'),
     url: text('url'),
+    // TEXT-JSON MediaRenditionsJson (src/lib/media/renditions.ts): pending
+    // marker at upload, variant list after the queue consumer runs.
+    renditions: text('renditions'),
     status: text('status', { enum: contentStatuses }).notNull().default('draft'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),

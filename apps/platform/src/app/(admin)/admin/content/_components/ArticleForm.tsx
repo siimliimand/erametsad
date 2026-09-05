@@ -1,5 +1,11 @@
 import Link from 'next/link'
 
+import { CheckboxField } from './CheckboxField'
+import {
+  contentPublicPath,
+  redirectPathsForSlugChange,
+  utcIsoToTallinnInputValue,
+} from './scheduled-publish'
 import { saveArticleAction } from '../../../_actions/content'
 import {
   FormField,
@@ -21,6 +27,11 @@ const statusOptions = contentStatuses.map((status) => ({
 const mediaIdHint = 'Meediafaili ID. Meediakogu haldus lisandub hiljem.'
 
 export function ArticleForm({ article }: { article?: ArticleDoc }) {
+  const redirectPaths =
+    article?.status === 'published'
+      ? redirectPathsForSlugChange('articles', article.slug, article.slug)
+      : null
+
   return (
     <form
       action={saveArticleAction}
@@ -62,15 +73,32 @@ export function ArticleForm({ article }: { article?: ArticleDoc }) {
           label="Olek"
           name="status"
           options={statusOptions}
+          hint="Tulevikus seatud avaldamise ajaga jääb artikkel mustandiks kuni avaldamiseni."
           defaultValue={article?.status ?? 'draft'}
         />
         <FormField
-          label="Peapildi ID"
-          name="featuredImageId"
-          hint={mediaIdHint}
-          defaultValue={article?.featuredImageId ?? ''}
+          label="Avaldamise aeg"
+          name="publishAt"
+          type="datetime-local"
+          step="60"
+          hint="Kellaaeg Europe/Tallinn. Planeeritud avaldamine tehakse automaatselt."
+          defaultValue={utcIsoToTallinnInputValue(article?.publishedAt)}
         />
       </div>
+      <FormField
+        label="Peapildi ID"
+        name="featuredImageId"
+        hint={mediaIdHint}
+        defaultValue={article?.featuredImageId ?? ''}
+      />
+      {article?.status === 'published' && redirectPaths ? (
+        <CheckboxField
+          label="Loo suunamine vana aadressilt"
+          name="createRedirect"
+          hint={`URL-i muutusel luuakse suunamine aadressilt ${redirectPaths.from} aadressile uue URL-i.`}
+          defaultChecked
+        />
+      ) : null}
       <div className="flex items-center gap-sm pt-xs">
         <button type="submit" className={primaryButtonClass}>
           Salvesta
@@ -78,6 +106,15 @@ export function ArticleForm({ article }: { article?: ArticleDoc }) {
         <Link href="/admin/content/articles" className={secondaryButtonClass}>
           Tühista
         </Link>
+        {article?.status === 'published' ? (
+          <Link
+            href={contentPublicPath('articles', article.slug)}
+            target="_blank"
+            className={secondaryButtonClass}
+          >
+            Vaata avaldatud versiooni
+          </Link>
+        ) : null}
       </div>
     </form>
   )
