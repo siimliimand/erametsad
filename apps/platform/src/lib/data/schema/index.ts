@@ -18,6 +18,8 @@ export * from './contracts'
 export * from './notifications'
 export * from './audit-entries'
 export * from './leads'
+export * from './partners'
+export * from './service-requests'
 export * from './settings'
 export * from './articles'
 export * from './content'
@@ -59,10 +61,12 @@ import type { notifications as notificationsTable } from './notifications'
 import type { pages as pagesTable } from './pages'
 import type { parishes as parishesTable } from './parishes'
 import type { partnerServices as partnerServicesTable } from './partner-services'
+import type { partners as partnersTable } from './partners'
 import type { passwordResetTokens as passwordResetTokensTable } from './password-reset-tokens'
 import type { profiles as profilesTable } from './profiles'
 import type { redirects as redirectsTable } from './redirects'
 import type { rightsRequests as rightsRequestsTable } from './rights-requests'
+import type { serviceRequests as serviceRequestsTable } from './service-requests'
 import type { sessions as sessionsTable } from './sessions'
 import type { settings as settingsTable } from './settings'
 import type { specialists as specialistsTable } from './specialists'
@@ -122,6 +126,8 @@ export type Page = InferSelectModel<typeof pagesTable>
 export type NewPage = InferInsertModel<typeof pagesTable>
 export type Parish = InferSelectModel<typeof parishesTable>
 export type NewParish = InferInsertModel<typeof parishesTable>
+export type Partner = InferSelectModel<typeof partnersTable>
+export type NewPartner = InferInsertModel<typeof partnersTable>
 export type PartnerService = InferSelectModel<typeof partnerServicesTable>
 export type NewPartnerService = InferInsertModel<typeof partnerServicesTable>
 export type PasswordResetToken = InferSelectModel<typeof passwordResetTokensTable>
@@ -132,6 +138,8 @@ export type RightsRequest = InferSelectModel<typeof rightsRequestsTable>
 export type NewRightsRequest = InferInsertModel<typeof rightsRequestsTable>
 export type Session = InferSelectModel<typeof sessionsTable>
 export type NewSession = InferInsertModel<typeof sessionsTable>
+export type ServiceRequest = InferSelectModel<typeof serviceRequestsTable>
+export type NewServiceRequest = InferInsertModel<typeof serviceRequestsTable>
 export type Specialist = InferSelectModel<typeof specialistsTable>
 export type NewSpecialist = InferInsertModel<typeof specialistsTable>
 export type StatisticsSnapshot = InferSelectModel<typeof statisticsSnapshotsTable>

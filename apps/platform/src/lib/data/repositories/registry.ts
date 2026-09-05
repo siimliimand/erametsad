@@ -41,10 +41,12 @@ import type {
   NewNotification,
   NewPage,
   NewParish,
+  NewPartner,
   NewPartnerService,
   NewProfile,
   NewRedirect,
   NewRightsRequest,
+  NewServiceRequest,
   NewSettings,
   NewSpecialist,
   NewStatisticsSnapshot,
@@ -54,10 +56,12 @@ import type {
   NotificationRow,
   Page,
   Parish,
+  Partner,
   PartnerService,
   Profile,
   Redirect,
   RightsRequest,
+  ServiceRequest,
   SettingsRow,
   Specialist,
   StatisticsSnapshot,
@@ -87,10 +91,12 @@ import {
   notifications,
   pages,
   parishes,
+  partners,
   partnerServices,
   profiles,
   redirects,
   rightsRequests,
+  serviceRequests,
   settings,
   specialists,
   statisticsSnapshots,
@@ -119,6 +125,8 @@ export type CoreCollectionSlug =
   | 'analytics-events'
   | 'newsletter-subscribers'
   | 'leads'
+  | 'service-requests'
+  | 'partners'
   | 'settings'
 
 export type ContentCollectionSlug =
@@ -165,6 +173,12 @@ export const consentLogJsonFields = { categories: 'json' } as const satisfies Js
 export const analyticsEventsJsonFields = { props: 'json' } as const satisfies JsonFieldSpec
 export const settingsJsonFields = { featureFlags: 'json' } as const satisfies JsonFieldSpec
 export const auctionSubscriptionsJsonFields = { filterJson: 'json' } as const satisfies JsonFieldSpec
+export const serviceRequestsJsonFields = {
+  payload: 'json',
+  attachments: 'array',
+  routedTo: 'array',
+} as const satisfies JsonFieldSpec
+export const partnersJsonFields = { serviceTypes: 'array', counties: 'array' } as const satisfies JsonFieldSpec
 
 // Payload text hasMany on articles; blocks on pages. RichText columns
 // (articles.content, faq-items.answer, legal-documents.content,
@@ -192,6 +206,8 @@ export type ConsentLogDoc = JsonDoc<ConsentLog, typeof consentLogJsonFields>
 export type AnalyticsEventDoc = JsonDoc<AnalyticsEvent, typeof analyticsEventsJsonFields>
 export type SettingsDoc = JsonDoc<SettingsRow, typeof settingsJsonFields>
 export type AuctionSubscriptionDoc = JsonDoc<AuctionSubscription, typeof auctionSubscriptionsJsonFields>
+export type ServiceRequestDoc = JsonDoc<ServiceRequest, typeof serviceRequestsJsonFields>
+export type PartnerDoc = JsonDoc<Partner, typeof partnersJsonFields>
 
 export type UserCreateData = CreateData<NewUser> & { isikukood?: string }
 export type AuctionCreateData = CreateData<NewAuction, typeof auctionsJsonFields>
@@ -205,6 +221,8 @@ export type AuctionSubscriptionCreateData = CreateData<
   NewAuctionSubscription,
   typeof auctionSubscriptionsJsonFields
 >
+export type ServiceRequestCreateData = CreateData<NewServiceRequest, typeof serviceRequestsJsonFields>
+export type PartnerCreateData = CreateData<NewPartner, typeof partnersJsonFields>
 
 export type ArticleDoc = JsonDoc<Article, typeof articlesJsonFields>
 export type PageDoc = JsonDoc<Page, typeof pagesJsonFields>
@@ -232,6 +250,8 @@ export interface CoreCollectionDocs {
   'analytics-events': AnalyticsEventDoc
   'newsletter-subscribers': NewsletterSubscriber
   leads: Lead
+  'service-requests': ServiceRequestDoc
+  partners: PartnerDoc
   settings: SettingsDoc
 }
 
@@ -253,6 +273,8 @@ export interface CoreCollectionCreates {
   'analytics-events': AnalyticsEventCreateData
   'newsletter-subscribers': CreateData<NewNewsletterSubscriber>
   leads: CreateData<NewLead>
+  'service-requests': ServiceRequestCreateData
+  partners: PartnerCreateData
   settings: SettingsCreateData
 }
 
@@ -430,6 +452,20 @@ export const coreCollections: Readonly<Record<CoreCollectionSlug, RepositoryColl
     table: leads,
     aliases: { assignedSpecialist: 'assignedSpecialistId' },
     jsonFields: {},
+    isikukood: false,
+    templateActivation: false,
+  },
+  'service-requests': {
+    table: serviceRequests,
+    aliases: {},
+    jsonFields: serviceRequestsJsonFields,
+    isikukood: false,
+    templateActivation: false,
+  },
+  partners: {
+    table: partners,
+    aliases: {},
+    jsonFields: partnersJsonFields,
     isikukood: false,
     templateActivation: false,
   },
