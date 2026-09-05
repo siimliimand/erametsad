@@ -303,7 +303,7 @@ export const ADMIN_MODULES: readonly AdminModuleDefinition[] = [
   { id: 'content', label: 'Sisu', href: '/admin/content' },
   { id: 'statistics', label: 'Statistika', href: '/admin/statistics' },
   { id: 'settings', label: 'Seaded', href: '/admin/settings' },
-  { id: 'audit-log', label: 'Auditlogi', href: '/admin/audit-log' },
+  { id: 'audit-log', label: 'Auditlogi', href: '/admin/audit' },
 ]
 
 const MODULE_READ_PERMISSION: Record<AdminModuleId, AdminPermission> = {
