@@ -48,14 +48,15 @@ requests to the default hostname SHALL serve the `(marketing)` route group
 plus `/admin` and `/styleguide`. On the default host, `/` SHALL rewrite to
 the real route `/avaleht` and `/lepingud` SHALL rewrite to
 `/lepingud/dokumendid`; on the portal host those two paths SHALL keep
-serving the portal. Marketing-only paths SHALL 308 to the default host
-when requested on the portal host, and portal paths SHALL 308 to the
-portal host when requested on the default host, preserving path and query.
-`/metsateatise-juhend` SHALL 301 to `/metsateatis`. Sessions SHALL work on
-both hostnames with host-only cookies. No additional Worker SHALL be
-created; the mapping lives in application middleware plus a Workers route
-or custom domain on the zone. The `api.` and `admin.` hostnames SHALL use
-the same mapping table when introduced.
+serving the portal. Marketing-only paths, including `/paringud` and
+`/paringud/*`, SHALL 308 to the default host when requested on the portal
+host, and portal paths SHALL 308 to the portal host when requested on the
+default host, preserving path and query. `/metsateatise-juhend` SHALL 301
+to `/metsateatis`. Sessions SHALL work on both hostnames with host-only
+cookies. No additional Worker SHALL be created; the mapping lives in
+application middleware plus a Workers route or custom domain on the zone.
+The `api.` and `admin.` hostnames SHALL use the same mapping table when
+introduced.
 
 #### Scenario: Marketing hostname serves the homepage
 
@@ -73,6 +74,12 @@ the same mapping table when introduced.
 #### Scenario: Wrong-host marketing path redirects
 
 - **WHEN** a client requests `/kontakt` on the portal hostname
+- **THEN** the middleware responds with a 308 to the same path on the
+  default hostname
+
+#### Scenario: Paringud path redirects from the portal host
+
+- **WHEN** a client requests `/paringud/hooldusraie` on the portal hostname
 - **THEN** the middleware responds with a 308 to the same path on the
   default hostname
 
