@@ -34,5 +34,5 @@ Annotation format: `<!-- agent: <name>.<tier>, depends_on: [<ids>], touches: [<g
 
 ## 7. Tests and verification
 
-- [ ] 7.1 Component and route tests: hub partner counts + disabled card state, draft persistence excluding consent and file, checkbox-group validation, success/zero-partner/network-error states (extends 1.1 middleware tests and 2.1 API tests) <!-- agent: fullstack-engineer.build, depends_on: [4.2, 4.3, 4.4], touches: [apps/platform/src/app/(marketing)/paringud/_components/__tests__/] -->
+- [x] 7.1 Component and route tests: hub partner counts + disabled card state, draft persistence excluding consent and file, checkbox-group validation, success/zero-partner/network-error states (extends 1.1 middleware tests and 2.1 API tests) <!-- agent: fullstack-engineer.build, depends_on: [4.2, 4.3, 4.4], touches: [apps/platform/src/app/(marketing)/paringud/_components/__tests__/] -->
 - [ ] 7.2 Run lint, typecheck, build, and the full test suite; fix fallout <!-- agent: fullstack-engineer.fast, depends_on: [2.1, 5.1, 6.1, 7.1], touches: [] -->
