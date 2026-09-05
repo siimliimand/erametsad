@@ -2,6 +2,8 @@ import {
   tallinnWallTimeToUtcIso,
   utcIsoToTallinnInputValue,
 } from '../../content/_components/scheduled-publish'
+import { attachmentTagFrom } from '../../media/_lib/media-upload'
+import type { AttachmentTag } from '../../media/_lib/media-upload'
 import {
   auctionInputSchema,
   collectPublishGateFailures,
@@ -29,6 +31,12 @@ export interface AuctionMediaItemState {
   alt: string
   focalX?: number
   focalY?: number
+}
+
+/** PDF attachment row (docs 03 step 5 files[]): PDF-only with a tag. */
+export interface AuctionFileItemState {
+  url: string
+  tag: AttachmentTag
 }
 
 /** Package table row kept as raw input strings until payload build. */
@@ -83,6 +91,12 @@ export interface AuctionWizardState {
   descriptionPublic: string
   descriptionSecondary: string
   media: AuctionMediaItemState[]
+  /**
+   * Optional so the pre-2.6 seed paths (auction-form) stay untouched: absent
+   * means "never edited here" and the payload omits `files`, so stored
+   * attachments survive partial updates. MediaStep writes it for new lots.
+   */
+  files?: AuctionFileItemState[]
   packageHeader: string
   packageRows: PackageRowState[]
 }
@@ -233,6 +247,7 @@ const FIELD_STEP: Record<string, number> = {
   descriptionPublic: 5,
   descriptionSecondary: 5,
   media: 5,
+  files: 5,
   propertyCount: 6,
   packageHeader: 6,
   packageRows: 6,
@@ -354,6 +369,11 @@ export function buildAuctionPayload(
     ...(item.focalX !== undefined ? { focalX: item.focalX } : {}),
     ...(item.focalY !== undefined ? { focalY: item.focalY } : {}),
   }))
+  // `files` travels only once MediaStep owns the list; a save from a session
+  // that never touched attachments stays absent and cannot wipe stored rows.
+  if (state.files !== undefined) {
+    payload.files = state.files.map((item) => ({ url: item.url, tag: item.tag }))
+  }
 
   // Step 6 (Pakett): package fields travel only for package lots, so a
   // non-package save never wipes stored rows.
@@ -431,6 +451,19 @@ export function mediaStateFrom(value: unknown): AuctionMediaItemState[] {
       ...(typeof record.focalX === 'number' ? { focalX: record.focalX } : {}),
       ...(typeof record.focalY === 'number' ? { focalY: record.focalY } : {}),
     })
+  }
+  return items
+}
+
+/** Stored files JSON -> editable rows; unknown tags fall back to "muu". */
+export function filesStateFrom(value: unknown): AuctionFileItemState[] {
+  if (!Array.isArray(value)) return []
+  const items: AuctionFileItemState[] = []
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) continue
+    const record = entry as Record<string, unknown>
+    if (typeof record.url !== 'string' || record.url.trim() === '') continue
+    items.push({ url: record.url, tag: attachmentTagFrom(record.tag) })
   }
   return items
 }

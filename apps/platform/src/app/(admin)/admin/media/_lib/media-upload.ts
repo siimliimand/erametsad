@@ -68,6 +68,136 @@ export function mediaUrlFor(id: string): string {
   return `/api/v1/media/${id}`
 }
 
+// ── Editor pipeline (design D6, docs/design/admin/03 step 5) ────────────────
+// Stricter than the media-library rules above: the lot editor accepts only
+// jpg/png/webp images and PDF attachments, with larger caps because the
+// originals feed rendition crops.
+
+export const EDITOR_IMAGE_MIME_TYPES: readonly string[] = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]
+
+export const MAX_EDITOR_IMAGE_BYTES = 15 * 1024 * 1024
+
+/** Minimum source width; renditions crop down, never up. */
+export const MIN_EDITOR_IMAGE_WIDTH = 1200
+
+/** PDF attachments cap (docs 03 media pipeline: "PDF files max 25 MB"). */
+export const MAX_EDITOR_PDF_BYTES = 25 * 1024 * 1024
+
+export function isEditorImageMimeType(mimeType: string): boolean {
+  return EDITOR_IMAGE_MIME_TYPES.includes(mimeType)
+}
+
+/**
+ * Estonian validation message, or null when the editor image is acceptable.
+ * `width` is optional because it must be measured by the caller (the browser
+ * decodes the image; the worker runtime has no decoder), so the min-width
+ * rule only runs when a measured width is supplied.
+ */
+export function validateEditorImageUpload(input: {
+  filename: string
+  mimeType: string
+  size: number
+  width?: number
+}): string | null {
+  if (input.filename.trim().length === 0) {
+    return 'Failinimi puudub.'
+  }
+  if (!isEditorImageMimeType(input.mimeType)) {
+    return 'Pilt peab olema JPEG, PNG või WebP-vormingus.'
+  }
+  if (input.size <= 0) {
+    return 'Fail on tühi.'
+  }
+  if (input.size > MAX_EDITOR_IMAGE_BYTES) {
+    return 'Pildi maksimaalne suurus on 15 MB.'
+  }
+  if (input.width !== undefined && input.width < MIN_EDITOR_IMAGE_WIDTH) {
+    return 'Pildi laius peab olema vähemalt 1200 pikslit.'
+  }
+  return null
+}
+
+/** PDF-only attachment rule for the editor's `files` list. */
+export function validateEditorAttachmentUpload(input: {
+  filename: string
+  mimeType: string
+  size: number
+}): string | null {
+  if (input.filename.trim().length === 0) {
+    return 'Failinimi puudub.'
+  }
+  if (input.mimeType !== 'application/pdf') {
+    return 'Manused peavad olema PDF-failid.'
+  }
+  if (input.size <= 0) {
+    return 'Fail on tühi.'
+  }
+  if (input.size > MAX_EDITOR_PDF_BYTES) {
+    return 'Manuse maksimaalne suurus on 25 MB.'
+  }
+  return null
+}
+
+export const attachmentTags = ['takseer', 'metsateatised', 'muu'] as const
+
+export type AttachmentTag = (typeof attachmentTags)[number]
+
+export const attachmentTagLabels: Record<AttachmentTag, string> = {
+  takseer: 'Takseer',
+  metsateatised: 'Metsateatised',
+  muu: 'Muu',
+}
+
+/** Coerces a stored/unknown value onto a valid tag, defaulting to "muu". */
+export function attachmentTagFrom(value: unknown): AttachmentTag {
+  return typeof value === 'string' && (attachmentTags as readonly string[]).includes(value)
+    ? (value as AttachmentTag)
+    : 'muu'
+}
+
+// Renditions are DECLARED sizes only. The worker runtime has no image
+// decoder (sharp cannot run on Cloudflare Workers) and wrangler.jsonc binds
+// no Cloudflare Image Resizing or upload queue, so no in-repo mechanism can
+// produce the bytes today; the media table also has no renditions column to
+// store variant metadata in. These specs are the single source of truth for
+// whichever mechanism (Image Resizing transform on the streaming route, or
+// a queue consumer) lands later.
+export interface RenditionSpec {
+  name: 'hero' | 'gallery' | 'thumb'
+  width: number
+  height: number
+}
+
+export const RENDITION_SPECS: readonly RenditionSpec[] = [
+  { name: 'hero', width: 1600, height: 1000 },
+  { name: 'gallery', width: 1200, height: 750 },
+  { name: 'thumb', width: 350, height: 175 },
+]
+
+export function buildRenditionKey(
+  id: string,
+  filename: string,
+  name: RenditionSpec['name'],
+): string {
+  return `media/${id}-${name}-${sanitizeFilename(filename)}`
+}
+
+/**
+ * Declared variant metadata for a media row: target sizes plus the R2 keys
+ * the generating mechanism would write. Nothing consumes these keys yet —
+ * see the gap note above RENDITION_SPECS.
+ */
+export function declaredRenditions(
+  id: string,
+  filename: string,
+): (RenditionSpec & { key: string })[] {
+  return RENDITION_SPECS.map((spec) => ({ ...spec, key: buildRenditionKey(id, filename, spec.name) }))
+}
+
 export function formatFileSize(bytes: number | null | undefined): string {
   if (bytes === null || bytes === undefined) return '—'
   if (bytes < 1024) return `${String(bytes)} B`
