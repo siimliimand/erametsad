@@ -20,9 +20,11 @@ function isValidIsikukood(code: string): boolean {
   return last !== undefined && checksum === last
 }
 
+export const EE_PHONE_PATTERN = /^\+372\d{7,8}$/
+
 export const EEPhone = z
   .string()
-  .regex(/^\+372\d{7,8}$/, 'Must be a valid Estonian phone number (+372 followed by 7-8 digits)')
+  .regex(EE_PHONE_PATTERN, 'Must be a valid Estonian phone number (+372 followed by 7-8 digits)')
 
 export const EEIsikukood = z
   .string()
