@@ -4,7 +4,13 @@ import { EE_COUNTIES } from '@erametsad/types'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
+import {
+  buildLeadExportRows,
+  resolveConsentWithdrawnAt,
+  type LeadExportRow,
+} from '../../api/v1/admin/leads/export/_lib/leads-export'
 import { requireAdminRepositories, type AdminSession } from '../_lib/admin'
+import { formatDateTime } from '../_lib/labels'
 import { can, leadInScope, leadScope } from '../_lib/permissions'
 import { evaluateLeadExitGuard } from '../admin/leads/_components/lead-flow'
 import {
@@ -16,7 +22,7 @@ import {
   buildMinimizedForwardPayload,
 } from '../admin/requests/_components/routing'
 
-import type { CoreRepositories } from '@/lib/data/repositories'
+import type { AuditEntryDoc, CoreRepositories } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 import {
   auctionObjectTypes,
@@ -705,6 +711,105 @@ export async function createLeadAction(formData: FormData): Promise<void> {
 
   revalidatePath(LEADS_PATH)
   redirectWithNotice(`/admin/leads/${leadId}`, 'Juhtlõige loodud.')
+}
+
+// ---------------------------------------------------------------------------
+// 5.3 Leads CSV export (download route: /api/v1/admin/leads/export)
+// ---------------------------------------------------------------------------
+
+export type LeadExportResult =
+  | { ok: true; rows: LeadExportRow[]; withdrawnCount: number }
+  | { ok: false; error: string }
+
+/**
+ * Assembles the rows for the leads CSV download. Admin+ only: the design
+ * matrix names a dedicated leads.export permission (13-settings §Rollid)
+ * that the AdminPermission union does not have yet, so leads:read is
+ * combined with an explicit admin-role gate — specialists see leads but
+ * must not export. Consent-withdrawn contacts are blanked here, so the
+ * withdrawn contact data never leaves this function, and the lead.export
+ * audit entry is written before the route returns the CSV.
+ */
+export async function loadLeadExportData(): Promise<LeadExportResult> {
+  const { session } = await requireAdminRepositories()
+  if (
+    !can(session.role, 'leads:read') ||
+    (session.role !== 'admin' && session.role !== 'superadmin')
+  ) {
+    return { ok: false, error: 'Teil puudub õigus juhtlõimede eksportimiseks.' }
+  }
+  const repositories = await getRepositories()
+
+  const { docs: leads } = await repositories.find({
+    collection: 'leads',
+    sort: '-createdAt',
+    pagination: false,
+  })
+  const { docs: specialists } = await repositories.find({
+    collection: 'specialists',
+    sort: 'name',
+    pagination: false,
+  })
+
+  const { docs: leadAudits } = await repositories.find({
+    collection: 'audit-entry',
+    where: { entityType: { equals: 'lead' } },
+    sort: '-createdAt',
+    pagination: false,
+  })
+  const nextActionAtByLeadId = new Map<string, string>()
+  const noteCountsByLeadId = new Map<string, number>()
+  for (const entry of leadAudits as (AuditEntryDoc & { entityId?: string | null })[]) {
+    if (!entry.entityId) continue
+    if (entry.action === 'lead.next_action') {
+      const after = entry.after as { dueAt?: unknown } | null
+      if (!nextActionAtByLeadId.has(entry.entityId) && typeof after?.dueAt === 'string') {
+        nextActionAtByLeadId.set(entry.entityId, formatDateTime(after.dueAt))
+      }
+    }
+    if (entry.action === 'lead.note') {
+      noteCountsByLeadId.set(entry.entityId, (noteCountsByLeadId.get(entry.entityId) ?? 0) + 1)
+    }
+  }
+
+  const ipHashes = [
+    ...new Set(leads.map((lead) => lead.ipHash).filter((ipHash): ipHash is string => Boolean(ipHash))),
+  ]
+  const { docs: consentEntries } =
+    ipHashes.length > 0
+      ? await repositories.find({
+          collection: 'consent-log',
+          where: { ipHash: { in: ipHashes } },
+          sort: '-createdAt',
+          pagination: false,
+        })
+      : { docs: [] }
+
+  const consentWithdrawnAtByIpHash = resolveConsentWithdrawnAt(consentEntries)
+  const withdrawnCount = leads.filter(
+    (lead) => lead.ipHash !== null && consentWithdrawnAtByIpHash.has(lead.ipHash),
+  ).length
+
+  const rows = buildLeadExportRows(leads, {
+    consentWithdrawnAtByIpHash,
+    specialistNames: new Map(specialists.map((specialist) => [specialist.id, specialist.name])),
+    nextActionAtByLeadId,
+    noteCountsByLeadId,
+  })
+
+  try {
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'lead.export',
+      entityType: 'lead',
+      entityId: 'bulk',
+      after: { count: rows.length, filters: null },
+    })
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+
+  return { ok: true, rows, withdrawnCount }
 }
 
 // ---------------------------------------------------------------------------
