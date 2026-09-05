@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 
-import { AdminNav } from './_components/AdminNav'
+import { AdminShell } from './_components/AdminShell'
 import { requireAdminRepositories } from './_lib/admin'
 import { userRoleLabels } from './_lib/labels'
+import { visibleModules } from './_lib/permissions'
 
-import type { UserRole } from '@/lib/data/schema'
+import { getRepositories } from '@/lib/data/runtime'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,32 +16,46 @@ export const metadata: Metadata = {
   },
 }
 
+function environmentBadgeLabel(): string | null {
+  if (process.env.NODE_ENV === 'development') return 'Arendus'
+  if (process.env.NODE_ENV === 'test') return 'Test'
+  return null
+}
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { session } = await requireAdminRepositories()
-  const roleLabel =
-    session.role in userRoleLabels ? userRoleLabels[session.role as UserRole] : session.role
+  const { session, repositories } = await requireAdminRepositories()
+  // users reads are admin-only at the guard level, so the operator's own
+  // row for the user menu runs as system context scoped to the session id.
+  const systemRepositories = await getRepositories()
+
+  const [operator, unread] = await Promise.all([
+    systemRepositories.findByID({ collection: 'users', id: session.userId }),
+    repositories.find({
+      collection: 'notifications',
+      where: { userId: { equals: session.userId }, readAt: { exists: false } },
+      sort: '-createdAt',
+      pagination: false,
+    }),
+  ])
+
+  const roleLabel = userRoleLabels[session.role]
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg-mist md:flex-row">
-      <aside className="hidden w-sidebar shrink-0 flex-col bg-primaryDark text-ink-inverse md:flex">
-        <div className="border-b border-white/10 px-md py-lg">
-          <p className="font-heading text-h4 font-extrabold">Erametsad</p>
-          <p className="text-label text-ink-inverse opacity-70">Halduspaneel</p>
-        </div>
-        <AdminNav />
-        <div className="mt-auto border-t border-white/10 px-md py-md">
-          <p className="text-label text-ink-inverse opacity-70">Sisse logitud: {roleLabel}</p>
-        </div>
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-col gap-xs border-b border-border bg-bgPage px-md py-sm md:hidden">
-          <p className="font-heading text-h4 font-extrabold text-primaryDark">Haldus</p>
-          <AdminNav orientation="horizontal" />
-        </header>
-        <main className="mx-auto w-full max-w-container-xl flex-1 px-md py-lg md:px-lg">
-          {children}
-        </main>
-      </div>
-    </div>
+    <AdminShell
+      modules={visibleModules(session.role)}
+      roleLabel={roleLabel}
+      userName={operator?.name ?? operator?.email ?? roleLabel}
+      environmentLabel={environmentBadgeLabel()}
+      notifications={{
+        unreadCount: unread.docs.length,
+        items: unread.docs.slice(0, 5).map((doc) => ({
+          id: doc.id,
+          title: doc.title,
+          createdAt: doc.createdAt,
+        })),
+      }}
+    >
+      {children}
+    </AdminShell>
   )
 }
