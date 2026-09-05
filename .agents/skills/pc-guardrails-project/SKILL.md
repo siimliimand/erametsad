@@ -12,7 +12,7 @@ license: MIT
 
 - Three deployment units share one monorepo: marketing site (`erametsad.ee`), auction portal (`oksjonid.erametsad.ee`), and core backend + admin (`api.erametsad.ee` / `admin.erametsad.ee`). Do not split them into separate repositories.
 - Use subdomain routing per the established pattern: `erametsad.ee` (marketing), `oksjonid.erametsad.ee` (portal), `api.erametsad.ee` (API), `admin.erametsad.ee` (admin), optional `metsauhistu.erametsad.ee` (Phase 5). Prototype runs under `ww0.dev` (`erametsad.ww0.dev`, `oksjonid.erametsad.ww0.dev`, `api.erametsad.ww0.dev`, `admin.erametsad.ww0.dev`). Production `.ee` cutover is a separate future step.
-- The backend is a Next.js 15 App Router application on Cloudflare Workers (via OpenNext) with Cloudflare D1 (SQLite) via Drizzle ORM. The data layer uses a repository pattern (`apps/platform/src/lib/data/`) with 33 schema tables (including the append-only `consent_log`, `newsletter_subscribers`, `analytics_events`), access guards (`guards.ts`), and runtime helpers (`runtime.ts`). Do not use Payload CMS 3.
+- The backend is a Next.js 15 App Router application on Cloudflare Workers (via OpenNext) with Cloudflare D1 (SQLite) via Drizzle ORM. The data layer uses a repository pattern (`apps/platform/src/lib/data/`) with 35 schema tables (including the append-only `consent_log`, `newsletter_subscribers`, `analytics_events`, and the service-request tables `service_requests`, `partners`), access guards (`guards.ts`), and runtime helpers (`runtime.ts`). Do not use Payload CMS 3.
 - Auction timing is server-authoritative only. End-of-auction transitions are DO-alarm-driven with a cron sweep safety net, never triggered by a client request.
 - Bids are append-only. Corrections use compensating entries, not deletions or updates. Sealed bids are encrypted at rest until the admin opening ceremony.
 - The marketing site uses SSG/ISR where possible, with live data fetched client-side (auction ticker, form submissions).
@@ -86,5 +86,6 @@ license: MIT
 - Auction anti-sniping: a bid within the last N minutes (default 5, configurable per auction) extends the end time by N minutes. This is enabled by default and toggleable per auction.
 - The 3% + VAT success fee is paid only on completion — never show fees on an active or unsold auction.
 - Anonymity rules: bid lists show amounts and relative times but never bidder identities. Archive shows only `finalPrice` — no winner identity, no bid count.
+- Service requests (`POST /api/v1/service-requests`): honeypot neutral success, 5/min IP rate limit, 409 duplicate throttle (same phone + cadastral within 10 min), 422 per-field errors. Hub partner counts are anonymized counts only. Attachments: one PDF/JPG/PNG up to 10 MB, stored in R2 under `service-requests/`. Routing records matched partner ids in `routed_to[]`; delivery to partner inboxes is Phase 5.5.
 
-<!-- Last updated: 2026-08-31 -->
+<!-- Last updated: 2026-09-05 -->

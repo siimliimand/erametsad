@@ -82,6 +82,14 @@ describe('middleware default-host marketing rewrites', () => {
     }
   })
 
+  it('serves /paringud on the default host as a marketing route without redirecting', () => {
+    const response = middleware(requestFor(DEFAULT_HOSTNAME, '/paringud?piirkond=harju'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull()
+    expect(response.headers.get('location')).toBeNull()
+  })
+
   it('never rewrites on the portal host', () => {
     const response = middleware(requestFor(PORTAL_HOSTNAME, '/lepingud'))
 
@@ -99,6 +107,15 @@ describe('middleware marketing paths on the portal host', () => {
     expect(response.headers.get('location')).toBe(
       `https://${DEFAULT_HOSTNAME}/teenused/hindamine?kee=info`,
     )
+  })
+
+  it('redirects /paringud to the default host with 308, preserving path and query', () => {
+    for (const pathAndQuery of ['/paringud?piirkond=harju', '/paringud/hooldusraie?teenus=raie']) {
+      const response = middleware(requestFor(PORTAL_HOSTNAME, pathAndQuery))
+
+      expect(response.status).toBe(308)
+      expect(response.headers.get('location')).toBe(`https://${DEFAULT_HOSTNAME}${pathAndQuery}`)
+    }
   })
 
   it('normalizes /avaleht to / on the default host', () => {

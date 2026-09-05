@@ -25,6 +25,7 @@ const APP_PATHS = ['/admin', '/styleguide']
 // document list back to their shared short URLs.
 const MARKETING_PREFIXES = [
   '/teenused/',
+  '/paringud/',
   '/kkk/',
   '/meist/',
   '/artiklid/',
@@ -36,6 +37,7 @@ const MARKETING_PREFIXES = [
 ]
 const MARKETING_PATHS = [
   '/teenused',
+  '/paringud',
   '/kkk',
   '/meist',
   '/artiklid',

@@ -5,6 +5,8 @@ import { seedBids } from './bids'
 import { seedCms } from './cms'
 import { seedContractTemplates } from './contracts'
 import { seedLeads } from './leads'
+import { seedPartners } from './partners'
+import { seedServiceRequests } from './service-requests'
 import { seedSpecialists } from './specialists'
 import { seedTaxonomies } from './taxonomies'
 import { seedUsers } from './users'
@@ -44,6 +46,8 @@ export async function seed(repos: CoreRepositories): Promise<void> {
   await seedCms(repos)
   await seedContractTemplates(repos)
   await seedLeads(repos)
+  await seedPartners(repos)
+  await seedServiceRequests(repos)
 
   console.log('Seeding complete')
 }

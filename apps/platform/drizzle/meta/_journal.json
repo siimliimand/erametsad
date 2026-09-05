@@ -64,6 +64,13 @@
       "when": 1788187267464,
       "tag": "0008_lean_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1788590313577,
+      "tag": "0009_past_firebrand",
+      "breakpoints": true
     }
   ]
 }
