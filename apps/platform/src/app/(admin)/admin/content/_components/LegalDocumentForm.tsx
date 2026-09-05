@@ -1,5 +1,7 @@
 import Link from 'next/link'
 
+import { CheckboxField } from './CheckboxField'
+import { redirectPathsForSlugChange, utcIsoToTallinnInputValue } from './scheduled-publish'
 import { saveLegalDocumentAction } from '../../../_actions/content'
 import {
   FormField,
@@ -24,6 +26,11 @@ const typeOptions = [
 ]
 
 export function LegalDocumentForm({ document }: { document?: LegalDocument }) {
+  const redirectPaths =
+    document?.status === 'published'
+      ? redirectPathsForSlugChange('legal-documents', document.slug, document.slug)
+      : null
+
   return (
     <form
       action={saveLegalDocumentAction}
@@ -61,12 +68,31 @@ export function LegalDocumentForm({ document }: { document?: LegalDocument }) {
           defaultValue={document?.effectiveDate ? document.effectiveDate.slice(0, 10) : ''}
         />
       </div>
-      <FormSelectField
-        label="Olek"
-        name="status"
-        options={statusOptions}
-        defaultValue={document?.status ?? 'draft'}
-      />
+      <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
+        <FormSelectField
+          label="Olek"
+          name="status"
+          options={statusOptions}
+          hint="Tulevikus seatud avaldamise ajaga jääb dokument mustandiks kuni avaldamiseni."
+          defaultValue={document?.status ?? 'draft'}
+        />
+        <FormField
+          label="Avaldamise aeg"
+          name="publishAt"
+          type="datetime-local"
+          step="60"
+          hint="Kellaaeg Europe/Tallinn. Planeeritud avaldamine tehakse automaatselt."
+          defaultValue={utcIsoToTallinnInputValue(document?.publishedAt)}
+        />
+      </div>
+      {document?.status === 'published' && redirectPaths ? (
+        <CheckboxField
+          label="Loo suunamine vana aadressilt"
+          name="createRedirect"
+          hint={`URL-i muutusel luuakse suunamine aadressilt ${redirectPaths.from} aadressile uue URL-i.`}
+          defaultChecked
+        />
+      ) : null}
       <div className="flex items-center gap-sm pt-xs">
         <button type="submit" className={primaryButtonClass}>
           Salvesta
@@ -74,6 +100,11 @@ export function LegalDocumentForm({ document }: { document?: LegalDocument }) {
         <Link href="/admin/content/legal-documents" className={secondaryButtonClass}>
           Tühista
         </Link>
+        {document?.status === 'published' ? (
+          <Link href="/lepingud/dokumendid" target="_blank" className={secondaryButtonClass}>
+            Vaata avaldatud loendit
+          </Link>
+        ) : null}
       </div>
     </form>
   )

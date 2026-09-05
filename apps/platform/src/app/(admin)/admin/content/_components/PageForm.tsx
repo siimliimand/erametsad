@@ -1,5 +1,7 @@
 import Link from 'next/link'
 
+import { CheckboxField } from './CheckboxField'
+import { redirectPathsForSlugChange, utcIsoToTallinnInputValue } from './scheduled-publish'
 import { savePageAction } from '../../../_actions/content'
 import {
   FormField,
@@ -23,6 +25,10 @@ export function PageForm({ page }: { page?: PageDoc }) {
     page?.layout === null || page?.layout === undefined
       ? ''
       : JSON.stringify(page.layout, null, 2)
+  const redirectPaths =
+    page?.status === 'published'
+      ? redirectPathsForSlugChange('pages', page.slug, page.slug)
+      : null
 
   return (
     <form
@@ -52,12 +58,31 @@ export function PageForm({ page }: { page?: PageDoc }) {
         hint="Lehe blokkide JSON. Vorming peab olema korrektne JSON."
         defaultValue={layoutText}
       />
-      <FormSelectField
-        label="Olek"
-        name="status"
-        options={statusOptions}
-        defaultValue={page?.status ?? 'draft'}
-      />
+      <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
+        <FormSelectField
+          label="Olek"
+          name="status"
+          options={statusOptions}
+          hint="Tulevikus seatud avaldamise ajaga jääb leht mustandiks kuni avaldamiseni."
+          defaultValue={page?.status ?? 'draft'}
+        />
+        <FormField
+          label="Avaldamise aeg"
+          name="publishAt"
+          type="datetime-local"
+          step="60"
+          hint="Kellaaeg Europe/Tallinn. Planeeritud avaldamine tehakse automaatselt."
+          defaultValue={utcIsoToTallinnInputValue(page?.publishedAt)}
+        />
+      </div>
+      {page?.status === 'published' && redirectPaths ? (
+        <CheckboxField
+          label="Loo suunamine vana aadressilt"
+          name="createRedirect"
+          hint={`URL-i muutusel luuakse suunamine aadressilt ${redirectPaths.from} aadressile uue URL-i.`}
+          defaultChecked
+        />
+      ) : null}
       <div className="flex items-center gap-sm pt-xs">
         <button type="submit" className={primaryButtonClass}>
           Salvesta

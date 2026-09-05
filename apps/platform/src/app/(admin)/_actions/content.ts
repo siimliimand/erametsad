@@ -4,7 +4,25 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { requireAdminRepositories } from '../_lib/admin'
+import { assertCan } from '../_lib/permissions'
+import {
+  contentPublicPath,
+  redirectPathsForSlugChange,
+  resolvePublishDecision,
+  tallinnWallTimeToUtcIso,
+  type PublishedSlugCollection,
+} from '../admin/content/_components/scheduled-publish'
+import {
+  isValidReason,
+  maskSecretValues,
+  mergeFlagPayload,
+  parseAuctionDefaults,
+  parseFlagObject,
+  readFlagObject,
+  withAuctionDefaults,
+} from '../admin/content/_components/settings-audit'
 
+import type { CoreRepositories, UpdateDataFor } from '@/lib/data/repositories'
 import {
   auctionObjectTypes,
   contentStatuses,
@@ -100,15 +118,150 @@ function revalidate(basePath: string, id: string): void {
   }
 }
 
-function publishedAtFor(status: ContentStatus, current: string | null | undefined): string | null {
-  if (status !== 'published') {
-    return current ?? null
+function readPublishAt(formData: FormData, errorPath: string, label: string): string | null {
+  const raw = readText(formData, 'publishAt')
+  if (raw.length === 0) {
+    return null
   }
-  return current ?? new Date().toISOString()
+  const iso = tallinnWallTimeToUtcIso(raw)
+  if (!iso) {
+    redirectWithError(errorPath, `${label} peab olema korrektne kuupäev ja kellaaeg.`)
+  }
+  return iso
+}
+
+type ScheduledCollection = Extract<PublishedSlugCollection, 'pages' | 'articles' | 'legal-documents'>
+
+const scheduledCollections: readonly ScheduledCollection[] = ['pages', 'articles', 'legal-documents']
+
+function auditEntityType(collection: ScheduledCollection): string {
+  switch (collection) {
+    case 'articles':
+      return 'article'
+    case 'legal-documents':
+      return 'legal-document'
+    case 'pages':
+      return 'page'
+  }
+}
+
+/**
+ * Lazy scheduled publishing: rows kept as drafts with a due `publishedAt`
+ * flip to published before every write to a status-bearing collection. The
+ * live site reads only `published` rows, so the flip makes scheduled content
+ * visible without a manual publish. Limitation: nothing sweeps while no
+ * admin action runs (no cron or DO alarm is in scope); the next content
+ * write catches up, and revalidatePath refreshes the public routes.
+ */
+async function publishDueScheduledContent(
+  repositories: CoreRepositories,
+  actorId: string,
+): Promise<void> {
+  const nowIso = new Date().toISOString()
+  for (const collection of scheduledCollections) {
+    try {
+      const { docs } = await repositories.find({
+        collection,
+        where: {
+          and: [
+            { status: { equals: 'draft' } },
+            { publishedAt: { less_than_equal: nowIso } },
+          ],
+        },
+        pagination: false,
+      })
+      for (const doc of docs) {
+        if (!doc.publishedAt) {
+          continue
+        }
+        await repositories.update({
+          collection,
+          id: doc.id,
+          data: { status: 'published' },
+        })
+        await writeAudit(repositories, {
+          actorId,
+          action: 'content.publish',
+          entityType: auditEntityType(collection),
+          entityId: doc.id,
+          before: { status: 'draft' },
+          after: { status: 'published', slug: doc.slug, publishedAt: doc.publishedAt },
+        })
+        revalidatePath(contentPublicPath(collection, doc.slug))
+      }
+    } catch {
+      // Opportunistic sweep: never block an unrelated admin write.
+    }
+  }
+}
+
+interface SlugChangeRedirectSource {
+  slug: string
+  status: ContentStatus
+}
+
+/**
+ * Slug-change redirect offer (spec: published documents). The form checkbox
+ * defaults to on; nothing happens for drafts, unchanged slugs, or a cleared
+ * checkbox. An existing redirect for the old path is re-pointed instead of
+ * creating a duplicate.
+ */
+async function persistSlugChangeRedirect(
+  repositories: CoreRepositories,
+  actorId: string,
+  collection: PublishedSlugCollection,
+  formData: FormData,
+  current: SlugChangeRedirectSource | null,
+  nextSlug: string,
+  errorPath: string,
+): Promise<void> {
+  if (current?.status !== 'published') {
+    return
+  }
+  if (current.slug === nextSlug || !readBool(formData, 'createRedirect')) {
+    return
+  }
+  const { from, to } = redirectPathsForSlugChange(collection, current.slug, nextSlug)
+  let failure: string | null = null
+  try {
+    const existing = await repositories.find({
+      collection: 'redirects',
+      where: { from: { equals: from } },
+      limit: 1,
+    })
+    const doc = existing.docs[0]
+    if (doc) {
+      await repositories.update({
+        collection: 'redirects',
+        id: doc.id,
+        data: { to, type: '301', active: true },
+      })
+    } else {
+      await repositories.create({
+        collection: 'redirects',
+        data: { from, to, type: '301', active: true },
+      })
+      await writeAudit(repositories, {
+        actorId,
+        action: 'redirect.create',
+        entityType: 'redirect',
+        entityId: from,
+        after: { from, to, type: '301' },
+      })
+    }
+    revalidatePath(from)
+    revalidatePath(to)
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    redirectWithError(errorPath, `Suunamise loomine ebaõnnestus: ${failure}`)
+  }
 }
 
 export async function saveArticleAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   const errorPath = formPath(articlesPath, id)
@@ -120,6 +273,9 @@ export async function saveArticleAction(formData: FormData): Promise<void> {
   if (!slug) redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
   if (!contentStatuses.includes(status)) redirectWithError(errorPath, 'Vali sobiv olek.')
 
+  await publishDueScheduledContent(repositories, session.userId)
+
+  const publishAtIso = readPublishAt(formData, errorPath, 'Avaldamise aeg')
   const current = id
     ? await persist(errorPath, 'Artikli lugemine ebaõnnestus: ', () =>
         repositories.findByID({ collection: 'articles', id }),
@@ -127,55 +283,119 @@ export async function saveArticleAction(formData: FormData): Promise<void> {
     : null
   if (id && !current) redirectWithError(errorPath, 'Artiklit ei leitud.')
 
+  const decision = resolvePublishDecision({
+    requestedStatus: status,
+    publishAtIso,
+    currentPublishedAt: current?.publishedAt ?? null,
+    currentStatus: current?.status ?? null,
+    nowIso: new Date().toISOString(),
+  })
+
   const data = {
     title,
     slug,
-    status,
+    status: decision.status,
     excerpt: readOptionalText(formData, 'excerpt'),
     content: readOptionalText(formData, 'content'),
     author: readOptionalText(formData, 'author'),
     tags: readTags(formData),
     featuredImageId: readOptionalText(formData, 'featuredImageId'),
-    publishedAt: publishedAtFor(status, current?.publishedAt),
+    publishedAt: decision.publishedAt,
   }
 
-  await persist(errorPath, 'Artikli salvestamine ebaõnnestus: ', () =>
-    current
-      ? repositories.update({ collection: 'articles', id, data })
-      : repositories.create({ collection: 'articles', data }),
+  await persist(errorPath, 'Artikli salvestamine ebaõnnestus: ', async () => {
+    const saved = current
+      ? await repositories.update({ collection: 'articles', id, data })
+      : await repositories.create({ collection: 'articles', data })
+    if (decision.scheduled) {
+      await writeAudit(repositories, {
+        actorId: session.userId,
+        action: 'content.schedule',
+        entityType: 'article',
+        entityId: saved.id,
+        after: { slug, publishedAt: decision.publishedAt },
+      })
+    } else if (decision.publishTransition) {
+      await writeAudit(repositories, {
+        actorId: session.userId,
+        action: 'content.publish',
+        entityType: 'article',
+        entityId: saved.id,
+        before: {
+          status: current?.status ?? null,
+          slug: current?.slug ?? null,
+          publishedAt: current?.publishedAt ?? null,
+        },
+        after: { ...data },
+      })
+    }
+  })
+
+  await persistSlugChangeRedirect(
+    repositories,
+    session.userId,
+    'articles',
+    formData,
+    current ? { slug: current.slug, status: current.status } : null,
+    slug,
+    errorPath,
   )
 
   revalidate(articlesPath, id)
+  revalidatePath(contentPublicPath('articles', slug))
   redirect(articlesPath)
 }
 
 export async function setArticleStatusAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   const status = readText(formData, 'status') as ContentStatus
   if (!id) redirectWithError(articlesPath, 'Artikli identifikaator puudub.')
   if (!contentStatuses.includes(status)) redirectWithError(articlesPath, 'Vali sobiv olek.')
 
+  await publishDueScheduledContent(repositories, session.userId)
+
   const current = await persist(articlesPath, 'Artikli lugemine ebaõnnestus: ', () =>
     repositories.findByID({ collection: 'articles', id }),
   )
   if (!current) redirectWithError(articlesPath, 'Artiklit ei leitud.')
 
-  await persist(articlesPath, 'Artikli oleku muutmine ebaõnnestus: ', () =>
-    repositories.update({
+  const decision = resolvePublishDecision({
+    requestedStatus: status,
+    publishAtIso: null,
+    currentPublishedAt: current.publishedAt,
+    currentStatus: current.status,
+    nowIso: new Date().toISOString(),
+  })
+
+  await persist(articlesPath, 'Artikli oleku muutmine ebaõnnestus: ', async () => {
+    await repositories.update({
       collection: 'articles',
       id,
-      data: { status, publishedAt: publishedAtFor(status, current.publishedAt) },
-    }),
-  )
+      data: { status: decision.status, publishedAt: decision.publishedAt },
+    })
+    if (decision.publishTransition) {
+      await writeAudit(repositories, {
+        actorId: session.userId,
+        action: 'content.publish',
+        entityType: 'article',
+        entityId: id,
+        before: { status: current.status, publishedAt: current.publishedAt },
+        after: { status: decision.status, publishedAt: decision.publishedAt },
+      })
+    }
+  })
 
   revalidate(articlesPath, id)
+  revalidatePath(contentPublicPath('articles', current.slug))
   redirect(articlesPath)
 }
 
 export async function deleteArticleAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   if (!id) redirectWithError(articlesPath, 'Artikli identifikaator puudub.')
@@ -189,7 +409,8 @@ export async function deleteArticleAction(formData: FormData): Promise<void> {
 }
 
 export async function savePageAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   const errorPath = formPath(pagesPath, id)
@@ -203,6 +424,9 @@ export async function savePageAction(formData: FormData): Promise<void> {
   if (!contentStatuses.includes(status)) redirectWithError(errorPath, 'Vali sobiv olek.')
   if (layout.invalid) redirectWithError(errorPath, 'Paigutus peab olema korrektne JSON.')
 
+  await publishDueScheduledContent(repositories, session.userId)
+
+  const publishAtIso = readPublishAt(formData, errorPath, 'Avaldamise aeg')
   const current = id
     ? await persist(errorPath, 'Lehe lugemine ebaõnnestus: ', () =>
         repositories.findByID({ collection: 'pages', id }),
@@ -210,28 +434,70 @@ export async function savePageAction(formData: FormData): Promise<void> {
     : null
   if (id && !current) redirectWithError(errorPath, 'Lehte ei leitud.')
 
+  const decision = resolvePublishDecision({
+    requestedStatus: status,
+    publishAtIso,
+    currentPublishedAt: current?.publishedAt ?? null,
+    currentStatus: current?.status ?? null,
+    nowIso: new Date().toISOString(),
+  })
+
   const data = {
     title,
     slug,
-    status,
+    status: decision.status,
     seoTitle: readOptionalText(formData, 'seoTitle'),
     seoDescription: readOptionalText(formData, 'seoDescription'),
     layout: layout.value,
-    publishedAt: publishedAtFor(status, current?.publishedAt),
+    publishedAt: decision.publishedAt,
   }
 
-  await persist(errorPath, 'Lehe salvestamine ebaõnnestus: ', () =>
-    current
-      ? repositories.update({ collection: 'pages', id, data })
-      : repositories.create({ collection: 'pages', data }),
+  await persist(errorPath, 'Lehe salvestamine ebaõnnestus: ', async () => {
+    const saved = current
+      ? await repositories.update({ collection: 'pages', id, data })
+      : await repositories.create({ collection: 'pages', data })
+    if (decision.scheduled) {
+      await writeAudit(repositories, {
+        actorId: session.userId,
+        action: 'content.schedule',
+        entityType: 'page',
+        entityId: saved.id,
+        after: { slug, publishedAt: decision.publishedAt },
+      })
+    } else if (decision.publishTransition) {
+      await writeAudit(repositories, {
+        actorId: session.userId,
+        action: 'content.publish',
+        entityType: 'page',
+        entityId: saved.id,
+        before: {
+          status: current?.status ?? null,
+          slug: current?.slug ?? null,
+          publishedAt: current?.publishedAt ?? null,
+        },
+        after: { ...data },
+      })
+    }
+  })
+
+  await persistSlugChangeRedirect(
+    repositories,
+    session.userId,
+    'pages',
+    formData,
+    current ? { slug: current.slug, status: current.status } : null,
+    slug,
+    errorPath,
   )
 
   revalidate(pagesPath, id)
+  revalidatePath(contentPublicPath('pages', slug))
   redirect(pagesPath)
 }
 
 export async function deletePageAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   if (!id) redirectWithError(pagesPath, 'Lehe identifikaator puudub.')
@@ -245,7 +511,8 @@ export async function deletePageAction(formData: FormData): Promise<void> {
 }
 
 export async function saveFaqCategoryAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   const errorPath = formPath(faqCategoriesPath, id)
@@ -272,7 +539,8 @@ export async function saveFaqCategoryAction(formData: FormData): Promise<void> {
 }
 
 export async function deleteFaqCategoryAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   if (!id) redirectWithError(faqCategoriesPath, 'Kategooria identifikaator puudub.')
@@ -286,7 +554,8 @@ export async function deleteFaqCategoryAction(formData: FormData): Promise<void>
 }
 
 export async function saveFaqItemAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   const errorPath = formPath(faqItemsPath, id)
@@ -326,7 +595,8 @@ export async function saveFaqItemAction(formData: FormData): Promise<void> {
 }
 
 export async function deleteFaqItemAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   if (!id) redirectWithError(faqItemsPath, 'Küsimuse identifikaator puudub.')
@@ -340,7 +610,8 @@ export async function deleteFaqItemAction(formData: FormData): Promise<void> {
 }
 
 export async function saveTestimonialAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   const errorPath = formPath(testimonialsPath, id)
@@ -369,7 +640,8 @@ export async function saveTestimonialAction(formData: FormData): Promise<void> {
 }
 
 export async function deleteTestimonialAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   if (!id) redirectWithError(testimonialsPath, 'Tagasiside identifikaator puudub.')
@@ -383,7 +655,8 @@ export async function deleteTestimonialAction(formData: FormData): Promise<void>
 }
 
 export async function savePartnerServiceAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   const errorPath = formPath(partnerServicesPath, id)
@@ -418,7 +691,8 @@ export async function savePartnerServiceAction(formData: FormData): Promise<void
 }
 
 export async function deletePartnerServiceAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   if (!id) redirectWithError(partnerServicesPath, 'Teenuse identifikaator puudub.')
@@ -432,7 +706,8 @@ export async function deletePartnerServiceAction(formData: FormData): Promise<vo
 }
 
 export async function saveLegalDocumentAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   const errorPath = formPath(legalDocumentsPath, id)
@@ -450,12 +725,23 @@ export async function saveLegalDocumentAction(formData: FormData): Promise<void>
     redirectWithError(errorPath, 'Vali sobiv dokumendi tüüp.')
   }
 
+  await publishDueScheduledContent(repositories, session.userId)
+
+  const publishAtIso = readPublishAt(formData, errorPath, 'Avaldamise aeg')
   const current = id
     ? await persist(errorPath, 'Dokumendi lugemine ebaõnnestus: ', () =>
         repositories.findByID({ collection: 'legal-documents', id }),
       )
     : null
   if (id && !current) redirectWithError(errorPath, 'Dokumenti ei leitud.')
+
+  const decision = resolvePublishDecision({
+    requestedStatus: status,
+    publishAtIso,
+    currentPublishedAt: current?.publishedAt ?? null,
+    currentStatus: current?.status ?? null,
+    nowIso: new Date().toISOString(),
+  })
 
   const data = {
     title,
@@ -464,22 +750,56 @@ export async function saveLegalDocumentAction(formData: FormData): Promise<void>
     content,
     version: readOptionalText(formData, 'version'),
     effectiveDate: readOptionalText(formData, 'effectiveDate'),
-    status,
-    publishedAt: publishedAtFor(status, current?.publishedAt),
+    status: decision.status,
+    publishedAt: decision.publishedAt,
   }
 
-  await persist(errorPath, 'Dokumendi salvestamine ebaõnnestus: ', () =>
-    current
-      ? repositories.update({ collection: 'legal-documents', id, data })
-      : repositories.create({ collection: 'legal-documents', data }),
+  await persist(errorPath, 'Dokumendi salvestamine ebaõnnestus: ', async () => {
+    const saved = current
+      ? await repositories.update({ collection: 'legal-documents', id, data })
+      : await repositories.create({ collection: 'legal-documents', data })
+    if (decision.scheduled) {
+      await writeAudit(repositories, {
+        actorId: session.userId,
+        action: 'content.schedule',
+        entityType: 'legal-document',
+        entityId: saved.id,
+        after: { slug, publishedAt: decision.publishedAt },
+      })
+    } else if (decision.publishTransition) {
+      await writeAudit(repositories, {
+        actorId: session.userId,
+        action: 'content.publish',
+        entityType: 'legal-document',
+        entityId: saved.id,
+        before: {
+          status: current?.status ?? null,
+          slug: current?.slug ?? null,
+          publishedAt: current?.publishedAt ?? null,
+        },
+        after: { ...data },
+      })
+    }
+  })
+
+  await persistSlugChangeRedirect(
+    repositories,
+    session.userId,
+    'legal-documents',
+    formData,
+    current ? { slug: current.slug, status: current.status } : null,
+    slug,
+    errorPath,
   )
 
   revalidate(legalDocumentsPath, id)
+  revalidatePath(contentPublicPath('legal-documents', slug))
   redirect(legalDocumentsPath)
 }
 
 export async function deleteLegalDocumentAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   if (!id) redirectWithError(legalDocumentsPath, 'Dokumendi identifikaator puudub.')
@@ -493,7 +813,8 @@ export async function deleteLegalDocumentAction(formData: FormData): Promise<voi
 }
 
 export async function saveRedirectAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   const errorPath = formPath(redirectsPath, id)
@@ -518,7 +839,8 @@ export async function saveRedirectAction(formData: FormData): Promise<void> {
 }
 
 export async function deleteRedirectAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   if (!id) redirectWithError(redirectsPath, 'Suunamise identifikaator puudub.')
@@ -532,7 +854,8 @@ export async function deleteRedirectAction(formData: FormData): Promise<void> {
 }
 
 export async function saveSpecialistAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   const errorPath = formPath(specialistsPath, id)
@@ -566,7 +889,8 @@ export async function saveSpecialistAction(formData: FormData): Promise<void> {
 }
 
 export async function deleteSpecialistAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
   if (!id) redirectWithError(specialistsPath, 'Spetsialisti identifikaator puudub.')
@@ -634,53 +958,157 @@ export async function deleteStatisticsSnapshotAction(formData: FormData): Promis
   redirect(statisticsPath)
 }
 
+const settingsSections = ['uldine', 'tasud', 'oksjonid', 'lipud'] as const
+
+/** Append-only audit write; the schema has a dedicated `before` JSON column. */
+async function writeAudit(
+  repositories: CoreRepositories,
+  entry: {
+    actorId: string
+    action: string
+    entityType: string
+    entityId: string
+    before?: unknown
+    after: unknown
+  },
+): Promise<unknown> {
+  return repositories.create({
+    collection: 'audit-entry',
+    data: {
+      actorId: entry.actorId,
+      action: entry.action,
+      entityType: entry.entityType,
+      entityId: entry.entityId,
+      ...(entry.before !== undefined ? { before: entry.before } : {}),
+      after: entry.after,
+    },
+  })
+}
+
 export async function updateSettingsAction(formData: FormData): Promise<void> {
-  const { repositories } = await requireAdminRepositories()
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'settings:write')
 
-  const feePercent = readInt(formData, 'feePercent')
-  const vatPercent = readInt(formData, 'vatPercent')
-  const antiSnipeDurationMinutes = readInt(formData, 'antiSnipeDurationMinutes')
-  const sealedRevisionCap = readInt(formData, 'sealedRevisionCap')
-  const featureFlags = readJsonValue(formData, 'featureFlags')
-
-  if (!Number.isInteger(feePercent) || feePercent < 0 || feePercent > 100) {
-    redirectWithError(settingsPath, 'Vahendustasu peab olema täisarv vahemikus 0 kuni 100.')
+  const section = readText(formData, 'section')
+  if (!settingsSections.includes(section as (typeof settingsSections)[number])) {
+    redirectWithError(settingsPath, 'Tundmatu seadete sektsioon.')
   }
-  if (!Number.isInteger(vatPercent) || vatPercent < 0 || vatPercent > 100) {
-    redirectWithError(settingsPath, 'Käibemaks peab olema täisarv vahemikus 0 kuni 100.')
-  }
-  if (!Number.isInteger(antiSnipeDurationMinutes) || antiSnipeDurationMinutes < 0) {
-    redirectWithError(settingsPath, 'Aja pikendamise minutid peavad olema mitte negatiivne täisarv.')
-  }
-  if (!Number.isInteger(sealedRevisionCap) || sealedRevisionCap < 0) {
-    redirectWithError(settingsPath, 'Paranduste limiit peab olema mitte negatiivne täisarv.')
-  }
-  if (featureFlags.invalid) {
-    redirectWithError(settingsPath, 'Lipud peavad olema korrektne JSON.')
+  // Reason-required saves (design D7): without a valid reason nothing changes.
+  const reason = readText(formData, 'reason')
+  if (!isValidReason(reason)) {
+    redirectWithError(settingsPath, 'Põhjendus peab olema vähemalt 5 tähemärki.')
   }
 
-  const data = {
-    orgName: readOptionalText(formData, 'orgName'),
-    orgRegCode: readOptionalText(formData, 'orgRegCode'),
-    orgAddress: readOptionalText(formData, 'orgAddress'),
-    feePercent,
-    vatPercent,
-    antiSnipeDurationMinutes,
-    sealedRevisionCap,
-    alapakkumineEnabled: readBool(formData, 'alapakkumineEnabled'),
-    featureFlags: featureFlags.value,
-  }
+  const { docs } = await persist(settingsPath, 'Sätete lugemine ebaõnnestus: ', () =>
+    repositories.find({ collection: 'settings', limit: 1 }),
+  )
+  const current = docs[0]
+  const currentFlags = readFlagObject(current?.featureFlags)
 
-  await persist(settingsPath, 'Sätete salvestamine ebaõnnestus: ', async () => {
-    const existing = await repositories.find({ collection: 'settings', limit: 1 })
-    const current = existing.docs[0]
-    if (current) {
-      await repositories.update({ collection: 'settings', id: current.id, data })
-    } else {
-      await repositories.create({ collection: 'settings', data })
+  let data: UpdateDataFor<'settings'>
+  let beforeValues: Record<string, unknown>
+  let afterValues: Record<string, unknown>
+  let feeChanged = false
+
+  if (section === 'uldine') {
+    data = {
+      orgName: readOptionalText(formData, 'orgName'),
+      orgRegCode: readOptionalText(formData, 'orgRegCode'),
+      orgAddress: readOptionalText(formData, 'orgAddress'),
     }
+    beforeValues = {
+      orgName: current?.orgName ?? null,
+      orgRegCode: current?.orgRegCode ?? null,
+      orgAddress: current?.orgAddress ?? null,
+    }
+    afterValues = {
+      orgName: data.orgName,
+      orgRegCode: data.orgRegCode,
+      orgAddress: data.orgAddress,
+    }
+  } else if (section === 'tasud') {
+    const feePercent = readInt(formData, 'feePercent')
+    const vatPercent = readInt(formData, 'vatPercent')
+    if (!Number.isInteger(feePercent) || feePercent < 0 || feePercent > 100) {
+      redirectWithError(settingsPath, 'Vahendustasu peab olema täisarv vahemikus 0 kuni 100.')
+    }
+    if (!Number.isInteger(vatPercent) || vatPercent < 0 || vatPercent > 100) {
+      redirectWithError(settingsPath, 'Käibemaks peab olema täisarv vahemikus 0 kuni 100.')
+    }
+    feeChanged = current ? current.feePercent !== feePercent || current.vatPercent !== vatPercent : true
+    data = { feePercent, vatPercent }
+    beforeValues = {
+      feePercent: current?.feePercent ?? null,
+      vatPercent: current?.vatPercent ?? null,
+    }
+    afterValues = { feePercent, vatPercent }
+  } else if (section === 'oksjonid') {
+    const antiSnipeDurationMinutes = readInt(formData, 'antiSnipeDurationMinutes')
+    const sealedRevisionCap = readInt(formData, 'sealedRevisionCap')
+    if (
+      !Number.isInteger(antiSnipeDurationMinutes) ||
+      antiSnipeDurationMinutes < 1 ||
+      antiSnipeDurationMinutes > 30
+    ) {
+      redirectWithError(settingsPath, 'Aja pikendamise minutid peavad olema täisarv vahemikus 1 kuni 30.')
+    }
+    if (!Number.isInteger(sealedRevisionCap) || sealedRevisionCap < 0 || sealedRevisionCap > 5) {
+      redirectWithError(settingsPath, 'Paranduste limiit peab olema täisarv vahemikus 0 kuni 5.')
+    }
+    const parsedDefaults = parseAuctionDefaults({
+      alapakkumineDecisionDeadlineDays: readInt(formData, 'alapakkumineDecisionDeadlineDays'),
+      kiiroksjonDurationHours: readInt(formData, 'kiiroksjonDurationHours'),
+      sealedApproverRole: readText(formData, 'sealedApproverRole'),
+    })
+    if (!parsedDefaults.ok) {
+      redirectWithError(settingsPath, parsedDefaults.error)
+    }
+    const previousDefaults = readFlagObject(currentFlags.auctionDefaults ?? {})
+    data = {
+      antiSnipeDurationMinutes,
+      sealedRevisionCap,
+      alapakkumineEnabled: readBool(formData, 'alapakkumineEnabled'),
+      featureFlags: withAuctionDefaults(currentFlags, parsedDefaults.value),
+    }
+    beforeValues = {
+      antiSnipeDurationMinutes: current?.antiSnipeDurationMinutes ?? null,
+      alapakkumineEnabled: current?.alapakkumineEnabled ?? null,
+      sealedRevisionCap: current?.sealedRevisionCap ?? null,
+      auctionDefaults: previousDefaults,
+    }
+    afterValues = {
+      antiSnipeDurationMinutes,
+      alapakkumineEnabled: data.alapakkumineEnabled,
+      sealedRevisionCap,
+      auctionDefaults: parsedDefaults.value,
+    }
+  } else {
+    const parsedFlags = parseFlagObject(readText(formData, 'featureFlags'))
+    if (!parsedFlags.ok) {
+      redirectWithError(settingsPath, parsedFlags.error)
+    }
+    const mergedFlags = mergeFlagPayload(currentFlags, parsedFlags.value)
+    data = { featureFlags: mergedFlags }
+    beforeValues = { featureFlags: currentFlags }
+    afterValues = { featureFlags: mergedFlags }
+  }
+
+  // Secrets are masked in both snapshots; the audit shows that a value
+  // changed without recording it (spec 14).
+  await persist(settingsPath, 'Sätete salvestamine ebaõnnestus: ', async () => {
+    const saved = current
+      ? await repositories.update({ collection: 'settings', id: current.id, data })
+      : await repositories.create({ collection: 'settings', data })
+    await writeAudit(repositories, {
+      actorId: session.userId,
+      action: 'settings.change',
+      entityType: 'settings',
+      entityId: saved.id,
+      before: maskSecretValues({ ...beforeValues, reason }),
+      after: maskSecretValues({ ...afterValues, reason }),
+    })
   })
 
   revalidatePath(settingsPath)
-  redirect(settingsPath)
+  redirect(feeChanged ? `${settingsPath}?ok=tasud` : settingsPath)
 }
