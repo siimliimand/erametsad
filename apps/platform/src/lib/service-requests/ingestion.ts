@@ -48,6 +48,8 @@ export interface ServiceRequestInput {
   consentAt: string
   /** Caller IP; hashed with the shared computeIpHash before storage. */
   requestIp?: string
+  /** R2 object keys of uploaded attachments, persisted to the row. */
+  attachments?: string[]
 }
 
 export interface IngestServiceRequestResult {
@@ -114,6 +116,9 @@ export async function ingestServiceRequest(
     payload: { ...payload, phone: payload.contact.phone },
     routedTo: matched.map((partner) => partner.id),
     status: matched.length > 0 ? 'routed' : 'new',
+    ...(input.attachments && input.attachments.length > 0
+      ? { attachments: input.attachments }
+      : {}),
     consentAt: input.consentAt,
     formName: input.formName,
     pageSlug: input.pageSlug ?? '',

@@ -137,6 +137,8 @@ export class RateLimiter {
 export const apiRateLimiter = new RateLimiter({ tokensPerInterval: 100, intervalMs: 60_000 })
 export const authRateLimiter = new RateLimiter({ tokensPerInterval: 5, intervalMs: 60_000 })
 export const leadsRateLimiter = new RateLimiter({ tokensPerInterval: 5, intervalMs: 60_000 })
+// Separate instance so service-request submissions never share the leads quota.
+export const serviceRequestsRateLimiter = new RateLimiter({ tokensPerInterval: 5, intervalMs: 60_000 })
 export const consentRateLimiter = new RateLimiter({ tokensPerInterval: 5, intervalMs: 60_000 })
 // Events are click-level traffic: higher ceiling than form endpoints.
 export const eventsRateLimiter = new RateLimiter({ tokensPerInterval: 30, intervalMs: 60_000 })
