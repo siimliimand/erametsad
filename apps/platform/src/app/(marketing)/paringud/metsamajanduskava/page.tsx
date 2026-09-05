@@ -11,9 +11,9 @@ import { PromiseBand } from '../_components/PromiseBand'
 import { RequestTabs } from '../_components/RequestTabs'
 import { ServiceRequestForm } from '../_components/ServiceRequestForm'
 
-// Static form page, but the shared marketing layout reads the CMS — see
-// kkk/page.tsx; force-dynamic keeps DB-less CI builds green.
-export const dynamic = 'force-dynamic'
+// Static shell: the page renders no server-side data, and the shared
+// layout's contact band degrades to empty without a D1 binding.
+export const revalidate = 3600
 
 export const metadata = buildMetadata({
   title: 'Metsamajanduskava koostamise päring',

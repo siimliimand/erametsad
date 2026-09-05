@@ -11,9 +11,9 @@ import { PromiseBand } from '../_components/PromiseBand'
 import { RequestTabs } from '../_components/RequestTabs'
 import { ServiceRequestForm } from '../_components/ServiceRequestForm'
 
-// ISR would match the sibling pages, but the shared marketing layout reads
-// the CMS and CI builds run without a D1 binding (see hindamisaktid).
-export const dynamic = 'force-dynamic'
+// Static shell: the page renders no server-side data, and the shared
+// layout's contact band degrades to empty without a D1 binding.
+export const revalidate = 3600
 
 export const metadata = buildMetadata({
   title: 'Metsa istutamise päring — istutamine, istikud',

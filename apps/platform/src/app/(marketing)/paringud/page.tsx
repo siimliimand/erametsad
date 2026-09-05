@@ -8,12 +8,10 @@ import { SERVICES, ServiceCards, type ServiceCounts } from './_components/Servic
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 
-// Spec 09 asks for ISR (revalidate = 3600), but CI and deploy builds run
-// `next build` without a seeded D1, and this page reads live partner
-// counts from the partners table (the shared marketing layout also reads
-// the CMS). Switch to `revalidate = 3600` once build-time D1 seeding
-// exists.
-export const dynamic = 'force-dynamic'
+// Spec 09: content caching via ISR. Partner counts degrade to zero when a
+// build runs without a seeded D1 (cards render disabled), so prerendering
+// is safe and runtime revalidation picks up the live counts.
+export const revalidate = 3600
 
 export const metadata = buildMetadata({
   title: 'Teenuste päringud — kava, raie, istutamine',

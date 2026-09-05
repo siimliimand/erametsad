@@ -7,10 +7,9 @@ import { PromiseBand } from '../_components/PromiseBand'
 import { RequestTabs } from '../_components/RequestTabs'
 import { ServiceRequestForm } from '../_components/ServiceRequestForm'
 
-// Repo-wide convention (see meist/page.tsx): builds run without a seeded D1
-// and the shared marketing layout reads the CMS, so request-time rendering
-// stays until build-time D1 seeding exists.
-export const dynamic = 'force-dynamic'
+// Static shell: the page renders no server-side data, and the shared
+// layout's contact band degrades to empty without a D1 binding.
+export const revalidate = 3600
 
 export const metadata = buildMetadata({
   title: 'Hooldusraie päring — hooldus- ja valgusraie',
