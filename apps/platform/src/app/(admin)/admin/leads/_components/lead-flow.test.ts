@@ -83,6 +83,35 @@ describe('evaluateLeadExitGuard', () => {
     })
     expect(result.ok).toBe(true)
   })
+
+  it('lets a same-status move pass every guard', () => {
+    const result = evaluateLeadExitGuard({
+      from: 'disqualified',
+      to: 'disqualified',
+      assignedSpecialistId: null,
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  it('rejects a whitespace-only qualification note', () => {
+    const result = evaluateLeadExitGuard({
+      from: 'contacted',
+      to: 'qualified',
+      assignedSpecialistId: 'spec-1',
+      note: '     ',
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('Kvalifitseerimise märkus')
+  })
+
+  it('requires the qualification note even when entering from Uus with a specialist', () => {
+    const result = evaluateLeadExitGuard({
+      from: 'new',
+      to: 'qualified',
+      assignedSpecialistId: 'spec-1',
+    })
+    expect(result.ok).toBe(false)
+  })
 })
 
 describe('leadSlaBadge', () => {
@@ -109,6 +138,10 @@ describe('leadSlaBadge', () => {
   it('only applies to the Uus column', () => {
     const created = new Date(now - 72 * 3600000).toISOString()
     expect(leadSlaBadge(created, 'qualified', now)).toBeNull()
+  })
+
+  it('returns nothing for an unparseable creation time', () => {
+    expect(leadSlaBadge('pole-kuupäev', 'new', now)).toBeNull()
   })
 })
 
@@ -153,5 +186,15 @@ describe('findDuplicateLead', () => {
   it('ignores matches older than 30 days', () => {
     const stale = { id: 'stale', phone: '', email: 'muu@meil.ee', createdAt: old.createdAt }
     expect(findDuplicateLead([stale], { email: 'muu@meil.ee' }, 'self', now)).toBeNull()
+  })
+
+  it('matches by e-mail inside the window', () => {
+    const emailLead = { id: 'mail', phone: '+37251119999', email: 'piret@meil.ee', createdAt: recent.createdAt }
+    expect(findDuplicateLead([emailLead], { phone: '+37251110002', email: 'Piret@Meil.EE' }, 'self', now)?.id).toBe('mail')
+  })
+
+  it('never reports the edited lead itself as a duplicate', () => {
+    const self = { id: 'self', phone: '+37251110001', email: 'mina@meil.ee', createdAt: recent.createdAt }
+    expect(findDuplicateLead([self], { phone: '+37251110001' }, 'self', now)).toBeNull()
   })
 })

@@ -74,6 +74,48 @@ describe('validateTemplateTokens', () => {
     expect(message).toContain('{{lot.nonexistent}}')
     expect(message).toContain('Nõutud kohatäited puuduvad')
   })
+
+  it('returns no message for a valid template', () => {
+    expect(buildValidationMessage({ ok: true })).toBeNull()
+  })
+
+  it('lists unknown tokens with the catalogue-only hint', () => {
+    const complete = ['bidder.name', 'bidder.isikukood', 'lot.id', 'lot.finalPrice', 'fee.total']
+    const message = buildValidationMessage(validateTemplateTokens('auction', [...complete, 'lot.nonexistent']))
+    expect(message).toBe('Tundmatud kohatäited: {{lot.nonexistent}}. Kasuta ainult kataloogi kohatäiteid.')
+  })
+
+  it('joins the unknown and missing parts in one message', () => {
+    const message = buildValidationMessage(
+      validateTemplateTokens('auction', ['lot.nonexistent', 'bidder.name', 'lot.id']),
+    )
+    expect(message).toContain('Tundmatud kohatäited: {{lot.nonexistent}}')
+    expect(message).toContain('{{bidder.isikukood}} või {{bidder.registrikood}}')
+    expect(message).toContain('{{lot.finalPrice}} või {{bid.amount}}; {{fee.total}}.')
+  })
+})
+
+describe('catalogue hygiene', () => {
+  it('keeps every token unique across the groups', () => {
+    const tokens = PLACEHOLDER_GROUPS.flatMap((group) => group.tokens)
+    expect(new Set(tokens).size).toBe(tokens.length)
+  })
+
+  it('labels every group and ships non-empty token lists', () => {
+    for (const group of PLACEHOLDER_GROUPS) {
+      expect(group.label, group.label).not.toBe('')
+      expect(group.tokens.length, group.label).toBeGreaterThan(0)
+    }
+  })
+
+  it('fills the fixture with the documented sample values', () => {
+    const fixture = templateFixtureData()
+    expect(fixture['bidder.name']).toBe('Test Testov')
+    expect(fixture['bidder.registrikood']).toBe('14309277')
+    expect(fixture['lot.finalPrice']).toBe('61 000 €')
+    expect(fixture['company.legalName']).toBe('Tamm OÜ')
+    expect(fixture['auctionTitle']).toBe('Testioksjon #1')
+  })
 })
 
 describe('catalogue and fixture coherence', () => {

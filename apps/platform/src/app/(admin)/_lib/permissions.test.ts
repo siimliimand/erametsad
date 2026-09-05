@@ -220,6 +220,48 @@ describe('leadInScope', () => {
   })
 })
 
+describe('foreign-resource scope matrix per role', () => {
+  const specialistA = 'user-a'
+  const specialistB = 'user-b'
+  const sellerA = 'seller-a'
+  const sellerB = 'seller-b'
+
+  it('lets admins and superadmins reach lots and leads of any specialist or seller', () => {
+    for (const role of ['admin', 'superadmin'] as const) {
+      const auction = auctionScope(role, specialistA)
+      expect(auctionInScope(auction, { specialistId: specialistB, sellerId: sellerB })).toBe(true)
+      expect(auctionInScope(auction, {})).toBe(true)
+      const lead = leadScope(role, specialistA)
+      expect(leadInScope(lead, { assignedSpecialistId: specialistB })).toBe(true)
+      expect(leadInScope(lead, {})).toBe(true)
+    }
+  })
+
+  it('denies a specialist every record that belongs to another specialist', () => {
+    const auction = auctionScope('specialist', specialistA)
+    expect(auctionInScope(auction, { specialistId: specialistA, sellerId: sellerA })).toBe(true)
+    expect(auctionInScope(auction, { specialistId: specialistB, sellerId: sellerA })).toBe(false)
+    expect(auctionInScope(auction, { sellerId: sellerA })).toBe(false)
+    const lead = leadScope('specialist', specialistA)
+    expect(leadInScope(lead, { assignedSpecialistId: specialistA })).toBe(true)
+    expect(leadInScope(lead, { assignedSpecialistId: specialistB })).toBe(false)
+  })
+
+  it('denies a seller lots owned by another seller', () => {
+    const scope = auctionScope('seller', sellerA)
+    expect(auctionInScope(scope, { sellerId: sellerA, specialistId: specialistA })).toBe(true)
+    expect(auctionInScope(scope, { sellerId: sellerB, specialistId: specialistA })).toBe(false)
+    expect(auctionInScope(scope, { specialistId: sellerA })).toBe(false)
+  })
+
+  it('denies the seller role every lead regardless of owner', () => {
+    const lead = leadScope('seller', sellerA)
+    expect(leadInScope(lead, { assignedSpecialistId: specialistA })).toBe(false)
+    expect(leadInScope(lead, { assignedSpecialistId: specialistB })).toBe(false)
+    expect(leadInScope(lead, {})).toBe(false)
+  })
+})
+
 describe('module visibility map', () => {
   const moduleIds = ADMIN_MODULES.map((module) => module.id)
 

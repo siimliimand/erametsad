@@ -119,6 +119,31 @@ describe('buildMinimizedForwardPayload', () => {
       expect(minimized).not.toHaveProperty(forbidden)
     }
   })
+
+  it('drops empty string, null and undefined values from the whitelist', () => {
+    const payload = {
+      type: 'kava',
+      contact: { name: 'B', phone: '+37251110002', email: 'b@meil.ee' },
+      county: '',
+      paper_copy: null,
+      provisions: undefined,
+      comment: '',
+    }
+    const minimized = buildMinimizedForwardPayload(payload)
+    expect(Object.keys(minimized).sort()).toEqual(['contact', 'type'])
+  })
+
+  it('keeps the paper_copy switch and cadastre list when present', () => {
+    const payload = {
+      type: 'raieoigus',
+      contact: { name: 'C', phone: '+37251110003', email: 'c@meil.ee' },
+      paper_copy: true,
+      cadastres: ['78402:003:0210'],
+    }
+    const minimized = buildMinimizedForwardPayload(payload)
+    expect(minimized.paper_copy).toBe(true)
+    expect(minimized.cadastres).toEqual(['78402:003:0210'])
+  })
 })
 
 describe('buildAttachmentLinks', () => {
