@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 
 import { BidMonitor, type MonitorBidRow, type MonitorExtensionEntry } from './bid-monitor'
+import { ErrorNotice } from '../../../../_components/ErrorNotice'
 import { PageHeader } from '../../../../_components/PageHeader'
 import { requireAdminRepositories } from '../../../../_lib/admin'
 import { StatusPill, formatEur } from '../../../../_lib/labels'
@@ -26,10 +27,13 @@ function optionalNumber(value: unknown): number | null {
 
 export default async function AuctionMonitorPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ viga?: string; teade?: string }>
 }) {
   const { id } = await params
+  const { viga, teade } = await searchParams
   const { session, repositories } = await requireAdminRepositories()
 
   const auction = await repositories.findByID({ collection: 'auctions', id })
@@ -137,6 +141,15 @@ export default async function AuctionMonitorPage({
 
   return (
     <div>
+      {viga ? <ErrorNotice message={viga} /> : null}
+      {teade ? (
+        <div
+          role="status"
+          className="mb-md rounded-input border border-l-4 border-info bg-info-light px-md py-sm text-bodySm text-info"
+        >
+          {teade}
+        </div>
+      ) : null}
       <PageHeader
         title={`Monitor: ${auction.title}`}
         description="Sama otseülekanne, mida kasutab avalik portaal. Näidatakse summasid ja aegu, mitte pakkujaid."

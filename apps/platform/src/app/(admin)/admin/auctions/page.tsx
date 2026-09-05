@@ -2,13 +2,14 @@ import Link from 'next/link'
 
 import {
   archiveAuctionAction,
+  bulkScheduleAuctionsAction,
   duplicateAuctionAction,
   endAuctionManuallyAction,
   relistAuctionAction,
 } from '../../_actions/auctions'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
-import { primaryButtonClass } from '../../_components/FormField'
+import { primaryButtonClass, secondaryButtonClass } from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
 import { PlusIcon } from '../../_components/icons'
 import { requireAdminRepositories } from '../../_lib/admin'
@@ -312,6 +313,7 @@ export default async function AdminAuctionsPage({
   const roleCanEndManual = can(role, 'auctions:end-manual')
   const roleCanArchive = can(role, 'auctions:archive')
   const roleCanWrite = can(role, 'auctions:write')
+  const roleCanExport = can(role, 'auctions:export')
 
   const currentValues = {
     tab: tab.id,
@@ -348,6 +350,22 @@ export default async function AdminAuctionsPage({
 
   const filterSelectClass =
     'h-9 rounded-input border border-border bg-bgPage px-2 text-bodySm text-ink'
+
+  // The export link reuses the list's shareable filter parameters; the tab
+  // narrows the object types and intersects with a picked single type.
+  const csvParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(currentValues)) {
+    if (value) csvParams.set(key, value)
+  }
+  csvParams.delete('sort')
+  csvParams.delete('tab')
+  if (tabObjectTypes !== null) {
+    const scopedTypes = typeFilter
+      ? tabObjectTypes.filter((objectType) => objectType === typeFilter)
+      : tabObjectTypes
+    csvParams.set('type', scopedTypes.join(','))
+  }
+  const csvHref = `/api/v1/admin/auctions/export?${csvParams.toString()}`
 
   return (
     <div>
@@ -469,8 +487,62 @@ export default async function AdminAuctionsPage({
         </Link>
       </form>
 
+      <div className="mb-md flex flex-wrap items-center justify-between gap-sm">
+        {roleCanWrite ? (
+          <form
+            id="bulk-schedule-form"
+            action={bulkScheduleAuctionsAction}
+            className="flex flex-wrap items-center gap-sm rounded-card border border-border bg-bgPage px-md py-sm"
+          >
+            <span className="text-label font-semibold text-ink">Bulks ajastamine</span>
+            <label className="flex items-center gap-xs text-label text-ink-muted">
+              Algus
+              <input
+                type="datetime-local"
+                name="startsAt"
+                required
+                className={filterSelectClass}
+              />
+            </label>
+            <label className="flex items-center gap-xs text-label text-ink-muted">
+              Lõpp
+              <input type="datetime-local" name="endsAt" className={filterSelectClass} />
+            </label>
+            <span className="text-bodySm text-ink-muted">
+              Vali tabelist mustandid; mitte-mustandid blokeeritakse. Kellaaeg Europe/Tallinn.
+            </span>
+            <button type="submit" className={primaryButtonClass}>
+              Ajasta valitud
+            </button>
+          </form>
+        ) : null}
+        {roleCanExport ? (
+          <a href={csvHref} className={secondaryButtonClass}>
+            Ekspordi CSV
+          </a>
+        ) : null}
+      </div>
+
       <DataTable
         columns={[
+          ...(roleCanWrite
+            ? [
+                {
+                  key: 'select',
+                  label: 'Vali',
+                  render: (row: AuctionRow) => (
+                    <input
+                      type="checkbox"
+                      name="ids"
+                      value={row.id}
+                      form="bulk-schedule-form"
+                      aria-label={`Vali oksjon ${row.title}`}
+                      className="h-4 w-4 accent-primary"
+                    />
+                  ),
+                },
+              ]
+            : []),
           {
             key: 'id',
             label: 'ID',

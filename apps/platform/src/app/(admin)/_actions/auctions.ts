@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { requireAdminRepositories } from '../_lib/admin'
+import { auctionStatusLabels } from '../_lib/labels'
 import {
   assertCan,
   auctionInScope,
@@ -21,6 +22,7 @@ import {
   type AuctionInput,
   type AuctionWriteData,
 } from '../admin/auctions/_lib/auction-schema'
+import { tallinnWallTimeToUtcIso } from '../admin/content/_components/scheduled-publish'
 
 import { verifyAdminAccessToken } from '@/lib/auth/jwt'
 import { verifyPassword } from '@/lib/auth/password'
@@ -44,6 +46,7 @@ import { createCache } from '@/lib/cache'
 import { prepareContract } from '@/lib/contracts/service'
 import type { AuctionDoc, CoreRepositories } from '@/lib/data/repositories'
 import { eurosToCents } from '@/lib/data/repositories/money'
+import { getRepositories } from '@/lib/data/runtime'
 import { eventBus } from '@/lib/notifications/event-bus'
 import { upsertSnapshot } from '@/lib/stats/aggregation'
 
@@ -61,6 +64,25 @@ function readOptionalText(formData: FormData, key: string): string | null {
 
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?viga=${encodeURIComponent(message)}`)
+}
+
+/** Appends a notice param to a path that may already carry a query string. */
+function noticePath(path: string, key: 'teade' | 'viga', message: string): string {
+  const joiner = path.includes('?') ? '&' : '?'
+  return `${path}${joiner}${key}=${encodeURIComponent(message)}`
+}
+
+function redirectNotice(path: string, key: 'teade' | 'viga', message: string): never {
+  redirect(noticePath(path, key, message))
+}
+
+/**
+ * Client-chosen return path (monitor, queue views). Only admin-relative
+ * paths are honored so the field can never become an open redirect.
+ */
+function feedbackPathFrom(formData: FormData, fallback: string): string {
+  const requested = readOptionalText(formData, 'redirectTo')
+  return requested?.startsWith('/admin/') ? requested : fallback
 }
 
 function auctionDetailPath(auctionId: string): string {
@@ -521,20 +543,22 @@ export async function endAuctionManuallyAction(formData: FormData): Promise<void
   const auction = await repositories.findByID({ collection: 'auctions', id })
   if (!auction) redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
   const detailPath = auctionDetailPath(id)
+  // The monitor modal returns to its own screen; the list stays on the list.
+  const feedbackPath = feedbackPathFrom(formData, detailPath)
 
   assertPermissionOrRedirect(session.role, 'auctions:end-manual', detailPath)
   assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
   if (auction.status !== 'active') {
-    redirectWithError(detailPath, 'Käsitsi saab lõpetada ainult aktiivset oksjonit.')
+    redirectWithError(feedbackPath, 'Käsitsi saab lõpetada ainult aktiivset oksjonit.')
   }
 
   const reason = readText(formData, 'reason')
   const outcome = readText(formData, 'outcome')
   if (reason.length < MIN_REASON_LENGTH) {
-    redirectWithError(detailPath, reasonHint)
+    redirectWithError(feedbackPath, reasonHint)
   }
   if (outcome !== 'winner' && outcome !== 'unsold') {
-    redirectWithError(detailPath, 'Vali lõpetamise tulemus: võitja kuulutamine või müümata märkimine.')
+    redirectWithError(feedbackPath, 'Vali lõpetamise tulemus: võitja kuulutamine või müümata märkimine.')
   }
 
   const leading = await repositories.find({
@@ -551,7 +575,7 @@ export async function endAuctionManuallyAction(formData: FormData): Promise<void
   const leadingBid = leading.docs[0]
 
   if (outcome === 'winner' && !leadingBid) {
-    redirectWithError(detailPath, 'Juhtivat pakkumust ei ole; märgi oksjon müümata.')
+    redirectWithError(feedbackPath, 'Juhtivat pakkumust ei ole; märgi oksjon müümata.')
   }
 
   try {
@@ -602,17 +626,20 @@ export async function endAuctionManuallyAction(formData: FormData): Promise<void
     })
   } catch (error) {
     redirectWithError(
-      detailPath,
+      feedbackPath,
       `Käsitsi lõpetamine ebaõnnestus: ${error instanceof Error ? error.message : String(error)}`,
     )
   }
 
   revalidatePath('/admin/auctions')
   revalidatePath(detailPath)
+  revalidatePath(feedbackPath)
   redirect(
-    `${detailPath}?teade=${encodeURIComponent(
+    noticePath(
+      feedbackPath,
+      'teade',
       outcome === 'winner' ? 'Oksjon lõpetatud; juhtiv pakkumus kuulutatud võitjaks.' : 'Oksjon lõpetatud ja märgitud müümata.',
-    )}`,
+    ),
   )
 }
 
@@ -1950,4 +1977,354 @@ export async function confirmSealedCeremonyWinnerAction(
   }
 
   return { ok: true, phase: 'confirmed', error: null }
+}
+
+// ── Bulk schedule (task 2.2) ────────────────────────────────────────────────
+//
+// Draft-only scheduling from the auctions list: every selected lot is
+// scope-checked, then moved one immutable step (draft → scheduled) to a
+// shared Tallinn wall-time start. Non-draft selections are rejected with an
+// explicit list naming the offending rows (spec scenario).
+
+export async function bulkScheduleAuctionsAction(formData: FormData): Promise<void> {
+  const { session, repositories } = await requireAdminRepositories()
+  const listPath = '/admin/auctions'
+  assertPermissionOrRedirect(session.role, 'auctions:write', listPath)
+
+  const ids = formData
+    .getAll('ids')
+    .filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
+    .map((entry) => entry.trim())
+  if (ids.length === 0) {
+    redirectWithError(listPath, 'Vali vähemalt üks oksjon.')
+  }
+
+  const startsIso = tallinnWallTimeToUtcIso(readText(formData, 'startsAt'))
+  if (startsIso === null) {
+    redirectWithError(listPath, 'Sisesta korrektne algusaeg (kellaaeg Europe/Tallinn).')
+  }
+  if (Date.parse(startsIso) <= Date.now()) {
+    redirectWithError(listPath, 'Algusaeg peab olema tulevikus.')
+  }
+  const endsRaw = readText(formData, 'endsAt')
+  let endsIso: string | null = null
+  if (endsRaw !== '') {
+    endsIso = tallinnWallTimeToUtcIso(endsRaw)
+    if (endsIso === null) {
+      redirectWithError(listPath, 'Sisesta korrektne lõppaeg (kellaaeg Europe/Tallinn).')
+    }
+    if (Date.parse(endsIso) <= Date.parse(startsIso)) {
+      redirectWithError(listPath, 'Lõppaeg peab olema pärast algusaega.')
+    }
+  }
+
+  // Reads run unscoped so in-scope drafts of any status are visible; the
+  // per-row scope check below is the authorization boundary.
+  const trusted = await getRepositories()
+  const scope = auctionScope(session.role, session.userId)
+  const offending: string[] = []
+  const schedulable: AuctionDoc[] = []
+  for (const id of ids) {
+    const auction = await trusted
+      .findByID({ collection: 'auctions', id })
+      .catch(() => null)
+    if (!auction) {
+      offending.push(`#${id.slice(0, 8)} (ei leitud)`)
+      continue
+    }
+    if (!auctionInScope(scope, { specialistId: auction.specialistId, sellerId: auction.sellerId })) {
+      offending.push(`${auction.title} (pole teie tööulatuses)`)
+      continue
+    }
+    if (auction.status !== 'draft') {
+      offending.push(`${auction.title} (${auctionStatusLabels[auction.status]})`)
+      continue
+    }
+    schedulable.push(auction)
+  }
+
+  if (offending.length > 0) {
+    redirectWithError(
+      listPath,
+      `Ajastada saab ainult mustandeid. Blokeeritud read: ${offending.slice(0, 5).join('; ')}`,
+    )
+  }
+  if (schedulable.length === 0) {
+    redirectWithError(listPath, 'Ühtegi valitud oksjonit ei saa ajastada.')
+  }
+
+  let failure: string | null = null
+  try {
+    for (const auction of schedulable) {
+      await repositories.update({
+        collection: 'auctions',
+        id: auction.id,
+        data: {
+          status: 'scheduled',
+          startsAt: startsIso,
+          ...(endsIso !== null ? { endsAt: endsIso } : {}),
+          scheduledAt: startsIso,
+        },
+      })
+    }
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'auction.schedule',
+      entityType: 'auction',
+      entityId: 'bulk',
+      after: {
+        count: schedulable.length,
+        startsAt: startsIso,
+        ...(endsIso !== null ? { endsAt: endsIso } : {}),
+        auctionIds: schedulable.map((auction) => auction.id),
+      },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    redirectWithError(listPath, `Bulks ajastamine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath('/admin/auctions')
+  redirectNotice(
+    listPath,
+    'teade',
+    `Ajastatud ${String(schedulable.length)} oksjonit (olek: ajastatud).`,
+  )
+}
+
+// ── Alapakkumine queue decisions (task 3.2) ─────────────────────────────────
+//
+// Global /admin/bids queue and per-auction blocks share these actions:
+// underbids:decide permission plus auctionScope limiting (seller sees and
+// decides only its own lots). The domain module serializes the state change
+// and emits the notifications; a losing race surfaces the first decision
+// (actor + time) from the audit chain instead of failing opaquely. Reject
+// requires a typed reason of at least 5 characters.
+
+const DECISION_AUDIT_ACTIONS: readonly string[] = [
+  'bid.approve',
+  'bid.reject',
+  'bid_approved',
+  'bid_rejected',
+]
+
+/** "Juba otsustatud (nimi, aeg)" from the first recorded decision. */
+async function earlierDecisionMessage(
+  trusted: CoreRepositories,
+  bidId: string,
+): Promise<string | null> {
+  const entries = await trusted.find({
+    collection: 'audit-entry',
+    where: {
+      and: [
+        { entityType: { equals: 'bid' } },
+        { entityId: { equals: bidId } },
+        { action: { in: DECISION_AUDIT_ACTIONS } },
+      ],
+    },
+    sort: '-createdAt',
+    limit: 1,
+  })
+  const entry = entries.docs[0]
+  if (!entry) return null
+  let actorName: string | null = null
+  try {
+    const actor = await trusted.findByID({ collection: 'users', id: String(entry.actorId) })
+    actorName = actor?.name ?? actor?.email ?? null
+  } catch {
+    actorName = null
+  }
+  const at = new Date(entry.createdAt)
+  const atText = Number.isNaN(at.getTime())
+    ? entry.createdAt
+    : at.toLocaleString('et-EE', { dateStyle: 'short', timeStyle: 'short' })
+  return `Juba otsustatud (${actorName ?? 'tundmatu tegija'}, ${atText}).`
+}
+
+async function loadAuctionForDecision(
+  trusted: CoreRepositories,
+  auctionId: string,
+): Promise<AuctionDoc | null> {
+  return trusted.findByID({ collection: 'auctions', id: auctionId }).catch(() => null)
+}
+
+export async function approveUnderbidAction(formData: FormData): Promise<void> {
+  const { session, repositories } = await requireAdminRepositories()
+  const feedbackPath = feedbackPathFrom(formData, '/admin/bids')
+  try {
+    assertCan(session.role, 'underbids:decide')
+  } catch (error) {
+    if (error instanceof PermissionDeniedError) {
+      redirectNotice(feedbackPath, 'viga', error.message)
+    }
+    throw error
+  }
+
+  const auctionId = readText(formData, 'auctionId')
+  const bidId = readText(formData, 'bidId')
+  if (!auctionId || !bidId) {
+    redirectWithError(feedbackPath, 'Pakkumuse otsustamiseks puudub identifikaator.')
+  }
+
+  const trusted = await getRepositories()
+  const auction = await loadAuctionForDecision(trusted, auctionId)
+  if (!auction) redirectWithError(feedbackPath, 'Oksjonit ei leitud.')
+  if (
+    !auctionInScope(auctionScope(session.role, session.userId), {
+      specialistId: auction.specialistId,
+      sellerId: auction.sellerId,
+    })
+  ) {
+    redirectWithError(feedbackPath, 'Oksjon ei ole teie tööulatuses.')
+  }
+
+  const decision: ApproveDecision = await approveAlapakkumine(auctionId, bidId)
+  if (decision.outcome !== 'approved') {
+    if (decision.outcome === 'not_pending') {
+      const earlier = await earlierDecisionMessage(trusted, bidId)
+      redirectWithError(
+        feedbackPath,
+        earlier ?? `Pakkumus ei ole enam kinnitamisel (hetke olek: ${decision.status}).`,
+      )
+    }
+    redirectWithError(feedbackPath, decisionFailure(decision.outcome, 'kinnitamine'))
+  }
+
+  await audit(repositories, {
+    actorId: session.userId,
+    action: 'bid.approve',
+    entityType: 'bid',
+    entityId: bidId,
+    after: { auctionId, amountEur: decision.bid.amount, bidderNotified: true },
+  })
+
+  revalidatePath('/admin/bids')
+  revalidatePath(auctionDetailPath(auctionId))
+  revalidatePath(feedbackPath)
+  redirectNotice(feedbackPath, 'teade', 'Alapakkumus kinnitatud ja juhtivaks seatud; osapooled teavitatud.')
+}
+
+export async function rejectUnderbidAction(formData: FormData): Promise<void> {
+  const { session, repositories } = await requireAdminRepositories()
+  const feedbackPath = feedbackPathFrom(formData, '/admin/bids')
+  try {
+    assertCan(session.role, 'underbids:decide')
+  } catch (error) {
+    if (error instanceof PermissionDeniedError) {
+      redirectNotice(feedbackPath, 'viga', error.message)
+    }
+    throw error
+  }
+
+  const auctionId = readText(formData, 'auctionId')
+  const bidId = readText(formData, 'bidId')
+  const reason = readText(formData, 'reason')
+  if (!auctionId || !bidId) {
+    redirectWithError(feedbackPath, 'Pakkumuse otsustamiseks puudub identifikaator.')
+  }
+  if (reason.length < MIN_REASON_LENGTH) {
+    redirectWithError(feedbackPath, reasonHint)
+  }
+
+  const trusted = await getRepositories()
+  const auction = await loadAuctionForDecision(trusted, auctionId)
+  if (!auction) redirectWithError(feedbackPath, 'Oksjonit ei leitud.')
+  if (
+    !auctionInScope(auctionScope(session.role, session.userId), {
+      specialistId: auction.specialistId,
+      sellerId: auction.sellerId,
+    })
+  ) {
+    redirectWithError(feedbackPath, 'Oksjon ei ole teie tööulatuses.')
+  }
+
+  const decision: RejectDecision = await rejectAlapakkumine(auctionId, bidId)
+  if (decision.outcome !== 'rejected') {
+    if (decision.outcome === 'not_pending') {
+      const earlier = await earlierDecisionMessage(trusted, bidId)
+      redirectWithError(
+        feedbackPath,
+        earlier ?? `Pakkumus ei ole enam kinnitamisel (hetke olek: ${decision.status}).`,
+      )
+    }
+    redirectWithError(feedbackPath, decisionFailure(decision.outcome, 'tagasilükkamine'))
+  }
+
+  await audit(repositories, {
+    actorId: session.userId,
+    action: 'bid.reject',
+    entityType: 'bid',
+    entityId: bidId,
+    after: { auctionId, amountEur: decision.bid.amount, reason, bidderNotified: true },
+  })
+
+  revalidatePath('/admin/bids')
+  revalidatePath(auctionDetailPath(auctionId))
+  revalidatePath(feedbackPath)
+  redirectNotice(feedbackPath, 'teade', 'Alapakkumus tagasi lükatud; pakkuja teavitatud põhjusega.')
+}
+
+// ── Audited identity reveal (task 3.2, design D5) ───────────────────────────
+//
+// The only path from an anonymized label to real identity. The
+// `user.identity_view` audit entry is written BEFORE the identity value
+// travels in the response; admin/superadmin see any in-scope lot, sellers
+// only alapakkumine rows on their own lots.
+
+export interface BidderIdentityView {
+  name: string | null
+  email: string
+}
+
+export type BidderIdentityReveal =
+  | { ok: true; identity: BidderIdentityView }
+  | { ok: false; error: string }
+
+export async function revealBidderIdentityAction(bidId: string): Promise<BidderIdentityReveal> {
+  const { session, repositories } = await requireAdminRepositories()
+  if (bidId.trim() === '') {
+    return { ok: false, error: 'Pakkumuse identifikaator puudub.' }
+  }
+
+  const trusted = await getRepositories()
+  const bid = await trusted.findByID({ collection: 'bids', id: bidId }).catch(() => null)
+  if (!bid) {
+    return { ok: false, error: 'Pakkumust ei leitud.' }
+  }
+
+  const auction = await loadAuctionForDecision(trusted, bid.auctionId)
+  if (!auction) {
+    return { ok: false, error: 'Oksjonit ei leitud.' }
+  }
+  const scope = auctionScope(session.role, session.userId)
+  if (!auctionInScope(scope, { specialistId: auction.specialistId, sellerId: auction.sellerId })) {
+    return { ok: false, error: 'Oksjon ei ole teie tööulatuses.' }
+  }
+
+  // Sellers decide alapakkumised, but identity stays hidden everywhere else.
+  if (session.role === 'seller' && bid.status !== 'pending_approval') {
+    return { ok: false, error: 'Identiteet on nähtav ainult alapakkumise otsuse korral.' }
+  }
+
+  const bidderUserId = bid.userId
+  try {
+    // Design D5: the audit write strictly precedes the identity response.
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'user.identity_view',
+      entityType: 'user',
+      entityId: bidderUserId,
+      after: { bidId, auctionId: auction.id },
+    })
+  } catch {
+    return { ok: false, error: 'Identiteedi avamine nurjus (auditikirje salvestamine ebaõnnestus).' }
+  }
+
+  const user = await trusted.findByID({ collection: 'users', id: bidderUserId }).catch(() => null)
+  if (!user) {
+    return { ok: false, error: 'Pakkujat ei leitud.' }
+  }
+  return { ok: true, identity: { name: user.name ?? null, email: user.email } }
 }

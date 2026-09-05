@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 
+import { endAuctionManuallyAction } from '../../../../_actions/auctions'
 import {
   bidSourceLabels,
   bidStatusLabels,
@@ -35,7 +36,6 @@ export interface MonitorExtensionEntry {
 type ConnectionState = 'connecting' | 'live' | 'offline'
 type SourceFilter = 'all' | BidSource
 type StatusFilter = 'all' | 'leading' | 'outbid' | 'pending_approval'
-type EndManualOutcome = 'sold' | 'unsold'
 
 const liveDotClass: Record<ConnectionState, string> = {
   connecting: 'bg-info',
@@ -172,8 +172,6 @@ export function BidMonitor({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [endModalOpen, setEndModalOpen] = useState(false)
   const [endReason, setEndReason] = useState('')
-  const [endOutcome, setEndOutcome] = useState<EndManualOutcome>('sold')
-  const [endSubmitting, setEndSubmitting] = useState(false)
 
   // Server-synced clock: the skew is fixed once against the server render
   // time, then the countdown ticks locally against it.
@@ -392,33 +390,6 @@ export function BidMonitor({
     setScrollPause((current) => (current === !atTop ? current : !atTop))
   }, [])
 
-  const submitEndManual = useCallback(async (): Promise<void> => {
-    if (endReason.trim().length < 5 || endSubmitting) return
-    setEndSubmitting(true)
-    try {
-      const response = await fetch(
-        `/api/v1/admin/auctions/${encodeURIComponent(auctionId)}/end-manual`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ reason: endReason.trim(), outcome: endOutcome }),
-        },
-      )
-      if (response.ok) {
-        setEndModalOpen(false)
-        setEndReason('')
-        pushNotice('Oksjon lõpetati käsitsi.')
-        router.refresh()
-      } else {
-        pushNotice('Käsitsi lõpetamine ei õnnestunud; teenus pole veel saadaval.')
-      }
-    } catch {
-      pushNotice('Käsitsi lõpetamine ei õnnestunud.')
-    } finally {
-      setEndSubmitting(false)
-    }
-  }, [auctionId, endOutcome, endReason, endSubmitting, pushNotice, router])
-
   const filteredRows = useMemo(
     () =>
       rows.filter(
@@ -529,7 +500,16 @@ export function BidMonitor({
 
       {endModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-md">
-          <div className="w-full max-w-md rounded-card border border-border bg-bgPage p-md">
+          <form
+            action={endAuctionManuallyAction}
+            className="w-full max-w-md rounded-card border border-border bg-bgPage p-md"
+          >
+            <input type="hidden" name="id" value={auctionId} />
+            <input
+              type="hidden"
+              name="redirectTo"
+              value={`/admin/auctions/${encodeURIComponent(auctionId)}/monitor`}
+            />
             <h2 className="font-heading text-h4 font-bold text-ink">Lõpeta oksjon käsitsi</h2>
             <p className="mt-xs text-bodySm text-ink-muted">
               Põhjus kirjutatakse auditilogi; tegevus on pöördumatu.
@@ -539,11 +519,14 @@ export function BidMonitor({
             </label>
             <textarea
               id="end-manual-reason"
+              name="reason"
               value={endReason}
               onChange={(event) => {
                 setEndReason(event.target.value)
               }}
               rows={3}
+              required
+              minLength={5}
               className="mt-1 h-auto w-full rounded-input border border-border bg-bgPage px-3 py-2 text-bodySm text-ink outline-none transition-colors duration-hover ease-hover focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <label htmlFor="end-manual-outcome" className="mt-md block text-label font-semibold text-ink">
@@ -551,13 +534,11 @@ export function BidMonitor({
             </label>
             <select
               id="end-manual-outcome"
-              value={endOutcome}
-              onChange={(event) => {
-                setEndOutcome(event.target.value === 'unsold' ? 'unsold' : 'sold')
-              }}
+              name="outcome"
+              defaultValue="winner"
               className="mt-1 h-10 w-full rounded-input border border-border bg-bgPage px-3 text-bodySm text-ink outline-none transition-colors duration-hover ease-hover focus:border-primary"
             >
-              <option value="sold">Müüd — juhtiv pakkumine võidab</option>
+              <option value="winner">Müüd — juhtiv pakkumine võidab</option>
               <option value="unsold">Müümata</option>
             </select>
             <div className="mt-md flex justify-end gap-sm">
@@ -571,17 +552,14 @@ export function BidMonitor({
                 Tühista
               </button>
               <button
-                type="button"
-                disabled={endReason.trim().length < 5 || endSubmitting}
-                onClick={() => {
-                  void submitEndManual()
-                }}
+                type="submit"
+                disabled={endReason.trim().length < 5}
                 className="inline-flex h-10 items-center rounded-button bg-danger px-4 text-label font-semibold text-ink-inverse transition-opacity duration-hover ease-hover hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {endSubmitting ? 'Lõpetan…' : 'Kinnita lõpetamine'}
+                Kinnita lõpetamine
               </button>
             </div>
-          </div>
+          </form>
         </div>
       ) : null}
 
