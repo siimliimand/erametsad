@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  grantAuctionRightAction,
+  revealIsikukoodAction,
+  revokeAuctionRightAction,
+} from '../users'
+
 import type { CoreRepositories } from '@/lib/data/repositories'
+import { getRepositories } from '@/lib/data/runtime'
 
 const { RedirectError } = vi.hoisted(() => {
   class RedirectError extends Error {
@@ -14,9 +21,12 @@ const { RedirectError } = vi.hoisted(() => {
   return { RedirectError }
 })
 
-const state = vi.hoisted(() => ({
-  session: { userId: 'admin-1', role: 'admin' } as { userId: string; role: string },
-  repositories: null as unknown,
+const state = vi.hoisted((): {
+  session: { userId: string; role: string }
+  repositories: unknown
+} => ({
+  session: { userId: 'admin-1', role: 'admin' },
+  repositories: null,
 }))
 
 vi.mock('next/navigation', () => ({
@@ -40,18 +50,10 @@ vi.mock('@/lib/auth/session', () => ({
 }))
 
 vi.mock('../../_lib/admin', () => ({
-  requireAdminRepositories: vi.fn(async () => ({
-    session: state.session,
-    repositories: state.repositories,
-  })),
+  requireAdminRepositories: vi.fn(() =>
+    Promise.resolve({ session: state.session, repositories: state.repositories }),
+  ),
 }))
-
-import { getRepositories } from '@/lib/data/runtime'
-import {
-  grantAuctionRightAction,
-  revealIsikukoodAction,
-  revokeAuctionRightAction,
-} from '../users'
 
 const getRepositoriesMock = vi.mocked(getRepositories)
 
@@ -82,17 +84,21 @@ function makeRepos() {
   const docsByCollection: Record<string, Record<string, unknown> | null> = {}
   const findDocsByCollection: Record<string, Record<string, unknown>[]> = {}
   return {
-    find: vi.fn(async (args: FindArgs) => ({ docs: findDocsByCollection[args.collection] ?? [] })),
-    findByID: vi.fn(async (args: FindByIDArgs) => (docsByCollection[args.collection] as never) ?? null),
-    create: vi.fn(async (args: CreateArgs) => {
+    find: vi.fn((args: FindArgs) =>
+      Promise.resolve({ docs: findDocsByCollection[args.collection] ?? [] }),
+    ),
+    findByID: vi.fn((args: FindByIDArgs): Promise<unknown> =>
+      Promise.resolve(docsByCollection[args.collection] ?? null),
+    ),
+    create: vi.fn((args: CreateArgs) => {
       creates.push(args)
-      return { id: `new-${String(creates.length)}`, ...args.data }
+      return Promise.resolve({ id: `new-${String(creates.length)}`, ...args.data })
     }),
-    update: vi.fn(async (args: UpdateArgs) => {
+    update: vi.fn((args: UpdateArgs) => {
       updates.push(args)
-      return { id: args.id, ...args.data }
+      return Promise.resolve({ id: args.id, ...args.data })
     }),
-    delete: vi.fn(async () => undefined),
+    delete: vi.fn(() => Promise.resolve(undefined)),
     creates,
     updates,
     docsByCollection,
@@ -103,7 +109,7 @@ function makeRepos() {
 type Repos = ReturnType<typeof makeRepos>
 
 function useRepos(repos: Repos): void {
-  state.repositories = repos as unknown as CoreRepositories
+  state.repositories = repos
   getRepositoriesMock.mockResolvedValue(repos as unknown as CoreRepositories)
 }
 
@@ -131,7 +137,7 @@ describe('grantAuctionRightAction (reason enforcement)', () => {
   beforeEach(() => {
     state.session = { userId: 'admin-1', role: 'admin' }
     repos = makeRepos()
-    repos.docsByCollection['users'] = { id: 'user-9', name: 'Test Testov' }
+    repos.docsByCollection.users = { id: 'user-9', name: 'Test Testov' }
     useRepos(repos)
   })
 
@@ -280,22 +286,22 @@ describe('revealIsikukoodAction (audited reveal)', () => {
   })
 
   it('reports a user without an isikukood', async () => {
-    repos.docsByCollection['users'] = { id: 'user-9', isikukood: null }
+    repos.docsByCollection.users = { id: 'user-9', isikukood: null }
     const result = await revealIsikukoodAction('user-9')
     expect(result).toEqual({ ok: false, error: 'Isikukood puudub.' })
   })
 
   it('writes the user.identity_view audit entry before the plaintext is returned', async () => {
-    repos.docsByCollection['users'] = { id: 'user-9', isikukood: '39101010000' }
+    repos.docsByCollection.users = { id: 'user-9', isikukood: '39101010000' }
     const auditCalls: string[] = []
-    repos.findByID.mockImplementation(async () => {
+    repos.findByID.mockImplementation(() => {
       auditCalls.push('find:users')
-      return (repos.docsByCollection['users'] as never) ?? null
+      return Promise.resolve(repos.docsByCollection.users ?? null)
     })
-    repos.create.mockImplementation(async (args: CreateArgs) => {
+    repos.create.mockImplementation((args: CreateArgs) => {
       auditCalls.push(`create:${String(args.data.action)}`)
       repos.creates.push(args)
-      return { id: `new-${String(repos.creates.length)}`, ...args.data }
+      return Promise.resolve({ id: `new-${String(repos.creates.length)}`, ...args.data })
     })
 
     const result = await revealIsikukoodAction('user-9')
@@ -312,7 +318,7 @@ describe('revealIsikukoodAction (audited reveal)', () => {
   })
 
   it('never returns the value when the audit write fails', async () => {
-    repos.docsByCollection['users'] = { id: 'user-9', isikukood: '39101010000' }
+    repos.docsByCollection.users = { id: 'user-9', isikukood: '39101010000' }
     repos.create.mockRejectedValueOnce(new Error('audit write failed'))
 
     const result = await revealIsikukoodAction('user-9')

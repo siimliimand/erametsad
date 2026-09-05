@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { CoreRepositories } from '@/lib/data/repositories'
-
 const { RedirectError } = vi.hoisted(() => {
   class RedirectError extends Error {
     constructor(
@@ -14,15 +12,20 @@ const { RedirectError } = vi.hoisted(() => {
   return { RedirectError }
 })
 
-const state = vi.hoisted(() => ({
-  session: { userId: 'opener-1', role: 'admin' } as { userId: string; role: string },
-  repositories: null as unknown,
-  cookies: {} as Record<string, string | undefined>,
+const state = vi.hoisted((): {
+  session: { userId: string; role: string }
+  repositories: unknown
+  cookies: Record<string, string | undefined>
+  tokens: Record<string, { userId: string; sessionId: string } | undefined>
+} => ({
+  session: { userId: 'opener-1', role: 'admin' },
+  repositories: null,
+  cookies: {},
   tokens: {
     'token-opener': { userId: 'opener-1', sessionId: 'sess-1' },
     'token-approver': { userId: 'approver-1', sessionId: 'sess-2' },
     'token-third': { userId: 'third-1', sessionId: 'sess-3' },
-  } as Record<string, { userId: string; sessionId: string } | undefined>,
+  },
 }))
 
 vi.mock('next/navigation', () => ({
@@ -36,7 +39,7 @@ vi.mock('next/cache', () => ({
 }))
 
 vi.mock('next/headers', () => ({
-  cookies: vi.fn(async () => ({
+  cookies: vi.fn(() => ({
     get: (name: string) =>
       state.cookies[name] !== undefined ? { value: state.cookies[name] } : undefined,
   })),
@@ -70,20 +73,11 @@ vi.mock('@/lib/data/runtime', () => ({
 }))
 
 vi.mock('../../_lib/admin', () => ({
-  requireAdminRepositories: vi.fn(async () => ({
-    session: state.session,
-    repositories: state.repositories,
-  })),
+  requireAdminRepositories: vi.fn(() =>
+    Promise.resolve({ session: state.session, repositories: state.repositories }),
+  ),
 }))
 
-import { verifyPassword } from '@/lib/auth/password'
-import { prepareContract } from '@/lib/contracts/service'
-import type { CoreRepositories } from '@/lib/data/repositories'
-import { upsertSnapshot } from '@/lib/stats/aggregation'
-import {
-  decryptSealedBids,
-  getSealedBidsForAuction,
-} from '@/lib/bidding/sealed-bid'
 import {
   confirmSealedCeremonyWinnerAction,
   revealSealedBidsAction,
@@ -92,6 +86,15 @@ import {
   signSealedOpenerAction,
   type SealedCeremonyActionState,
 } from '../auctions'
+
+import { verifyPassword } from '@/lib/auth/password'
+import type { DecryptedBid } from '@/lib/bidding/sealed-bid'
+import {
+  decryptSealedBids,
+  getSealedBidsForAuction,
+} from '@/lib/bidding/sealed-bid'
+import { prepareContract } from '@/lib/contracts/service'
+import { upsertSnapshot } from '@/lib/stats/aggregation'
 
 const verifyPasswordMock = vi.mocked(verifyPassword)
 const getSealedBidsMock = vi.mocked(getSealedBidsForAuction)
@@ -119,11 +122,11 @@ interface UpdateArgs {
 
 function whereValues(where: unknown): Record<string, string> {
   const parts =
-    (where as { and?: Array<Record<string, { equals?: unknown }>> } | undefined)?.and ?? []
+    (where as { and?: Record<string, { equals?: unknown }>[] } | undefined)?.and ?? []
   const values: Record<string, string> = {}
   for (const part of parts) {
     for (const [key, condition] of Object.entries(part)) {
-      if (condition && typeof condition.equals === 'string') {
+      if (typeof condition.equals === 'string') {
         values[key] = condition.equals
       }
     }
@@ -146,38 +149,40 @@ function makeRepos(fixture: CeremonyFixture = {}) {
   const auditByAction = new Map(Object.entries(fixture.auditEntries ?? {}))
 
   const repos = {
-    find: vi.fn(async (args: FindArgs) => {
+    find: vi.fn((args: FindArgs) => {
       const values = whereValues(args.where)
       if (args.collection === 'audit-entry') {
         const created = creates
           .filter((entry) => entry.collection === 'audit-entry' && entry.data.action === values.action)
           .map((entry) => ({ id: `created-${String(creates.indexOf(entry))}`, createdAt: new Date().toISOString(), ...entry.data }))
-        return { docs: [...(auditByAction.get(values.action) ?? []), ...created] }
+        return Promise.resolve({ docs: [...(auditByAction.get(values.action ?? '') ?? []), ...created] })
       }
       if (args.collection === 'bids') {
-        if (values.status === 'pending_approval') return { docs: fixture.pendingBids ?? [] }
-        if (values.status === 'leading') return { docs: fixture.otherLeadingBids ?? [] }
-        return { docs: [] }
+        if (values.status === 'pending_approval') return Promise.resolve({ docs: fixture.pendingBids ?? [] })
+        if (values.status === 'leading') return Promise.resolve({ docs: fixture.otherLeadingBids ?? [] })
+        return Promise.resolve({ docs: [] })
       }
       if (args.collection === 'contract-templates') {
-        return { docs: fixture.templates ?? [] }
+        return Promise.resolve({ docs: fixture.templates ?? [] })
       }
-      return { docs: [] }
+      return Promise.resolve({ docs: [] })
     }),
-    findByID: vi.fn(async (args: { collection: string; id: string }) => {
-      if (args.collection === 'auctions') return ((fixture.auction ?? null) as never) ?? null
-      if (args.collection === 'users') return ((fixture.user ?? null) as never) ?? null
-      return null
-    }),
-    create: vi.fn(async (args: CreateArgs) => {
+    findByID: vi.fn(
+      (args: { collection: string; id: string }): Promise<unknown> => {
+        if (args.collection === 'auctions') return Promise.resolve(fixture.auction ?? null)
+        if (args.collection === 'users') return Promise.resolve(fixture.user ?? null)
+        return Promise.resolve(null)
+      },
+    ),
+    create: vi.fn((args: CreateArgs) => {
       creates.push(args)
-      return { id: `new-${String(creates.length)}`, ...args.data }
+      return Promise.resolve({ id: `new-${String(creates.length)}`, ...args.data })
     }),
-    update: vi.fn(async (args: UpdateArgs) => {
+    update: vi.fn((args: UpdateArgs) => {
       updates.push(args)
-      return { id: args.id, ...args.data }
+      return Promise.resolve({ id: args.id, ...args.data })
     }),
-    delete: vi.fn(async () => undefined),
+    delete: vi.fn(() => Promise.resolve(undefined)),
     creates,
     updates,
   }
@@ -187,7 +192,7 @@ function makeRepos(fixture: CeremonyFixture = {}) {
 type Repos = ReturnType<typeof makeRepos>
 
 function useRepos(repos: Repos): void {
-  state.repositories = repos as unknown as CoreRepositories
+  state.repositories = repos
 }
 
 const form = (entries: Record<string, string>): FormData => {
@@ -254,7 +259,7 @@ const sealedRow = (
   valid,
 })
 
-async function signOpenerAndApprover(repos: Repos): Promise<void> {
+async function signOpenerAndApprover(_repos: Repos): Promise<void> {
   state.cookies.access_token = 'token-opener'
   const opener = await signSealedOpenerAction(actionState('checklist'), form({ auctionId, keyword: 'AVAN' }))
   expect(opener.ok, opener.error ?? 'opener sign failed').toBe(true)
@@ -271,7 +276,7 @@ describe('signSealedOpenerAction (ceremony checklist)', () => {
     state.session = { userId: 'opener-1', role: 'admin' }
     state.cookies = { access_token: 'token-opener' }
     vi.clearAllMocks()
-    decryptMock.mockImplementation((bids: unknown) => bids)
+    decryptMock.mockImplementation((bids) => bids as unknown as DecryptedBid[])
   })
 
   it('rejects a keyword other than AVAN', async () => {
@@ -373,7 +378,7 @@ describe('revealSealedBidsAction (one-shot reveal)', () => {
     state.session = { userId: 'opener-1', role: 'admin' }
     state.cookies = { access_token: 'token-opener' }
     vi.clearAllMocks()
-    decryptMock.mockImplementation((bids: unknown) => bids)
+    decryptMock.mockImplementation((bids) => bids as unknown as DecryptedBid[])
   })
 
   const seededRepos = (overrides: CeremonyFixture = {}): Repos => makeRepos(cleanFixture(overrides))
@@ -471,7 +476,7 @@ describe('sealedCeremonyStateAction (ranked read model)', () => {
     state.session = { userId: 'opener-1', role: 'admin' }
     state.cookies = { access_token: 'token-opener' }
     vi.clearAllMocks()
-    decryptMock.mockImplementation((bids: unknown) => bids)
+    decryptMock.mockImplementation((bids) => bids as unknown as DecryptedBid[])
   })
 
   it('denies a role without sealed:read', async () => {
@@ -588,7 +593,7 @@ describe('confirmSealedCeremonyWinnerAction (reserve branches)', () => {
     state.session = { userId: 'opener-1', role: 'admin' }
     state.cookies = { access_token: 'token-opener' }
     vi.clearAllMocks()
-    decryptMock.mockImplementation((bids: unknown) => bids)
+    decryptMock.mockImplementation((bids) => bids as unknown as DecryptedBid[])
     verifyPasswordMock.mockResolvedValue(true)
   })
 

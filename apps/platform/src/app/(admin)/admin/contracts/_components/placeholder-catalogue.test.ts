@@ -114,7 +114,7 @@ describe('catalogue hygiene', () => {
     expect(fixture['bidder.registrikood']).toBe('14309277')
     expect(fixture['lot.finalPrice']).toBe('61 000 €')
     expect(fixture['company.legalName']).toBe('Tamm OÜ')
-    expect(fixture['auctionTitle']).toBe('Testioksjon #1')
+    expect(fixture.auctionTitle).toBe('Testioksjon #1')
   })
 })
 

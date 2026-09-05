@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { approveUnderbidAction, rejectUnderbidAction } from '../auctions'
+
 import type { ApproveDecision, RejectDecision } from '@/lib/bidding/alapakkumine'
+import { approveAlapakkumine, rejectAlapakkumine } from '@/lib/bidding/alapakkumine'
 import type { CoreRepositories } from '@/lib/data/repositories'
+import { getRepositories } from '@/lib/data/runtime'
 
 const { RedirectError } = vi.hoisted(() => {
   class RedirectError extends Error {
@@ -15,9 +19,12 @@ const { RedirectError } = vi.hoisted(() => {
   return { RedirectError }
 })
 
-const state = vi.hoisted(() => ({
-  session: { userId: 'admin-1', role: 'admin' } as { userId: string; role: string },
-  repositories: null as unknown,
+const state = vi.hoisted((): {
+  session: { userId: string; role: string }
+  repositories: unknown
+} => ({
+  session: { userId: 'admin-1', role: 'admin' },
+  repositories: null,
 }))
 
 vi.mock('next/navigation', () => ({
@@ -41,15 +48,10 @@ vi.mock('@/lib/bidding/alapakkumine', () => ({
 }))
 
 vi.mock('../../_lib/admin', () => ({
-  requireAdminRepositories: vi.fn(async () => ({
-    session: state.session,
-    repositories: state.repositories,
-  })),
+  requireAdminRepositories: vi.fn(() =>
+    Promise.resolve({ session: state.session, repositories: state.repositories }),
+  ),
 }))
-
-import { approveAlapakkumine, rejectAlapakkumine } from '@/lib/bidding/alapakkumine'
-import { getRepositories } from '@/lib/data/runtime'
-import { approveUnderbidAction, rejectUnderbidAction } from '../auctions'
 
 const approveMock = vi.mocked(approveAlapakkumine)
 const rejectMock = vi.mocked(rejectAlapakkumine)
@@ -63,14 +65,20 @@ interface CreateArgs {
 function makeRepos() {
   const creates: CreateArgs[] = []
   return {
-    find: vi.fn(async () => ({ docs: [] as Record<string, unknown>[] })),
-    findByID: vi.fn(async () => null),
-    create: vi.fn(async (args: CreateArgs) => {
+    find: vi.fn((_args: { collection: string }) =>
+      Promise.resolve({ docs: [] as Record<string, unknown>[] }),
+    ),
+    findByID: vi.fn(
+      (_args: { collection: string; id: string }): Promise<unknown> => Promise.resolve(null),
+    ),
+    create: vi.fn((args: CreateArgs) => {
       creates.push(args)
-      return { id: `new-${String(creates.length)}`, ...args.data }
+      return Promise.resolve({ id: `new-${String(creates.length)}`, ...args.data })
     }),
-    update: vi.fn(async (args: { collection: string; id: string; data: Record<string, unknown> }) => args.data),
-    delete: vi.fn(async () => undefined),
+    update: vi.fn((args: { collection: string; id: string; data: Record<string, unknown> }) =>
+      Promise.resolve(args.data),
+    ),
+    delete: vi.fn(() => Promise.resolve(undefined)),
     creates,
   }
 }
@@ -130,15 +138,17 @@ function useTrusted(options: {
   actor?: Record<string, unknown> | null
 }): Repos {
   const trusted = makeRepos()
-  trusted.findByID.mockImplementation(async (args: { collection: string; id: string }) => {
-    if (args.collection === 'auctions') return ((options.auction ?? null) as never) ?? null
-    if (args.collection === 'users') return ((options.actor ?? null) as never) ?? null
-    return null
+  trusted.findByID.mockImplementation((args: { collection: string; id: string }) => {
+    if (args.collection === 'auctions') return Promise.resolve(options.auction ?? null)
+    if (args.collection === 'users') return Promise.resolve(options.actor ?? null)
+    return Promise.resolve(null)
   })
-  trusted.find.mockImplementation(async (args: { collection: string }) =>
-    args.collection === 'audit-entry'
-      ? { docs: options.auditEntries ?? [] }
-      : { docs: [] },
+  trusted.find.mockImplementation((args: { collection: string }) =>
+    Promise.resolve(
+      args.collection === 'audit-entry'
+        ? { docs: options.auditEntries ?? [] }
+        : { docs: [] },
+    ),
   )
   getRepositoriesMock.mockResolvedValue(trusted as unknown as CoreRepositories)
   return trusted
@@ -152,7 +162,7 @@ describe('approveUnderbidAction', () => {
     approveMock.mockReset()
     rejectMock.mockReset()
     guarded = makeRepos()
-    state.repositories = guarded as unknown as CoreRepositories
+    state.repositories = guarded
   })
 
   it('approves a pending alapakkumine and writes the bid.approve audit entry', async () => {
@@ -260,7 +270,7 @@ describe('rejectUnderbidAction', () => {
     approveMock.mockReset()
     rejectMock.mockReset()
     guarded = makeRepos()
-    state.repositories = guarded as unknown as CoreRepositories
+    state.repositories = guarded
   })
 
   it('rejects with a typed reason and records it in the audit entry', async () => {

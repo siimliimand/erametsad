@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { CoreRepositories } from '@/lib/data/repositories'
-
 const { RedirectError } = vi.hoisted(() => {
   class RedirectError extends Error {
     constructor(
@@ -14,9 +12,12 @@ const { RedirectError } = vi.hoisted(() => {
   return { RedirectError }
 })
 
-const state = vi.hoisted(() => ({
-  session: { userId: 'admin-1', role: 'admin' } as { userId: string; role: string },
-  repositories: null as unknown,
+const state = vi.hoisted((): {
+  session: { userId: string; role: string }
+  repositories: unknown
+} => ({
+  session: { userId: 'admin-1', role: 'admin' },
+  repositories: null,
 }))
 
 vi.mock('next/navigation', () => ({
@@ -30,10 +31,9 @@ vi.mock('next/cache', () => ({
 }))
 
 vi.mock('../../_lib/admin', () => ({
-  requireAdminRepositories: vi.fn(async () => ({
-    session: state.session,
-    repositories: state.repositories,
-  })),
+  requireAdminRepositories: vi.fn(() =>
+    Promise.resolve({ session: state.session, repositories: state.repositories }),
+  ),
 }))
 
 import { PermissionDeniedError } from '../../_lib/permissions'
@@ -53,28 +53,30 @@ interface UpdateArgs {
 function makeRepos(settingsRow: Record<string, unknown> | null) {
   const creates: CreateArgs[] = []
   const updates: UpdateArgs[] = []
+  // Non-null alias so tests can mutate the row without narrowing.
+  const row: Record<string, unknown> = settingsRow ?? {}
   return {
-    find: vi.fn(async () => ({ docs: settingsRow ? [settingsRow] : [] })),
-    findByID: vi.fn(async () => null),
-    create: vi.fn(async (args: CreateArgs) => {
+    find: vi.fn(() => Promise.resolve({ docs: settingsRow ? [settingsRow] : [] })),
+    findByID: vi.fn((_args?: unknown) => Promise.resolve(null)),
+    create: vi.fn((args: CreateArgs) => {
       creates.push(args)
-      return { id: 'created-settings', ...args.data }
+      return Promise.resolve({ id: 'created-settings', ...args.data })
     }),
-    update: vi.fn(async (args: UpdateArgs) => {
+    update: vi.fn((args: UpdateArgs) => {
       updates.push(args)
-      return { id: args.id, ...args.data }
+      return Promise.resolve({ id: args.id, ...args.data })
     }),
-    delete: vi.fn(async () => undefined),
+    delete: vi.fn(() => Promise.resolve(undefined)),
     creates,
     updates,
-    settingsRow,
+    settingsRow: row,
   }
 }
 
 type Repos = ReturnType<typeof makeRepos>
 
 function useRepos(repos: Repos): void {
-  state.repositories = repos as unknown as CoreRepositories
+  state.repositories = repos
 }
 
 async function redirectOf(run: () => Promise<unknown>): Promise<URL> {

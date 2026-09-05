@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { CoreRepositories } from '@/lib/data/repositories'
-
 const { RedirectError } = vi.hoisted(() => {
   class RedirectError extends Error {
     constructor(
@@ -14,10 +12,14 @@ const { RedirectError } = vi.hoisted(() => {
   return { RedirectError }
 })
 
-const state = vi.hoisted(() => ({
-  session: { userId: 'admin-1', role: 'admin' } as { userId: string; role: string },
-  repositories: null as unknown,
-  cookies: {} as Record<string, string | undefined>,
+const state = vi.hoisted((): {
+  session: { userId: string; role: string }
+  repositories: unknown
+  cookies: Record<string, string | undefined>
+} => ({
+  session: { userId: 'admin-1', role: 'admin' },
+  repositories: null,
+  cookies: {},
 }))
 
 vi.mock('next/navigation', () => ({
@@ -31,24 +33,23 @@ vi.mock('next/cache', () => ({
 }))
 
 vi.mock('next/headers', () => ({
-  cookies: vi.fn(async () => ({
+  cookies: vi.fn(() => ({
     get: (name: string) =>
-      state.cookies?.[name] !== undefined ? { value: state.cookies[name] } : undefined,
+      state.cookies[name] !== undefined ? { value: state.cookies[name] } : undefined,
   })),
 }))
 
 vi.mock('@/lib/data/runtime', () => ({
-  getRepositories: vi.fn(async () => {
-    throw new Error('trusted repositories are not used by endAuctionManuallyAction')
-  }),
+  getRepositories: vi.fn(() =>
+    Promise.reject(new Error('trusted repositories are not used by endAuctionManuallyAction')),
+  ),
   sessionGuardContext: (payload: unknown) => payload,
 }))
 
 vi.mock('../../_lib/admin', () => ({
-  requireAdminRepositories: vi.fn(async () => ({
-    session: state.session,
-    repositories: state.repositories,
-  })),
+  requireAdminRepositories: vi.fn(() =>
+    Promise.resolve({ session: state.session, repositories: state.repositories }),
+  ),
 }))
 
 import { endAuctionManuallyAction } from '../auctions'
@@ -75,17 +76,19 @@ function makeRepos(router: (args: FindArgs) => { docs: Record<string, unknown>[]
   const creates: CreateArgs[] = []
   const updates: UpdateArgs[] = []
   return {
-    find: vi.fn(async (args: FindArgs) => router(args) ?? { docs: [] }),
-    findByID: vi.fn(async () => null),
-    create: vi.fn(async (args: CreateArgs) => {
+    find: vi.fn((args: FindArgs) => Promise.resolve(router(args) ?? { docs: [] })),
+    findByID: vi.fn(
+      (_args: { collection: string; id: string }): Promise<unknown> => Promise.resolve(null),
+    ),
+    create: vi.fn((args: CreateArgs) => {
       creates.push(args)
-      return { id: `new-${String(creates.length)}`, ...args.data }
+      return Promise.resolve({ id: `new-${String(creates.length)}`, ...args.data })
     }),
-    update: vi.fn(async (args: UpdateArgs) => {
+    update: vi.fn((args: UpdateArgs) => {
       updates.push(args)
-      return { id: args.id, ...args.data }
+      return Promise.resolve({ id: args.id, ...args.data })
     }),
-    delete: vi.fn(async () => undefined),
+    delete: vi.fn(() => Promise.resolve(undefined)),
     creates,
     updates,
   }
@@ -94,7 +97,7 @@ function makeRepos(router: (args: FindArgs) => { docs: Record<string, unknown>[]
 type Repos = ReturnType<typeof makeRepos>
 
 function useRepos(repos: Repos): void {
-  state.repositories = repos as unknown as CoreRepositories
+  state.repositories = repos
 }
 
 async function redirectOf(run: () => Promise<unknown>): Promise<URL> {
@@ -136,10 +139,9 @@ describe('endAuctionManuallyAction', () => {
   })
 
   const withAuction = (auction: Record<string, unknown> | null, repos: Repos): void => {
-    repos.findByID.mockImplementation(async (args: { collection: string; id: string }) => {
-      if (args.collection === 'auctions') return (auction as never) ?? null
-      return null
-    })
+    repos.findByID.mockImplementation((args: { collection: string; id: string }) =>
+      Promise.resolve(args.collection === 'auctions' ? auction : null),
+    )
   }
 
   it('requires an auction identifier', async () => {
