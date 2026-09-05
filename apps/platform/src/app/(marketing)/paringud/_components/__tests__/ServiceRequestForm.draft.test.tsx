@@ -30,7 +30,8 @@ interface Envelope {
 function readEnvelope(key: string): Envelope {
   const raw = window.localStorage.getItem(key)
   if (raw === null) throw new Error(`missing draft: ${key}`)
-  return JSON.parse(raw) as unknown as Envelope
+  const parsed: unknown = JSON.parse(raw)
+  return parsed as Envelope
 }
 
 function seedDraft(key: string, envelope: Envelope): void {
@@ -105,7 +106,7 @@ async function clickCheckbox(selector: string): Promise<void> {
 }
 
 function textContent(): string {
-  return (container.textContent ?? '').replace(/<!--.*?-->/g, '')
+  return container.textContent.replace(/<!--.*?-->/g, '')
 }
 
 beforeEach(() => {

@@ -25,7 +25,8 @@ function seedDraft(formName: string, envelope: Envelope): void {
 function readEnvelope(formName: string): Envelope {
   const raw = window.localStorage.getItem(draftKey(formName))
   if (raw === null) throw new Error(`missing draft: ${draftKey(formName)}`)
-  return JSON.parse(raw) as unknown as Envelope
+  const parsed: unknown = JSON.parse(raw)
+  return parsed as Envelope
 }
 
 let container: HTMLDivElement
@@ -171,7 +172,9 @@ describe('useRequestDraft storage failures', () => {
       throw new DOMException('quota exceeded', 'QuotaExceededError')
     })
 
-    expect(() => draft.writeDraft({ name: 'Mari' })).not.toThrow()
+    expect(() => {
+      draft.writeDraft({ name: 'Mari' })
+    }).not.toThrow()
     expect(window.localStorage.getItem(draftKey('kava-1'))).toBeNull()
     vi.restoreAllMocks()
   })
@@ -182,7 +185,9 @@ describe('useRequestDraft storage failures', () => {
       throw new DOMException('blocked', 'SecurityError')
     })
 
-    expect(() => requiredApi().clearDraft()).not.toThrow()
+    expect(() => {
+      requiredApi().clearDraft()
+    }).not.toThrow()
     vi.restoreAllMocks()
   })
 })
@@ -201,8 +206,12 @@ describe('useRequestDraft SSR safety', () => {
     expect(typeof window).toBe('undefined')
 
     expect(draft.readDraft()).toBeNull()
-    expect(() => draft.writeDraft({ name: 'Mari' })).not.toThrow()
-    expect(() => draft.clearDraft()).not.toThrow()
+    expect(() => {
+      draft.writeDraft({ name: 'Mari' })
+    }).not.toThrow()
+    expect(() => {
+      draft.clearDraft()
+    }).not.toThrow()
     // Restore window before afterEach unmounts the React root.
     vi.unstubAllGlobals()
   })

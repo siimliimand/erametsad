@@ -1,6 +1,13 @@
 import { NextRequest } from 'next/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type * as MediaUpload from '@/app/(admin)/admin/media/_lib/media-upload'
+import { POST } from '@/app/api/v1/service-requests/route'
+import { createSqliteTestDb, type SqliteTestDb } from '@/lib/data/__tests__/sqlite'
+import { createPartnersRepository } from '@/lib/data/repositories'
+import { setD1ForTests } from '@/lib/db'
+import { MAX_ATTACHMENT_BYTES } from '@/lib/service-requests/attachments'
+
 const { getMediaBucketMock, putMock } = vi.hoisted(() => ({
   getMediaBucketMock: vi.fn(),
   putMock: vi.fn(),
@@ -8,17 +15,9 @@ const { getMediaBucketMock, putMock } = vi.hoisted(() => ({
 
 // Keep the real sanitizeFilename/constants; only the bucket binding is faked.
 vi.mock('@/app/(admin)/admin/media/_lib/media-upload', async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import('@/app/(admin)/admin/media/_lib/media-upload')
-  >()
+  const actual = await importOriginal<typeof MediaUpload>()
   return { ...actual, getMediaBucket: getMediaBucketMock }
 })
-
-import { POST } from '@/app/api/v1/service-requests/route'
-import { MAX_ATTACHMENT_BYTES } from '@/lib/service-requests/attachments'
-import { createSqliteTestDb, type SqliteTestDb } from '@/lib/data/__tests__/sqlite'
-import { createPartnersRepository } from '@/lib/data/repositories'
-import { setD1ForTests } from '@/lib/db'
 
 const BASE = 'http://localhost:3000/api/v1/service-requests'
 
@@ -195,13 +194,14 @@ async function seedPartner(
 
 describe('POST /api/v1/service-requests validation matrix', () => {
   it('creates a kava request from JSON with routedCount 0 and status new', async () => {
+    const anyId: unknown = expect.any(String)
     const result = await post(jsonRequest(validKava(), '10.1.0.1'))
 
     expect(result.status).toBe(201)
     expect(result.body).toEqual({
       status: 'ok',
       routedCount: 0,
-      request: { id: expect.any(String), status: 'new' },
+      request: { id: anyId, status: 'new' },
     })
     expect(serviceRequestCount()).toBe(1)
   })
@@ -320,13 +320,14 @@ describe('POST /api/v1/service-requests routing selection', () => {
   })
 
   it('stores a zero-match request as new with routedCount 0', async () => {
+    const anyId: unknown = expect.any(String)
     const result = await post(jsonRequest(validIstutamine(), '10.4.0.2'))
 
     expect(result.status).toBe(201)
     expect(result.body).toEqual({
       status: 'ok',
       routedCount: 0,
-      request: { id: expect.any(String), status: 'new' },
+      request: { id: anyId, status: 'new' },
     })
   })
 })
@@ -418,7 +419,7 @@ describe('POST /api/v1/service-requests attachment file rules', () => {
 
   it('returns 503 with a file error when the R2 put fails', async () => {
     putMock.mockRejectedValueOnce(new Error('r2 unreachable'))
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
     const file: MultipartFile = {
       data: new ArrayBuffer(1024),

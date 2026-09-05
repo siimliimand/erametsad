@@ -1,6 +1,6 @@
 import { serviceRequestPayloadSchema, type ServiceRequestType } from '@erametsad/types'
-import type { ZodError } from 'zod'
 import { NextResponse } from 'next/server'
+import type { ZodError } from 'zod'
 
 import {
   getMediaBucket,

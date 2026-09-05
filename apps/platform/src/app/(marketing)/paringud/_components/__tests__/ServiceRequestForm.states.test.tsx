@@ -150,7 +150,7 @@ async function fillValidIstutamine(
 }
 
 function text(): string {
-  return (container.textContent ?? '').replace(/<!--.*?-->/g, '')
+  return container.textContent.replace(/<!--.*?-->/g, '')
 }
 
 function submitButton(): HTMLButtonElement {
@@ -357,7 +357,9 @@ describe('ServiceRequestForm multipart transport (hooldusraie)', () => {
     ontimeout: (() => void) | null = null
     onload: (() => void) | null = null
 
-    open(): void {}
+    open(): void {
+      return undefined
+    }
 
     send(data: FormData): void {
       this.sent = data
