@@ -84,6 +84,7 @@ import {
   sealedCeremonyStateAction,
   signSealedApproverAction,
   signSealedOpenerAction,
+  voidSealedBidsAction,
   type SealedCeremonyActionState,
 } from '../auctions'
 
@@ -769,5 +770,108 @@ describe('confirmSealedCeremonyWinnerAction (reserve branches)', () => {
     expect(repos.updates).toEqual([])
     const backup = repos.creates.find((entry) => entry.data.action === 'sealed.house_backup')
     expect(backup?.data.after).toMatchObject({ reason: 'maja varupakkumine', topAmount: 150_000 })
+  })
+})
+
+describe('voidSealedBidsAction (superadmin void)', () => {
+  beforeEach(() => {
+    auctionId = `auction-${crypto.randomUUID()}`
+    state.session = { userId: 'opener-1', role: 'admin' }
+    state.cookies = { access_token: 'token-opener' }
+    vi.clearAllMocks()
+    decryptMock.mockImplementation((bids) => bids as unknown as DecryptedBid[])
+  })
+
+  const voidForm = (overrides: Record<string, string> = {}): FormData =>
+    form({ auctionId, reason: 'kahtlane pakkumine', ...overrides })
+
+  it('denies a role that is not a superadmin', async () => {
+    const repos = makeRepos(cleanFixture())
+    useRepos(repos)
+    const result = await voidSealedBidsAction(actionState('checklist'), voidForm())
+    expect(result).toEqual({
+      ok: false,
+      phase: 'checklist',
+      error: 'Avamise tühistada saab ainult superadmin.',
+    })
+    expect(repos.creates).toEqual([])
+    expect(repos.updates).toEqual([])
+  })
+
+  it('rejects a reason shorter than 5 characters', async () => {
+    state.session = { userId: 'opener-1', role: 'superadmin' }
+    const repos = makeRepos(cleanFixture())
+    useRepos(repos)
+    const result = await voidSealedBidsAction(actionState('checklist'), voidForm({ reason: 'ei' }))
+    expect(result).toEqual({
+      ok: false,
+      phase: 'checklist',
+      error: 'Tühistamise põhjus on kohustuslik (vähemalt 5 tähemärki).',
+    })
+    expect(repos.updates).toEqual([])
+  })
+
+  it('rejects every sealed bid, marks the lot unsold and audits sealed.void', async () => {
+    state.session = { userId: 'opener-1', role: 'superadmin' }
+    const repos = makeRepos(cleanFixture())
+    useRepos(repos)
+    getSealedBidsMock.mockResolvedValue([
+      sealedRow('bid-1', 'user-a', 150_000, minutesAgo(30)),
+      { ...sealedRow('bid-2', 'user-b', 120_000, minutesAgo(29)), status: 'rejected' },
+    ] as never)
+
+    const result = await voidSealedBidsAction(actionState('checklist'), voidForm())
+
+    expect(result).toEqual({ ok: true, phase: 'unsold', error: null })
+    expect(repos.updates).toContainEqual({
+      collection: 'bids',
+      id: 'bid-1',
+      data: { status: 'rejected' },
+    })
+    expect(repos.updates).not.toContainEqual({
+      collection: 'bids',
+      id: 'bid-2',
+      data: { status: 'rejected' },
+    })
+    expect(repos.updates).toContainEqual({
+      collection: 'auctions',
+      id: auctionId,
+      data: { status: 'unsold' },
+    })
+    const voidEntry = repos.creates.find((entry) => entry.data.action === 'sealed.void')
+    expect(voidEntry?.data).toMatchObject({
+      actorId: 'opener-1',
+      entityType: 'auction',
+      entityId: auctionId,
+      after: { reason: 'kahtlane pakkumine', status: 'unsold', voidedBidCount: 2 },
+    })
+  })
+
+  it('replays a no-op success on a second void without a duplicate audit entry', async () => {
+    state.session = { userId: 'opener-1', role: 'superadmin' }
+    const repos = makeRepos(cleanFixture())
+    useRepos(repos)
+    getSealedBidsMock.mockResolvedValue([sealedRow('bid-1', 'user-a', 150_000, minutesAgo(30))] as never)
+
+    const first = await voidSealedBidsAction(actionState('checklist'), voidForm())
+    // The lot is now unsold; the replay must resolve before the ended-only gate.
+    const second = await voidSealedBidsAction(actionState('unsold'), voidForm())
+
+    expect(first.ok).toBe(true)
+    expect(second).toEqual({ ok: true, phase: 'unsold', error: null })
+    expect(repos.creates.filter((entry) => entry.data.action === 'sealed.void')).toHaveLength(1)
+    expect(getSealedBidsMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports context.voided through the state action after the void', async () => {
+    state.session = { userId: 'opener-1', role: 'superadmin' }
+    useRepos(makeRepos(cleanFixture()))
+    getSealedBidsMock.mockResolvedValue([sealedRow('bid-1', 'user-a', 150_000, minutesAgo(30))] as never)
+
+    await voidSealedBidsAction(actionState('checklist'), voidForm())
+    const context = await sealedCeremonyStateAction(auctionId)
+
+    expect(context.voided).toBe(true)
+    expect(context.winnerConfirmed).toBe(false)
   })
 })

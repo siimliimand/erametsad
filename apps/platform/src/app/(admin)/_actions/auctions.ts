@@ -1979,6 +1979,121 @@ export async function confirmSealedCeremonyWinnerAction(
   return { ok: true, phase: 'confirmed', error: null }
 }
 
+/**
+ * Superadmin void of the sealed opening before the winner decision: every
+ * sealed bid is rejected, the lot is declared unsold, and the `sealed.void`
+ * audit entry — the same state location the legacy void writes — flips
+ * `sealedCeremonyStateAction` to its read-only voided view. A second void
+ * replays the same success like the one-shot reveal, without a duplicate
+ * audit entry.
+ */
+export async function voidSealedBidsAction(
+  _prev: SealedCeremonyActionState,
+  formData: FormData,
+): Promise<SealedCeremonyActionState> {
+  const { session, repositories } = await requireAdminRepositories()
+  const denied = ceremonyOperateOrError(session.role)
+  if (denied) return { ok: false, phase: 'checklist', error: denied }
+
+  const auctionId = readText(formData, 'auctionId')
+  const reason = readText(formData, 'reason')
+
+  // docs 05: the void path is superadmin-only with a typed reason.
+  if (session.role !== 'superadmin') {
+    return { ok: false, phase: 'checklist', error: 'Avamise tühistada saab ainult superadmin.' }
+  }
+  if (reason.length < MIN_REASON_LENGTH) {
+    return {
+      ok: false,
+      phase: 'checklist',
+      error: `Tühistamise põhjus on kohustuslik (vähemalt ${String(MIN_REASON_LENGTH)} tähemärki).`,
+    }
+  }
+
+  const auction = await repositories.findByID({ collection: 'auctions', id: auctionId })
+  if (!auction) return { ok: false, phase: 'checklist', error: 'Oksjonit ei leitud.' }
+
+  // Idempotency precedes the status gate: a voided lot is already `unsold`,
+  // so the replay must resolve before the ended-only eligibility check.
+  const existing = await findCeremonyAuditEntry(repositories, 'sealed.void', auctionId)
+  if (existing !== null) {
+    return { ok: true, phase: 'unsold', error: null }
+  }
+  if (auction.status !== 'ended') {
+    return {
+      ok: false,
+      phase: 'checklist',
+      error: 'Tühistada saab enne võitja kinnitamist; pärast kinnitamist tühistab lepingu 08 moodulis.',
+    }
+  }
+
+  const failure: string | null = await (async (): Promise<string | null> => {
+    try {
+      // Every sealed bid on the lot is voided; amounts were never revealed.
+      const sealedBids = await getSealedBidsForAuction(auctionId)
+      for (const bid of sealedBids) {
+        const status = typeof bid.status === 'string' ? bid.status : ''
+        if (status === 'rejected') continue
+        const bidId = typeof bid.id === 'string' ? bid.id : ''
+        if (bidId === '') continue
+        await repositories.update({
+          collection: 'bids',
+          id: bidId,
+          data: { status: 'rejected' },
+        })
+      }
+
+      await repositories.update({
+        collection: 'auctions',
+        id: auctionId,
+        data: { status: 'unsold' },
+      })
+
+      const bidderIds = [
+        ...new Set(
+          sealedBids
+            .map((bid) => (typeof bid.userId === 'string' ? bid.userId : ''))
+            .filter((userId) => userId !== ''),
+        ),
+      ]
+      for (const bidderId of bidderIds) {
+        eventBus.emit({
+          type: 'auction.ended',
+          userId: bidderId,
+          payload: {
+            auctionId,
+            auctionTitle: auction.title,
+            type: 'sealed',
+            hasWinner: false,
+            voided: true,
+          },
+        })
+      }
+
+      await audit(repositories, {
+        actorId: session.userId,
+        action: 'sealed.void',
+        entityType: 'auction',
+        entityId: auctionId,
+        after: { reason, status: 'unsold', voidedBidCount: sealedBids.length },
+      })
+
+      await ceremonyCache.delete(ceremonyRecordKey(auctionId))
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error)
+    }
+  })()
+  if (failure !== null) {
+    return { ok: false, phase: 'checklist', error: `Avamise tühistamine ebaõnnestus: ${failure}` }
+  }
+
+  revalidatePath(auctionDetailPath(auctionId))
+  revalidatePath(`${auctionDetailPath(auctionId)}/ceremony`)
+
+  return { ok: true, phase: 'unsold', error: null }
+}
+
 // ── Bulk schedule (task 2.2) ────────────────────────────────────────────────
 //
 // Draft-only scheduling from the auctions list: every selected lot is
