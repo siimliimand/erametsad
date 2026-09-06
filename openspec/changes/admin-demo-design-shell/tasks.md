@@ -9,7 +9,7 @@
 
 - [x] 2.1 Restyle the rail to the demo: white surface bg, right border, mist logo chip with primary icon; drop the primaryDark/white-10 treatment <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/app/(admin)/_components/AdminShell.tsx] -->
 - [x] 2.2 Restyle AdminNav states: muted icons, tint hover, strong-tint active + 3px primary left indicator, dark tooltip badge; restyle the horizontal mobile pills with demo tints <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/app/(admin)/_components/AdminNav.tsx] -->
-- [ ] 2.3 Make the topbar sticky 64px with brand title "Erametsad haldus" + semantic env badge (Arendus red, Test amber, prod hidden) and show operator name + role chip inline <!-- agent: fullstack-engineer.build, depends_on: [2.1], touches: [apps/platform/src/app/(admin)/_components/AdminShell.tsx] -->
+- [x] 2.3 Make the topbar sticky 64px with brand title "Erametsad haldus" + semantic env badge (Arendus red, Test amber, prod hidden) and show operator name + role chip inline <!-- agent: fullstack-engineer.build, depends_on: [2.1], touches: [apps/platform/src/app/(admin)/_components/AdminShell.tsx] -->
 - [ ] 2.4 Add the TopbarSearch stub component (disabled input, Search icon, placeholder "Otsi oksjoneid, kasutajaid, juhtlõimi...", ⌘K kbd badge) and mount it centered in the topbar <!-- agent: fullstack-engineer.fast, depends_on: [2.3], touches: [apps/platform/src/app/(admin)/_components/TopbarSearch.tsx, apps/platform/src/app/(admin)/_components/AdminShell.tsx] -->
 
 ## 3. Shared components
@@ -17,7 +17,7 @@
 - [x] 3.1 Restyle DataTable to demo density: mist header row at label size, 13px/18px body cells, hover row highlight, edge-cell padding <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/app/(admin)/_components/DataTable.tsx] -->
 - [x] 3.2 Restyle PageHeader: breadcrumb line, 28px/34px font-heading 700 title, right-aligned action slot <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/app/(admin)/_components/PageHeader.tsx] -->
 - [x] 3.3 Restyle FormField and ErrorNotice to the admin token scale (label 12px, input radius/border, danger banner styling) <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/app/(admin)/_components/FormField.tsx, apps/platform/src/app/(admin)/_components/ErrorNotice.tsx] -->
-- [ ] 3.4 Create shared StatusChip with the demo triads (mustand, ajastatud, aktiivne, lõppenud, müümata outline, leping, arhiivis) and adopt it in the auctions list and bids list <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/app/(admin)/_components/StatusChip.tsx, apps/platform/src/app/(admin)/admin/auctions/page.tsx, apps/platform/src/app/(admin)/admin/bids/page.tsx] -->
+- [x] 3.4 Create shared StatusChip with the demo triads (mustand, ajastatud, aktiivne, lõppenud, müümata outline, leping, arhiivis) and adopt it in the auctions list and bids list <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/app/(admin)/_components/StatusChip.tsx, apps/platform/src/app/(admin)/admin/auctions/page.tsx, apps/platform/src/app/(admin)/admin/bids/page.tsx] -->
 
 ## 4. Verification
 
