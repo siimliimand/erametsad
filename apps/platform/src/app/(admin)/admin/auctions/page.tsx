@@ -408,7 +408,7 @@ export default async function AdminAuctionsPage({
 
       <form method="get" action="/admin/auctions" className="mb-md flex flex-wrap items-center gap-sm rounded-card border border-border bg-bgPage p-md">
         <input type="hidden" name="tab" value={tab.id} />
-        <label className="flex items-center gap-xs text-label text-ink-muted">
+        <label className="flex items-center gap-xs text-label text-inkMuted">
           Olek
           <select name="status" multiple className={`${filterSelectClass} h-auto`} defaultValue={statusFilter}>
             {auctionStatusList.map((status) => (
@@ -418,7 +418,7 @@ export default async function AdminAuctionsPage({
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-xs text-label text-ink-muted">
+        <label className="flex items-center gap-xs text-label text-inkMuted">
           Tüüp
           <select name="type" className={filterSelectClass} defaultValue={typeFilter ?? ''}>
             <option value="">Kõik objektid</option>
@@ -429,7 +429,7 @@ export default async function AdminAuctionsPage({
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-xs text-label text-ink-muted">
+        <label className="flex items-center gap-xs text-label text-inkMuted">
           Mehaanika
           <select name="auctionType" className={filterSelectClass} defaultValue={auctionTypeFilter ?? ''}>
             <option value="">Kõik</option>
@@ -438,7 +438,7 @@ export default async function AdminAuctionsPage({
           </select>
         </label>
         {specialistUsers.length > 0 && scope.kind === 'all' ? (
-          <label className="flex items-center gap-xs text-label text-ink-muted">
+          <label className="flex items-center gap-xs text-label text-inkMuted">
             Spetsialist
             <select name="specialist" className={filterSelectClass} defaultValue={specialistFilter ?? ''}>
               <option value="">Kõik</option>
@@ -450,7 +450,7 @@ export default async function AdminAuctionsPage({
             </select>
           </label>
         ) : null}
-        <label className="flex items-center gap-xs text-label text-ink-muted">
+        <label className="flex items-center gap-xs text-label text-inkMuted">
           Maakond
           <select name="county" className={filterSelectClass} defaultValue={countyFilter ?? ''}>
             <option value="">Kõik</option>
@@ -461,15 +461,15 @@ export default async function AdminAuctionsPage({
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-xs text-label text-ink-muted">
+        <label className="flex items-center gap-xs text-label text-inkMuted">
           Lõpp alates
           <input type="date" name="endFrom" defaultValue={currentValues.endFrom ?? ''} className={filterSelectClass} />
         </label>
-        <label className="flex items-center gap-xs text-label text-ink-muted">
+        <label className="flex items-center gap-xs text-label text-inkMuted">
           kuni
           <input type="date" name="endTo" defaultValue={currentValues.endTo ?? ''} className={filterSelectClass} />
         </label>
-        <label className="flex min-w-[16rem] flex-1 items-center gap-xs text-label text-ink-muted">
+        <label className="flex min-w-[16rem] flex-1 items-center gap-xs text-label text-inkMuted">
           <span className="sr-only">{FREETEXT_HINT}</span>
           <input
             type="search"
@@ -482,7 +482,7 @@ export default async function AdminAuctionsPage({
         <button type="submit" className="h-9 rounded-button border border-border px-3 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary">
           Filtreeri
         </button>
-        <Link href={buildUrl({ status: undefined, type: undefined, auctionType: undefined, specialist: undefined, county: undefined, endFrom: undefined, endTo: undefined, q: undefined, page: undefined })} className="text-label font-semibold text-ink-muted transition-colors duration-hover ease-hover hover:text-primary">
+        <Link href={buildUrl({ status: undefined, type: undefined, auctionType: undefined, specialist: undefined, county: undefined, endFrom: undefined, endTo: undefined, q: undefined, page: undefined })} className="text-label font-semibold text-inkMuted transition-colors duration-hover ease-hover hover:text-primary">
           Tühjenda{activeFilterCount > 0 ? ` (${String(activeFilterCount)})` : ''}
         </Link>
       </form>
@@ -495,7 +495,7 @@ export default async function AdminAuctionsPage({
             className="flex flex-wrap items-center gap-sm rounded-card border border-border bg-bgPage px-md py-sm"
           >
             <span className="text-label font-semibold text-ink">Bulks ajastamine</span>
-            <label className="flex items-center gap-xs text-label text-ink-muted">
+            <label className="flex items-center gap-xs text-label text-inkMuted">
               Algus
               <input
                 type="datetime-local"
@@ -504,11 +504,11 @@ export default async function AdminAuctionsPage({
                 className={filterSelectClass}
               />
             </label>
-            <label className="flex items-center gap-xs text-label text-ink-muted">
+            <label className="flex items-center gap-xs text-label text-inkMuted">
               Lõpp
               <input type="datetime-local" name="endsAt" className={filterSelectClass} />
             </label>
-            <span className="text-bodySm text-ink-muted">
+            <span className="text-bodySm text-inkMuted">
               Vali tabelist mustandid; mitte-mustandid blokeeritakse. Kellaaeg Europe/Tallinn.
             </span>
             <button type="submit" className={primaryButtonClass}>
@@ -634,7 +634,7 @@ export default async function AdminAuctionsPage({
                     <input type="hidden" name="id" value={row.id} />
                     <button
                       type="submit"
-                      className="text-label font-semibold text-ink-muted transition-colors duration-hover ease-hover hover:text-ink"
+                      className="text-label font-semibold text-inkMuted transition-colors duration-hover ease-hover hover:text-ink"
                       title="Dupl."
                     >
                       Dupl.
@@ -654,7 +654,7 @@ export default async function AdminAuctionsPage({
                       <p className="text-label font-semibold text-danger">
                         Kinnitan lõpetamise — see on pöördumatu
                       </p>
-                      <label className="flex flex-col gap-xs text-label text-ink-muted">
+                      <label className="flex flex-col gap-xs text-label text-inkMuted">
                         Lõpetamise põhjus (kohustuslik)
                         <textarea
                           name="reason"
@@ -666,7 +666,7 @@ export default async function AdminAuctionsPage({
                         />
                       </label>
                       <fieldset className="flex flex-col gap-xs text-bodySm text-ink">
-                        <legend className="text-label text-ink-muted">Tulemus</legend>
+                        <legend className="text-label text-inkMuted">Tulemus</legend>
                         <label className="flex items-center gap-xs">
                           <input type="radio" name="outcome" value="winner" defaultChecked />
                           Kuuluta võitjaks praegune kõrgeim pakkumine
@@ -678,7 +678,7 @@ export default async function AdminAuctionsPage({
                       </fieldset>
                       <button
                         type="submit"
-                        className="rounded-button border border-danger px-3 py-1 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light"
+                        className="rounded-button border border-danger px-3 py-1 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-dangerLight"
                       >
                         Lõpeta käsitsi
                       </button>
@@ -687,7 +687,7 @@ export default async function AdminAuctionsPage({
                 ) : null}
                 {roleCanArchive && (row.status === 'unsold' || row.status === 'completed') ? (
                   <details className="relative">
-                    <summary className="cursor-pointer text-label font-semibold text-ink-muted transition-colors duration-hover ease-hover hover:text-ink">
+                    <summary className="cursor-pointer text-label font-semibold text-inkMuted transition-colors duration-hover ease-hover hover:text-ink">
                       Arhiivi
                     </summary>
                     <form
@@ -695,7 +695,7 @@ export default async function AdminAuctionsPage({
                       className="mt-xs flex w-72 flex-col gap-xs rounded-card border border-border bg-bgPage p-sm shadow-md"
                     >
                       <input type="hidden" name="id" value={row.id} />
-                      <label className="flex flex-col gap-xs text-label text-ink-muted">
+                      <label className="flex flex-col gap-xs text-label text-inkMuted">
                         Arhiiveerimise põhjus (kohustuslik)
                         <textarea
                           name="reason"
@@ -734,7 +734,7 @@ export default async function AdminAuctionsPage({
         emptyLabel="Filtritele vastavaid oksjoneid ei leitud"
       />
 
-      <div className="mt-sm flex items-center justify-between text-label text-ink-muted">
+      <div className="mt-sm flex items-center justify-between text-label text-inkMuted">
         <span>
           {totalCount === 0
             ? '0 oksjonit'

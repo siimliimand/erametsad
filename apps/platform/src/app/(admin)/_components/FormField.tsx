@@ -9,7 +9,7 @@ export const inputClass =
   'h-10 w-full rounded-input border border-border bg-bgPage px-3 text-bodySm text-ink outline-none transition-colors duration-hover ease-hover focus:border-primary focus:ring-2 focus:ring-primary/20'
 
 export const primaryButtonClass =
-  'inline-flex h-10 items-center gap-xs rounded-button bg-primary px-4 text-label font-semibold text-ink-inverse transition-colors duration-hover ease-hover hover:bg-primaryHover'
+  'inline-flex h-10 items-center gap-xs rounded-button bg-primary px-4 text-label font-semibold text-inkInverse transition-colors duration-hover ease-hover hover:bg-primaryHover'
 
 export const secondaryButtonClass =
   'inline-flex h-10 items-center gap-xs rounded-button border border-border bg-bgPage px-4 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary'

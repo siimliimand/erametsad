@@ -29,14 +29,14 @@ export default async function AdminDashboardPage() {
   return (
     <div>
       <h1 className="font-heading text-h3 font-bold text-ink">Töölaud</h1>
-      <p className="mt-xs text-bodySm text-ink-muted">Ülevaade platvormi olulisematest arvudest.</p>
+      <p className="mt-xs text-bodySm text-inkMuted">Ülevaade platvormi olulisematest arvudest.</p>
       <div className="mt-md grid grid-cols-1 gap-sm sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <div
             key={stat.label}
             className="rounded-card border border-border bg-bgPage p-md shadow-card"
           >
-            <p className="text-label font-semibold text-ink-muted">{stat.label}</p>
+            <p className="text-label font-semibold text-inkMuted">{stat.label}</p>
             <p className="mt-xs font-mono text-count font-medium text-primaryDark">{stat.value}</p>
           </div>
         ))}
