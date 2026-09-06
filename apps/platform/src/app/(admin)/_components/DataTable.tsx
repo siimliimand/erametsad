@@ -13,13 +13,15 @@ export interface DataTableColumn<T> {
   key: string
   label: string
   render?: (row: T) => ReactNode
-  sort?: DataTableColumnSort
+  sort?: DataTableColumnSort | undefined
 }
 
 export interface DataTableProps<T> {
   columns: readonly DataTableColumn<T>[]
   rows: readonly T[]
   emptyLabel?: string
+  // Extra <tr> classes, e.g. selection highlights; applied per row.
+  rowClassName?: (row: T) => string
 }
 
 function rowKey(row: unknown, index: number): string {
@@ -40,7 +42,12 @@ function SortGlyph({ dir, active }: { dir?: 'asc' | 'desc' | undefined; active: 
   return <ArrowUpDownIcon className={className} />
 }
 
-export function DataTable<T>({ columns, rows, emptyLabel = 'Andmeid pole' }: DataTableProps<T>) {
+export function DataTable<T>({
+  columns,
+  rows,
+  emptyLabel = 'Andmeid pole',
+  rowClassName,
+}: DataTableProps<T>) {
   if (rows.length === 0) {
     return (
       <div className="rounded-card border border-border bg-bgPage px-md py-lg text-center text-bodySm text-inkMuted shadow-card">
@@ -82,7 +89,7 @@ export function DataTable<T>({ columns, rows, emptyLabel = 'Andmeid pole' }: Dat
           {rows.map((row, index) => (
             <tr
               key={rowKey(row, index)}
-              className="border-b border-border last:border-b-0 hover:bg-bgMist transition-colors duration-hover ease-hover"
+              className={`border-b border-border last:border-b-0 hover:bg-bgMist transition-colors duration-hover ease-hover${rowClassName ? ` ${rowClassName(row)}` : ''}`}
             >
               {columns.map((column) => (
                 <td key={column.key} className="py-3 px-3 text-[13px] leading-[18px] text-ink first:pl-5 last:pr-5">

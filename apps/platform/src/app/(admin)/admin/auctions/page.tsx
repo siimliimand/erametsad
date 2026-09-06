@@ -1,8 +1,10 @@
 import { Download as DownloadIcon } from 'lucide-react'
 import Link from 'next/link'
-import type { ComponentType } from 'react'
 
-import { Countdown } from './_components/Countdown'
+import {
+  AuctionsTable,
+  type AuctionTableRow,
+} from './_components/AuctionsTable'
 import {
   countdownText,
   defaultSortFor,
@@ -17,36 +19,23 @@ import {
   endAuctionManuallyAction,
   relistAuctionAction,
 } from '../../_actions/auctions'
-import {
-  DataTable,
-  type DataTableColumnSort,
-} from '../../_components/DataTable'
+import type { DataTableColumnSort } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
-import { StatusChip } from '../../_components/StatusChip'
 import {
   ChevronDownIcon,
-  CopyIcon,
-  EllipsisIcon,
-  ExternalLinkIcon,
-  MapPinHouseIcon,
-  PackageIcon,
-  PencilIcon,
   PlusIcon,
   SearchIcon,
-  TreePineIcon,
   XIcon,
-  ZapIcon,
 } from '../../_components/icons'
 import { requireAdminRepositories } from '../../_lib/admin'
 import {
   auctionObjectTypeLabels,
   auctionStatusLabels,
-  auctionTypeLabels,
   formatDateTime,
   formatEur,
 } from '../../_lib/labels'
@@ -77,28 +66,6 @@ const LIST_TABS: readonly {
 const PAGE_SIZE = 25
 const FREETEXT_HINT =
   'Otsi: id / nimi / kataster / registri number / alias e-post'
-
-const typeChipClass: Record<AuctionObjectType, string> = {
-  raieoigus: 'bg-[var(--st-active-bg)] text-[color:var(--st-active-text)]',
-  kinnistu: 'bg-[var(--st-scheduled-bg)] text-[color:var(--st-scheduled-text)]',
-  pakett: 'bg-[var(--st-draft-bg)] text-[color:var(--st-draft-text)]',
-  kiire: 'bg-[var(--st-draft-bg)] text-[color:var(--st-draft-text)]',
-}
-
-const typeChipIcons: Record<
-  AuctionObjectType,
-  ComponentType<{ className?: string }>
-> = {
-  raieoigus: TreePineIcon,
-  kinnistu: MapPinHouseIcon,
-  pakett: PackageIcon,
-  kiire: ZapIcon,
-}
-
-const raBtnClass =
-  'inline-flex items-center gap-1 rounded-md border border-border bg-bgPage px-2 py-1 text-[11px] font-medium text-inkMuted transition-colors duration-hover ease-hover'
-const raBtnActionClass = `${raBtnClass} hover:border-primary hover:bg-bgMist hover:text-primary`
-const raBtnDangerClass = `${raBtnClass} hover:border-danger hover:bg-dangerLight hover:text-danger`
 
 type RawParams = Record<string, string | string[] | undefined>
 
@@ -150,21 +117,6 @@ function tallinnDayStartIso(day: string): string | null {
 function tallinnDayEndIso(day: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null
   return new Date(`${day}T23:59:59+03:00`).toISOString()
-}
-
-interface AuctionRow {
-  id: string
-  title: string
-  objectType: AuctionObjectType
-  type: 'open' | 'sealed'
-  isQuickAuction: boolean
-  status: AuctionStatus
-  countyName: string | null
-  minBidCents: number
-  endsAt: string | null
-  bidCount: number
-  pendingCount: number
-  specialistName: string | null
 }
 
 function freetextMatches(
@@ -386,7 +338,15 @@ export default async function AdminAuctionsPage({
     countBids(bids.docs)
   }
 
-  const rows: AuctionRow[] = pageEntries.map(({ doc }) => ({
+  const roleCanEndManual = can(role, 'auctions:end-manual')
+  const roleCanArchive = can(role, 'auctions:archive')
+  const roleCanWrite = can(role, 'auctions:write')
+  const roleCanExport = can(role, 'auctions:export')
+
+  // Rows are serialized for the client wrapper: every string a cell renders
+  // is precomputed here so the client bundle stays lean and hydration
+  // output matches the server render.
+  const rows: AuctionTableRow[] = pageEntries.map(({ doc }) => ({
     id: doc.id,
     title: doc.title,
     objectType: doc.objectType,
@@ -395,18 +355,30 @@ export default async function AdminAuctionsPage({
     status: doc.status,
     countyName: doc.countyId ? (countyNames.get(doc.countyId) ?? null) : null,
     minBidCents: doc.minBidCents,
+    minBidLabel: formatEur(doc.minBidCents),
     endsAt: doc.endsAt,
+    endsLabel:
+      doc.endsAt === null
+        ? null
+        : doc.status === 'active'
+          ? countdownText(doc.endsAt, now)
+          : formatDateTime(doc.endsAt),
     bidCount: bidCounts.get(doc.id) ?? 0,
     pendingCount: pendingCounts.get(doc.id) ?? 0,
     specialistName: doc.specialistId
       ? (specialistNames.get(doc.specialistId) ?? null)
       : null,
+    specialistInitials: initials(
+      doc.specialistId ? (specialistNames.get(doc.specialistId) ?? null) : null,
+    ),
+    portalHref: `/oksjon/${doc.id}`,
+    editHref: `/admin/auctions/${doc.id}/edit`,
+    canEnd: roleCanEndManual && doc.status === 'active',
+    canArchive:
+      roleCanArchive && (doc.status === 'unsold' || doc.status === 'completed'),
+    canRelist:
+      roleCanWrite && (doc.status === 'ended' || doc.status === 'unsold'),
   }))
-
-  const roleCanEndManual = can(role, 'auctions:end-manual')
-  const roleCanArchive = can(role, 'auctions:archive')
-  const roleCanWrite = can(role, 'auctions:write')
-  const roleCanExport = can(role, 'auctions:export')
 
   const currentValues = {
     tab: tab.id,
@@ -442,6 +414,14 @@ export default async function AdminAuctionsPage({
       : { dir: 'asc', href: buildUrl({ sort: `-${key}` }) }
   }
 
+  const sorts: Partial<Record<SortKey, DataTableColumnSort>> = {
+    id: columnSort('id'),
+    title: columnSort('title'),
+    minBidCents: columnSort('minBidCents'),
+    bidCount: columnSort('bidCount'),
+    endsAt: columnSort('endsAt'),
+  }
+
   const activeFilterCount = [
     currentValues.status,
     currentValues.type,
@@ -453,8 +433,6 @@ export default async function AdminAuctionsPage({
     currentValues.q,
   ].filter(Boolean).length
 
-  const filterSelectClass =
-    'h-9 rounded-input border border-border bg-bgPage px-2 text-bodySm text-ink'
   const filterChipClass =
     'inline-flex h-[34px] items-center gap-1.5 rounded-pill border border-border bg-bgPage px-2.5 text-label text-inkMuted transition-colors duration-hover ease-hover focus-within:border-primary'
   const filterChipSelectClass =
@@ -700,344 +678,17 @@ export default async function AdminAuctionsPage({
         </Link>
       </form>
 
-      {roleCanWrite ? (
-        <form
-          id="bulk-schedule-form"
-          action={bulkScheduleAuctionsAction}
-          className="mb-md flex flex-wrap items-center gap-sm rounded-card border border-border bg-bgPage px-md py-sm"
-        >
-          <span className="text-label font-semibold text-ink">
-            Bulks ajastamine
-          </span>
-          <label className="flex items-center gap-xs text-label text-inkMuted">
-            Algus
-            <input
-              type="datetime-local"
-              name="startsAt"
-              required
-              className={filterSelectClass}
-            />
-          </label>
-          <label className="flex items-center gap-xs text-label text-inkMuted">
-            Lõpp
-            <input
-              type="datetime-local"
-              name="endsAt"
-              className={filterSelectClass}
-            />
-          </label>
-          <span className="text-bodySm text-inkMuted">
-            Vali tabelist mustandid; mitte-mustandid blokeeritakse. Kellaaeg
-            Europe/Tallinn.
-          </span>
-          <button type="submit" className={primaryButtonClass}>
-            Ajasta valitud
-          </button>
-        </form>
-      ) : null}
-
-      <DataTable
-        columns={[
-          ...(roleCanWrite
-            ? [
-                {
-                  key: 'select',
-                  label: 'Vali',
-                  render: (row: AuctionRow) => (
-                    <input
-                      type="checkbox"
-                      name="ids"
-                      value={row.id}
-                      form="bulk-schedule-form"
-                      aria-label={`Vali oksjon ${row.title}`}
-                      className="h-4 w-4 accent-primary"
-                    />
-                  ),
-                },
-              ]
-            : []),
-          {
-            key: 'id',
-            label: 'ID',
-            sort: columnSort('id'),
-            render: (row) => (
-              <Link
-                href={`/admin/auctions/${row.id}`}
-                className="font-mono text-bodySm text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
-                title={row.id}
-              >
-                #{row.id.slice(0, 8)}
-              </Link>
-            ),
-          },
-          {
-            key: 'title',
-            label: 'Nimi',
-            sort: columnSort('title'),
-            render: (row) => (
-              <span className="flex items-center gap-1.5">
-                {row.isQuickAuction || row.objectType === 'kiire' ? (
-                  <>
-                    <ZapIcon
-                      aria-hidden="true"
-                      className="h-3.5 w-3.5 shrink-0 text-cta"
-                    />
-                    <span className="sr-only">Kiiroksjon</span>
-                  </>
-                ) : null}
-                <Link
-                  href={`/admin/auctions/${row.id}`}
-                  className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
-                >
-                  {row.title}
-                </Link>
-              </span>
-            ),
-          },
-          {
-            key: 'objectType',
-            label: 'Tüüp',
-            render: (row) => {
-              const TypeIcon = typeChipIcons[row.objectType]
-              return (
-                <span
-                  title={`${auctionObjectTypeLabels[row.objectType]} — ${auctionTypeLabels[row.type]}`}
-                  className={`inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-label ${typeChipClass[row.objectType]}`}
-                >
-                  <TypeIcon aria-hidden="true" className="h-3 w-3" />
-                  <span className="sr-only">
-                    {auctionObjectTypeLabels[row.objectType]}
-                  </span>
-                  <span
-                    title={auctionTypeLabels[row.type]}
-                    className="rounded border border-border bg-bgPage px-1 font-mono text-[10px] text-inkMuted"
-                  >
-                    {row.type === 'open' ? 'A' : 'S'}
-                  </span>
-                </span>
-              )
-            },
-          },
-          {
-            key: 'status',
-            label: 'Olek',
-            render: (row) => <StatusChip status={row.status} />,
-          },
-          {
-            key: 'countyName',
-            label: 'Maakond',
-            render: (row) => row.countyName ?? '—',
-          },
-          {
-            key: 'minBidCents',
-            label: 'Alghind',
-            sort: columnSort('minBidCents'),
-            render: (row) => (
-              <span className="text-right tabular-nums">
-                {formatEur(row.minBidCents)}
-              </span>
-            ),
-          },
-          {
-            key: 'bidCount',
-            label: 'Pakkumisi',
-            sort: columnSort('bidCount'),
-            render: (row) => (
-              <span className="tabular-nums">
-                {String(row.bidCount)}
-                {row.pendingCount > 0 ? (
-                  <span
-                    className="ml-1 font-medium text-amber-600"
-                    title="Alapakkumisi ootel"
-                  >
-                    ({String(row.pendingCount)}p)
-                  </span>
-                ) : null}
-              </span>
-            ),
-          },
-          {
-            key: 'endsAt',
-            label: 'Lõpp',
-            sort: columnSort('endsAt'),
-            render: (row) => {
-              if (!row.endsAt) return '—'
-              if (row.status === 'active') {
-                return (
-                  <Countdown endsAt={row.endsAt}>
-                    {countdownText(row.endsAt, now)}
-                  </Countdown>
-                )
-              }
-              return formatDateTime(row.endsAt)
-            },
-          },
-          {
-            key: 'specialistName',
-            label: 'Spetsialist',
-            render: (row) =>
-              row.specialistName ? (
-                <>
-                  <span
-                    aria-hidden="true"
-                    title={row.specialistName}
-                    className="flex h-[26px] w-[26px] items-center justify-center rounded-pill bg-primaryLight font-heading text-[10px] font-semibold text-primary"
-                  >
-                    {initials(row.specialistName)}
-                  </span>
-                  <span className="sr-only">{row.specialistName}</span>
-                </>
-              ) : (
-                '—'
-              ),
-          },
-          {
-            key: 'actions',
-            label: 'Tegevused',
-            render: (row) => (
-              <span className="row-actions">
-                <a
-                  href={`/oksjon/${row.id}`}
-                  target="_blank"
-                  rel="noopener"
-                  title="Vaata portaalis"
-                  className={raBtnActionClass}
-                >
-                  <ExternalLinkIcon aria-hidden="true" className="h-3 w-3" />
-                  Vaata
-                </a>
-                {roleCanWrite ? (
-                  <Link
-                    href={`/admin/auctions/${row.id}/edit`}
-                    title="Muuda oksjonit"
-                    className={raBtnActionClass}
-                  >
-                    <PencilIcon aria-hidden="true" className="h-3 w-3" />
-                    Muuda
-                  </Link>
-                ) : null}
-                {roleCanWrite ? (
-                  <form action={duplicateAuctionAction}>
-                    <input type="hidden" name="id" value={row.id} />
-                    <button
-                      type="submit"
-                      title="Duplikaat uueks mustandiks"
-                      className={raBtnActionClass}
-                    >
-                      <CopyIcon aria-hidden="true" className="h-3 w-3" />
-                      Dupl.
-                    </button>
-                  </form>
-                ) : null}
-                {roleCanEndManual && row.status === 'active' ? (
-                  <details className="relative">
-                    <summary
-                      title="Lõpeta käsitsi"
-                      className={`${raBtnDangerClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
-                    >
-                      <EllipsisIcon aria-hidden="true" className="h-3 w-3" />
-                      Lõpeta
-                    </summary>
-                    <form
-                      action={endAuctionManuallyAction}
-                      className="mt-xs flex w-72 flex-col gap-xs rounded-card border border-border bg-bgPage p-3 shadow-modal"
-                    >
-                      <input type="hidden" name="id" value={row.id} />
-                      <p className="text-label font-semibold text-danger">
-                        Kinnitan lõpetamise — see on pöördumatu
-                      </p>
-                      <label className="flex flex-col gap-xs text-label text-inkMuted">
-                        Lõpetamise põhjus (kohustuslik)
-                        <textarea
-                          name="reason"
-                          required
-                          minLength={5}
-                          rows={2}
-                          className="rounded-input border border-border bg-bgPage px-2 py-1 text-bodySm text-ink"
-                          placeholder="Kirjuta põhjus (min 5 tähemärki)"
-                        />
-                      </label>
-                      <fieldset className="flex flex-col gap-xs text-bodySm text-ink">
-                        <legend className="text-label text-inkMuted">
-                          Tulemus
-                        </legend>
-                        <label className="flex items-center gap-xs">
-                          <input
-                            type="radio"
-                            name="outcome"
-                            value="winner"
-                            defaultChecked
-                          />
-                          Kuuluta võitjaks praegune kõrgeim pakkumine
-                        </label>
-                        <label className="flex items-center gap-xs">
-                          <input type="radio" name="outcome" value="unsold" />
-                          Märgi müümata
-                        </label>
-                      </fieldset>
-                      <button
-                        type="submit"
-                        className="rounded-button border border-danger px-3 py-1 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-dangerLight"
-                      >
-                        Lõpeta käsitsi
-                      </button>
-                    </form>
-                  </details>
-                ) : null}
-                {roleCanArchive &&
-                (row.status === 'unsold' || row.status === 'completed') ? (
-                  <details className="relative">
-                    <summary
-                      title="Arhiivi"
-                      className={`${raBtnActionClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
-                    >
-                      <EllipsisIcon aria-hidden="true" className="h-3 w-3" />
-                      Arhiivi
-                    </summary>
-                    <form
-                      action={archiveAuctionAction}
-                      className="mt-xs flex w-72 flex-col gap-xs rounded-card border border-border bg-bgPage p-3 shadow-modal"
-                    >
-                      <input type="hidden" name="id" value={row.id} />
-                      <label className="flex flex-col gap-xs text-label text-inkMuted">
-                        Arhiiveerimise põhjus (kohustuslik)
-                        <textarea
-                          name="reason"
-                          required
-                          minLength={5}
-                          rows={2}
-                          className="rounded-input border border-border bg-bgPage px-2 py-1 text-bodySm text-ink"
-                          placeholder="Kirjuta põhjus (min 5 tähemärki)"
-                        />
-                      </label>
-                      <button
-                        type="submit"
-                        className="rounded-button border border-border px-3 py-1 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary"
-                      >
-                        Arhiivi
-                      </button>
-                    </form>
-                  </details>
-                ) : null}
-                {roleCanWrite &&
-                (row.status === 'ended' || row.status === 'unsold') ? (
-                  <form action={relistAuctionAction}>
-                    <input type="hidden" name="id" value={row.id} />
-                    <button
-                      type="submit"
-                      title="Avalda uuesti"
-                      className={raBtnActionClass}
-                    >
-                      Avalda uuesti
-                    </button>
-                  </form>
-                ) : null}
-              </span>
-            ),
-          },
-        ]}
+      <AuctionsTable
         rows={rows}
-        emptyLabel="Filtritele vastavaid oksjoneid ei leitud"
+        sorts={sorts}
+        csvHref={csvHref}
+        roleCanWrite={roleCanWrite}
+        roleCanExport={roleCanExport}
+        bulkScheduleAction={bulkScheduleAuctionsAction}
+        duplicateAction={duplicateAuctionAction}
+        endManuallyAction={endAuctionManuallyAction}
+        archiveAction={archiveAuctionAction}
+        relistAction={relistAuctionAction}
       />
 
       <div className="mt-sm flex items-center justify-between text-label text-inkMuted">
