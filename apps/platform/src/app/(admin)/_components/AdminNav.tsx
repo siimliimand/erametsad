@@ -66,7 +66,7 @@ export function AdminNav({
               href={module.href}
               aria-current={active ? 'page' : undefined}
               className={`whitespace-nowrap rounded-pill px-3 py-1 text-label font-semibold transition-colors duration-hover ease-hover ${
-                active ? 'bg-primaryLight text-primaryDark' : 'text-inkMuted hover:text-primary'
+                active ? 'bg-[var(--tint-primary-strong)] text-primary' : 'text-inkMuted hover:bg-[var(--tint-primary)] hover:text-primary'
               }`}
             >
               {module.label}
@@ -90,20 +90,20 @@ export function AdminNav({
             aria-current={active ? 'page' : undefined}
             className={`group relative flex h-10 w-10 items-center justify-center rounded-button transition-colors duration-hover ease-hover ${
               active
-                ? 'bg-white/15 text-inkInverse'
-                : 'text-inkInverse opacity-70 hover:bg-white/10 hover:opacity-100'
+                ? 'bg-[var(--tint-primary-strong)] text-primary'
+                : 'text-inkMuted hover:bg-[var(--tint-primary)] hover:text-primary'
             }`}
           >
             <span
               aria-hidden="true"
-              className={`absolute -left-2 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-pill transition-colors duration-hover ${
-                active ? 'bg-inkInverse' : 'bg-transparent'
+              className={`absolute -left-2 top-1.5 bottom-1.5 h-auto w-[3px] rounded-r-[2px] transition-colors duration-hover ${
+                active ? 'bg-primary' : 'bg-transparent'
               }`}
             />
             <Icon className="h-5 w-5 shrink-0" />
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute left-full z-20 ml-2 whitespace-nowrap rounded-button bg-ink px-2 py-1 text-label font-semibold text-inkInverse opacity-0 shadow-card transition-opacity duration-hover ease-hover group-focus-within:opacity-100 group-hover:opacity-100"
+              className="pointer-events-none absolute left-full z-20 ml-2 whitespace-nowrap rounded-[6px] bg-ink px-2 py-1 text-label font-medium text-inkInverse opacity-0 shadow-card transition-opacity duration-hover ease-hover group-focus-within:opacity-100 group-hover:opacity-100"
             >
               {module.label}
             </span>
