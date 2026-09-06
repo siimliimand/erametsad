@@ -74,7 +74,7 @@ function slaBadge(
 
 const slaToneClass: Record<'amber' | 'red', string> = {
   amber: 'bg-amber-50 text-amber-700',
-  red: 'bg-danger-light text-danger',
+  red: 'bg-dangerLight text-danger',
 }
 
 export default async function AdminBidsPage({
@@ -249,7 +249,7 @@ export default async function AdminBidsPage({
 
   const decisionCell = (row: QueueRow): ReactNode => {
     if (row.auctionStatus !== 'active') {
-      return <span className="text-label text-ink-muted">Otsustamine ainult aktiivsel oksjonil</span>
+      return <span className="text-label text-inkMuted">Otsustamine ainult aktiivsel oksjonil</span>
     }
     return (
       <span className="flex flex-wrap items-center gap-sm">
@@ -275,7 +275,7 @@ export default async function AdminBidsPage({
             <input type="hidden" name="auctionId" value={row.auctionId} />
             <input type="hidden" name="bidId" value={row.bidId} />
             <input type="hidden" name="redirectTo" value={redirectTo} />
-            <label className="flex flex-col gap-xs text-label text-ink-muted">
+            <label className="flex flex-col gap-xs text-label text-inkMuted">
               Keeldumise põhjus (kohustuslik, min 5 tähemärki)
               <textarea
                 name="reason"
@@ -288,7 +288,7 @@ export default async function AdminBidsPage({
             </label>
             <button
               type="submit"
-              className="rounded-button border border-danger px-3 py-1 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light"
+              className="rounded-button border border-danger px-3 py-1 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-dangerLight"
             >
               Lükka tagasi
             </button>
@@ -344,7 +344,7 @@ export default async function AdminBidsPage({
           className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
         >
           {row.auctionTitle}
-          <span className="ml-1 text-ink-muted">
+          <span className="ml-1 text-inkMuted">
             ({auctionTypeLabels[row.auctionType]} · {auctionStatusLabels[row.auctionStatus]})
           </span>
         </Link>
@@ -387,7 +387,7 @@ export default async function AdminBidsPage({
       {teade ? (
         <div
           role="status"
-          className="mb-md rounded-input border border-l-4 border-info bg-info-light px-md py-sm text-bodySm text-info"
+          className="mb-md rounded-input border border-l-4 border-info bg-infoLight px-md py-sm text-bodySm text-info"
         >
           {teade}
         </div>
@@ -401,7 +401,7 @@ export default async function AdminBidsPage({
               href={viewHref('jarjekord')}
               aria-current={!grouped ? 'page' : undefined}
               className={`rounded-pill border px-3 py-1 text-label font-semibold ${
-                !grouped ? 'border-primary bg-primary-light text-primaryDark' : 'border-border text-ink-muted'
+                !grouped ? 'border-primary bg-primaryLight text-primaryDark' : 'border-border text-inkMuted'
               }`}
             >
               Järjekord
@@ -410,7 +410,7 @@ export default async function AdminBidsPage({
               href={viewHref('oksjonid')}
               aria-current={grouped ? 'page' : undefined}
               className={`rounded-pill border px-3 py-1 text-label font-semibold ${
-                grouped ? 'border-primary bg-primary-light text-primaryDark' : 'border-border text-ink-muted'
+                grouped ? 'border-primary bg-primaryLight text-primaryDark' : 'border-border text-inkMuted'
               }`}
             >
               Oksjoniti
@@ -421,7 +421,7 @@ export default async function AdminBidsPage({
 
       <form method="get" action="/admin/bids" className="mb-md flex flex-wrap items-center gap-sm rounded-card border border-border bg-bgPage p-md">
         {grouped ? <input type="hidden" name="vaade" value="oksjonid" /> : null}
-        <label className="flex items-center gap-xs text-label text-ink-muted">
+        <label className="flex items-center gap-xs text-label text-inkMuted">
           Mehaanika
           <select name="type" className={filterSelectClass} defaultValue={typeFilter ?? ''}>
             <option value="">Kõik</option>
@@ -429,7 +429,7 @@ export default async function AdminBidsPage({
             <option value="sealed">Suletud</option>
           </select>
         </label>
-        <label className="flex items-center gap-xs text-label text-ink-muted">
+        <label className="flex items-center gap-xs text-label text-inkMuted">
           Maakond
           <select name="county" className={filterSelectClass} defaultValue={countyFilter ?? ''}>
             <option value="">Kõik</option>
@@ -446,14 +446,14 @@ export default async function AdminBidsPage({
         >
           Filtreeri
         </button>
-        <span className="text-bodySm text-ink-muted">
+        <span className="text-bodySm text-inkMuted">
           Suletud oksjonitel summasid ei näidata. Pakkuja identiteet avatakse ainult läbi auditeeritud
           kuviku (logitakse <code>user.identity_view</code>).
         </span>
       </form>
 
       {rows.length === 0 ? (
-        <div className="rounded-card border border-border bg-bgPage px-md py-lg text-center text-bodySm text-ink-muted">
+        <div className="rounded-card border border-border bg-bgPage px-md py-lg text-center text-bodySm text-inkMuted">
           Ootel alapakkumisi ei ole.
         </div>
       ) : grouped ? (
@@ -471,11 +471,11 @@ export default async function AdminBidsPage({
                     {first.auctionTitle}
                   </Link>
                   <StatusChip status={first.auctionStatus} />
-                  <span className="text-label text-ink-muted">
+                  <span className="text-label text-inkMuted">
                     {auctionTypeLabels[first.auctionType]}
                     {first.countyName !== null ? ` · ${first.countyName}` : ''}
                   </span>
-                  <span className="rounded-pill bg-info-light px-2 py-0.5 text-label font-semibold text-info">
+                  <span className="rounded-pill bg-infoLight px-2 py-0.5 text-label font-semibold text-info">
                     {String(auctionRows.length)} ootel
                   </span>
                 </header>

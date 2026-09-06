@@ -22,4 +22,4 @@
 ## 4. Verification
 
 - [x] 4.1 Visual regression: capture before/after screenshots of a marketing page and a portal page (must be identical) and of the admin dashboard plus auctions list (compare against docs/design/demo/admin/01-dashboard.html and 02-auctions-list.html); fix any fixed-height clipping or stacking issues the density change exposes <!-- agent: fullstack-engineer.fast, depends_on: [2.4, 3.1, 3.2, 3.3, 3.4], touches: [] -->
-- [ ] 4.2 Run lint, typecheck, build, and vitest across the workspace and fix findings <!-- agent: fullstack-engineer.fast, depends_on: [4.1], touches: [] -->
+- [x] 4.2 Run lint, typecheck, build, and vitest across the workspace and fix findings <!-- agent: fullstack-engineer.fast, depends_on: [4.1], touches: [] -->
