@@ -1,0 +1,75 @@
+/* Admin token scope (design D1/D3). The (admin) layout renders .admin-scope
+   on the shell root; these overrides redefine the shared CSS variables inside
+   that scope only, so public pages keep the :root defaults from
+   packages/ui/src/styles/tokens.css. Values come from the demo prototype
+   (docs/design/demo/admin/index.html) translated onto the shared var names. */
+
+.admin-scope {
+  /* Density (design D2 admin-scope column) */
+  --radius-card: 8px;
+  --radius-button: 8px;
+  --radius-input: 8px;
+
+  --font-size-h4: 16px;
+  --line-height-h4: 22px;
+  --font-size-body: 14px;
+  --line-height-body: 20px;
+  --font-size-body-sm: 14px;
+  --line-height-body-sm: 20px;
+  --font-size-label: 12px;
+  --line-height-label: 16px;
+  --font-size-count: 32px;
+  --line-height-count: 36px;
+
+  --space-md: 16px;
+  --space-lg: 24px;
+
+  --layout-container-xl: 1400px;
+
+  /* Status triads (consumed by StatusChip) */
+  --st-draft-text: #414844;
+  --st-draft-bg: #EBEBEB;
+  --st-draft-dot: #6B7570;
+
+  --st-scheduled-text: #1F4E79;
+  --st-scheduled-bg: #E9F1F7;
+  --st-scheduled-dot: #2D6FA8;
+
+  --st-active-text: #1B6338;
+  --st-active-bg: #E8F6ED;
+  --st-active-dot: #2E9E5B;
+
+  --st-ending-text: #941E17;
+  --st-ending-bg: #FBEAE9;
+  --st-ending-dot: #B3261E;
+
+  --st-ended-text: #8F590A;
+  --st-ended-bg: #FEF5E7;
+  --st-ended-dot: #F2A93B;
+
+  --st-unsold: #B3261E;
+
+  --st-contract-text: #236B3B;
+  --st-contract-bg: #EBF7F0;
+  --st-contract-dot: #58B368;
+
+  --st-archived-text: #414844;
+  --st-archived-bg: #ECEEEB;
+  --st-archived-dot: #6B7570;
+
+  /* Tints */
+  --tint-primary: rgba(1, 45, 29, 0.06);
+  --tint-primary-strong: rgba(1, 45, 29, 0.1);
+  --glow-active: rgba(46, 158, 91, 0.45);
+
+  /* Shadows */
+  --shadow-card: 0 1px 2px rgba(24, 26, 46, 0.04),
+    0 2px 8px rgba(24, 26, 46, 0.05);
+  --shadow-card-hover: 0 2px 8px rgba(24, 26, 46, 0.08),
+    0 8px 24px rgba(24, 26, 46, 0.08);
+  --shadow-pop: 0 8px 24px rgba(24, 26, 46, 0.14);
+
+  /* Rail and topbar dimensions */
+  --rail-w: 56px;
+  --topbar-h: 64px;
+}

@@ -61,9 +61,9 @@ layout:
   sidebar: 280
 
 radii:
-  card: 8
-  button: 9999
-  input: 8
+  card: 14
+  button: 10
+  input: 10
   hero: 12
   modal: 16
   pill: 9999
@@ -82,6 +82,18 @@ motion:
   page-transition: { duration: 250, easing: cubic-bezier(.4,0,.2,1) }
   countdown-pulse: { duration: 80, easing: ease }
   anti-snipe-extend: { duration: 500, easing: cubic-bezier(.22,.61,.36,1) }
+
+# Admin scope: the (admin) route group redefines tokens under the
+# `.admin-scope` class (apps/platform/src/app/(admin)/admin.css). Root
+# defaults above are unchanged outside the admin shell.
+admin-scope:
+  body: { size: 14, line-height: 20 }
+  table-text: { size: 13, line-height: 18 }
+  label: { size: 12, line-height: 16 }
+  radii: { card: 8, button: 8, input: 8 }
+  container-xl: 1400
+  spacing: { md: 16, lg: 24 }
+  extras: "status triads (--st-*), tints (--tint-primary, --tint-primary-strong), shadows, --rail-w 56, --topbar-h 64"
 
 hero-overlay: "linear-gradient(90deg, rgba(22,56,42,.85), rgba(22,56,42,.35))"
 ---

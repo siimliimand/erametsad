@@ -12,7 +12,7 @@
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-  border-radius: var(--radius-button);
+  border-radius: var(--radius-pill);
 }
 
 :focus:not(:focus-visible) {

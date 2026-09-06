@@ -6,6 +6,7 @@ import { useState } from 'react'
 
 import { AdminNav } from './AdminNav'
 import { NotificationBell, type BellNotification } from './NotificationBell'
+import { TopbarSearch } from './TopbarSearch'
 import { LogOutIcon } from './icons'
 import type { AdminModuleDefinition } from '../_lib/permissions'
 
@@ -40,7 +41,6 @@ function UserMenu({ roleLabel, userName }: { roleLabel: string; userName: string
         <span className="flex h-6 w-6 items-center justify-center rounded-pill bg-primary text-inkInverse">
           {userName.charAt(0).toUpperCase()}
         </span>
-        <span className="hidden max-w-32 truncate md:inline">{userName}</span>
       </button>
       {open && (
         <div
@@ -83,29 +83,44 @@ export function AdminShell({
   children,
 }: AdminShellProps) {
   return (
-    <div className="flex min-h-screen flex-col bg-bgMist md:flex-row">
-      <aside className="hidden w-14 shrink-0 flex-col items-center bg-primaryDark text-inkInverse md:flex">
+    <div className="admin-scope flex min-h-screen flex-col bg-bgMist md:flex-row">
+      <aside className="hidden w-14 shrink-0 flex-col items-center border-r border-border bg-bgPage text-ink md:flex">
         <Link
           href="/admin"
           aria-label="Erametsa halduspaneel"
-          className="flex h-14 w-14 items-center justify-center border-b border-white/10"
+          className="flex h-14 w-14 items-center justify-center"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-button bg-white/10 font-heading text-h4 font-extrabold">
+          <span className="flex h-8 w-8 items-center justify-center rounded-button bg-bgMist font-heading text-h4 font-extrabold text-primary">
             E
           </span>
         </Link>
         <AdminNav modules={modules} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-sm border-b border-border bg-bgPage px-md py-2xs md:py-sm">
-          <p className="font-heading text-h4 font-extrabold text-primaryDark md:hidden">Haldus</p>
+        <header className="sticky top-0 z-[90] flex h-16 items-center gap-sm border-b border-border bg-bgPage px-md">
+          <p className="font-heading text-[15px] leading-[20px] font-semibold text-ink">
+            Erametsad haldus
+          </p>
           {environmentLabel && (
-            <span className="rounded-pill bg-infoLight px-2 py-0.5 text-label font-semibold uppercase text-info">
+            <span
+              className={`rounded-pill px-2.5 py-[3px] font-heading text-[11px] leading-[14px] font-bold uppercase tracking-[0.04em] ${
+                environmentLabel === 'Test'
+                  ? 'bg-[var(--st-ended-bg)] text-[var(--st-ended-text)]'
+                  : 'bg-dangerLight text-danger'
+              }`}
+            >
               {environmentLabel}
             </span>
           )}
+          <TopbarSearch />
           <div className="ml-auto flex items-center gap-sm">
             <NotificationBell items={notifications.items} unreadCount={notifications.unreadCount} />
+            <div className="hidden items-center gap-2xs md:flex">
+              <span className="max-w-40 truncate text-label font-medium text-ink">{userName}</span>
+              <span className="rounded-pill bg-primaryLight px-2 py-0.5 text-label font-semibold text-primary">
+                {roleLabel}
+              </span>
+            </div>
             <UserMenu roleLabel={roleLabel} userName={userName} />
           </div>
         </header>
