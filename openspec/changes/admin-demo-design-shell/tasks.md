@@ -3,7 +3,7 @@
 ## 1. Token infrastructure
 
 - [x] 1.1 Make hardcoded Tailwind theme keys var-based with root defaults matching today's rendering: borderRadius card/button/input, fontSize h4/body/bodySm/label/count (with line-height companions), maxWidth container-xl, spacing 2xs-lg; add the root values to packages/ui tokens.css (note: root --radius-card becomes 14px, today's rendered value, resolving the 8px contradiction) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/tailwind.config.ts, packages/ui/src/styles/tokens.css] -->
-- [ ] 1.2 Add the admin token scope: create apps/platform/src/app/(admin)/admin.css with the demo :root overrides (density scale, 8px radii, 1400px container, status triads, tints, shadows, rail/topbar dims), import it from the (admin) layout, and render the scope class on the AdminShell root element <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(admin)/admin.css, apps/platform/src/app/(admin)/layout.tsx, apps/platform/src/app/(admin)/_components/AdminShell.tsx] -->
+- [x] 1.2 Add the admin token scope: create apps/platform/src/app/(admin)/admin.css with the demo :root overrides (density scale, 8px radii, 1400px container, status triads, tints, shadows, rail/topbar dims), import it from the (admin) layout, and render the scope class on the AdminShell root element <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(admin)/admin.css, apps/platform/src/app/(admin)/layout.tsx, apps/platform/src/app/(admin)/_components/AdminShell.tsx] -->
 
 ## 2. Shell restyle
 

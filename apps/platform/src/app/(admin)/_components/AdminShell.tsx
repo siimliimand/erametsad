@@ -83,7 +83,7 @@ export function AdminShell({
   children,
 }: AdminShellProps) {
   return (
-    <div className="flex min-h-screen flex-col bg-bgMist md:flex-row">
+    <div className="admin-scope flex min-h-screen flex-col bg-bgMist md:flex-row">
       <aside className="hidden w-14 shrink-0 flex-col items-center bg-primaryDark text-inkInverse md:flex">
         <Link
           href="/admin"

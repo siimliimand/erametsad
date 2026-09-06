@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 
+import './admin.css'
+
 import { AdminShell } from './_components/AdminShell'
 import { requireAdminRepositories } from './_lib/admin'
 import { userRoleLabels } from './_lib/labels'
