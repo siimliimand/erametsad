@@ -11,6 +11,7 @@ import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import { primaryButtonClass, secondaryButtonClass } from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
+import { StatusChip } from '../../_components/StatusChip'
 import { PlusIcon } from '../../_components/icons'
 import { requireAdminRepositories } from '../../_lib/admin'
 import {
@@ -19,7 +20,6 @@ import {
   auctionTypeLabels,
   formatDateTime,
   formatEur,
-  StatusPill,
 } from '../../_lib/labels'
 import { auctionScope, can, type StaffRole } from '../../_lib/permissions'
 
@@ -578,7 +578,7 @@ export default async function AdminAuctionsPage({
               </span>
             ),
           },
-          { key: 'status', label: 'Olek', render: (row) => <StatusPill status={row.status} /> },
+          { key: 'status', label: 'Olek', render: (row) => <StatusChip status={row.status} /> },
           { key: 'countyName', label: 'Maakond', render: (row) => row.countyName ?? '—' },
           {
             key: 'minBidCents',

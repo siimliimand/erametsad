@@ -6,13 +6,13 @@ import { approveUnderbidAction, rejectUnderbidAction } from '../../_actions/auct
 import { DataTable, type DataTableColumn } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import { PageHeader } from '../../_components/PageHeader'
+import { StatusChip } from '../../_components/StatusChip'
 import { requireAdminRepositories } from '../../_lib/admin'
 import {
   auctionStatusLabels,
   auctionTypeLabels,
   formatDateTime,
   formatRelativeTime,
-  StatusPill,
 } from '../../_lib/labels'
 import { auctionInScope, auctionScope, can } from '../../_lib/permissions'
 import { readAuctionDefaults } from '../content/_components/settings-audit'
@@ -470,7 +470,7 @@ export default async function AdminBidsPage({
                   >
                     {first.auctionTitle}
                   </Link>
-                  <StatusPill status={first.auctionStatus} />
+                  <StatusChip status={first.auctionStatus} />
                   <span className="text-label text-ink-muted">
                     {auctionTypeLabels[first.auctionType]}
                     {first.countyName !== null ? ` · ${first.countyName}` : ''}
