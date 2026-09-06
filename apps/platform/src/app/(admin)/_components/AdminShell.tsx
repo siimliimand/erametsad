@@ -6,6 +6,7 @@ import { useState } from 'react'
 
 import { AdminNav } from './AdminNav'
 import { NotificationBell, type BellNotification } from './NotificationBell'
+import { TopbarSearch } from './TopbarSearch'
 import { LogOutIcon } from './icons'
 import type { AdminModuleDefinition } from '../_lib/permissions'
 
@@ -111,6 +112,7 @@ export function AdminShell({
               {environmentLabel}
             </span>
           )}
+          <TopbarSearch />
           <div className="ml-auto flex items-center gap-sm">
             <NotificationBell items={notifications.items} unreadCount={notifications.unreadCount} />
             <div className="hidden items-center gap-2xs md:flex">

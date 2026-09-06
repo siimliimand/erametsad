@@ -10,7 +10,7 @@
 - [x] 2.1 Restyle the rail to the demo: white surface bg, right border, mist logo chip with primary icon; drop the primaryDark/white-10 treatment <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/app/(admin)/_components/AdminShell.tsx] -->
 - [x] 2.2 Restyle AdminNav states: muted icons, tint hover, strong-tint active + 3px primary left indicator, dark tooltip badge; restyle the horizontal mobile pills with demo tints <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/app/(admin)/_components/AdminNav.tsx] -->
 - [x] 2.3 Make the topbar sticky 64px with brand title "Erametsad haldus" + semantic env badge (Arendus red, Test amber, prod hidden) and show operator name + role chip inline <!-- agent: fullstack-engineer.build, depends_on: [2.1], touches: [apps/platform/src/app/(admin)/_components/AdminShell.tsx] -->
-- [ ] 2.4 Add the TopbarSearch stub component (disabled input, Search icon, placeholder "Otsi oksjoneid, kasutajaid, juhtlõimi...", ⌘K kbd badge) and mount it centered in the topbar <!-- agent: fullstack-engineer.fast, depends_on: [2.3], touches: [apps/platform/src/app/(admin)/_components/TopbarSearch.tsx, apps/platform/src/app/(admin)/_components/AdminShell.tsx] -->
+- [x] 2.4 Add the TopbarSearch stub component (disabled input, Search icon, placeholder "Otsi oksjoneid, kasutajaid, juhtlõimi...", ⌘K kbd badge) and mount it centered in the topbar <!-- agent: fullstack-engineer.fast, depends_on: [2.3], touches: [apps/platform/src/app/(admin)/_components/TopbarSearch.tsx, apps/platform/src/app/(admin)/_components/AdminShell.tsx] -->
 
 ## 3. Shared components
 
