@@ -144,7 +144,7 @@ A slim server-rendered results bar sits above the card grid. It shows the found 
 
 `Countdown` synchronises with the server and uses the status colour phases: neutral, amber below one hour, red below five minutes, with optional pulse. The listing tabs row holds six tabs: Kõik objektid, Raieõigused, Metskinnistud, Põllumaad, Paketid, and Kiiroksjonid. Kõik objektid comes first and is the default view, under the heading "Aktiivsed oksjonid". Each tab carries a live count pill. Põllumaad renders its empty state until the schema stores its object type.
 
-The bidding panel (`BidPanel`) handles step-based and sealed input, auto-bidder toggle, and under-bid mode. `DataTable` uses 40-pixel rows with sortable and filterable columns. `Accordion`, `Tabs`, `Steps`, `EmptyState`, `Toast`, `Modal`, and `Drawer` cover the usual interaction patterns.
+The bidding panel (`BidPanel`) handles step-based and sealed input, auto-bidder toggle, and under-bid mode. `DataTable` renders inside the admin demo card treatment (white card with mist header row and 13px/18px cells) and takes optional per-column sort descriptors that render `aria-sort` header links; non-sortable columns render plain. `Accordion`, `Tabs`, `Steps`, `EmptyState`, `Toast`, `Modal`, and `Drawer` cover the usual interaction patterns.
 
 Form components use floating labels, inline errors, and hint text. `ConsentCheck` is always visible and always unchecked. `LeadForm` includes honeypot fields. `FormFile` supports drag-and-drop uploads with progress indication.
 
