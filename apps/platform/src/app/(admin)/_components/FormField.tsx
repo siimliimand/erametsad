@@ -31,7 +31,7 @@ function FieldShell({
         {label}
       </label>
       {children}
-      {hint ? <p className="text-bodySm text-ink-muted">{hint}</p> : null}
+      {hint ? <p className="text-bodySm text-inkMuted">{hint}</p> : null}
     </div>
   )
 }
