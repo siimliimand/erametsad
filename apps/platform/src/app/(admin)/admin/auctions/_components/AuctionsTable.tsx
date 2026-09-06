@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
 
 import { Countdown } from './Countdown'
+import { EndAuctionModal } from './EndAuctionModal'
 import {
   DataTable,
   type DataTableColumn,
@@ -33,6 +34,7 @@ import {
 } from '../../../_components/icons'
 import {
   auctionObjectTypeLabels,
+  auctionStatusLabels,
   auctionTypeLabels,
 } from '../../../_lib/labels'
 import type { SortKey } from '../_lib/list-view'
@@ -111,6 +113,20 @@ const bulkBarBtnClass =
 const bulkCancelBtnClass =
   'inline-flex items-center gap-1 rounded-[8px] px-2 py-1.5 text-label text-white/75 transition-colors duration-hover ease-hover hover:text-white'
 
+/**
+ * Info line for the end-manual modal, from row data only: the demo line
+ * includes the leading bid, which the serialized row does not carry.
+ */
+function endContextLabel(row: AuctionTableRow): string {
+  if (row.type === 'sealed') {
+    return `suletud oksjon — ${String(row.bidCount)} pakkumist, avamine pärast lõppu`
+  }
+  if (row.status === 'active') {
+    return `aktiivne oksjon — ${String(row.bidCount)} pakkumist`
+  }
+  return `staatus: ${auctionStatusLabels[row.status]}`
+}
+
 export function AuctionsTable({
   rows,
   sorts,
@@ -126,6 +142,7 @@ export function AuctionsTable({
   const [selected, setSelected] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
   )
+  const [endTarget, setEndTarget] = useState<AuctionTableRow | null>(null)
 
   // Global ⌘N / Ctrl+N opens the new-auction form, mirroring the header
   // button's kbd hint; write-gated roles never register the listener.
@@ -354,57 +371,17 @@ export function AuctionsTable({
             </form>
           ) : null}
           {row.canEnd ? (
-            <details className="relative">
-              <summary
-                title="Lõpeta käsitsi"
-                className={`${raBtnDangerClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
-              >
-                <EllipsisIcon aria-hidden="true" className="h-3 w-3" />
-                Lõpeta
-              </summary>
-              <form
-                action={endManuallyAction}
-                className="mt-xs flex w-72 flex-col gap-xs rounded-card border border-border bg-bgPage p-3 shadow-modal"
-              >
-                <input type="hidden" name="id" value={row.id} />
-                <p className="text-label font-semibold text-danger">
-                  Kinnitan lõpetamise — see on pöördumatu
-                </p>
-                <label className="flex flex-col gap-xs text-label text-inkMuted">
-                  Lõpetamise põhjus (kohustuslik)
-                  <textarea
-                    name="reason"
-                    required
-                    minLength={5}
-                    rows={2}
-                    className="rounded-input border border-border bg-bgPage px-2 py-1 text-bodySm text-ink"
-                    placeholder="Kirjuta põhjus (min 5 tähemärki)"
-                  />
-                </label>
-                <fieldset className="flex flex-col gap-xs text-bodySm text-ink">
-                  <legend className="text-label text-inkMuted">Tulemus</legend>
-                  <label className="flex items-center gap-xs">
-                    <input
-                      type="radio"
-                      name="outcome"
-                      value="winner"
-                      defaultChecked
-                    />
-                    Kuuluta võitjaks praegune kõrgeim pakkumine
-                  </label>
-                  <label className="flex items-center gap-xs">
-                    <input type="radio" name="outcome" value="unsold" />
-                    Märgi müümata
-                  </label>
-                </fieldset>
-                <button
-                  type="submit"
-                  className="rounded-button border border-danger px-3 py-1 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-dangerLight"
-                >
-                  Lõpeta käsitsi
-                </button>
-              </form>
-            </details>
+            <button
+              type="button"
+              title="Lõpeta käsitsi"
+              className={raBtnDangerClass}
+              onClick={() => {
+                setEndTarget(row)
+              }}
+            >
+              <EllipsisIcon aria-hidden="true" className="h-3 w-3" />
+              Lõpeta
+            </button>
           ) : null}
           {row.canArchive ? (
             <details className="relative">
@@ -466,6 +443,21 @@ export function AuctionsTable({
         rowClassName={(row) =>
           selected.has(row.id) ? '[&>td]:bg-primaryLight' : ''
         }
+      />
+      <EndAuctionModal
+        auction={
+          endTarget
+            ? {
+                id: endTarget.id,
+                title: endTarget.title,
+                context: endContextLabel(endTarget),
+              }
+            : null
+        }
+        action={endManuallyAction}
+        onClose={() => {
+          setEndTarget(null)
+        }}
       />
       {roleCanWrite && selected.size > 0 ? (
         <form
