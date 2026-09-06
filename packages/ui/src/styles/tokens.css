@@ -37,9 +37,9 @@
   --space-3xl: 128px;
 
   /* ── Radii ── */
-  --radius-card: 8px;
-  --radius-button: 9999px;
-  --radius-input: 8px;
+  --radius-card: 14px;
+  --radius-button: 10px;
+  --radius-input: 10px;
   --radius-hero: 12px;
   --radius-modal: 16px;
   --radius-pill: 9999px;
@@ -73,9 +73,20 @@
   --font-heading: "Public Sans", sans-serif;
   --font-body: "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
+  --font-size-h4: 18px;
+  --line-height-h4: 1.35;
+  --font-size-body: 16px;
+  --line-height-body: 1.6;
+  --font-size-body-sm: 14px;
+  --line-height-body-sm: 1.5;
+  --font-size-label: 13px;
+  --line-height-label: 1.4;
+  --font-size-count: 32px;
+  --line-height-count: 1.1;
 
   /* ── Layout ── */
   --layout-container-max: 1200px;
+  --layout-container-xl: 1280px;
   --layout-content-narrow: 720px;
   --layout-sidebar: 280px;
   --layout-grid-columns: 12;
