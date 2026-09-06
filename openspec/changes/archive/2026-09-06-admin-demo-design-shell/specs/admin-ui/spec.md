@@ -4,13 +4,13 @@
 
 ### Requirement: Shared admin components follow demo density
 
-The shared admin components `DataTable`, `PageHeader`, `FormField`, and
-`ErrorNotice` SHALL follow the ADMIN-DESIGN-SPEC §1.2 density: data tables
-render 13px/18px row text with mist-background header rows and hover row
-highlight; page headers render a breadcrumb line and a 28px/34px
-Public Sans 700 title with an action slot; form fields and error notices
-use the admin token scale. Screens composed from these components SHALL
-inherit the styling without per-screen edits.
+The shared admin components SHALL follow the ADMIN-DESIGN-SPEC §1.2
+density. `DataTable`, `PageHeader`, `FormField`, and `ErrorNotice` render at
+the demo scale: data tables render 13px/18px row text with mist-background
+header rows and hover row highlight; page headers render a breadcrumb line
+and a 28px/34px Public Sans 700 title with an action slot; form fields and
+error notices use the admin token scale. Screens composed from these
+components SHALL inherit the styling without per-screen edits.
 
 #### Scenario: Auctions list table density
 
