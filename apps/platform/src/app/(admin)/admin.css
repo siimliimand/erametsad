@@ -62,14 +62,47 @@
   --tint-primary-strong: rgba(1, 45, 29, 0.1);
   --glow-active: rgba(46, 158, 91, 0.45);
 
-  /* Shadows */
+  /* Shadow key names match the Tailwind boxShadow theme keys, which resolve
+     var(--shadow-*) with public root defaults (see tailwind.config.ts). */
   --shadow-card: 0 1px 2px rgba(24, 26, 46, 0.04),
     0 2px 8px rgba(24, 26, 46, 0.05);
   --shadow-card-hover: 0 2px 8px rgba(24, 26, 46, 0.08),
     0 8px 24px rgba(24, 26, 46, 0.08);
-  --shadow-pop: 0 8px 24px rgba(24, 26, 46, 0.14);
+  --shadow-modal: 0 8px 24px rgba(24, 26, 46, 0.14);
 
   /* Rail and topbar dimensions */
   --rail-w: 56px;
   --topbar-h: 64px;
+}
+
+/* Demo restyle helpers (docs/design/demo/admin/02-auctions-list.html):
+   countdown critical blink and hover-revealed auction row actions. */
+
+@keyframes cd-blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.admin-scope .cd-crit {
+  color: var(--color-danger) !important;
+  animation: cd-blink 1s step-end infinite;
+}
+
+.admin-scope .row-actions {
+  display: inline-flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.12s ease-out;
+}
+
+.admin-scope tr:hover .row-actions,
+.admin-scope tr:focus-within .row-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .admin-scope .row-actions {
+    opacity: 1;
+  }
 }
