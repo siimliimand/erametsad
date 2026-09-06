@@ -1,5 +1,17 @@
+import { Download as DownloadIcon } from 'lucide-react'
 import Link from 'next/link'
 
+import {
+  AuctionsTable,
+  type AuctionTableRow,
+} from './_components/AuctionsTable'
+import {
+  countdownText,
+  defaultSortFor,
+  initials,
+  sortAuctionRows,
+  type SortKey,
+} from './_lib/list-view'
 import {
   archiveAuctionAction,
   bulkScheduleAuctionsAction,
@@ -7,17 +19,23 @@ import {
   endAuctionManuallyAction,
   relistAuctionAction,
 } from '../../_actions/auctions'
-import { DataTable } from '../../_components/DataTable'
+import type { DataTableColumnSort } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
-import { primaryButtonClass, secondaryButtonClass } from '../../_components/FormField'
+import {
+  primaryButtonClass,
+  secondaryButtonClass,
+} from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
-import { StatusChip } from '../../_components/StatusChip'
-import { PlusIcon } from '../../_components/icons'
+import {
+  ChevronDownIcon,
+  PlusIcon,
+  SearchIcon,
+  XIcon,
+} from '../../_components/icons'
 import { requireAdminRepositories } from '../../_lib/admin'
 import {
   auctionObjectTypeLabels,
   auctionStatusLabels,
-  auctionTypeLabels,
   formatDateTime,
   formatEur,
 } from '../../_lib/labels'
@@ -32,7 +50,11 @@ import { auctionObjectTypes } from '@/lib/data/schema'
  * map to objectType 'kiire'; Põllumaad stay an empty bucket until the
  * schema gains the object type.
  */
-const LIST_TABS: readonly { id: string; label: string; objectTypes: readonly AuctionObjectType[] | null }[] = [
+const LIST_TABS: readonly {
+  id: string
+  label: string
+  objectTypes: readonly AuctionObjectType[] | null
+}[] = [
   { id: 'koik', label: 'Kõik', objectTypes: null },
   { id: 'raieoigused', label: 'Raieõigused', objectTypes: ['raieoigus'] },
   { id: 'metskinnistud', label: 'Metskinnistud', objectTypes: ['kinnistu'] },
@@ -42,7 +64,8 @@ const LIST_TABS: readonly { id: string; label: string; objectTypes: readonly Auc
 ]
 
 const PAGE_SIZE = 25
-const FREETEXT_HINT = 'Otsi: id / nimi / kataster / registri number / alias e-post'
+const FREETEXT_HINT =
+  'Otsi: id / nimi / kataster / registri number / alias e-post'
 
 type RawParams = Record<string, string | string[] | undefined>
 
@@ -96,46 +119,13 @@ function tallinnDayEndIso(day: string): string | null {
   return new Date(`${day}T23:59:59+03:00`).toISOString()
 }
 
-function countdownText(endsAt: string, now: number): string {
-  const ms = Date.parse(endsAt) - now
-  if (ms <= 0) return 'lõppenud'
-  const totalMinutes = Math.floor(ms / 60000)
-  const days = Math.floor(totalMinutes / 1440)
-  const hours = Math.floor((totalMinutes % 1440) / 60)
-  const minutes = totalMinutes % 60
-  if (days > 0) return `${String(days)} p ${String(hours)} h`
-  if (hours > 0) return `${String(hours)} h ${String(minutes)} min`
-  const seconds = Math.floor((ms % 60000) / 1000)
-  return `${String(minutes)}:${String(seconds).padStart(2, '0')}`
-}
-
-function initials(name: string | null | undefined): string {
-  if (!name) return '—'
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('')
-}
-
-interface AuctionRow {
-  id: string
-  title: string
-  objectType: AuctionObjectType
-  type: 'open' | 'sealed'
-  isQuickAuction: boolean
-  status: AuctionStatus
-  countyName: string | null
-  minBidCents: number
-  endsAt: string | null
-  bidCount: number
-  pendingCount: number
-  specialistName: string | null
-}
-
 function freetextMatches(
-  entry: { doc: { id: string; title: string }; cadastres: unknown; registryNumbers: unknown; aliasEmail: string | null },
+  entry: {
+    doc: { id: string; title: string }
+    cadastres: unknown
+    registryNumbers: unknown
+    aliasEmail: string | null
+  },
   q: string,
 ): boolean {
   const needle = q.toLowerCase()
@@ -143,10 +133,20 @@ function freetextMatches(
   if (entry.doc.title.toLowerCase().includes(needle)) return true
   if (entry.aliasEmail?.toLowerCase().includes(needle)) return true
   if (Array.isArray(entry.cadastres)) {
-    if ((entry.cadastres as unknown[]).some((value) => String(value).toLowerCase().includes(needle))) return true
+    if (
+      (entry.cadastres as unknown[]).some((value) =>
+        String(value).toLowerCase().includes(needle),
+      )
+    )
+      return true
   }
   if (Array.isArray(entry.registryNumbers)) {
-    if ((entry.registryNumbers as unknown[]).some((value) => String(value).toLowerCase().includes(needle))) return true
+    if (
+      (entry.registryNumbers as unknown[]).some((value) =>
+        String(value).toLowerCase().includes(needle),
+      )
+    )
+      return true
   }
   return false
 }
@@ -176,8 +176,12 @@ export default async function AdminAuctionsPage({
   const endFromIso = tallinnDayStartIso(firstParam(params, 'endFrom') ?? '')
   const endToIso = tallinnDayEndIso(firstParam(params, 'endTo') ?? '')
   const q = (firstParam(params, 'q') ?? '').trim()
-  const sort = firstParam(params, 'sort') ?? (statusFilter.length === 1 && statusFilter[0] === 'active' ? 'endsAt' : '-createdAt')
-  const page = Math.max(1, Number.parseInt(firstParam(params, 'page') ?? '1', 10) || 1)
+  const sort = firstParam(params, 'sort') ?? defaultSortFor(statusFilter)
+  const sortField = sort.startsWith('-') ? sort.slice(1) : sort
+  const page = Math.max(
+    1,
+    Number.parseInt(firstParam(params, 'page') ?? '1', 10) || 1,
+  )
 
   // Scope + shareable filters translate into the repository where clause;
   // the repository layer has no >= operator yet, so the end-date range and
@@ -194,7 +198,10 @@ export default async function AdminAuctionsPage({
   if (statusFilter.length > 0) {
     whereParts.push({ status: { in: statusFilter } })
   }
-  if (typeFilter && (auctionObjectTypes as readonly string[]).includes(typeFilter)) {
+  if (
+    typeFilter &&
+    (auctionObjectTypes as readonly string[]).includes(typeFilter)
+  ) {
     whereParts.push({ objectType: { equals: typeFilter } })
   }
   if (auctionTypeFilter === 'open' || auctionTypeFilter === 'sealed') {
@@ -206,7 +213,9 @@ export default async function AdminAuctionsPage({
 
   const { docs } = await repositories.find({
     collection: 'auctions',
-    ...(whereParts.length > 0 ? { where: { and: whereParts } satisfies WhereClause } : {}),
+    ...(whereParts.length > 0
+      ? { where: { and: whereParts } satisfies WhereClause }
+      : {}),
     sort: '-createdAt',
     pagination: false,
     limit: 5000,
@@ -223,11 +232,15 @@ export default async function AdminAuctionsPage({
   for (const entry of LIST_TABS) {
     const tabTypes = entry.objectTypes
     tabCounts[entry.id] =
-      tabTypes === null ? preTab.length : preTab.filter((doc) => tabTypes.includes(doc.objectType)).length
+      tabTypes === null
+        ? preTab.length
+        : preTab.filter((doc) => tabTypes.includes(doc.objectType)).length
   }
 
   const tabFiltered =
-    tabObjectTypes === null ? preTab : preTab.filter((doc) => tabObjectTypes.includes(doc.objectType))
+    tabObjectTypes === null
+      ? preTab
+      : preTab.filter((doc) => tabObjectTypes.includes(doc.objectType))
 
   const searchable = tabFiltered.map((doc) => ({
     doc,
@@ -235,23 +248,56 @@ export default async function AdminAuctionsPage({
     registryNumbers: doc.registryNumbers,
     aliasEmail: doc.aliasEmail,
   }))
-  const qFiltered = q ? searchable.filter((entry) => freetextMatches(entry, q)) : searchable
+  const qFiltered = q
+    ? searchable.filter((entry) => freetextMatches(entry, q))
+    : searchable
 
-  qFiltered.sort((a, b) => {
-    const dir = sort.startsWith('-') ? -1 : 1
-    const field = sort.startsWith('-') ? sort.slice(1) : sort
-    if (field === 'endsAt') {
-      const av = a.doc.endsAt ?? ''
-      const bv = b.doc.endsAt ?? ''
-      return av < bv ? -dir : av > bv ? dir : 0
+  // Sorting by bidCount needs counts for every filtered row, not just the
+  // visible page slice, so the bids fetch widens only for that sort key.
+  const bidCounts = new Map<string, number>()
+  const pendingCounts = new Map<string, number>()
+  const countBids = (
+    docs: readonly { auctionId: string; status: string }[],
+  ) => {
+    for (const bid of docs) {
+      bidCounts.set(bid.auctionId, (bidCounts.get(bid.auctionId) ?? 0) + 1)
+      if (bid.status === 'pending_approval') {
+        pendingCounts.set(
+          bid.auctionId,
+          (pendingCounts.get(bid.auctionId) ?? 0) + 1,
+        )
+      }
     }
-    return a.doc.createdAt < b.doc.createdAt ? -dir : a.doc.createdAt > b.doc.createdAt ? dir : 0
-  })
+  }
+  if (sortField === 'bidCount' && qFiltered.length > 0) {
+    const bids = await repositories.find({
+      collection: 'bids',
+      where: {
+        and: [{ auction: { in: qFiltered.map((entry) => entry.doc.id) } }],
+      },
+      pagination: false,
+      limit: 2000,
+    })
+    countBids(bids.docs)
+  }
 
-  const totalCount = qFiltered.length
+  const sortedEntries = sortAuctionRows(
+    qFiltered.map((entry) => ({
+      ...entry,
+      ...entry.doc,
+      bidCount: bidCounts.get(entry.doc.id) ?? 0,
+    })),
+    sort,
+    defaultSortFor(statusFilter),
+  )
+
+  const totalCount = sortedEntries.length
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
-  const pageEntries = qFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const pageEntries = sortedEntries.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE,
+  )
   const pageIds = pageEntries.map((entry) => entry.doc.id)
 
   const countyDocs = await repositories.find({
@@ -263,7 +309,9 @@ export default async function AdminAuctionsPage({
   const countyNames = new Map(countyDocs.docs.map((doc) => [doc.id, doc.name]))
 
   const specialistUsers =
-    can(role, 'auctions:reassign-specialist') || role === 'admin' || role === 'superadmin'
+    can(role, 'auctions:reassign-specialist') ||
+    role === 'admin' ||
+    role === 'superadmin'
       ? (
           await repositories.find({
             collection: 'users',
@@ -274,11 +322,11 @@ export default async function AdminAuctionsPage({
           })
         ).docs
       : []
-  const specialistNames = new Map(specialistUsers.map((doc) => [doc.id, doc.name ?? doc.email]))
+  const specialistNames = new Map(
+    specialistUsers.map((doc) => [doc.id, doc.name ?? doc.email]),
+  )
 
-  const bidCounts = new Map<string, number>()
-  const pendingCounts = new Map<string, number>()
-  if (pageIds.length > 0) {
+  if (sortField !== 'bidCount' && pageIds.length > 0) {
     const bids = await repositories.find({
       collection: 'bids',
       where: {
@@ -287,15 +335,18 @@ export default async function AdminAuctionsPage({
       pagination: false,
       limit: 2000,
     })
-    for (const bid of bids.docs) {
-      bidCounts.set(bid.auctionId, (bidCounts.get(bid.auctionId) ?? 0) + 1)
-      if (bid.status === 'pending_approval') {
-        pendingCounts.set(bid.auctionId, (pendingCounts.get(bid.auctionId) ?? 0) + 1)
-      }
-    }
+    countBids(bids.docs)
   }
 
-  const rows: AuctionRow[] = pageEntries.map(({ doc }) => ({
+  const roleCanEndManual = can(role, 'auctions:end-manual')
+  const roleCanArchive = can(role, 'auctions:archive')
+  const roleCanWrite = can(role, 'auctions:write')
+  const roleCanExport = can(role, 'auctions:export')
+
+  // Rows are serialized for the client wrapper: every string a cell renders
+  // is precomputed here so the client bundle stays lean and hydration
+  // output matches the server render.
+  const rows: AuctionTableRow[] = pageEntries.map(({ doc }) => ({
     id: doc.id,
     title: doc.title,
     objectType: doc.objectType,
@@ -304,16 +355,30 @@ export default async function AdminAuctionsPage({
     status: doc.status,
     countyName: doc.countyId ? (countyNames.get(doc.countyId) ?? null) : null,
     minBidCents: doc.minBidCents,
+    minBidLabel: formatEur(doc.minBidCents),
     endsAt: doc.endsAt,
+    endsLabel:
+      doc.endsAt === null
+        ? null
+        : doc.status === 'active'
+          ? countdownText(doc.endsAt, now)
+          : formatDateTime(doc.endsAt),
     bidCount: bidCounts.get(doc.id) ?? 0,
     pendingCount: pendingCounts.get(doc.id) ?? 0,
-    specialistName: doc.specialistId ? (specialistNames.get(doc.specialistId) ?? null) : null,
+    specialistName: doc.specialistId
+      ? (specialistNames.get(doc.specialistId) ?? null)
+      : null,
+    specialistInitials: initials(
+      doc.specialistId ? (specialistNames.get(doc.specialistId) ?? null) : null,
+    ),
+    portalHref: `/oksjon/${doc.id}`,
+    editHref: `/admin/auctions/${doc.id}/edit`,
+    canEnd: roleCanEndManual && doc.status === 'active',
+    canArchive:
+      roleCanArchive && (doc.status === 'unsold' || doc.status === 'completed'),
+    canRelist:
+      roleCanWrite && (doc.status === 'ended' || doc.status === 'unsold'),
   }))
-
-  const roleCanEndManual = can(role, 'auctions:end-manual')
-  const roleCanArchive = can(role, 'auctions:archive')
-  const roleCanWrite = can(role, 'auctions:write')
-  const roleCanExport = can(role, 'auctions:export')
 
   const currentValues = {
     tab: tab.id,
@@ -330,11 +395,31 @@ export default async function AdminAuctionsPage({
 
   function buildUrl(overrides: Record<string, string | undefined>): string {
     const search = new URLSearchParams()
-    for (const [key, value] of Object.entries({ ...currentValues, page: safePage > 1 ? String(safePage) : undefined, ...overrides })) {
+    for (const [key, value] of Object.entries({
+      ...currentValues,
+      page: safePage > 1 ? String(safePage) : undefined,
+      ...overrides,
+    })) {
       if (value) search.set(key, value)
     }
     const qs = search.toString()
     return qs === '' ? '/admin/auctions' : `/admin/auctions?${qs}`
+  }
+
+  // asc → desc → asc toggle; an inactive column starts at ascending.
+  function columnSort(key: SortKey): DataTableColumnSort {
+    if (sortField !== key) return { href: buildUrl({ sort: key }) }
+    return sort.startsWith('-')
+      ? { dir: 'desc', href: buildUrl({ sort: key }) }
+      : { dir: 'asc', href: buildUrl({ sort: `-${key}` }) }
+  }
+
+  const sorts: Partial<Record<SortKey, DataTableColumnSort>> = {
+    id: columnSort('id'),
+    title: columnSort('title'),
+    minBidCents: columnSort('minBidCents'),
+    bidCount: columnSort('bidCount'),
+    endsAt: columnSort('endsAt'),
   }
 
   const activeFilterCount = [
@@ -348,8 +433,12 @@ export default async function AdminAuctionsPage({
     currentValues.q,
   ].filter(Boolean).length
 
-  const filterSelectClass =
-    'h-9 rounded-input border border-border bg-bgPage px-2 text-bodySm text-ink'
+  const filterChipClass =
+    'inline-flex h-[34px] items-center gap-1.5 rounded-pill border border-border bg-bgPage px-2.5 text-label text-inkMuted transition-colors duration-hover ease-hover focus-within:border-primary'
+  const filterChipSelectClass =
+    'max-w-[140px] cursor-pointer appearance-none border-0 bg-transparent p-0 text-[12px] font-medium text-ink outline-none'
+  const filterChipIconClass =
+    'pointer-events-none h-3 w-3 shrink-0 text-inkMuted'
 
   // The export link reuses the list's shareable filter parameters; the tab
   // narrows the object types and intersects with a picked single type.
@@ -371,46 +460,91 @@ export default async function AdminAuctionsPage({
     <div>
       {viga ? <ErrorNotice message={viga} /> : null}
       <PageHeader
+        breadcrumb={
+          <>
+            <Link
+              href="/admin"
+              className="transition-colors duration-hover ease-hover hover:text-primary"
+            >
+              Töölaud
+            </Link>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Oksjonid</span>
+          </>
+        }
         title="Oksjonid"
         description="Kõik oksjonid koos oleku, ajade ja pakkumuste arvuga."
         actions={
-          roleCanWrite ? (
-            <Link href="/admin/auctions/new" className={primaryButtonClass}>
-              <PlusIcon />
-              Uus oksjon
-            </Link>
-          ) : null
+          <>
+            {roleCanWrite ? (
+              <Link href="/admin/auctions/new" className={primaryButtonClass}>
+                <PlusIcon />
+                Uus oksjon
+                <kbd
+                  aria-hidden="true"
+                  className="ml-0.5 rounded border border-white/35 px-[5px] font-mono text-[10px] font-medium leading-4 text-white/85"
+                >
+                  ⌘N
+                </kbd>
+              </Link>
+            ) : null}
+            {roleCanExport ? (
+              <a href={csvHref} className={secondaryButtonClass}>
+                <DownloadIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                Ekspordi CSV
+              </a>
+            ) : null}
+          </>
         }
       />
 
-      <nav aria-label="Oksjonite tüübid" className="mb-md overflow-x-auto border-b border-border">
-        <ul className="flex min-w-max">
-          {LIST_TABS.map((entry) => (
-            <li key={entry.id}>
-              <Link
-                href={buildUrl({ tab: entry.id, page: undefined })}
-                aria-current={entry.id === tab.id ? 'page' : undefined}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2 text-label font-semibold whitespace-nowrap transition-colors duration-hover ease-hover ${
-                  entry.id === tab.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-inkMuted hover:border-primary hover:text-primary'
+      <nav
+        aria-label="Oksjonite tüübid"
+        className="mb-md flex flex-wrap items-center gap-2"
+      >
+        {LIST_TABS.map((entry) => {
+          const active = entry.id === tab.id
+          return (
+            <Link
+              key={entry.id}
+              href={buildUrl({ tab: entry.id, page: undefined })}
+              aria-current={active ? 'page' : undefined}
+              className={`inline-flex items-center gap-2 rounded-pill border px-3.5 py-1.5 text-label whitespace-nowrap transition-colors duration-hover ease-hover ${
+                active
+                  ? 'border-primary bg-primary font-semibold text-inkInverse'
+                  : 'border-border bg-bgPage text-ink hover:border-primary hover:text-primary'
+              }`}
+            >
+              {entry.label}
+              <span
+                className={`rounded-pill px-2 text-[11px] font-medium ${
+                  active
+                    ? 'bg-white/20 text-inkInverse'
+                    : 'bg-bgMist text-inkMuted'
                 }`}
               >
-                {entry.label}
-                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-primaryLight px-1.5 text-[11px] font-semibold text-primaryDark">
-                  {String(tabCounts[entry.id] ?? 0)}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                {String(tabCounts[entry.id] ?? 0)}
+              </span>
+            </Link>
+          )
+        })}
       </nav>
 
-      <form method="get" action="/admin/auctions" className="mb-md flex flex-wrap items-center gap-sm rounded-card border border-border bg-bgPage p-md">
+      <form
+        method="get"
+        action="/admin/auctions"
+        aria-label="Filtrid"
+        className="mb-md flex flex-wrap items-center gap-2 rounded-card border border-border bg-bgPage p-3 shadow-card"
+      >
         <input type="hidden" name="tab" value={tab.id} />
-        <label className="flex items-center gap-xs text-label text-inkMuted">
-          Olek
-          <select name="status" multiple className={`${filterSelectClass} h-auto`} defaultValue={statusFilter}>
+        <label className="inline-flex items-start gap-1.5 rounded-card border border-border bg-bgPage px-2.5 py-1.5 text-label text-inkMuted transition-colors duration-hover ease-hover focus-within:border-primary">
+          <span className="pt-0.5 text-[12px] text-inkMuted">Olek</span>
+          <select
+            name="status"
+            multiple
+            defaultValue={statusFilter}
+            className="h-auto cursor-pointer appearance-none border-0 bg-transparent p-0 text-[12px] leading-4 text-ink outline-none"
+          >
             {auctionStatusList.map((status) => (
               <option key={status} value={status}>
                 {auctionStatusLabels[status]}
@@ -418,9 +552,13 @@ export default async function AdminAuctionsPage({
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-xs text-label text-inkMuted">
-          Tüüp
-          <select name="type" className={filterSelectClass} defaultValue={typeFilter ?? ''}>
+        <label className={filterChipClass}>
+          <span className="text-[12px] text-inkMuted">Tüüp</span>
+          <select
+            name="type"
+            defaultValue={typeFilter ?? ''}
+            className={filterChipSelectClass}
+          >
             <option value="">Kõik objektid</option>
             {auctionObjectTypes.map((objectType) => (
               <option key={objectType} value={objectType}>
@@ -428,19 +566,29 @@ export default async function AdminAuctionsPage({
               </option>
             ))}
           </select>
+          <ChevronDownIcon aria-hidden="true" className={filterChipIconClass} />
         </label>
-        <label className="flex items-center gap-xs text-label text-inkMuted">
-          Mehaanika
-          <select name="auctionType" className={filterSelectClass} defaultValue={auctionTypeFilter ?? ''}>
+        <label className={filterChipClass}>
+          <span className="text-[12px] text-inkMuted">Mehaanika</span>
+          <select
+            name="auctionType"
+            defaultValue={auctionTypeFilter ?? ''}
+            className={filterChipSelectClass}
+          >
             <option value="">Kõik</option>
             <option value="open">Avatud</option>
             <option value="sealed">Suletud</option>
           </select>
+          <ChevronDownIcon aria-hidden="true" className={filterChipIconClass} />
         </label>
         {specialistUsers.length > 0 && scope.kind === 'all' ? (
-          <label className="flex items-center gap-xs text-label text-inkMuted">
-            Spetsialist
-            <select name="specialist" className={filterSelectClass} defaultValue={specialistFilter ?? ''}>
+          <label className={filterChipClass}>
+            <span className="text-[12px] text-inkMuted">Spetsialist</span>
+            <select
+              name="specialist"
+              defaultValue={specialistFilter ?? ''}
+              className={filterChipSelectClass}
+            >
               <option value="">Kõik</option>
               {specialistUsers.map((user) => (
                 <option key={user.id} value={user.id}>
@@ -448,11 +596,19 @@ export default async function AdminAuctionsPage({
                 </option>
               ))}
             </select>
+            <ChevronDownIcon
+              aria-hidden="true"
+              className={filterChipIconClass}
+            />
           </label>
         ) : null}
-        <label className="flex items-center gap-xs text-label text-inkMuted">
-          Maakond
-          <select name="county" className={filterSelectClass} defaultValue={countyFilter ?? ''}>
+        <label className={filterChipClass}>
+          <span className="text-[12px] text-inkMuted">Maakond</span>
+          <select
+            name="county"
+            defaultValue={countyFilter ?? ''}
+            className={filterChipSelectClass}
+          >
             <option value="">Kõik</option>
             {countyDocs.docs.map((county) => (
               <option key={county.id} value={county.id}>
@@ -460,278 +616,79 @@ export default async function AdminAuctionsPage({
               </option>
             ))}
           </select>
+          <ChevronDownIcon aria-hidden="true" className={filterChipIconClass} />
         </label>
-        <label className="flex items-center gap-xs text-label text-inkMuted">
-          Lõpp alates
-          <input type="date" name="endFrom" defaultValue={currentValues.endFrom ?? ''} className={filterSelectClass} />
-        </label>
-        <label className="flex items-center gap-xs text-label text-inkMuted">
-          kuni
-          <input type="date" name="endTo" defaultValue={currentValues.endTo ?? ''} className={filterSelectClass} />
-        </label>
-        <label className="flex min-w-[16rem] flex-1 items-center gap-xs text-label text-inkMuted">
+        <span className={filterChipClass}>
+          <span className="text-[12px] text-inkMuted">Lõpp</span>
+          <input
+            type="date"
+            name="endFrom"
+            aria-label="Lõpp alates"
+            defaultValue={currentValues.endFrom ?? ''}
+            className="w-[112px] border-0 bg-transparent p-0 font-mono text-[12px] text-ink outline-none"
+          />
+          <span aria-hidden="true" className="text-inkMuted">
+            —
+          </span>
+          <input
+            type="date"
+            name="endTo"
+            aria-label="Lõpp kuni"
+            defaultValue={currentValues.endTo ?? ''}
+            className="w-[112px] border-0 bg-transparent p-0 font-mono text-[12px] text-ink outline-none"
+          />
+        </span>
+        <label className="flex h-[34px] min-w-[210px] flex-1 items-center gap-2 rounded-pill border border-border bg-bgPage px-3 text-label text-inkMuted transition-colors duration-hover ease-hover focus-within:border-primary">
           <span className="sr-only">{FREETEXT_HINT}</span>
+          <SearchIcon
+            aria-hidden="true"
+            className="h-3.5 w-3.5 shrink-0 text-inkMuted"
+          />
           <input
             type="search"
             name="q"
             placeholder={FREETEXT_HINT}
             defaultValue={q}
-            className="h-9 w-full rounded-input border border-border bg-bgPage px-2 text-bodySm text-ink"
+            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] text-ink outline-none"
           />
         </label>
-        <button type="submit" className="h-9 rounded-button border border-border px-3 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary">
+        <button
+          type="submit"
+          className="inline-flex h-[34px] items-center rounded-button border border-border bg-bgPage px-3 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary"
+        >
           Filtreeri
         </button>
-        <Link href={buildUrl({ status: undefined, type: undefined, auctionType: undefined, specialist: undefined, county: undefined, endFrom: undefined, endTo: undefined, q: undefined, page: undefined })} className="text-label font-semibold text-inkMuted transition-colors duration-hover ease-hover hover:text-primary">
-          Tühjenda{activeFilterCount > 0 ? ` (${String(activeFilterCount)})` : ''}
+        <Link
+          href={buildUrl({
+            status: undefined,
+            type: undefined,
+            auctionType: undefined,
+            specialist: undefined,
+            county: undefined,
+            endFrom: undefined,
+            endTo: undefined,
+            q: undefined,
+            page: undefined,
+          })}
+          className="inline-flex h-[34px] items-center gap-1 rounded-button px-2 text-label font-medium text-danger transition-colors duration-hover ease-hover hover:bg-dangerLight"
+        >
+          <XIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
+          Tühjenda
+          {activeFilterCount > 0 ? ` (${String(activeFilterCount)})` : ''}
         </Link>
       </form>
 
-      <div className="mb-md flex flex-wrap items-center justify-between gap-sm">
-        {roleCanWrite ? (
-          <form
-            id="bulk-schedule-form"
-            action={bulkScheduleAuctionsAction}
-            className="flex flex-wrap items-center gap-sm rounded-card border border-border bg-bgPage px-md py-sm"
-          >
-            <span className="text-label font-semibold text-ink">Bulks ajastamine</span>
-            <label className="flex items-center gap-xs text-label text-inkMuted">
-              Algus
-              <input
-                type="datetime-local"
-                name="startsAt"
-                required
-                className={filterSelectClass}
-              />
-            </label>
-            <label className="flex items-center gap-xs text-label text-inkMuted">
-              Lõpp
-              <input type="datetime-local" name="endsAt" className={filterSelectClass} />
-            </label>
-            <span className="text-bodySm text-inkMuted">
-              Vali tabelist mustandid; mitte-mustandid blokeeritakse. Kellaaeg Europe/Tallinn.
-            </span>
-            <button type="submit" className={primaryButtonClass}>
-              Ajasta valitud
-            </button>
-          </form>
-        ) : null}
-        {roleCanExport ? (
-          <a href={csvHref} className={secondaryButtonClass}>
-            Ekspordi CSV
-          </a>
-        ) : null}
-      </div>
-
-      <DataTable
-        columns={[
-          ...(roleCanWrite
-            ? [
-                {
-                  key: 'select',
-                  label: 'Vali',
-                  render: (row: AuctionRow) => (
-                    <input
-                      type="checkbox"
-                      name="ids"
-                      value={row.id}
-                      form="bulk-schedule-form"
-                      aria-label={`Vali oksjon ${row.title}`}
-                      className="h-4 w-4 accent-primary"
-                    />
-                  ),
-                },
-              ]
-            : []),
-          {
-            key: 'id',
-            label: 'ID',
-            render: (row) => (
-              <Link
-                href={`/admin/auctions/${row.id}`}
-                className="font-mono text-bodySm text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
-                title={row.id}
-              >
-                #{row.id.slice(0, 8)}
-              </Link>
-            ),
-          },
-          {
-            key: 'title',
-            label: 'Nimi',
-            render: (row) => (
-              <Link
-                href={`/admin/auctions/${row.id}`}
-                className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
-              >
-                {row.objectType === 'kiire' || row.isQuickAuction ? '⚡ ' : ''}
-                {row.title}
-              </Link>
-            ),
-          },
-          {
-            key: 'objectType',
-            label: 'Tüüp',
-            render: (row) => (
-              <span title={`${auctionObjectTypeLabels[row.objectType]} — ${auctionTypeLabels[row.type]}`}>
-                {auctionObjectTypeLabels[row.objectType]} {row.type === 'open' ? '(A)' : '(S)'}
-              </span>
-            ),
-          },
-          { key: 'status', label: 'Olek', render: (row) => <StatusChip status={row.status} /> },
-          { key: 'countyName', label: 'Maakond', render: (row) => row.countyName ?? '—' },
-          {
-            key: 'minBidCents',
-            label: 'Alghind',
-            render: (row) => <span className="text-right tabular-nums">{formatEur(row.minBidCents)}</span>,
-          },
-          {
-            key: 'bidCount',
-            label: 'Pakkumisi',
-            render: (row) => (
-              <span>
-                {String(row.bidCount)}
-                {row.pendingCount > 0 ? (
-                  <span
-                    className="ml-1 font-semibold text-amber-600"
-                    title="Alapakkumisi ootel"
-                  >
-                    ({String(row.pendingCount)}p)
-                  </span>
-                ) : null}
-              </span>
-            ),
-          },
-          {
-            key: 'endsAt',
-            label: 'Lõpp',
-            render: (row) => {
-              if (!row.endsAt) return '—'
-              if (row.status === 'active') {
-                const ending = Date.parse(row.endsAt) - now < 5 * 60 * 1000
-                return (
-                  <time
-                    dateTime={row.endsAt}
-                    aria-label={`Lõpeb ${formatDateTime(row.endsAt)}`}
-                    className={ending ? 'font-semibold text-amber-600' : undefined}
-                    title={formatDateTime(row.endsAt)}
-                  >
-                    {countdownText(row.endsAt, now)}
-                  </time>
-                )
-              }
-              return formatDateTime(row.endsAt)
-            },
-          },
-          { key: 'specialistName', label: 'Spetsialist', render: (row) => initials(row.specialistName) },
-          {
-            key: 'actions',
-            label: 'Tegevused',
-            render: (row) => (
-              <div className="flex flex-wrap items-center gap-sm">
-                {roleCanWrite ? (
-                  <form action={duplicateAuctionAction}>
-                    <input type="hidden" name="id" value={row.id} />
-                    <button
-                      type="submit"
-                      className="text-label font-semibold text-inkMuted transition-colors duration-hover ease-hover hover:text-ink"
-                      title="Dupl."
-                    >
-                      Dupl.
-                    </button>
-                  </form>
-                ) : null}
-                {roleCanEndManual && row.status === 'active' ? (
-                  <details className="relative">
-                    <summary className="cursor-pointer text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:text-danger/80">
-                      Lõpeta
-                    </summary>
-                    <form
-                      action={endAuctionManuallyAction}
-                      className="mt-xs flex w-72 flex-col gap-xs rounded-card border border-border bg-bgPage p-sm shadow-md"
-                    >
-                      <input type="hidden" name="id" value={row.id} />
-                      <p className="text-label font-semibold text-danger">
-                        Kinnitan lõpetamise — see on pöördumatu
-                      </p>
-                      <label className="flex flex-col gap-xs text-label text-inkMuted">
-                        Lõpetamise põhjus (kohustuslik)
-                        <textarea
-                          name="reason"
-                          required
-                          minLength={5}
-                          rows={2}
-                          className="rounded-input border border-border bg-bgPage px-2 py-1 text-bodySm text-ink"
-                          placeholder="Kirjuta põhjus (min 5 tähemärki)"
-                        />
-                      </label>
-                      <fieldset className="flex flex-col gap-xs text-bodySm text-ink">
-                        <legend className="text-label text-inkMuted">Tulemus</legend>
-                        <label className="flex items-center gap-xs">
-                          <input type="radio" name="outcome" value="winner" defaultChecked />
-                          Kuuluta võitjaks praegune kõrgeim pakkumine
-                        </label>
-                        <label className="flex items-center gap-xs">
-                          <input type="radio" name="outcome" value="unsold" />
-                          Märgi müümata
-                        </label>
-                      </fieldset>
-                      <button
-                        type="submit"
-                        className="rounded-button border border-danger px-3 py-1 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-dangerLight"
-                      >
-                        Lõpeta käsitsi
-                      </button>
-                    </form>
-                  </details>
-                ) : null}
-                {roleCanArchive && (row.status === 'unsold' || row.status === 'completed') ? (
-                  <details className="relative">
-                    <summary className="cursor-pointer text-label font-semibold text-inkMuted transition-colors duration-hover ease-hover hover:text-ink">
-                      Arhiivi
-                    </summary>
-                    <form
-                      action={archiveAuctionAction}
-                      className="mt-xs flex w-72 flex-col gap-xs rounded-card border border-border bg-bgPage p-sm shadow-md"
-                    >
-                      <input type="hidden" name="id" value={row.id} />
-                      <label className="flex flex-col gap-xs text-label text-inkMuted">
-                        Arhiiveerimise põhjus (kohustuslik)
-                        <textarea
-                          name="reason"
-                          required
-                          minLength={5}
-                          rows={2}
-                          className="rounded-input border border-border bg-bgPage px-2 py-1 text-bodySm text-ink"
-                          placeholder="Kirjuta põhjus (min 5 tähemärki)"
-                        />
-                      </label>
-                      <button
-                        type="submit"
-                        className="rounded-button border border-border px-3 py-1 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary"
-                      >
-                        Arhiivi
-                      </button>
-                    </form>
-                  </details>
-                ) : null}
-                {roleCanWrite && (row.status === 'ended' || row.status === 'unsold') ? (
-                  <form action={relistAuctionAction}>
-                    <input type="hidden" name="id" value={row.id} />
-                    <button
-                      type="submit"
-                      className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
-                    >
-                      Avalda uuesti
-                    </button>
-                  </form>
-                ) : null}
-              </div>
-            ),
-          },
-        ]}
+      <AuctionsTable
         rows={rows}
-        emptyLabel="Filtritele vastavaid oksjoneid ei leitud"
+        sorts={sorts}
+        csvHref={csvHref}
+        roleCanWrite={roleCanWrite}
+        roleCanExport={roleCanExport}
+        bulkScheduleAction={bulkScheduleAuctionsAction}
+        duplicateAction={duplicateAuctionAction}
+        endManuallyAction={endAuctionManuallyAction}
+        archiveAction={archiveAuctionAction}
+        relistAction={relistAuctionAction}
       />
 
       <div className="mt-sm flex items-center justify-between text-label text-inkMuted">
@@ -742,7 +699,10 @@ export default async function AdminAuctionsPage({
         </span>
         <span className="flex items-center gap-sm">
           {safePage > 1 ? (
-            <Link href={buildUrl({ page: String(safePage - 1) })} className="font-semibold text-primary hover:text-primary/80">
+            <Link
+              href={buildUrl({ page: String(safePage - 1) })}
+              className="font-semibold text-primary hover:text-primary/80"
+            >
               ‹ Eelmine
             </Link>
           ) : null}
@@ -750,7 +710,10 @@ export default async function AdminAuctionsPage({
             Leht {String(safePage)} / {String(pageCount)}
           </span>
           {safePage < pageCount ? (
-            <Link href={buildUrl({ page: String(safePage + 1) })} className="font-semibold text-primary hover:text-primary/80">
+            <Link
+              href={buildUrl({ page: String(safePage + 1) })}
+              className="font-semibold text-primary hover:text-primary/80"
+            >
               Järgmine ›
             </Link>
           ) : null}

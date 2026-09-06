@@ -53,11 +53,14 @@ const config: Config = {
         pill: '9999px',
       },
       boxShadow: {
-        card: '0 2px 12px rgba(22, 56, 42, 0.08)',
+        // Var-based with root defaults matching today's public rendering; the
+        // (admin) token scope (admin.css) redefines the vars with the demo
+        // values, mirroring the fontSize/radius pattern.
+        card: 'var(--shadow-card, 0 2px 12px rgba(22, 56, 42, 0.08))',
         'card-hover':
-          '0 2px 8px rgba(22, 56, 42, 0.12), 0 8px 24px rgba(22, 56, 42, 0.08)',
+          'var(--shadow-card-hover, 0 2px 8px rgba(22, 56, 42, 0.12), 0 8px 24px rgba(22, 56, 42, 0.08))',
         modal:
-          '0 4px 16px rgba(22, 56, 42, 0.12), 0 16px 48px rgba(22, 56, 42, 0.1)',
+          'var(--shadow-modal, 0 4px 16px rgba(22, 56, 42, 0.12), 0 16px 48px rgba(22, 56, 42, 0.1))',
       },
       fontSize: {
         h1: ['48px', { lineHeight: '1.15' }],

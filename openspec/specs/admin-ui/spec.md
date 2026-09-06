@@ -83,6 +83,10 @@ and a 28px/34px Public Sans 700 title with an action slot; form fields and
 error notices use the admin token scale. Screens composed from these
 components SHALL inherit the styling without per-screen edits.
 
+`DataTable` SHALL render inside the demo card treatment: white surface,
+8px radius, 1px border, and the `--shadow-card` elevation, with edge-cell
+padding on the first and last columns.
+
 #### Scenario: Auctions list table density
 
 - **WHEN** the auctions list renders its table
@@ -94,6 +98,12 @@ components SHALL inherit the styling without per-screen edits.
 - **WHEN** an admin page renders `PageHeader`
 - **THEN** a 12px breadcrumb line appears above a 28px page title and the
   page's primary action renders right-aligned on the same row
+
+#### Scenario: Table card elevation
+
+- **WHEN** any admin screen renders `DataTable`
+- **THEN** the table sits on a white card with an 8px radius, a 1px border,
+  and the demo card shadow
 
 ### Requirement: Status chips use semantic triads
 
@@ -114,4 +124,27 @@ status display.
 - **WHEN** a status chip for müümata renders
 - **THEN** the chip shows danger-red text with a red outline border and a
   transparent background
+
+### Requirement: Sortable data table headers
+
+The shared `DataTable` SHALL support optional sortable columns: a column
+MAY declare a sort descriptor carrying the sort key, the current
+direction, and a URL for toggling to the opposite direction. Sortable
+headers SHALL render as buttons with an ascending/descending arrow icon
+and the active direction SHALL set `aria-sort` on the `th`. Toggling sort
+SHALL preserve all other URL parameters. Columns without a sort
+descriptor SHALL render unchanged.
+
+#### Scenario: Toggling sort preserves filters
+
+- **WHEN** the auctions list is filtered by county and the operator clicks
+  the Alghind header
+- **THEN** the list re-sorts by minimum bid and the county filter remains
+  applied in the URL
+
+#### Scenario: Active sort is announced
+
+- **WHEN** the list is sorted by Lõpp descending
+- **THEN** the Lõpp `th` carries `aria-sort="descending"` and its button
+  shows the active arrow icon
 
