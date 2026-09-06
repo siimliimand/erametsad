@@ -1,9 +1,28 @@
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  CalendarClock,
+  ChevronDown,
+  Copy,
+  Ellipsis,
+  ExternalLink,
+  MapPinHouse,
+  Package,
+  Pencil,
+  Search,
+  TreePine,
+  TriangleAlert,
+  Wheat,
+  X,
+  Zap,
+} from 'lucide-react'
 import type { SVGProps } from 'react'
 
-// Inline Lucide-geometry icons (ISC). apps/platform does not declare
-// lucide-react as a direct dependency and this task may not change
-// package.json, so the few icons the shell needs are vendored here.
-// Keep this file in sync with lucide-react when the dependency lands.
+// Icon module for the admin shell. The older icons vendor Lucide geometry
+// inline (ISC) from before lucide-react was a direct dependency; newer icons
+// re-export Lucide components through the same XxxIcon contract (default
+// h-4 w-4 class, overridable via className).
 
 function Svg({ children, ...props }: SVGProps<SVGSVGElement>) {
   return (
@@ -229,4 +248,72 @@ export function CheckIcon(props: SVGProps<SVGSVGElement>) {
       <path d="M20 6 9 17l-5-5" />
     </Svg>
   )
+}
+
+export function ArrowUpIcon(props: SVGProps<SVGSVGElement>) {
+  return <ArrowUp className={iconClass} {...props} />
+}
+
+export function ArrowDownIcon(props: SVGProps<SVGSVGElement>) {
+  return <ArrowDown className={iconClass} {...props} />
+}
+
+export function ArrowUpDownIcon(props: SVGProps<SVGSVGElement>) {
+  return <ArrowUpDown className={iconClass} {...props} />
+}
+
+export function TreePineIcon(props: SVGProps<SVGSVGElement>) {
+  return <TreePine className={iconClass} {...props} />
+}
+
+export function MapPinHouseIcon(props: SVGProps<SVGSVGElement>) {
+  return <MapPinHouse className={iconClass} {...props} />
+}
+
+export function WheatIcon(props: SVGProps<SVGSVGElement>) {
+  return <Wheat className={iconClass} {...props} />
+}
+
+export function PackageIcon(props: SVGProps<SVGSVGElement>) {
+  return <Package className={iconClass} {...props} />
+}
+
+export function ZapIcon(props: SVGProps<SVGSVGElement>) {
+  return <Zap className={iconClass} {...props} />
+}
+
+export function ExternalLinkIcon(props: SVGProps<SVGSVGElement>) {
+  return <ExternalLink className={iconClass} {...props} />
+}
+
+export function PencilIcon(props: SVGProps<SVGSVGElement>) {
+  return <Pencil className={iconClass} {...props} />
+}
+
+export function CopyIcon(props: SVGProps<SVGSVGElement>) {
+  return <Copy className={iconClass} {...props} />
+}
+
+export function EllipsisIcon(props: SVGProps<SVGSVGElement>) {
+  return <Ellipsis className={iconClass} {...props} />
+}
+
+export function XIcon(props: SVGProps<SVGSVGElement>) {
+  return <X className={iconClass} {...props} />
+}
+
+export function ChevronDownIcon(props: SVGProps<SVGSVGElement>) {
+  return <ChevronDown className={iconClass} {...props} />
+}
+
+export function CalendarClockIcon(props: SVGProps<SVGSVGElement>) {
+  return <CalendarClock className={iconClass} {...props} />
+}
+
+export function TriangleAlertIcon(props: SVGProps<SVGSVGElement>) {
+  return <TriangleAlert className={iconClass} {...props} />
+}
+
+export function SearchIcon(props: SVGProps<SVGSVGElement>) {
+  return <Search className={iconClass} {...props} />
 }
