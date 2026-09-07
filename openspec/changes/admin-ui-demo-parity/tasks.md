@@ -8,15 +8,15 @@
 - [x] 1.6 Collapse StatusChip and StatusPill into one component with the full demo variant set (auction triads, user states, contract glyphs, lead and content variants) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_components/StatusChip.tsx, apps/platform/src/app/(admin)/_lib/labels.tsx] -->
 - [x] 1.7 AdminNav badge support (amber dot, red count) fed by server pending counts <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_components/AdminNav.tsx, apps/platform/src/app/(admin)/_components/AdminShell.tsx, apps/platform/src/app/(admin)/layout.tsx] -->
 - [ ] 1.8 Wire Cmd/Ctrl+K in TopbarSearch: grouped route-jump palette (auctions, users, leads, contracts, settings) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_components/TopbarSearch.tsx] -->
-- [ ] 1.9 Tests for all primitives (overlay focus, Esc, drawer widths, toast timing, pill variants) <!-- agent: fullstack-engineer.build, depends_on: [1.4, 1.5, 1.6], touches: [apps/platform/src/app/(admin)/_components/**/__tests__/**] -->
+- [x] 1.9 Tests for all primitives (overlay focus, Esc, drawer widths, toast timing, pill variants) <!-- agent: fullstack-engineer.build, depends_on: [1.4, 1.5, 1.6], touches: [apps/platform/src/app/(admin)/_components/**/__tests__/**] -->
 
 ## 2. Navigation and route repairs
 
 - [x] 2.1 Create /admin/companies (move company approvals from leads/requests) with a redirect from the old path <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/companies/**, apps/platform/src/app/(admin)/admin/leads/requests/**] -->
 - [x] 2.2 Create /admin/inquiries (move requests) and /admin/inquiries/partners with redirects <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/inquiries/**, apps/platform/src/app/(admin)/admin/requests/**] -->
 - [x] 2.3 Create /admin/settings (move content/settings) with a redirect <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/settings/**, apps/platform/src/app/(admin)/admin/content/settings/**] -->
-- [ ] 2.4 Create /admin/sealed-opening index: sealed and ended auctions awaiting ceremony, links into per-auction ceremony <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/sealed-opening/page.tsx] -->
-- [ ] 2.5 Create /admin/notifications read-only list; repoint the bell footer link <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/notifications/page.tsx, apps/platform/src/app/(admin)/_components/NotificationBell.tsx] -->
+- [x] 2.4 Create /admin/sealed-opening index: sealed and ended auctions awaiting ceremony, links into per-auction ceremony <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/sealed-opening/page.tsx] -->
+- [x] 2.5 Create /admin/notifications read-only list; repoint the bell footer link <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/notifications/page.tsx, apps/platform/src/app/(admin)/_components/NotificationBell.tsx] -->
 - [ ] 2.6 Route tests: all 13 module hrefs resolve, old paths redirect, role gating intact per module <!-- agent: fullstack-engineer.build, depends_on: [2.1, 2.2, 2.3, 2.4, 2.5], touches: [apps/platform/src/app/(admin)/**/__tests__/**] -->
 
 ## 3. Workspace (Töölaud)
@@ -87,8 +87,8 @@
 - [x] 12.1 Schema and repository: page_blocks (pageId, type, ordinal, configJson) and page_versions snapshots, migration <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/data/schema/**, apps/platform/src/lib/data/repositories/**] -->
 - [x] 12.2 Block type registry with zod configs: hero, text, cards, accordion, form, ticker, stats, cta, testimonials, faq <!-- agent: fullstack-engineer.build, depends_on: [12.1], touches: [apps/platform/src/lib/content/blocks/**] -->
 - [x] 12.3 Builder UI on the page editor: ordered block list, add-block menu, per-block settings drawer, delete with confirm <!-- agent: fullstack-engineer.build, depends_on: [12.2, 1.3, 1.5], touches: [apps/platform/src/app/(admin)/admin/content/pages/_components/**] -->
-- [ ] 12.4 Live preview pane: read-only block rendering with desktop/mobile width toggle <!-- agent: fullstack-engineer.build, depends_on: [12.3], touches: [apps/platform/src/app/(admin)/admin/content/pages/_components/BlockPreview.tsx] -->
-- [ ] 12.5 Versions: publish creates a snapshot, versions drawer with two-column diff, restore action <!-- agent: fullstack-engineer.build, depends_on: [12.3, 1.3], touches: [apps/platform/src/app/(admin)/admin/content/pages/_components/VersionsDrawer.tsx, apps/platform/src/app/(admin)/_actions/content.ts] -->
+- [x] 12.4 Live preview pane: read-only block rendering with desktop/mobile width toggle <!-- agent: fullstack-engineer.build, depends_on: [12.3], touches: [apps/platform/src/app/(admin)/admin/content/pages/_components/BlockPreview.tsx] -->
+- [x] 12.5 Versions: publish creates a snapshot, versions drawer with two-column diff, restore action <!-- agent: fullstack-engineer.build, depends_on: [12.3, 1.3], touches: [apps/platform/src/app/(admin)/admin/content/pages/_components/VersionsDrawer.tsx, apps/platform/src/app/(admin)/_actions/content.ts] -->
 - [x] 12.6 Marketing renderer: PageBlocks renderer component adopted by the CMS pages route <!-- agent: fullstack-engineer.build, depends_on: [12.2], touches: [packages/ui/src/components/content/**, apps/platform/src/app/(marketing)/**] -->
 - [ ] 12.7 Tests: registry validation, ordinal integrity, snapshot diff, renderer <!-- agent: fullstack-engineer.build, depends_on: [12.4, 12.5, 12.6], touches: [apps/platform/src/lib/content/**/__tests__/**, apps/platform/src/app/(admin)/admin/content/pages/**/__tests__/**] -->
 
