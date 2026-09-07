@@ -1,11 +1,11 @@
+import { SettingsForm } from './_components/SettingsForm'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import { PageHeader } from '../../_components/PageHeader'
 import { requireAdminRepositories } from '../../_lib/admin'
-import { SettingsForm } from './_components/SettingsForm'
 
 export const metadata = { title: 'Seaded' }
 
-export default async function AdminContentSettingsPage({
+export default async function AdminSettingsPage({
   searchParams,
 }: {
   searchParams: Promise<{ viga?: string }>
@@ -21,8 +21,7 @@ export default async function AdminContentSettingsPage({
       {viga ? <ErrorNotice message={viga} /> : null}
       <PageHeader
         title="Seaded"
-        description="Platvormi üldsätted: vahendustasu, käibemaks ja funktsioonide lipud."
-        backHref="/admin/content"
+        description="Platvormi seaded: üldsätted, oksjonite reeglid, teenustasud, päringud, integratsioonid ja õigused."
       />
       <SettingsForm settings={settings} />
     </div>
