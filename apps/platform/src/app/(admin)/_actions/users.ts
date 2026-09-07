@@ -1,13 +1,21 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { requireAdminRepositories } from '../_lib/admin'
-import { can, type AdminPermission } from '../_lib/permissions'
+import { can, isStaffRole, type AdminPermission } from '../_lib/permissions'
 import { isSuspendDuration, suspendedUntil } from '../admin/users/_components/suspend'
 
-import { getUserSession, revokeSession } from '@/lib/auth/session'
+import { verifyAccessToken } from '@/lib/auth/jwt'
+import {
+  clearSessionCookiesOnStore,
+  createSession,
+  getUserSession,
+  revokeSession,
+  writeSessionCookies,
+} from '@/lib/auth/session'
 import type { CoreRepositories, UserDoc } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 import { auctionObjectTypes, userRoles } from '@/lib/data/schema'
@@ -17,6 +25,10 @@ const REASON_MIN_LENGTH = 5
 // Enforcement actions are audited with the same `user.suspend` key in both
 // directions; `after.status` distinguishes a suspension from an early end.
 const AUDIT_SUSPEND = 'user.suspend'
+
+// Registry key from docs/design/admin/14-audit-log.md; `after.phase` splits
+// start from stop, `after.reason` carries the mandatory view reason.
+const AUDIT_IMPERSONATE = 'user.impersonate'
 
 function readText(formData: FormData, key: string): string {
   const value = formData.get(key)
@@ -487,4 +499,122 @@ export async function revokeUserSessionAction(formData: FormData): Promise<void>
 
   revalidatePath(editPath)
   redirect(editPath)
+}
+
+/**
+ * Start an admin impersonation ("vaate seanss") session for a non-staff
+ * user. The view session replaces the browser's cookies: it authenticates
+ * as the target user with `impersonatedBy` bound to the operator in both
+ * the JWT claims and the D1 session row (so rotation cannot shed it), and
+ * the guard layer fails every portal write closed for it.
+ */
+export async function startImpersonationAction(formData: FormData): Promise<void> {
+  const { session } = await requireAdminRepositories()
+
+  const userId = readText(formData, 'userId')
+  const reason = readText(formData, 'reason')
+  const editPath = `/admin/users/${userId}`
+
+  if (!userId) redirectWithError('/admin/users', 'Kasutaja identifikaator puudub.')
+  assertPermissionOrRedirect(session.role, 'users:write', editPath)
+  if (!hasMinReason(reason)) {
+    redirectWithError(editPath, 'Vaatluse alustamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+  }
+
+  const repositories = await getRepositories()
+
+  const user = await repositories.findByID({ collection: 'users', id: userId })
+  if (!user) redirectWithError('/admin/users', 'Kasutajat ei leitud.')
+  // Staff targets would chain administrative access through the view
+  // session, so impersonation stays limited to portal roles.
+  if (isStaffRole(user.role)) {
+    redirectWithError(editPath, 'Töötaja konto vaatlemine ei ole lubatud.')
+  }
+  if (user.status !== 'active') {
+    redirectWithError(editPath, 'Kasutaja konto ei ole aktiivne.')
+  }
+
+  const { accessToken, refreshToken, sessionId } = await createSession(
+    user.id,
+    user.role,
+    undefined,
+    session.userId,
+  )
+
+  // Fail closed: the browser's cookies only move once the start is on the
+  // append-only audit trail.
+  let failure: string | null = null
+  try {
+    await audit(repositories, {
+      actorId: session.userId,
+      action: AUDIT_IMPERSONATE,
+      entityType: 'user',
+      entityId: user.id,
+      after: { phase: 'start', reason, sessionId },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    redirectWithError(editPath, `Vaatluse alustamise logimine ebaõnnestus: ${failure}`)
+  }
+
+  writeSessionCookies(await cookies(), accessToken, refreshToken)
+
+  revalidatePath(editPath)
+  redirect('/user')
+}
+
+/**
+ * End the current impersonation session. Runs inside the view session (the
+ * portal banner's LÕPETA VAATLUS control), so the caller's authority comes
+ * from the verified `impersonatedBy` claim cross-checked against the D1
+ * session row — never from the request body. A caller without an active
+ * view session gets a no-op redirect and keeps its cookies.
+ */
+export async function stopImpersonationAction(): Promise<void> {
+  const token = (await cookies()).get('access_token')?.value
+  const payload = token ? verifyAccessToken(token) : null
+  const operatorId = payload?.impersonatedBy
+  const sessionId = payload?.sessionId
+
+  if (!payload || !operatorId || !sessionId) redirect('/')
+
+  const record = await getUserSession(sessionId)
+  if (record === null) redirect('/')
+  if (record.impersonatedBy !== operatorId || record.userId !== payload.userId) {
+    redirect('/')
+  }
+
+  const repositories = await getRepositories()
+
+  // The stop is audited against the real operator, but it must always win:
+  // if the audit write fails the session is still revoked (the start entry
+  // already carries the binding, so no revocation goes unexplained).
+  try {
+    await audit(repositories, {
+      actorId: operatorId,
+      action: AUDIT_IMPERSONATE,
+      entityType: 'user',
+      entityId: payload.userId,
+      after: { phase: 'stop', reason: null, sessionId },
+    })
+  } catch {
+    // Availability of the stop path takes precedence over the stop entry.
+  }
+
+  await revokeSession(sessionId)
+
+  // Hand the operator a fresh session with their own role; the original
+  // admin session row was never stored in the browser, so nothing needs
+  // restoring from client-side state.
+  const operator = await repositories.findByID({ collection: 'users', id: operatorId })
+  if (operator && isStaffRole(operator.role) && operator.status === 'active') {
+    const restored = await createSession(operator.id, operator.role)
+    writeSessionCookies(await cookies(), restored.accessToken, restored.refreshToken)
+    redirectWithNotice(`/admin/users/${payload.userId}`, 'Vaatlus lõpetatud.')
+  }
+
+  clearSessionCookiesOnStore(await cookies())
+  redirect('/login')
 }

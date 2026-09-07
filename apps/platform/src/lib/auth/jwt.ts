@@ -144,6 +144,10 @@ export interface AccessTokenPayload {
   // distinguisher, same-second issuances for one user are byte-identical
   // JWTs and collide on the sessions.access_token_hash unique index.
   sessionId?: string | undefined
+  // Admin impersonation ("vaate seanss"): the real operator's user id while
+  // this token acts as a read-only view session for userId; absent on
+  // sessions the user logged into themselves.
+  impersonatedBy?: string | undefined
 }
 
 export interface RefreshTokenPayload {
@@ -167,7 +171,9 @@ function toAccessToken(result: Record<string, unknown> | null): AccessTokenPaylo
     typeof result.activeProfileId === 'string' ? result.activeProfileId : undefined
   const sessionId =
     typeof result.sessionId === 'string' ? result.sessionId : undefined
-  if (activeProfileId === undefined && sessionId === undefined) {
+  const impersonatedBy =
+    typeof result.impersonatedBy === 'string' ? result.impersonatedBy : undefined
+  if (activeProfileId === undefined && sessionId === undefined && impersonatedBy === undefined) {
     return { userId: result.userId, role: result.role }
   }
   return {
@@ -175,6 +181,7 @@ function toAccessToken(result: Record<string, unknown> | null): AccessTokenPaylo
     role: result.role,
     ...(activeProfileId !== undefined ? { activeProfileId } : {}),
     ...(sessionId !== undefined ? { sessionId } : {}),
+    ...(impersonatedBy !== undefined ? { impersonatedBy } : {}),
   }
 }
 

@@ -33,7 +33,12 @@ function render(auth: Parameters<typeof PortalHeader>[0]['auth']): string {
 
 describe('PortalHeader portal links', () => {
   it('renders Ajalugu and Registreeru links for guests and signed-in users', () => {
-    for (const auth of [null, { userId: 'u1', role: 'user', profileId: 'p1', profileName: 'Mari' }]) {
+    for (
+      const auth of [
+        null,
+        { userId: 'u1', role: 'user', profileId: 'p1', profileName: 'Mari', impersonatedBy: null },
+      ]
+    ) {
       const html = render(auth)
       expect(html).toContain('Ajalugu')
       expect(html).toContain('Registreeru')

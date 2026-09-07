@@ -37,5 +37,7 @@ function toGuardRole(role: string): GuardRole {
  */
 export function sessionGuardContext(token: AccessTokenPayload | null): GuardContext {
   if (!token) return publicContext
-  return userContext(token.userId, toGuardRole(token.role))
+  // The impersonation claim rides along so the guard veto in guards.ts can
+  // fail every write closed for view sessions.
+  return userContext(token.userId, toGuardRole(token.role), token.impersonatedBy)
 }

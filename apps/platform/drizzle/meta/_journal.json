@@ -85,6 +85,13 @@
       "when": 1788791732568,
       "tag": "0011_medical_sway",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788792907311,
+      "tag": "0012_minor_joseph",
+      "breakpoints": true
     }
   ]
 }

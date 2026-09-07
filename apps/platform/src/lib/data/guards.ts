@@ -26,7 +26,10 @@ export interface GuardUser {
 }
 
 /** public = anonymous caller, user = authenticated caller, system = trusted server code */
-export type GuardContext = { kind: 'public' } | { kind: 'user'; user: GuardUser } | { kind: 'system' }
+export type GuardContext =
+  | { kind: 'public' }
+  | { kind: 'user'; user: GuardUser; impersonatedBy?: string }
+  | { kind: 'system' }
 
 export type GuardOperation = 'read' | 'create' | 'update' | 'delete'
 
@@ -42,8 +45,12 @@ export type GuardedRow = Record<string, unknown>
 export const publicContext: GuardContext = { kind: 'public' }
 export const systemContext: GuardContext = { kind: 'system' }
 
-export function userContext(id: string, role: GuardRole): GuardContext {
-  return { kind: 'user', user: { id, role } }
+export function userContext(id: string, role: GuardRole, impersonatedBy?: string): GuardContext {
+  return {
+    kind: 'user',
+    user: { id, role },
+    ...(impersonatedBy !== undefined ? { impersonatedBy } : {}),
+  }
 }
 
 type GuardRule =
@@ -203,6 +210,12 @@ export function can(
   row?: GuardedRow,
 ): GuardDecision {
   if (ctx.kind === 'system') return { allowed: true }
+  // Admin impersonation ("vaate seanss") is strictly read-only: every
+  // guarded create/update/delete fails closed for a view session, no
+  // matter which collection or role rule would otherwise allow it.
+  if (ctx.kind === 'user' && ctx.impersonatedBy !== undefined && operation !== 'read') {
+    return { allowed: false, reason: 'read-only impersonation session: writes are blocked' }
+  }
   const rule = GUARD_RULES[collection]?.[operation]
   if (!rule) {
     return { allowed: false, reason: `no ${operation} rule for '${collection}'; access denied` }

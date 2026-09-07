@@ -44,13 +44,37 @@ function fakeSessionsD1(store: SessionRow[]): DbDatabase {
     const changes = (n: number): DbResult => ({ results: [], success: true, meta: { changes: n } })
 
     if (s.startsWith('INSERT INTO sessions')) {
-      const [id, userId, role, profileId, tokenFamily, atHash, rtHash, expiresAt, createdAt, updatedAt] =
-        params as [string, string, string, string | null, string, string, string, string, string, string]
+      const [
+        id,
+        userId,
+        role,
+        profileId,
+        impersonatedBy,
+        tokenFamily,
+        atHash,
+        rtHash,
+        expiresAt,
+        createdAt,
+        updatedAt,
+      ] = params as [
+        string,
+        string,
+        string,
+        string | null,
+        string | null,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
       store.push({
         id,
         user_id: userId,
         role,
         profile_id: profileId,
+        impersonated_by: impersonatedBy,
         token_family: tokenFamily,
         access_token_hash: atHash,
         refresh_token_hash: rtHash,
