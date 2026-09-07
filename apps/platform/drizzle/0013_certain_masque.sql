@@ -1,0 +1,1 @@
+ALTER TABLE `settings` ADD `maintenance_enabled` integer DEFAULT false NOT NULL;

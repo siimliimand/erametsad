@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { IntegrationKeys } from './IntegrationKeys'
+import { MaintenanceMode } from './MaintenanceMode'
 import { RoleMatrix } from './RoleMatrix'
 import { updateSettingsAction } from '../../../_actions/content'
 import {
@@ -154,6 +155,7 @@ export function SettingsForm({
                 />
               </div>
             </SectionForm>
+            <MaintenanceMode enabled={settings?.maintenanceEnabled ?? false} />
             <SectionForm section="lipud">
               <h3 className="text-label font-semibold text-ink">
                 Funktsioonide lipud
