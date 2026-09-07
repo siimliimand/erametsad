@@ -10,6 +10,7 @@ import {
   type RevealedBidView,
 } from '../../../../../_actions/auctions'
 import { FormField, primaryButtonClass } from '../../../../../_components/FormField'
+import { useToast } from '../../../../../_components/ui/Toast'
 
 type Decision = 'sold' | 'unsold' | 'house-backup'
 
@@ -47,6 +48,7 @@ export function WinnerConfirm({
   kiiroksjon: boolean
 }) {
   const router = useRouter()
+  const toast = useToast()
   const [confirmState, confirmFormAction, confirmPending] = useActionState(
     confirmSealedCeremonyWinnerAction,
     initialState,
@@ -61,18 +63,39 @@ export function WinnerConfirm({
   const effectiveDecision: Decision =
     decision === 'sold' && !soldPossible ? 'unsold' : decision
 
+  // Server-action error semantics stay intact: the state drives the toast,
+  // and the success message follows the server-authoritative phase.
   useEffect(() => {
     if (confirmState.ok) {
       setDialogOpen(false)
+      if (confirmState.phase === 'confirmed') {
+        toast({ tone: 'success', title: 'Võitja kinnitatud. Lõpphind avaldatud.' })
+      } else if (confirmState.phase === 'house-backup') {
+        toast({
+          tone: 'success',
+          title: 'Varupakkumine kinnitatud. Otsus salvestatud auditilogisse.',
+        })
+      } else {
+        toast({
+          tone: 'success',
+          title: 'Oksjon kuulutatud müümata. Otsus salvestatud auditilogisse.',
+        })
+      }
       router.refresh()
+    } else if (confirmState.error !== null) {
+      toast({
+        tone: 'error',
+        title: 'Kinnitamine ebaõnnestus',
+        description: confirmState.error,
+      })
     }
-  }, [confirmState.ok, router])
+  }, [confirmState, toast, router])
 
   if (!isOpener) {
     return (
       <section className="rounded-card border border-border bg-bgPage p-md">
         <h2 className="mb-xs font-heading text-h4 font-bold text-ink">Võitja kinnitamine</h2>
-        <p className="text-bodySm text-ink-muted">
+        <p className="text-bodySm text-inkMuted">
           Võitja kinnitab avaja pärast uuesti autentimist. Oota, kuni avaja tulemuse kinnitab.
         </p>
       </section>
@@ -83,21 +106,15 @@ export function WinnerConfirm({
     <section className="rounded-card border border-border bg-bgPage p-md">
       <h2 className="mb-xs font-heading text-h4 font-bold text-ink">Võitja kinnitamine</h2>
       {!soldPossible ? (
-        <p className="mb-sm text-bodySm text-ink-muted">
+        <p className="mb-sm text-bodySm text-inkMuted">
           {topBid === null
             ? 'Kehtivaid pakkumisi ei ole — märgi oksjon müümata.'
             : 'Kõrgeim kehtiv pakkumine ei täida piirhinna — võimalik on müümata või varupakkumine.'}
         </p>
       ) : null}
       {!houseBackupPossible && kiiroksjon ? (
-        <p className="mb-sm text-bodySm text-ink-muted">
+        <p className="mb-sm text-bodySm text-inkMuted">
           Varupakkumise tee on ainult superadminile.
-        </p>
-      ) : null}
-
-      {confirmState.error ? (
-        <p className="mb-sm rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
-          {confirmState.error}
         </p>
       ) : null}
 
@@ -127,7 +144,7 @@ export function WinnerConfirm({
             <input type="hidden" name="bidId" value={topBid?.id ?? ''} />
             <input type="hidden" name="decision" value={effectiveDecision} />
             <h3 className="font-heading text-h4 font-bold text-ink">Kinnita tulemus</h3>
-            <p className="mt-sm rounded-input border-l-4 border-danger bg-danger-light px-md py-sm text-bodySm font-semibold text-danger">
+            <p className="mt-sm rounded-input border-l-4 border-danger bg-dangerLight px-md py-sm text-bodySm font-semibold text-danger">
               HOIATUS: otsus on lõplik. Müük avaldab lõpphinna ja koostab võitjale lepingu;
               müümata kuulutab oksjoni müüdud tagasi ei tule.
             </p>
@@ -209,12 +226,6 @@ export function WinnerConfirm({
               hint="Step-up: avaja kinnitab uuesti. eID-konto (ilma salasõnata) kinnitab kehtiva sessiooniga — jäta väli tühjaks."
             />
 
-            {confirmState.error ? (
-              <p className="mt-sm rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
-                {confirmState.error}
-              </p>
-            ) : null}
-
             <div className="mt-md flex justify-end gap-sm">
               <button
                 type="button"
@@ -231,7 +242,7 @@ export function WinnerConfirm({
                   confirmPending ||
                   (effectiveDecision === 'unsold' && reason.trim().length < 5)
                 }
-                className="inline-flex h-10 items-center rounded-button bg-danger px-4 text-label font-semibold text-ink-inverse transition-opacity duration-hover ease-hover hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 items-center rounded-button bg-danger px-4 text-label font-semibold text-inkInverse transition-[filter] duration-hover ease-hover hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {confirmPending
                   ? 'Kinnitan…'

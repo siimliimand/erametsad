@@ -30,7 +30,7 @@ function ChecklistItem({
       </span>
       <div>
         <p className="text-bodySm font-semibold text-ink">{label}</p>
-        <p className={`text-bodySm ${pass ? 'text-ink-muted' : 'text-danger'}`}>{detail}</p>
+        <p className={`text-bodySm ${pass ? 'text-inkMuted' : 'text-danger'}`}>{detail}</p>
         {warning ? (
           <p className="mt-1 text-bodySm text-statusEndingSoon">{warning}</p>
         ) : null}

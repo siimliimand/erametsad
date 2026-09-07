@@ -41,7 +41,7 @@ export function CeremonyFlow({
 
   if (context.error !== null) {
     return (
-      <section className="rounded-card border border-l-4 border-danger bg-danger-light p-md">
+      <section className="rounded-card border border-l-4 border-danger bg-dangerLight p-md">
         <h2 className="mb-xs font-heading text-h4 font-bold text-danger">
           Tseremoonia olek ei ole saadaval
         </h2>
@@ -56,7 +56,7 @@ export function CeremonyFlow({
     <div className="space-y-md">
       <section className="rounded-card border border-border bg-bgPage p-md">
         <h2 className="mb-xs font-heading text-h4 font-bold text-ink">Lukustatud pakkumised</h2>
-        <p className="text-bodySm text-ink-muted">
+        <p className="text-bodySm text-inkMuted">
           Krüptitud pakkumusi:{' '}
           <span className="font-semibold text-ink">{String(sealedBidCount)}</span>. Summasid
           näidatakse ainult pärast paljastust; piirhind jääb serverisse.
@@ -65,7 +65,7 @@ export function CeremonyFlow({
 
       {context.voided ? (
         <>
-          <div className="rounded-card border border-l-4 border-danger bg-danger-light p-md">
+          <div className="rounded-card border border-l-4 border-danger bg-dangerLight p-md">
             <h2 className="mb-xs font-heading text-h4 font-bold text-danger">Tühistatud</h2>
             <p className="text-bodySm text-danger">
               Avamine tühistati; oksjon on kuulutatud müümata. Tseremoonia kirje on ainult

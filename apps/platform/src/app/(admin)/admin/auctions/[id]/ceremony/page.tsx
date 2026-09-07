@@ -1,3 +1,4 @@
+import { ShieldAlert } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
@@ -7,8 +8,9 @@ import { sealedCeremonyStateAction } from '../../../../_actions/auctions'
 import { ErrorNotice } from '../../../../_components/ErrorNotice'
 import { secondaryButtonClass } from '../../../../_components/FormField'
 import { PageHeader } from '../../../../_components/PageHeader'
+import { StatusChip } from '../../../../_components/StatusChip'
 import { requireAdminRepositories } from '../../../../_lib/admin'
-import { contractStatusLabels, formatDateTime, formatEur, StatusPill } from '../../../../_lib/labels'
+import { contractStatusLabels, formatDateTime, formatEur } from '../../../../_lib/labels'
 
 export const metadata = { title: 'Pitseeritud avamine' }
 
@@ -64,8 +66,17 @@ export default async function AuctionCeremonyPage({
         title={`Pitseeritud avamine: ${auction.title}`}
         description="Kahe allkirjaga tseremoonia: eelkontroll, ühekordne paljastus, võitja kinnitamine."
         backHref={detailPath}
-        actions={<StatusPill status={auction.status} />}
+        actions={<StatusChip status={auction.status} />}
       />
+
+      {/* Demo 05-sealed seal-auditbar: every action here lands in the sealed.* audit chain. */}
+      <p
+        role="note"
+        className="mb-lg flex items-center gap-xs rounded-input bg-cta px-md py-sm text-label font-semibold text-ink"
+      >
+        <ShieldAlert aria-hidden="true" className="h-[15px] w-[15px] shrink-0" />
+        <span>Kõik tegevused sel lehel salvestatakse püsivasse auditlogisse</span>
+      </p>
 
       {auction.status === 'ended' ? (
         <CeremonyFlow
@@ -77,7 +88,7 @@ export default async function AuctionCeremonyPage({
         />
       ) : auction.status === 'appraised' ? (
         <div className="space-y-md">
-          <section className="rounded-card border border-l-4 border-info bg-info-light p-md">
+          <section className="rounded-card border border-l-4 border-info bg-infoLight p-md">
             <h2 className="mb-xs font-heading text-h4 font-bold text-info">Tseremoonia läbi</h2>
             <p className="text-bodySm text-info">
               Võitja on kinnitatud. Lõpphind:{' '}
@@ -105,7 +116,7 @@ export default async function AuctionCeremonyPage({
         </div>
       ) : auction.status === 'unsold' ? (
         <div className="space-y-md">
-          <section className="rounded-card border border-l-4 border-danger bg-danger-light p-md">
+          <section className="rounded-card border border-l-4 border-danger bg-dangerLight p-md">
             <h2 className="mb-xs font-heading text-h4 font-bold text-danger">Müümata</h2>
             <p className="text-bodySm text-danger">
               Avamine tühistati või reservhind jäi täitmata; võitjat pole.
@@ -120,7 +131,7 @@ export default async function AuctionCeremonyPage({
         <div className="space-y-md">
           <section className="rounded-card border border-border bg-bgPage p-md">
             <h2 className="mb-xs font-heading text-h4 font-bold text-ink">Ootel</h2>
-            <p className="text-bodySm text-ink-muted">
+            <p className="text-bodySm text-inkMuted">
               Tseremoonia on võimalik ainult lõppenud suletud oksjonil. Krüptitud pakkumisi:{' '}
               <span className="font-semibold text-ink">{String(sealedBidsResult.docs.length)}</span>.
             </p>

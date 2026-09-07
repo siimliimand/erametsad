@@ -10,6 +10,7 @@ import {
   type SealedCeremonyContext,
 } from '../../../../../_actions/auctions'
 import { primaryButtonClass } from '../../../../../_components/FormField'
+import { useToast } from '../../../../../_components/ui/Toast'
 
 const initialState: SealedCeremonyActionState = {
   ok: false,
@@ -32,6 +33,7 @@ export function RevealPanel({
   signaturesExpired: boolean
 }) {
   const router = useRouter()
+  const toast = useToast()
   const [revealState, revealFormAction, revealPending] = useActionState(
     revealSealedBidsAction,
     initialState,
@@ -39,12 +41,20 @@ export function RevealPanel({
   const [dialogOpen, setDialogOpen] = useState(false)
   const now = useCeremonyClock()
 
+  // Server-action error semantics stay intact: the state drives the toast.
   useEffect(() => {
     if (revealState.ok) {
       setDialogOpen(false)
+      toast({ tone: 'success', title: 'Pakkumised dekrüpteeritud ja paljastatud.' })
       router.refresh()
+    } else if (revealState.error !== null) {
+      toast({
+        tone: 'error',
+        title: 'Paljastamine ebaõnnestus',
+        description: revealState.error,
+      })
     }
-  }, [revealState.ok, router])
+  }, [revealState, toast, router])
 
   const unlocked =
     revealAllowedAt !== null && now !== null && now >= Date.parse(revealAllowedAt)
@@ -54,23 +64,17 @@ export function RevealPanel({
   return (
     <section className="rounded-card border border-border bg-bgPage p-md">
       <h2 className="mb-xs font-heading text-h4 font-bold text-ink">Paljastus</h2>
-      <p className="mb-sm text-bodySm text-ink-muted">
+      <p className="mb-sm text-bodySm text-inkMuted">
         Mõlemad allkirjad on olemas. Paljastus dekrüpteerib kõik pakkumised korraga ja on
         ühekordne.
       </p>
-
-      {revealState.error ? (
-        <p className="mb-sm rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
-          {revealState.error}
-        </p>
-      ) : null}
 
       {signaturesExpired ? (
         <p className="mb-sm text-bodySm text-danger">
           Allkirjad on aegunud — paljastus on lukus, kuni avaja on uuesti allkirja andnud.
         </p>
       ) : !unlocked ? (
-        <p className="mb-sm text-bodySm text-ink-muted">
+        <p className="mb-sm text-bodySm text-inkMuted">
           {countdownMs !== null
             ? `Paljastus avaneb 60 sekundit pärast oksjoni lõppu (${formatCountdown(countdownMs)}).`
             : 'Paljastus avaneb 60 sekundit pärast oksjoni lõppu.'}
@@ -101,15 +105,10 @@ export function RevealPanel({
           >
             <input type="hidden" name="auctionId" value={auctionId} />
             <h3 className="font-heading text-h4 font-bold text-ink">Paljasta pakkumised</h3>
-            <p className="mt-sm rounded-input border-l-4 border-danger bg-danger-light px-md py-sm text-bodySm font-semibold text-danger">
+            <p className="mt-sm rounded-input border-l-4 border-danger bg-dangerLight px-md py-sm text-bodySm font-semibold text-danger">
               HOIATUS: paljastus on ühekordne ja tagasivõtmatu. Kõik pakkumised dekrüpteeritakse
               korraga ja toiming kirjutatakse pöördumatult auditilogisse.
             </p>
-            {revealState.error ? (
-              <p className="mt-sm rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
-                {revealState.error}
-              </p>
-            ) : null}
             <div className="mt-md flex justify-end gap-sm">
               <button
                 type="button"
@@ -123,7 +122,7 @@ export function RevealPanel({
               <button
                 type="submit"
                 disabled={revealPending}
-                className="inline-flex h-10 items-center rounded-button bg-danger px-4 text-label font-semibold text-ink-inverse transition-opacity duration-hover ease-hover hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 items-center rounded-button bg-danger px-4 text-label font-semibold text-inkInverse transition-[filter] duration-hover ease-hover hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {revealPending ? 'Paljastan…' : 'Jah, paljasta lõplikult'}
               </button>

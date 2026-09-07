@@ -12,6 +12,7 @@ import {
   type SealedCeremonyContext,
 } from '../../../../../_actions/auctions'
 import { FormField, FormTextareaField, primaryButtonClass } from '../../../../../_components/FormField'
+import { useToast } from '../../../../../_components/ui/Toast'
 import { formatDateTime } from '../../../../../_lib/labels'
 
 type SignatureSlot = SealedCeremonyContext['opener']
@@ -37,7 +38,7 @@ function SignatureState({
       : null
   return (
     <div className="rounded-input border border-border bg-bgMist px-md py-sm">
-      <dt className="text-label font-semibold text-ink-muted">{label}</dt>
+      <dt className="text-label font-semibold text-inkMuted">{label}</dt>
       <dd className="mt-1 text-bodySm text-ink">
         {signer !== null ? (
           <>
@@ -56,7 +57,7 @@ function SignatureState({
             ) : null}
           </>
         ) : (
-          <span className="text-ink-muted">—allkiri puudub</span>
+          <span className="text-inkMuted">—allkiri puudub</span>
         )}
       </dd>
     </div>
@@ -84,6 +85,7 @@ export function SigningPanel({
   currentUserId: string
 }) {
   const router = useRouter()
+  const toast = useToast()
   const [openerState, openerFormAction, openerPending] = useActionState(
     signSealedOpenerAction,
     initialState,
@@ -94,10 +96,32 @@ export function SigningPanel({
   )
   const now = useCeremonyClock()
 
-  const signed = openerState.ok || approverState.ok
+  // Server-action error semantics stay intact: the states drive the toasts.
   useEffect(() => {
-    if (signed) router.refresh()
-  }, [signed, router])
+    if (openerState.ok) {
+      toast({ tone: 'success', title: 'Avaja allkiri lisatud. Tseremoonia jätkub.' })
+      router.refresh()
+    } else if (openerState.error !== null) {
+      toast({
+        tone: 'error',
+        title: 'Allkirjastamine ebaõnnestus',
+        description: openerState.error,
+      })
+    }
+  }, [openerState, toast, router])
+
+  useEffect(() => {
+    if (approverState.ok) {
+      toast({ tone: 'success', title: 'Kinnitaja allkiri lisatud. Tseremoonia jätkub.' })
+      router.refresh()
+    } else if (approverState.error !== null) {
+      toast({
+        tone: 'error',
+        title: 'Allkirjastamine ebaõnnestus',
+        description: approverState.error,
+      })
+    }
+  }, [approverState, toast, router])
 
   const checklistPass = ceremonyChecklistPass(checklist)
   const openerSigned = opener !== null
@@ -107,12 +131,12 @@ export function SigningPanel({
       <CeremonyChecklist checklist={checklist} />
 
       {!checklistPass ? (
-        <p className="rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
+        <p className="rounded-input border border-danger bg-dangerLight px-md py-sm text-bodySm text-danger">
           Eelkontroll ei läbi — allkirjastamine on lukus, kuni kõik eeltingimused on täidetud.
         </p>
       ) : null}
       {signaturesExpired ? (
-        <p className="rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
+        <p className="rounded-input border border-danger bg-dangerLight px-md py-sm text-bodySm text-danger">
           Allkirjad on aegunud (30 minutit). Alusta avamist uuesti: avaja annab allkirja uuesti.
         </p>
       ) : null}
@@ -123,17 +147,6 @@ export function SigningPanel({
           <SignatureState signer={opener} label="Avaja" now={now} />
           <SignatureState signer={approver} label="Kinnitaja" now={now} />
         </dl>
-
-        {openerState.error ? (
-          <p className="mb-sm rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
-            {openerState.error}
-          </p>
-        ) : null}
-        {approverState.error ? (
-          <p className="mb-sm rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
-            {approverState.error}
-          </p>
-        ) : null}
 
         {!openerSigned || signaturesExpired ? (
           <form action={openerFormAction} className="max-w-md space-y-sm">
@@ -172,13 +185,13 @@ export function SigningPanel({
             <button type="submit" className={primaryButtonClass} disabled={approverPending}>
               {approverPending ? 'Kinnitan…' : 'Kinnita kinnitajana'}
             </button>
-            <p className="text-bodySm text-ink-muted">
+            <p className="text-bodySm text-inkMuted">
               Kinnitaja peab olema teine isik ja teine sessioon kui avaja
               {currentUserId === opener.userId ? ' — sina oled selle avamise avaja.' : '.'}
             </p>
           </form>
         )}
-        <p className="mt-sm text-bodySm text-ink-muted">
+        <p className="mt-sm text-bodySm text-inkMuted">
           Allkirjad kehtivad 30 minutit ja siduvad kindla sessiooniga.
         </p>
       </section>
