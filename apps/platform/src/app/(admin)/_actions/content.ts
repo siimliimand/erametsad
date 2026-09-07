@@ -22,17 +22,22 @@ import {
   withAuctionDefaults,
 } from '../admin/content/_components/settings-audit'
 
-import type { CoreRepositories, UpdateDataFor } from '@/lib/data/repositories'
+import type { BlockConfig } from '@/lib/content/blocks'
+import { safeParseBlockConfig, serializeBlockConfig } from '@/lib/content/blocks'
+import type { CoreRepositories, PageBlockDoc, UpdateDataFor } from '@/lib/data/repositories'
+import { getRepositories } from '@/lib/data/runtime'
 import {
   auctionObjectTypes,
   contentStatuses,
   legalDocumentTypes,
+  pageBlockTypes,
   redirectTypes,
 } from '@/lib/data/schema'
 import type {
   AuctionObjectType,
   ContentStatus,
   LegalDocumentType,
+  PageBlockType,
   RedirectType,
 } from '@/lib/data/schema'
 
@@ -173,6 +178,12 @@ async function publishDueScheduledContent(
       for (const doc of docs) {
         if (!doc.publishedAt) {
           continue
+        }
+        // A due page going live counts as a publish: snapshot its blocks
+        // before the flip. The surrounding catch keeps the sweep
+        // opportunistic when the snapshot fails.
+        if (collection === 'pages') {
+          await createPageVersionSnapshot(doc.id, actorId)
         }
         await repositories.update({
           collection,
@@ -465,6 +476,10 @@ export async function savePageAction(formData: FormData): Promise<void> {
         after: { slug, publishedAt: decision.publishedAt },
       })
     } else if (decision.publishTransition) {
+      // Published pages are versioned: the snapshot goes into the same
+      // persist block, so a failed snapshot fails the save like any
+      // other write.
+      await createPageVersionSnapshot(saved.id, session.userId)
       await writeAudit(repositories, {
         actorId: session.userId,
         action: 'content.publish',
@@ -508,6 +523,222 @@ export async function deletePageAction(formData: FormData): Promise<void> {
 
   revalidate(pagesPath, id)
   redirect(pagesPath)
+}
+
+/** One validated block as stored in snapshots and `page_blocks.config_json`. */
+interface SnapshotBlock {
+  type: PageBlockType
+  config: BlockConfig
+}
+
+/** A block row as read back from D1: the config has not been revalidated. */
+interface StoredBlock {
+  type: PageBlockType
+  config: unknown
+}
+
+const maxBlocksPerPage = 100
+
+/**
+ * Validates a raw blocks payload (builder JSON or a version snapshot) through
+ * the per-type registry schemas. Runs fully before any mutation so a bad
+ * payload can never leave a page with half-replaced blocks.
+ */
+function parseSnapshotBlocks(raw: unknown): { ok: true; blocks: SnapshotBlock[] } | { ok: false; error: string } {
+  if (!Array.isArray(raw)) {
+    return { ok: false, error: 'Blokid peavad olema loend.' }
+  }
+  if (raw.length > maxBlocksPerPage) {
+    return { ok: false, error: `Blokke võib olla kuni ${String(maxBlocksPerPage)}.` }
+  }
+  const blocks: SnapshotBlock[] = []
+  for (const [index, entry] of raw.entries()) {
+    const record = (entry ?? {}) as Record<string, unknown>
+    const type = record.type
+    if (typeof type !== 'string' || !pageBlockTypes.includes(type as PageBlockType)) {
+      return { ok: false, error: `Bloki ${String(index + 1)} tüüp on tundmatu.` }
+    }
+    const parsed = safeParseBlockConfig(type as PageBlockType, record.config ?? {})
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0]
+      const detail = issue ? ` (${issue.path}: ${issue.message})` : ''
+      return { ok: false, error: `Bloki ${String(index + 1)} sisu ei vasta skeemile${detail}.` }
+    }
+    blocks.push({ type: type as PageBlockType, config: parsed.data })
+  }
+  return { ok: true, blocks }
+}
+
+function readPageBlocks(
+  repositories: CoreRepositories,
+  pageId: string,
+): Promise<StoredBlock[]> {
+  return repositories
+    .find({
+      collection: 'page-blocks',
+      where: { pageId: { equals: pageId } },
+      sort: 'ordinal',
+      pagination: false,
+    })
+    .then(({ docs }) =>
+      docs.map((doc) => ({ type: doc.type, config: doc.configJson ?? {} })),
+    )
+}
+
+/**
+ * Replace-all block write: existing rows for the page are deleted, the new
+ * set is inserted with ordinals 0..n. The repository layer exposes no
+ * transaction, so the payload is fully validated up front (parseSnapshotBlocks)
+ * and rows are rewritten in one pass; a mid-write failure surfaces through the
+ * action's error redirect instead of leaving a mixed config behind silently.
+ * Returns the previous rows for the audit `before` payload.
+ */
+async function replacePageBlocks(
+  repositories: CoreRepositories,
+  pageId: string,
+  blocks: readonly SnapshotBlock[],
+): Promise<PageBlockDoc[]> {
+  const { docs } = await repositories.find({
+    collection: 'page-blocks',
+    where: { pageId: { equals: pageId } },
+    pagination: false,
+  })
+  for (const doc of docs) {
+    await repositories.delete({ collection: 'page-blocks', id: doc.id })
+  }
+  for (const [ordinal, block] of blocks.entries()) {
+    await repositories.create({
+      collection: 'page-blocks',
+      data: {
+        pageId,
+        type: block.type,
+        ordinal,
+        configJson: serializeBlockConfig(block.config),
+      },
+    })
+  }
+  return docs
+}
+
+/**
+ * Append-only publish snapshot: the page's current blocks serialized into
+ * `page_versions` with the next per-page version number. Runs on a trusted
+ * repository (page_versions has no guard rule); the admin permission was
+ * already asserted by the calling action.
+ */
+async function createPageVersionSnapshot(pageId: string, actorId: string): Promise<void> {
+  const repositories = await getRepositories()
+  const blocks = await readPageBlocks(repositories, pageId)
+  const { docs } = await repositories.find({
+    collection: 'page-versions',
+    where: { pageId: { equals: pageId } },
+    sort: '-version',
+    limit: 1,
+  })
+  const version = (docs[0]?.version ?? 0) + 1
+  await repositories.create({
+    collection: 'page-versions',
+    data: { pageId, version, snapshotJson: JSON.stringify(blocks) },
+  })
+  await writeAudit(repositories, {
+    actorId,
+    action: 'content.version.create',
+    entityType: 'page',
+    entityId: pageId,
+    after: { version, blockCount: blocks.length },
+  })
+}
+
+export async function savePageBlocksAction(formData: FormData): Promise<void> {
+  const { session } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
+
+  const pageId = readText(formData, 'pageId')
+  if (!pageId) redirectWithError(pagesPath, 'Lehe identifikaator puudub.')
+  const errorPath = formPath(pagesPath, pageId)
+
+  const raw = readJsonValue(formData, 'blocks')
+  if (raw.invalid) redirectWithError(errorPath, 'Blokid peavad olema korrektne JSON.')
+  const parsed = parseSnapshotBlocks(raw.value)
+  if (!parsed.ok) redirectWithError(errorPath, parsed.error)
+
+  const repositories = await getRepositories()
+  const page = await persist(errorPath, 'Lehe lugemine ebaõnnestus: ', () =>
+    repositories.findByID({ collection: 'pages', id: pageId }),
+  )
+  if (!page) redirectWithError(errorPath, 'Lehte ei leitud.')
+
+  await persist(errorPath, 'Blokide salvestamine ebaõnnestus: ', async () => {
+    const previousDocs = await replacePageBlocks(repositories, pageId, parsed.blocks)
+    await writeAudit(repositories, {
+      actorId: session.userId,
+      action: 'content.blocks.save',
+      entityType: 'page',
+      entityId: pageId,
+      before: { blockCount: previousDocs.length },
+      after: {
+        blockCount: parsed.blocks.length,
+        types: parsed.blocks.map((block) => block.type),
+      },
+    })
+  })
+
+  revalidate(pagesPath, pageId)
+  revalidatePath(contentPublicPath('pages', page.slug))
+}
+
+export async function restorePageVersionAction(formData: FormData): Promise<void> {
+  const { session } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
+
+  const pageId = readText(formData, 'pageId')
+  if (!pageId) redirectWithError(pagesPath, 'Lehe identifikaator puudub.')
+  const errorPath = formPath(pagesPath, pageId)
+  const versionId = readText(formData, 'versionId')
+  if (!versionId) redirectWithError(errorPath, 'Versiooni identifikaator puudub.')
+  // Restores overwrite the current blocks: reason-required like settings saves.
+  const reason = readText(formData, 'reason')
+  if (!isValidReason(reason)) {
+    redirectWithError(errorPath, 'Põhjendus peab olema vähemalt 5 tähemärki.')
+  }
+
+  const repositories = await getRepositories()
+  const page = await persist(errorPath, 'Lehe lugemine ebaõnnestus: ', () =>
+    repositories.findByID({ collection: 'pages', id: pageId }),
+  )
+  if (!page) redirectWithError(errorPath, 'Lehte ei leitud.')
+
+  const version = await persist(errorPath, 'Versiooni lugemine ebaõnnestus: ', () =>
+    repositories.findByID({ collection: 'page-versions', id: versionId }),
+  )
+  if (version?.pageId !== pageId) {
+    redirectWithError(errorPath, 'Versiooni ei leitud.')
+  }
+
+  const parsed = parseSnapshotBlocks(version.snapshotJson)
+  if (!parsed.ok) {
+    redirectWithError(errorPath, `Versiooni andmed ei ole korrektsed: ${parsed.error}`)
+  }
+
+  await persist(errorPath, 'Versiooni taastamine ebaõnnestus: ', async () => {
+    const previous = await replacePageBlocks(repositories, pageId, parsed.blocks)
+    await writeAudit(repositories, {
+      actorId: session.userId,
+      action: 'content.version.restore',
+      entityType: 'page',
+      entityId: pageId,
+      before: { blockCount: previous.length },
+      after: {
+        restoredVersion: version.version,
+        blockCount: parsed.blocks.length,
+        reason,
+      },
+    })
+  })
+
+  revalidate(pagesPath, pageId)
+  revalidatePath(contentPublicPath('pages', page.slug))
+  redirect(errorPath)
 }
 
 export async function saveFaqCategoryAction(formData: FormData): Promise<void> {
