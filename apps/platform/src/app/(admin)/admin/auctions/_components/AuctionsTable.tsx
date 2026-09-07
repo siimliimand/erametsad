@@ -145,14 +145,31 @@ export function AuctionsTable({
   const [endTarget, setEndTarget] = useState<AuctionTableRow | null>(null)
 
   // Global ⌘N / Ctrl+N opens the new-auction form, mirroring the header
-  // button's kbd hint; write-gated roles never register the listener.
+  // button's kbd hint; write-gated roles never register the listener. Typing
+  // in form fields keeps the shortcut inert so draft filter input is never
+  // lost to a surprise navigation.
   useEffect(() => {
     if (!roleCanWrite) return
+    const isEditableTarget = (event: KeyboardEvent): boolean => {
+      const target = event.target
+      return (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      )
+    }
     const onKeyDown = (event: KeyboardEvent): void => {
-      if ((event.metaKey || event.ctrlKey) && event.key === 'n') {
-        event.preventDefault()
-        window.location.href = '/admin/auctions/new'
+      if (
+        !(event.metaKey || event.ctrlKey) ||
+        event.key.toLowerCase() !== 'n' ||
+        isEditableTarget(event)
+      ) {
+        return
       }
+      event.preventDefault()
+      window.location.href = '/admin/auctions/new'
     }
     window.addEventListener('keydown', onKeyDown)
     return () => {
