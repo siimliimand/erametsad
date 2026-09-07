@@ -1,5 +1,6 @@
 'use client'
 
+import { TimerReset } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 
@@ -110,6 +111,114 @@ function formatCountdown(remainingMs: number): string {
 function formatClock(iso: string): string {
   const date = new Date(iso)
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleTimeString('et-EE')
+}
+
+/**
+ * Demo monitor-head strip (docs/design/demo/admin/04-bids-monitoring.html):
+ * timer-xl with the anti-snipe chip, the leading-bid line, and the action
+ * buttons. Purely presentational — every value comes from the live feed or
+ * the page props; anonymity rules allow amounts and times only.
+ */
+function MonitorHeadStrip({
+  isSealed,
+  sealedCount,
+  ended,
+  endsAt,
+  remainingMs,
+  countdownUrgent,
+  antiSnipeMinutes,
+  leadingPlacedAt,
+  serverNowMs,
+  currentPriceEur,
+  bidStepEur,
+  canEndManually,
+  onEndManually,
+}: {
+  isSealed: boolean
+  sealedCount: number | null
+  ended: boolean
+  endsAt: string | null
+  remainingMs: number | null
+  countdownUrgent: boolean
+  antiSnipeMinutes: number
+  leadingPlacedAt: string | null
+  serverNowMs: number
+  currentPriceEur: number
+  bidStepEur: number | null
+  canEndManually: boolean
+  onEndManually: () => void
+}) {
+  return (
+    <section
+      aria-label="Oksjoni olekuriba"
+      className="mb-md flex flex-wrap items-center gap-x-6 gap-y-2 rounded-card border border-border bg-bgPage px-md py-sm shadow-card"
+    >
+      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        <span className="text-label font-medium text-ink-muted">Lõpp:</span>
+        {ended ? (
+          <span className="font-mono text-count font-bold text-ink">Lõppenud</span>
+        ) : (
+          <span
+            role="timer"
+            title={endsAt === null ? undefined : formatDateTime(endsAt)}
+            className={`font-mono text-count font-bold tabular-nums tracking-[-0.01em] text-ink${countdownUrgent ? ' cd-crit' : ''}`}
+          >
+            {remainingMs === null ? '—' : formatCountdown(remainingMs)}
+          </span>
+        )}
+        <span
+          title={`Lõpp pikeneb +${String(antiSnipeMinutes)} min, kui viimase ${String(antiSnipeMinutes)} minuti jooksul esitatakse pakkumine`}
+          className="inline-flex items-center gap-1 rounded-pill bg-info-light px-2 py-0.5 text-label font-medium text-info"
+        >
+          <TimerReset className="h-3 w-3" aria-hidden="true" />
+          anti-snipe: {String(antiSnipeMinutes)} min
+        </span>
+      </div>
+
+      <p className="w-full text-bodySm text-ink-muted">
+        {isSealed ? (
+          <>
+            Suletud pakkumisi:{' '}
+            <strong className="font-mono font-medium text-ink">
+              {sealedCount === null ? '—' : String(sealedCount)}
+            </strong>{' '}
+            · summad krüptitud kuni avamiseni
+          </>
+        ) : leadingPlacedAt === null ? (
+          'Juhtivat pakkumist veel ei ole.'
+        ) : (
+          <>
+            Juhtiv pakkumine:{' '}
+            <strong className="font-mono font-medium text-ink">
+              {formatEurAmount(currentPriceEur)}
+            </strong>{' '}
+            · {formatRelativeTime(leadingPlacedAt, serverNowMs)}
+            {bidStepEur !== null ? (
+              <>
+                {' '}
+                · Samm:{' '}
+                <strong className="font-mono font-medium text-ink">
+                  +{formatEurAmount(bidStepEur)}
+                </strong>
+              </>
+            ) : null}
+          </>
+        )}
+      </p>
+
+      {canEndManually && !ended ? (
+        <div className="ml-auto flex gap-2">
+          <button
+            type="button"
+            onClick={onEndManually}
+            className="inline-flex h-7 items-center rounded-button border border-danger bg-transparent px-3 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light"
+          >
+            Lõpeta käsitsi
+          </button>
+        </div>
+      ) : null}
+    </section>
+  )
 }
 
 /**
@@ -408,9 +517,31 @@ export function BidMonitor({
   }, [endsAtTime, tick])
   const countdownUrgent =
     remainingMs !== null && !ended && remainingMs <= antiSnipeMinutes * 60000
+  const leadingPlacedAt = useMemo(
+    () => rows.find((row) => row.status === 'leading')?.placedAt ?? null,
+    [rows],
+  )
 
   return (
     <div>
+      <MonitorHeadStrip
+        isSealed={isSealed}
+        sealedCount={sealedCount}
+        ended={ended}
+        endsAt={streamEndsAt}
+        remainingMs={remainingMs}
+        countdownUrgent={countdownUrgent}
+        antiSnipeMinutes={antiSnipeMinutes}
+        leadingPlacedAt={leadingPlacedAt}
+        serverNowMs={Date.now() - skewRef.current}
+        currentPriceEur={currentPriceEur}
+        bidStepEur={bidStepEur}
+        canEndManually={canEndManually}
+        onEndManually={() => {
+          setEndModalOpen(true)
+        }}
+      />
+
       <div className="mb-md grid grid-cols-1 gap-xs sm:grid-cols-3">
         {isSealed ? (
           <div className="flex flex-col gap-1 rounded-card border border-border bg-bgPage px-md py-sm">
@@ -482,20 +613,6 @@ export function BidMonitor({
             </li>
           ))}
         </ul>
-      ) : null}
-
-      {canEndManually && !ended ? (
-        <div className="mb-md flex justify-end">
-          <button
-            type="button"
-            onClick={() => {
-              setEndModalOpen(true)
-            }}
-            className="inline-flex h-9 items-center rounded-button border border-danger bg-danger-light px-4 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger hover:text-ink-inverse"
-          >
-            Lõpeta käsitsi
-          </button>
-        </div>
       ) : null}
 
       {endModalOpen ? (
