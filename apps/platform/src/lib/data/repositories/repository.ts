@@ -5,6 +5,7 @@ import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 
 import { can, type GuardContext, type GuardOperation } from '../guards'
 import type * as schema from '../schema'
+import { chainAuditEntry } from './audit-chain'
 import { DocumentNotFoundError, GuardAccessError, UnknownFieldError } from './errors'
 import { applyIsikukoodOnRead, applyIsikukoodOnWrite, shouldDeactivateOtherTemplates, type IsikukoodCodec } from './hooks'
 import { decodeJsonFields, encodeJsonFields } from './json-fields'
@@ -356,7 +357,10 @@ export function createCoreRepositories(db: CoreDatabase, options: RepositoryOpti
       const collection = createOptions.collection
       const config = getCollectionConfig(collection)
       guard(collection, 'create', createOptions.data)
-      const encoded = encodeWrite(collection, createOptions.data, 'create')
+      let encoded = encodeWrite(collection, createOptions.data, 'create')
+      if (collection === 'audit-entry') {
+        encoded = await chainAuditEntry(db, encoded)
+      }
       const effectiveActive = encoded.active === undefined ? true : encoded.active === true
       if (
         config.templateActivation &&

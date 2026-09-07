@@ -29,6 +29,8 @@ export * from './faq-items'
 export * from './legal-documents'
 export * from './media'
 export * from './newsletter-subscribers'
+export * from './page-blocks'
+export * from './page-versions'
 export * from './pages'
 export * from './parishes'
 export * from './partner-services'
@@ -58,6 +60,8 @@ import type { legalDocuments as legalDocumentsTable } from './legal-documents'
 import type { media as mediaTable } from './media'
 import type { newsletterSubscribers as newsletterSubscribersTable } from './newsletter-subscribers'
 import type { notifications as notificationsTable } from './notifications'
+import type { pageBlocks as pageBlocksTable } from './page-blocks'
+import type { pageVersions as pageVersionsTable } from './page-versions'
 import type { pages as pagesTable } from './pages'
 import type { parishes as parishesTable } from './parishes'
 import type { partnerServices as partnerServicesTable } from './partner-services'
@@ -124,6 +128,10 @@ export type NewsletterSubscriber = InferSelectModel<typeof newsletterSubscribers
 export type NewNewsletterSubscriber = InferInsertModel<typeof newsletterSubscribersTable>
 export type Page = InferSelectModel<typeof pagesTable>
 export type NewPage = InferInsertModel<typeof pagesTable>
+export type PageBlock = InferSelectModel<typeof pageBlocksTable>
+export type NewPageBlock = InferInsertModel<typeof pageBlocksTable>
+export type PageVersion = InferSelectModel<typeof pageVersionsTable>
+export type NewPageVersion = InferInsertModel<typeof pageVersionsTable>
 export type Parish = InferSelectModel<typeof parishesTable>
 export type NewParish = InferInsertModel<typeof parishesTable>
 export type Partner = InferSelectModel<typeof partnersTable>
