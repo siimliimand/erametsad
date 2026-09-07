@@ -3,10 +3,10 @@
 - [x] 1.1 Extend `admin.css`: overlay token, keyframes (cd-blink, row-flash, live-pulse, save-ping, modal-in), z-scale documentation, focus ring parity with the demo core <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/admin.css] -->
 - [x] 1.2 Modal primitive: 480/720 sizes, backdrop, Esc close, focus trap and restore, body scroll lock, mobile full-width <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(admin)/_components/ui/Modal.tsx] -->
 - [x] 1.3 Drawer primitive: right slide-over with 460/560/680/720 size props, full-width below 768px, Esc/backdrop close, focus restore <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(admin)/_components/ui/Drawer.tsx] -->
-- [ ] 1.4 ToastProvider and ConfirmDialog (reason min 5 chars and typed keyword variants) wired into AdminShell <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/app/(admin)/_components/ui/Toast.tsx, apps/platform/src/app/(admin)/_components/ui/ConfirmDialog.tsx, apps/platform/src/app/(admin)/_components/AdminShell.tsx] -->
+- [x] 1.4 ToastProvider and ConfirmDialog (reason min 5 chars and typed keyword variants) wired into AdminShell <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/app/(admin)/_components/ui/Toast.tsx, apps/platform/src/app/(admin)/_components/ui/ConfirmDialog.tsx, apps/platform/src/app/(admin)/_components/AdminShell.tsx] -->
 - [x] 1.5 Small primitives: Switch, TabBar (pill tabs with counts, roving tabindex), FilterChip, EmptyRow, KpiCard <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(admin)/_components/ui/**] -->
 - [x] 1.6 Collapse StatusChip and StatusPill into one component with the full demo variant set (auction triads, user states, contract glyphs, lead and content variants) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_components/StatusChip.tsx, apps/platform/src/app/(admin)/_lib/labels.tsx] -->
-- [ ] 1.7 AdminNav badge support (amber dot, red count) fed by server pending counts <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_components/AdminNav.tsx, apps/platform/src/app/(admin)/_components/AdminShell.tsx, apps/platform/src/app/(admin)/layout.tsx] -->
+- [x] 1.7 AdminNav badge support (amber dot, red count) fed by server pending counts <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_components/AdminNav.tsx, apps/platform/src/app/(admin)/_components/AdminShell.tsx, apps/platform/src/app/(admin)/layout.tsx] -->
 - [ ] 1.8 Wire Cmd/Ctrl+K in TopbarSearch: grouped route-jump palette (auctions, users, leads, contracts, settings) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_components/TopbarSearch.tsx] -->
 - [ ] 1.9 Tests for all primitives (overlay focus, Esc, drawer widths, toast timing, pill variants) <!-- agent: fullstack-engineer.build, depends_on: [1.4, 1.5, 1.6], touches: [apps/platform/src/app/(admin)/_components/**/__tests__/**] -->
 
@@ -30,7 +30,7 @@
 ## 4. Auctions list parity
 
 - [ ] 4.1 Column chooser ("Veerud") with localStorage persistence over AuctionsTable <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/AuctionsTable.tsx] -->
-- [ ] 4.2 Visual parity: selected-row mint tint, tab-count inversion, global ⌘N listener, status glyphs via the unified chip <!-- agent: fullstack-engineer.build, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/admin/auctions/page.tsx, apps/platform/src/app/(admin)/admin/auctions/_components/AuctionsTable.tsx] -->
+- [x] 4.2 Visual parity: selected-row mint tint, tab-count inversion, global ⌘N listener, status glyphs via the unified chip <!-- agent: fullstack-engineer.build, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/admin/auctions/page.tsx, apps/platform/src/app/(admin)/admin/auctions/_components/AuctionsTable.tsx] -->
 - [ ] 4.3 Tests: chooser persistence, selection tint, keyboard shortcut <!-- agent: fullstack-engineer.build, depends_on: [4.1, 4.2], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/__tests__/**] -->
 
 ## 5. Wizard chrome and autosave
@@ -86,10 +86,10 @@
 
 - [x] 12.1 Schema and repository: page_blocks (pageId, type, ordinal, configJson) and page_versions snapshots, migration <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/data/schema/**, apps/platform/src/lib/data/repositories/**] -->
 - [x] 12.2 Block type registry with zod configs: hero, text, cards, accordion, form, ticker, stats, cta, testimonials, faq <!-- agent: fullstack-engineer.build, depends_on: [12.1], touches: [apps/platform/src/lib/content/blocks/**] -->
-- [ ] 12.3 Builder UI on the page editor: ordered block list, add-block menu, per-block settings drawer, delete with confirm <!-- agent: fullstack-engineer.build, depends_on: [12.2, 1.3, 1.5], touches: [apps/platform/src/app/(admin)/admin/content/pages/_components/**] -->
+- [x] 12.3 Builder UI on the page editor: ordered block list, add-block menu, per-block settings drawer, delete with confirm <!-- agent: fullstack-engineer.build, depends_on: [12.2, 1.3, 1.5], touches: [apps/platform/src/app/(admin)/admin/content/pages/_components/**] -->
 - [ ] 12.4 Live preview pane: read-only block rendering with desktop/mobile width toggle <!-- agent: fullstack-engineer.build, depends_on: [12.3], touches: [apps/platform/src/app/(admin)/admin/content/pages/_components/BlockPreview.tsx] -->
 - [ ] 12.5 Versions: publish creates a snapshot, versions drawer with two-column diff, restore action <!-- agent: fullstack-engineer.build, depends_on: [12.3, 1.3], touches: [apps/platform/src/app/(admin)/admin/content/pages/_components/VersionsDrawer.tsx, apps/platform/src/app/(admin)/_actions/content.ts] -->
-- [ ] 12.6 Marketing renderer: PageBlocks renderer component adopted by the CMS pages route <!-- agent: fullstack-engineer.build, depends_on: [12.2], touches: [packages/ui/src/components/content/**, apps/platform/src/app/(marketing)/**] -->
+- [x] 12.6 Marketing renderer: PageBlocks renderer component adopted by the CMS pages route <!-- agent: fullstack-engineer.build, depends_on: [12.2], touches: [packages/ui/src/components/content/**, apps/platform/src/app/(marketing)/**] -->
 - [ ] 12.7 Tests: registry validation, ordinal integrity, snapshot diff, renderer <!-- agent: fullstack-engineer.build, depends_on: [12.4, 12.5, 12.6], touches: [apps/platform/src/lib/content/**/__tests__/**, apps/platform/src/app/(admin)/admin/content/pages/**/__tests__/**] -->
 
 ## 13. Statistics dashboard
@@ -103,9 +103,9 @@
 
 - [x] 14.1 Two-pane layout: sticky section nav and 6 demo sections remapping existing fields <!-- agent: fullstack-engineer.build, depends_on: [2.3], touches: [apps/platform/src/app/(admin)/admin/settings/**] -->
 - [ ] 14.2 Switch components, save toasts with audit subline, reason-on-save kept <!-- agent: fullstack-engineer.build, depends_on: [14.1, 1.4, 1.5], touches: [apps/platform/src/app/(admin)/admin/settings/_components/SettingsForm.tsx] -->
-- [ ] 14.3 Role matrix: read-only view generated from permissions.ts, locked Superadmin column, note on code-defined permissions <!-- agent: fullstack-engineer.build, depends_on: [14.1], touches: [apps/platform/src/app/(admin)/admin/settings/_components/RoleMatrix.tsx] -->
-- [ ] 14.4 Maintenance mode: settings field, typed HOOLDUS confirm modal, middleware gate with admin bypass, audit start/end <!-- agent: fullstack-engineer.build, depends_on: [14.1], touches: [apps/platform/src/lib/data/schema/**, apps/platform/src/middleware.ts, apps/platform/src/app/(admin)/admin/settings/**] -->
-- [ ] 14.5 Integration key cards: masked env-backed values, audited reveal action, status dots <!-- agent: fullstack-engineer.build, depends_on: [14.1], touches: [apps/platform/src/app/(admin)/admin/settings/_components/IntegrationKeys.tsx, apps/platform/src/app/(admin)/_actions/settings.ts] -->
+- [x] 14.3 Role matrix: read-only view generated from permissions.ts, locked Superadmin column, note on code-defined permissions <!-- agent: fullstack-engineer.build, depends_on: [14.1], touches: [apps/platform/src/app/(admin)/admin/settings/_components/RoleMatrix.tsx] -->
+- [x] 14.4 Maintenance mode: settings field, typed HOOLDUS confirm modal, middleware gate with admin bypass, audit start/end <!-- agent: fullstack-engineer.build, depends_on: [14.1], touches: [apps/platform/src/lib/data/schema/**, apps/platform/src/middleware.ts, apps/platform/src/app/(admin)/admin/settings/**] -->
+- [x] 14.5 Integration key cards: masked env-backed values, audited reveal action, status dots <!-- agent: fullstack-engineer.build, depends_on: [14.1], touches: [apps/platform/src/app/(admin)/admin/settings/_components/IntegrationKeys.tsx, apps/platform/src/app/(admin)/_actions/settings.ts] -->
 - [ ] 14.6 Tests: maintenance gate, reveal audit, matrix rendering <!-- agent: fullstack-engineer.build, depends_on: [14.3, 14.4, 14.5], touches: [apps/platform/src/app/(admin)/admin/settings/**/__tests__/**] -->
 
 ## 15. Audit log chain and drawer
