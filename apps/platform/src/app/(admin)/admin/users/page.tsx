@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { OpenUserDrawerButton, UserDrawerProvider } from './_components/UserDrawer'
 import { classifyUserSearch, freetextMatchesUser } from './_components/user-search'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
@@ -149,42 +150,47 @@ export default async function AdminUsersPage({
         ) : null}
       </form>
 
-      <DataTable
-        columns={[
-          { key: 'name', label: 'Nimi', render: (row) => row.name ?? '—' },
-          { key: 'email', label: 'E-post' },
-          {
-            key: 'isikukoodMasked',
-            label: 'Isikukood',
-            render: (row) => <span className="font-mono">{row.isikukoodMasked}</span>,
-          },
-          {
-            key: 'role',
-            label: 'Roll',
-            render: (row) => userRoleLabels[row.role],
-          },
-          {
-            key: 'status',
-            label: 'Olek',
-            render: (row) => <UserStatusPill status={row.status} />,
-          },
-          { key: 'createdAt', label: 'Loodud', render: (row) => formatDateTime(row.createdAt) },
-          {
-            key: 'actions',
-            label: 'Tegevused',
-            render: (row) => (
-              <Link
-                href={`/admin/users/${row.id}`}
-                className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
-              >
-                Ava
-              </Link>
-            ),
-          },
-        ]}
-        rows={rows}
-        emptyLabel={q ? 'Kasutajat ei leitud — kontrolli isikukoodi või otsingusõna.' : 'Kasutajaid ei ole.'}
-      />
+      <UserDrawerProvider>
+        <DataTable
+          columns={[
+            { key: 'name', label: 'Nimi', render: (row) => row.name ?? '—' },
+            { key: 'email', label: 'E-post' },
+            {
+              key: 'isikukoodMasked',
+              label: 'Isikukood',
+              render: (row) => <span className="font-mono">{row.isikukoodMasked}</span>,
+            },
+            {
+              key: 'role',
+              label: 'Roll',
+              render: (row) => userRoleLabels[row.role],
+            },
+            {
+              key: 'status',
+              label: 'Olek',
+              render: (row) => <UserStatusPill status={row.status} />,
+            },
+            { key: 'createdAt', label: 'Loodud', render: (row) => formatDateTime(row.createdAt) },
+            {
+              key: 'actions',
+              label: 'Tegevused',
+              render: (row) => (
+                <span className="inline-flex items-center gap-sm">
+                  <OpenUserDrawerButton user={row} />
+                  <Link
+                    href={`/admin/users/${row.id}`}
+                    className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
+                  >
+                    Ava
+                  </Link>
+                </span>
+              ),
+            },
+          ]}
+          rows={rows}
+          emptyLabel={q ? 'Kasutajat ei leitud — kontrolli isikukoodi või otsingusõna.' : 'Kasutajaid ei ole.'}
+        />
+      </UserDrawerProvider>
     </div>
   )
 }
