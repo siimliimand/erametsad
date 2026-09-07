@@ -61,6 +61,11 @@
   --tint-primary: rgba(1, 45, 29, 0.06);
   --tint-primary-strong: rgba(1, 45, 29, 0.1);
   --glow-active: rgba(46, 158, 91, 0.45);
+  --accent-soft: rgba(88, 179, 104, 0.28);
+
+  /* Overlay backdrop shared by Modal, Drawer and ConfirmDialog. The demo
+     uses one value on every page, so it ports as a single token. */
+  --overlay: rgba(24, 26, 46, 0.45);
 
   /* Shadow key names match the Tailwind boxShadow theme keys, which resolve
      var(--shadow-*) with public root defaults (see tailwind.config.ts). */
@@ -73,6 +78,21 @@
   /* Rail and topbar dimensions */
   --rail-w: 56px;
   --topbar-h: 64px;
+
+  /* Z-scale. The demo pages disagree on overlay z-indexes; the change
+     proposal normalizes them to one owner per layer. Ranges never overlap,
+     so a new layer must claim a free value, not reuse an owned one.
+     Consumed by the Modal/Drawer/Toast primitives (480/720 modal,
+     460/560/680/720 drawer full-width below 768px, toasts bottom-center). */
+  --z-topbar: 90; /* sticky topbar */
+  --z-rail: 100; /* fixed nav rail */
+  --z-rail-flyout: 110; /* rail hover flyout */
+  --z-bulkbar: 120; /* floating bulk-action bar */
+  --z-drawer-backdrop: 130;
+  --z-drawer: 140; /* nav and side drawers */
+  --z-modal: 150; /* modal backdrop + dialog, ConfirmDialog included */
+  --z-toast: 160;
+  --z-skip-link: 200;
 }
 
 /* Demo restyle helpers (docs/design/demo/admin/02-auctions-list.html):
@@ -105,4 +125,60 @@
   .admin-scope .row-actions {
     opacity: 1;
   }
+}
+
+/* Overlay and feedback keyframes, copied verbatim from the demo pages.
+   Demo timings, for the primitives that reference them: row-flash
+   .9s ease-out 2, live-pulse 2s ease-out infinite, save-ping .6s
+   ease-out, modal-in .18s ease-out. */
+
+/* Fresh bid or anti-snipe extension in a table row. */
+@keyframes row-flash {
+  0% {
+    background: var(--accent-soft);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+/* Live indicator dot (workspace, bid monitor). */
+@keyframes live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--glow-active);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* Autosave save-dot ping on the wizard editor bar. */
+@keyframes save-ping {
+  0% {
+    box-shadow: 0 0 0 0 var(--glow-active);
+  }
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* Modal entry (Modal primitive). */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Focus ring parity with the demo core (outline accent, offset 2px).
+   Scope-only override of the shared :focus-visible rule in
+   packages/ui/src/styles/base.css, which uses --color-primary. */
+.admin-scope :focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
