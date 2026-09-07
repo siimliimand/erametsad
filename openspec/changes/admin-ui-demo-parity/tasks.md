@@ -17,7 +17,7 @@
 - [x] 2.3 Create /admin/settings (move content/settings) with a redirect <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/settings/**, apps/platform/src/app/(admin)/admin/content/settings/**] -->
 - [x] 2.4 Create /admin/sealed-opening index: sealed and ended auctions awaiting ceremony, links into per-auction ceremony <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/sealed-opening/page.tsx] -->
 - [x] 2.5 Create /admin/notifications read-only list; repoint the bell footer link <!-- agent: fullstack-engineer.fast, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/notifications/page.tsx, apps/platform/src/app/(admin)/_components/NotificationBell.tsx] -->
-- [ ] 2.6 Route tests: all 13 module hrefs resolve, old paths redirect, role gating intact per module <!-- agent: fullstack-engineer.build, depends_on: [2.1, 2.2, 2.3, 2.4, 2.5], touches: [apps/platform/src/app/(admin)/**/__tests__/**] -->
+- [x] 2.6 Route tests: all 13 module hrefs resolve, old paths redirect, role gating intact per module <!-- agent: fullstack-engineer.build, depends_on: [2.1, 2.2, 2.3, 2.4, 2.5], touches: [apps/platform/src/app/(admin)/**/__tests__/**] -->
 
 ## 3. Workspace (Töölaud)
 
@@ -35,14 +35,14 @@
 
 ## 5. Wizard chrome and autosave
 
-- [ ] 5.1 Editor bar: title with mono id, status pill, autosave indicator with ping, Eelvaade link <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/AuctionWizard.tsx] -->
+- [x] 5.1 Editor bar: title with mono id, status pill, autosave indicator with ping, Eelvaade link <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/AuctionWizard.tsx] -->
 - [ ] 5.2 Step rail marks: done/current/todo/disabled from existing per-step validation, "N puudust" footer <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/AuctionWizard.tsx, apps/platform/src/app/(admin)/admin/auctions/_components/wizard-model.ts] -->
 - [ ] 5.3 Client draft autosave to localStorage with restore prompt and beforeunload guard <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/(admin)/admin/auctions/auction-form.tsx, apps/platform/src/app/(admin)/admin/auctions/_components/AuctionWizard.tsx] -->
 - [ ] 5.4 Tests: mark computation, autosave restore, guard <!-- agent: fullstack-engineer.build, depends_on: [5.2, 5.3], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/__tests__/**] -->
 
 ## 6. Bid monitor parity
 
-- [ ] 6.1 Monitor-head strip: timer-xl, anti-snipe chip, leading-bid line, action buttons <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx] -->
+- [x] 6.1 Monitor-head strip: timer-xl, anti-snipe chip, leading-bid line, action buttons <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx] -->
 - [ ] 6.2 Autobidder duel collapse: group rapid autobid bursts behind an expandable row <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx] -->
 - [ ] 6.3 Bidder reveal chips in the live feed, reusing the audited identity unmask action <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx, apps/platform/src/app/(admin)/admin/bids/_actions/**] -->
 - [ ] 6.4 Anomalies panel: heuristics module (new-account burst, rapid overtake), internal-review audit flag, shill card UI <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/_lib/anomalies.ts, apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx] -->
@@ -50,14 +50,14 @@
 
 ## 7. Ceremony visuals
 
-- [ ] 7.1 Amber audit banner, toast adoption, dark danger button parity <!-- agent: fullstack-engineer.build, depends_on: [1.4], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/**] -->
+- [x] 7.1 Amber audit banner, toast adoption, dark danger button parity <!-- agent: fullstack-engineer.build, depends_on: [1.4], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/**] -->
 - [ ] 7.2 Reveal presentation: blurred table with veil before reveal, staggered row reveal, reduced-motion fallback <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/reveal-panel.tsx] -->
 - [ ] 7.3 Live audit strip: sealed-event audit lines for the auction, refreshed on SSE events <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/ceremony-checklist.tsx, apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/_lib/**] -->
 - [ ] 7.4 Ceremony tests <!-- agent: fullstack-engineer.build, depends_on: [7.2, 7.3], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/__tests__/**] -->
 
 ## 8. Users, rights, impersonation, GDPR
 
-- [ ] 8.1 User drawer shell on the list: 720px, 7 tabs, row deep link preserved to the detail page <!-- agent: fullstack-engineer.build, depends_on: [1.3, 1.9], touches: [apps/platform/src/app/(admin)/admin/users/page.tsx, apps/platform/src/app/(admin)/admin/users/_components/UserDrawer.tsx] -->
+- [x] 8.1 User drawer shell on the list: 720px, 7 tabs, row deep link preserved to the detail page <!-- agent: fullstack-engineer.build, depends_on: [1.3, 1.9], touches: [apps/platform/src/app/(admin)/admin/users/page.tsx, apps/platform/src/app/(admin)/admin/users/_components/UserDrawer.tsx] -->
 - [ ] 8.2 Tab content reuse: move the 5 detail tab panels into shared components consumed by page and drawer; add the Teavitused tab <!-- agent: fullstack-engineer.build, depends_on: [8.1], touches: [apps/platform/src/app/(admin)/admin/users/_components/**, apps/platform/src/app/(admin)/admin/users/[id]/page.tsx] -->
 - [x] 8.3 Impersonation backend: audited start/stop, impersonation session binding, portal write actions reject while impersonating <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/lib/auth/**, apps/platform/src/app/(portal)/**/_actions/**] -->
 - [ ] 8.4 Impersonation UI: reason modal, sticky amber banner with LÕPETA VAATLUS; ban action with isikukood-level registration guard <!-- agent: fullstack-engineer.build, depends_on: [8.1, 8.3], touches: [apps/platform/src/app/(admin)/admin/users/_components/UserDrawer.tsx, apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/app/(portal)/_actions/register/**] -->
