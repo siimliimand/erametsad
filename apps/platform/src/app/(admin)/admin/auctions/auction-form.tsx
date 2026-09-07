@@ -249,6 +249,7 @@ export async function AuctionForm({
       cancelHref={cancelHref}
       options={wizardOptions}
       initial={initial}
+      status={auction?.status ?? null}
     />
   )
 }
