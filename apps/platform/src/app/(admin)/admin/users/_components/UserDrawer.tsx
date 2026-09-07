@@ -1,10 +1,17 @@
 'use client'
 
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { Drawer } from '../../../_components/ui/Drawer'
 import { TabBar } from '../../../_components/ui/TabBar'
+
+import { GdprTab } from './tabs/GdprTab'
+import { UserTabPanel } from './tabs/UserTabPanel'
+import { loadUserTabData } from './tabs/userTabData'
+import type { UserTabResult } from './tabs/userTabQueries'
+import { DEFAULT_USER_TAB, USER_TABS } from './tabs/userTabs'
+import type { DataTabId, UserTabId } from './tabs/userTabs'
 
 export interface UserDrawerUser {
   id: string
@@ -13,28 +20,50 @@ export interface UserDrawerUser {
   isikukoodMasked: string
 }
 
-// Tab set follows the demo (docs/design/demo/admin/06-users.html): the five
-// detail page panels plus "Teavitused" and "GDPR". Panel content arrives in
-// task 8.2 — every panel renders a placeholder until then.
-const DEFAULT_TAB = { id: 'identiteet', label: 'Identiteet' } as const
+const DEFAULT_TAB = DEFAULT_USER_TAB
 
-const TABS = [
-  DEFAULT_TAB,
-  { id: 'profiilid', label: 'Profiilid' },
-  { id: 'oigused', label: 'Õigused' },
-  { id: 'lepingud', label: 'Lepingud' },
-  { id: 'pakkumised', label: 'Pakkumised' },
-  { id: 'teavitused', label: 'Teavitused' },
-  { id: 'gdpr', label: 'GDPR' },
-] as const
+// Tab set follows the demo (docs/design/demo/admin/06-users.html); the panel
+// components are the same shared ones the detail page renders.
+interface LoadedTab {
+  userId: string
+  tabId: DataTabId
+  result: UserTabResult
+}
+
+const errorBoxClass =
+  'flex flex-wrap items-center justify-between gap-sm rounded-input border border-danger bg-dangerLight px-md py-sm text-bodySm font-medium text-danger'
 
 const OpenUserDrawerContext = createContext<((user: UserDrawerUser) => void) | null>(null)
 
 export function UserDrawerProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserDrawerUser | null>(null)
-  const [activeTabId, setActiveTabId] = useState<string>(DEFAULT_TAB.id)
+  const [activeTabId, setActiveTabId] = useState<UserTabId>(DEFAULT_TAB.id)
+  const [loaded, setLoaded] = useState<LoadedTab | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
-  const activeTab = TABS.find((tab) => tab.id === activeTabId) ?? DEFAULT_TAB
+  const activeTab = USER_TABS.find((tab) => tab.id === activeTabId) ?? DEFAULT_TAB
+
+  useEffect(() => {
+    if (user === null || activeTab.id === 'gdpr') {
+      setLoaded(null)
+      setError(null)
+      return
+    }
+    let cancelled = false
+    const tabId = activeTab.id
+    setError(null)
+    loadUserTabData(user.id, tabId)
+      .then((result) => {
+        if (!cancelled) setLoaded({ userId: user.id, tabId, result })
+      })
+      .catch(() => {
+        if (!cancelled) setError('Andmete laadimine ebaõnnestus.')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [user, activeTab.id, reloadKey])
 
   return (
     <OpenUserDrawerContext.Provider value={setUser}>
@@ -51,13 +80,34 @@ export function UserDrawerProvider({ children }: { children: ReactNode }) {
         {user ? (
           <div className="space-y-md">
             <TabBar
-              items={TABS}
+              items={USER_TABS}
               value={activeTab.id}
-              onChange={setActiveTabId}
+              onChange={(id) => {
+                setActiveTabId(id as UserTabId)
+              }}
               aria-label="Kasutaja detailvaate vahelehed"
             />
             <div role="tabpanel" aria-label={activeTab.label}>
-              <p className="text-bodySm text-inkMuted">Laeb…</p>
+              {activeTab.id === 'gdpr' ? (
+                <GdprTab />
+              ) : error ? (
+                <div role="alert" className={errorBoxClass}>
+                  <span>{error}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReloadKey((key) => key + 1)
+                    }}
+                    className="inline-flex h-8 items-center rounded-button border border-danger px-3 text-label font-semibold transition-colors duration-hover ease-hover hover:bg-dangerLight"
+                  >
+                    Proovi uuesti
+                  </button>
+                </div>
+              ) : loaded && loaded.userId === user.id && loaded.tabId === activeTab.id ? (
+                <UserTabPanel payload={loaded.result.payload} canWrite={loaded.result.canWrite} />
+              ) : (
+                <p className="text-bodySm text-ink-muted">Laeb…</p>
+              )}
             </div>
           </div>
         ) : null}
