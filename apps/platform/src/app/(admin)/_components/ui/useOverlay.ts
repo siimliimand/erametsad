@@ -81,16 +81,34 @@ export function useEscapeKey(open: boolean, onClose: () => void): void {
 
 // Moves focus into the dialog on open and restores it to the trigger on
 // close; the restore runs in the cleanup so unmount is covered too.
+// The panel mounts one commit after open flips (OverlayPortal), so the
+// first run can see a null panel — retry on the next frame until it exists.
 export function useDialogFocus(open: boolean, panelRef: RefObject<HTMLElement | null>): void {
   const restoreRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     if (!open) return
     restoreRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const panel = panelRef.current
-    if (!panel) return
-    const target = getFocusableElements(panel)[0] ?? panel
-    target.focus()
+    const schedule =
+      typeof requestAnimationFrame === 'function'
+        ? (fn: () => void) => requestAnimationFrame(fn)
+        : (fn: () => void) => setTimeout(fn, 0) as unknown as number
+    const cancel =
+      typeof cancelAnimationFrame === 'function'
+        ? (id: number) => cancelAnimationFrame(id)
+        : (id: number) => clearTimeout(id)
+    let timer = 0
+    const focusPanel = () => {
+      const panel = panelRef.current
+      if (!panel) {
+        timer = schedule(focusPanel)
+        return
+      }
+      const target = getFocusableElements(panel)[0] ?? panel
+      target.focus()
+    }
+    focusPanel()
     return () => {
+      cancel(timer)
       restoreRef.current?.focus()
       restoreRef.current = null
     }

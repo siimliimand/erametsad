@@ -41,6 +41,13 @@ async function rerender(node: ReactElement): Promise<void> {
   })
 }
 
+// Focus defers to the next frame while the overlay portal mounts.
+async function nextFrame(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  })
+}
+
 afterEach(() => {
   act(() => {
     root.unmount()
@@ -177,11 +184,9 @@ describe('Modal', () => {
     expect(document.body.style.overflow).toBe('')
   })
 
-  // Characterization test for a known issue: useDialogFocus registers on the
-  // commit where OverlayPortal still renders null (mounted flips a commit
-  // later), so the panel ref is null and focus is neither moved in on open
-  // nor restored on close. Flip these assertions when that is fixed.
-  it('leaves focus on the trigger while the dialog is open (known focus-move gap)', async () => {
+  // Focus moves into the panel on open (after the portal mounts, one commit
+  // later) and returns to the trigger on close.
+  it('moves focus into the dialog on open and restores it to the trigger on close', async () => {
     await act(async () => {
       container = document.createElement('div')
       document.body.appendChild(container)
@@ -196,7 +201,8 @@ describe('Modal', () => {
     expect(document.activeElement).toBe(trigger)
 
     await rerender(modalNode())
-    expect(document.activeElement).toBe(trigger)
+    await nextFrame()
+    expect(dialog().contains(document.activeElement)).toBe(true)
 
     await rerender(modalNode({ open: false }))
     expect(document.activeElement).toBe(trigger)

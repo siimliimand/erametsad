@@ -41,6 +41,13 @@ async function rerender(node: ReactElement): Promise<void> {
   })
 }
 
+// Focus defers to the next frame while the overlay portal mounts.
+async function nextFrame(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  })
+}
+
 afterEach(() => {
   act(() => {
     root.unmount()
@@ -116,10 +123,9 @@ describe('Drawer', () => {
     expect(onCloseMock).toHaveBeenCalledTimes(1)
   })
 
-  // Characterization test for a known issue (shared with Modal): the focus
-  // effect runs before OverlayPortal mounts the panel, so focus is not moved
-  // in on open and not restored on close. Flip when fixed.
-  it('leaves focus on the trigger while the drawer is open (known focus-move gap)', async () => {
+  // Focus moves into the panel on open (after the portal mounts, one commit
+  // later) and returns to the trigger on close.
+  it('moves focus into the drawer on open and restores it to the trigger on close', async () => {
     await mount(drawerNode({ open: false }))
     const trigger = document.createElement('button')
     trigger.textContent = 'Ava kaart'
@@ -128,7 +134,8 @@ describe('Drawer', () => {
     expect(document.activeElement).toBe(trigger)
 
     await rerender(drawerNode())
-    expect(document.activeElement).toBe(trigger)
+    await nextFrame()
+    expect(dialog().contains(document.activeElement)).toBe(true)
 
     await rerender(drawerNode({ open: false }))
     expect(document.activeElement).toBe(trigger)
