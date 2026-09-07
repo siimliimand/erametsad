@@ -21,7 +21,7 @@
 
 ## 3. Workspace (Töölaud)
 
-- [ ] 3.1 _lib/workspace.ts: aggregations for 7 KPIs, ending-today auctions, queue counts, recent leads <!-- agent: fullstack-engineer.build, depends_on: [2.6], touches: [apps/platform/src/app/(admin)/admin/_lib/workspace.ts] -->
+- [x] 3.1 _lib/workspace.ts: aggregations for 7 KPIs, ending-today auctions, queue counts, recent leads <!-- agent: fullstack-engineer.build, depends_on: [2.6], touches: [apps/platform/src/app/(admin)/admin/_lib/workspace.ts] -->
 - [ ] 3.2 KPI strip: 7 cards, alert badge, sparkline SVG, trend sublines, card links <!-- agent: fullstack-engineer.build, depends_on: [3.1, 1.5], touches: [apps/platform/src/app/(admin)/admin/page.tsx] -->
 - [ ] 3.3 "Lõpevad täna" live table: countdown cells with critical blink, type chips, Monitor/Ava buttons <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/app/(admin)/admin/page.tsx, apps/platform/src/app/(admin)/admin/_components/EndingToday.tsx] -->
 - [ ] 3.4 "Süsteemi tervis", "Kiire tegevus", "Viimased juhtlõimed" cards <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/app/(admin)/admin/page.tsx, apps/platform/src/app/(admin)/admin/_components/**] -->
@@ -36,16 +36,16 @@
 ## 5. Wizard chrome and autosave
 
 - [x] 5.1 Editor bar: title with mono id, status pill, autosave indicator with ping, Eelvaade link <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/AuctionWizard.tsx] -->
-- [ ] 5.2 Step rail marks: done/current/todo/disabled from existing per-step validation, "N puudust" footer <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/AuctionWizard.tsx, apps/platform/src/app/(admin)/admin/auctions/_components/wizard-model.ts] -->
-- [ ] 5.3 Client draft autosave to localStorage with restore prompt and beforeunload guard <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/(admin)/admin/auctions/auction-form.tsx, apps/platform/src/app/(admin)/admin/auctions/_components/AuctionWizard.tsx] -->
+- [x] 5.2 Step rail marks: done/current/todo/disabled from existing per-step validation, "N puudust" footer <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/AuctionWizard.tsx, apps/platform/src/app/(admin)/admin/auctions/_components/wizard-model.ts] -->
+- [x] 5.3 Client draft autosave to localStorage with restore prompt and beforeunload guard <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/(admin)/admin/auctions/auction-form.tsx, apps/platform/src/app/(admin)/admin/auctions/_components/AuctionWizard.tsx] -->
 - [ ] 5.4 Tests: mark computation, autosave restore, guard <!-- agent: fullstack-engineer.build, depends_on: [5.2, 5.3], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/__tests__/**] -->
 
 ## 6. Bid monitor parity
 
 - [x] 6.1 Monitor-head strip: timer-xl, anti-snipe chip, leading-bid line, action buttons <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx] -->
-- [ ] 6.2 Autobidder duel collapse: group rapid autobid bursts behind an expandable row <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx] -->
-- [ ] 6.3 Bidder reveal chips in the live feed, reusing the audited identity unmask action <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx, apps/platform/src/app/(admin)/admin/bids/_actions/**] -->
-- [ ] 6.4 Anomalies panel: heuristics module (new-account burst, rapid overtake), internal-review audit flag, shill card UI <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/_lib/anomalies.ts, apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx] -->
+- [x] 6.2 Autobidder duel collapse: group rapid autobid bursts behind an expandable row <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx] -->
+- [x] 6.3 Bidder reveal chips in the live feed, reusing the audited identity unmask action <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx, apps/platform/src/app/(admin)/admin/bids/_actions/**] -->
+- [x] 6.4 Anomalies panel: heuristics module (new-account burst, rapid overtake), internal-review audit flag, shill card UI <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/_lib/anomalies.ts, apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx] -->
 - [ ] 6.5 Tests: duel grouping, heuristic thresholds, reveal audit entry <!-- agent: fullstack-engineer.build, depends_on: [6.2, 6.3, 6.4], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/__tests__/**] -->
 
 ## 7. Ceremony visuals
@@ -58,7 +58,7 @@
 ## 8. Users, rights, impersonation, GDPR
 
 - [x] 8.1 User drawer shell on the list: 720px, 7 tabs, row deep link preserved to the detail page <!-- agent: fullstack-engineer.build, depends_on: [1.3, 1.9], touches: [apps/platform/src/app/(admin)/admin/users/page.tsx, apps/platform/src/app/(admin)/admin/users/_components/UserDrawer.tsx] -->
-- [ ] 8.2 Tab content reuse: move the 5 detail tab panels into shared components consumed by page and drawer; add the Teavitused tab <!-- agent: fullstack-engineer.build, depends_on: [8.1], touches: [apps/platform/src/app/(admin)/admin/users/_components/**, apps/platform/src/app/(admin)/admin/users/[id]/page.tsx] -->
+- [x] 8.2 Tab content reuse: move the 5 detail tab panels into shared components consumed by page and drawer; add the Teavitused tab <!-- agent: fullstack-engineer.build, depends_on: [8.1], touches: [apps/platform/src/app/(admin)/admin/users/_components/**, apps/platform/src/app/(admin)/admin/users/[id]/page.tsx] -->
 - [x] 8.3 Impersonation backend: audited start/stop, impersonation session binding, portal write actions reject while impersonating <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/lib/auth/**, apps/platform/src/app/(portal)/**/_actions/**] -->
 - [ ] 8.4 Impersonation UI: reason modal, sticky amber banner with LÕPETA VAATLUS; ban action with isikukood-level registration guard <!-- agent: fullstack-engineer.build, depends_on: [8.1, 8.3], touches: [apps/platform/src/app/(admin)/admin/users/_components/UserDrawer.tsx, apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/app/(portal)/_actions/register/**] -->
 - [ ] 8.5 GDPR: export ZIP stream and anonymize-with-retention action, both audited, wired into the GDPR tab <!-- agent: fullstack-engineer.build, depends_on: [8.2], touches: [apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/app/(admin)/admin/users/_components/**] -->
@@ -95,7 +95,7 @@
 ## 13. Statistics dashboard
 
 - [ ] 13.1 _lib/statistics.ts: period aggregations (30/90/365) from auctions, bids, snapshots <!-- agent: fullstack-engineer.build, depends_on: [2.6], touches: [apps/platform/src/app/(admin)/admin/statistics/_lib/statistics.ts] -->
-- [ ] 13.2 Server-rendered SVG charts: grouped monthly bars, type donut, 30-day trend (no chart dependency) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/statistics/_components/Charts.tsx] -->
+- [x] 13.2 Server-rendered SVG charts: grouped monthly bars, type donut, 30-day trend (no chart dependency) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/statistics/_components/Charts.tsx] -->
 - [ ] 13.3 Page assembly: 6 KPIs, charts, Top-5 table, county table, CSV export link <!-- agent: fullstack-engineer.build, depends_on: [13.1, 13.2], touches: [apps/platform/src/app/(admin)/admin/statistics/page.tsx] -->
 - [ ] 13.4 Tests: aggregation math, chart data shapes, period switch <!-- agent: fullstack-engineer.build, depends_on: [13.3], touches: [apps/platform/src/app/(admin)/admin/statistics/_lib/__tests__/**] -->
 
