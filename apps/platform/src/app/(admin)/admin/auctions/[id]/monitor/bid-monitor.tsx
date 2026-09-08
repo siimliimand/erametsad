@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type UIEvent } from 'react'
 
+import { flagInternalReviewAction } from './_actions'
 import {
   detectAnomalies,
   NEW_ACCOUNT_BURST_WINDOW_MINUTES,
@@ -21,7 +22,6 @@ import {
   type DetectedAnomaly,
 } from './_lib/anomalies'
 import { endAuctionManuallyAction, revealBidderIdentityAction, type BidderIdentityView } from '../../../../_actions/auctions'
-import { requireAdminRepositories } from '../../../../_lib/admin'
 import {
   bidSourceLabels,
   bidStatusLabels,
@@ -334,29 +334,6 @@ function AnomaliesPanel({
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  // Audited internal-review flag: one `anomaly.flag` audit entry per flag
-  // action, written through the shared repository create (hash chain
-  // handled by the repository layer).
-  const flagInternalReview = async (): Promise<{ ok: boolean; error: string | null }> => {
-    'use server'
-    try {
-      const { session, repositories } = await requireAdminRepositories()
-      await repositories.create({
-        collection: 'audit-entry',
-        data: {
-          actorId: session.userId,
-          action: 'anomaly.flag',
-          entityType: 'auction',
-          entityId: auctionId,
-          after: { anomalies, flaggedAt: new Date().toISOString() },
-        },
-      })
-      return { ok: true, error: null }
-    } catch {
-      return { ok: false, error: 'Sisejuurdluse märkimine ebaõnnestus.' }
-    }
-  }
-
   return (
     <section
       aria-label="Anomaaliad ja shill-hoiatused"
@@ -404,7 +381,7 @@ function AnomaliesPanel({
                 disabled={pending}
                 onClick={() => {
                   startTransition(async () => {
-                    const result = await flagInternalReview()
+                    const result = await flagInternalReviewAction(auctionId, anomalies)
                     if (result.ok) {
                       setFlagged(true)
                     } else {

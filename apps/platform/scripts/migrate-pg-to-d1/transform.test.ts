@@ -207,8 +207,8 @@ describe('transformNdjson', () => {
 })
 
 describe('table graph', () => {
-  it('covers all 35 D1 tables (33 + service_requests + partners)', () => {
-    expect(tableNames()).toHaveLength(35)
+  it('covers all 37 D1 tables (35 + page_blocks + page_versions)', () => {
+    expect(tableNames()).toHaveLength(37)
     expect(tableNames()).toContain('sessions')
     expect(tableNames()).toContain('rights_requests')
     expect(tableNames()).toContain('password_reset_tokens')
@@ -217,6 +217,8 @@ describe('table graph', () => {
     expect(tableNames()).toContain('analytics_events')
     expect(tableNames()).toContain('service_requests')
     expect(tableNames()).toContain('partners')
+    expect(tableNames()).toContain('page_blocks')
+    expect(tableNames()).toContain('page_versions')
   })
 
   it('inserts FK parents before children', () => {
