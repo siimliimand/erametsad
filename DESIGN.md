@@ -93,7 +93,7 @@ admin-scope:
   radii: { card: 8, button: 8, input: 8 }
   container-xl: 1400
   spacing: { md: 16, lg: 24 }
-  extras: "status triads (--st-*), tints (--tint-primary, --tint-primary-strong), shadows, --rail-w 56, --topbar-h 64"
+  extras: "status triads (--st-*), tints (--tint-primary, --tint-primary-strong), shadows, --rail-w 56, --topbar-h 64, --overlay, --z-scale (topbar 90, drawer 140, modal 150, toast 160), keyframes cd-blink/row-flash/live-pulse/save-ping/modal-in"
 
 hero-overlay: "linear-gradient(90deg, rgba(22,56,42,.85), rgba(22,56,42,.35))"
 ---
@@ -112,7 +112,7 @@ The palette keeps its forest roots and gains a pale lavender surface. Primary is
 
 Surfaces are pale and warm. The page background is a lavender-tinted paper (`#fbf8ff`). Section alternates use a lighter mist tone (`#f4f2ff`). Borders use grey-green `#c1c8c2`. Body text is a blue-black ink (`#181a2e`), and muted text is `#414844`. Both pass WCAG AA on the paper surface.
 
-The CTA amber (`#F2A93B`) and the accent green (`#58B368`) keep their roles: main actions, price highlights, and success states. Danger red (`#B3261E`) and info blue (`#2D6FA8`) keep their light background pairs. The status pill set is unchanged: active green, amber for auctions ending within an hour, red for five minutes or less, grey for ended and draft, blue for scheduled.
+The CTA amber (`#F2A93B`) and the accent green (`#58B368`) keep their roles: main actions, price highlights, and success states. Danger red (`#B3261E`) and info blue (`#2D6FA8`) keep their light background pairs. The status pill set is unchanged: active green, amber for auctions ending within an hour, red for five minutes or less, grey for ended and draft, blue for scheduled. The admin extends this set with the unified `StatusChip` families described in the admin section below.
 
 ## Typography
 
@@ -144,11 +144,27 @@ A slim server-rendered results bar sits above the card grid. It shows the found 
 
 `Countdown` synchronises with the server and uses the status colour phases: neutral, amber below one hour, red below five minutes, with optional pulse. The listing tabs row holds six tabs: Kõik objektid, Raieõigused, Metskinnistud, Põllumaad, Paketid, and Kiiroksjonid. Kõik objektid comes first and is the default view, under the heading "Aktiivsed oksjonid". Each tab carries a live count pill. Põllumaad renders its empty state until the schema stores its object type.
 
-The bidding panel (`BidPanel`) handles step-based and sealed input, auto-bidder toggle, and under-bid mode. `DataTable` renders inside the admin demo card treatment (white card with mist header row and 13px/18px cells) and takes optional per-column sort descriptors that render `aria-sort` header links; non-sortable columns render plain. `Accordion`, `Tabs`, `Steps`, `EmptyState`, `Toast`, `Modal`, and `Drawer` cover the usual interaction patterns.
+The bidding panel (`BidPanel`) handles step-based and sealed input, auto-bidder toggle, and under-bid mode. `DataTable` renders inside the admin demo card treatment (white card with mist header row and 13px/18px cells) and takes optional per-column sort descriptors that render `aria-sort` header links; non-sortable columns render plain. `Accordion`, `Tabs`, `Steps`, `EmptyState`, `Toast`, `Modal`, and `Drawer` cover the usual interaction patterns on the marketing site and portal. The admin ships its own overlay and feedback set under `(admin)/_components/ui/`, described in the admin section below.
 
 Form components use floating labels, inline errors, and hint text. `ConsentCheck` is always visible and always unchecked. `LeadForm` includes honeypot fields. `FormFile` supports drag-and-drop uploads with progress indication.
 
 Content components include `SpecialistCard`, `AuctionTicker` (a smooth-scrolling row of lot cards), `ContactBand` in the pre-footer, `CookieBanner` with three-button choice, `Testimonial`, `ArticleCard`, `SubsidyCard`, and `DocumentLink`.
+
+## Admin design system
+
+The admin redefines tokens under `.admin-scope` in `apps/platform/src/app/(admin)/admin.css`: 14/20 body text, 13/18 table text, 12/16 labels, 8-pixel radii, a 1400-pixel container, an overlay token, and a z-scale. Shared primitives live in `(admin)/_components/ui/`, and every admin page builds from them.
+
+The chrome is a 56px icon rail with hover and focus tooltips plus a sticky 64px topbar. Rail icons carry pending markers fed by server counts: an amber dot for unhandled work, a red count pill capped at "99+" for urgent queues. The topbar search opens the Cmd/Ctrl+K route palette, grouped by module; the auctions list also listens for Cmd/Ctrl+N to start a new auction.
+
+Overlays come in two shapes. `Modal` centers a dialog at 480 pixels (sm, confirmations) or 720 pixels (lg, previews and editors). `Drawer` slides in from the right at 460 (sm, lead cards), 560 (md, service requests and CMS versions), 680 (lg, audit detail), or 720 pixels (xl, user detail). Below 768px the drawer goes full-width; the modal fills the viewport minus its 16-pixel gutters. Every overlay traps Tab focus, closes on Esc and backdrop click, locks body scroll, and restores focus on close. The z-scale (drawer 140, modal 150, toast 160) lets a modal stack above an open drawer.
+
+Feedback uses one toast pattern: a dark ink card with a 3px tone stripe (green success, red error, blue info), bottom-center, at most three visible, auto-dismissed after 3600 ms unless overridden. A toast can carry a secondary subline (the audit note under save confirmations) and a one-shot save-ping dot. Destructive actions confirm through `ConfirmDialog` in one of two guards: a required reason of at least 5 characters ("Põhjus on kohustuslik (vähemalt 5 tähemärki).") or a typed keyword matched case-insensitively (HOOLDUS turns on maintenance mode). The confirm button stays disabled until the guard passes.
+
+Status rendering is one `StatusChip` pill set. The auction lifecycle (draft, scheduled, active, ending, ended, unsold, contract, completed, archived, appraised) uses bare names. Absorbed domains use prefixed variants: `user:active/suspended/banned`, `contract:prepared/sent/signed/voided`, `lead:new/contacted/qualified/contract/disqualified`, `content:draft/published`, and `company:pending/approved/rejected/held`. Colors come from the `--st-*` triads. Contract states render glyphs (◻ ▣ ✓ ✕) in place of the dot; the other states keep a 6-pixel dot.
+
+KPI strips use `KpiCard`: a muted label, a 32-pixel JetBrains Mono value with tabular alignment, an optional amber alert badge beside the value, an optional sub line, an optional link wrapper, and a danger flag that turns the value red. Supporting primitives are `Switch`, `TabBar` (pill tabs with counts and roving tabindex), `FilterChip`, and `EmptyRow`.
+
+Admin motion stays subtle and purposeful. `admin.css` defines the keyframes the primitives reference: cd-blink (critical countdown blink), row-flash, live-pulse, save-ping, and modal-in. Overlay entry animates in 180 to 200 ms, and the drawer slide uses the 200 ms dropdown curve. The ceremony reveal honors `prefers-reduced-motion` with a plain, unstaggered fallback.
 
 ## Motion
 
@@ -182,4 +198,4 @@ The listing redesign follows the approved mockup with five deliberate deviations
 
 The voice in Estonian follows four traits: clear (short sentences, no jargon), honest (fees upfront, no hidden conditions), matter-of-fact (friendly but not chatty), and human (real names, real phone numbers, the tone of a trusted forester).
 
-<!-- Last updated: 2026-08-30 -->
+<!-- Last updated: 2026-09-08 -->

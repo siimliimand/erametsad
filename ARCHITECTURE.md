@@ -159,7 +159,7 @@ Host routing lives in `apps/platform/src/lib/routing/host-areas.ts` plus applica
 | Profiles | `POST /api/v1/profiles/:id/select`, `POST /api/v1/business/request-access` |
 | Realtime | `GET /api/v1/auctions/stream` (public SSE), `GET /api/v1/my/stream` (authenticated SSE) |
 | Public data | `GET /api/v1/statistics`, `GET /api/v1/company-lookup` (registry fixtures) |
-| Admin | `POST /api/v1/admin/auctions/:id/open-sealed`, `/approve-sealed`, `/confirm-winner`, plus admin CRUD routes |
+| Admin | `POST /api/v1/admin/auctions/:id/open-sealed`, `/approve-sealed`, `/confirm-winner`, `GET /api/v1/admin/audit/export/{csv,json}`, plus admin CRUD routes |
 | Forms | `POST /api/leads` (honeypot + rate-limited) |
 
 ### 3.4 Admin Backend
@@ -169,9 +169,23 @@ Host routing lives in `apps/platform/src/lib/routing/host-areas.ts` plus applica
 | **URL** | `admin.erametsad.ee` |
 | **Audience** | Erametsad staff (role-gated) |
 | **Stack** | Custom Next.js `(admin)/` route group with Estonian labels |
-| **Modules** | Dashboard, auction management, bid monitoring, users & rights, contracts, CRM (leads), service request routing, CMS content, statistics, settings, audit log |
+| **Modules** | Töölaud (workspace), auction management (Oksjonid), bid monitoring (Pakkumised), sealed-bid opening (Sul. avamine), users (Kasutajad), company approvals (Ettevõtted), contracts (Lepingud), CRM leads (Juhtlõimed), service requests (Päringud), CMS content (Sisu), statistics, settings, audit log — 13 modules registered in `ADMIN_MODULES` (`(admin)/_lib/permissions.ts`), each role-gated |
 
 The admin is a separate Next.js route group with role-based access control. It is not Payload admin.
+
+**Shared admin UI.** One chrome (56px icon rail, sticky topbar, `AdminShell`) serves all modules. Shared primitives live under `(admin)/_components/ui/`: `Modal` (480/720 widths), `Drawer` (460/560/680/720 widths, full-width below 768px), `ToastProvider` + `ConfirmDialog` (reason and typed-keyword guards), `Switch`, `TabBar`, `FilterChip`, `EmptyRow`, and `KpiCard`. A single `StatusChip` renders every admin status family. The rail shows pending markers (amber dot, red count) fed by server-computed counts, and the topbar search opens a Cmd/Ctrl+K route palette. Relocated routes keep redirects: `/admin/leads/requests` → `/admin/companies`, `/admin/requests` (and `/admin/requests/partners`) → `/admin/inquiries`, `/admin/content/settings` → `/admin/settings`.
+
+**Module internals.** The workspace (Töölaud) aggregates seven role-scoped KPIs and a live ending-today table in `_lib/workspace.ts`. The auction wizard autosaves a client draft to localStorage with a restore prompt; form submit stays the durable save. The bid monitor collapses autobidder duels, reveals bidder identities behind the audited `user.identity_view` action, and runs anomaly heuristics (new-account burst, rapid overtake) that flag entries for internal review. The sealed-opening ceremony streams a live sealed-event audit strip over the AuctionDO SSE feed. Users get a 720px drawer over the list (the detail page stays for deep links), impersonation, and GDPR tools. Statistics renders server-side SVG charts with a semicolon-separated CSV export. Settings provides a read-only role matrix generated from `permissions.ts`, masked env-backed integration keys with audited reveal, and maintenance mode.
+
+**Maintenance mode.** When `settings.maintenance_enabled` is on, middleware returns a 503 maintenance page for public page routes on mapped hosts. The flag is cached in the middleware module with a ~2s TTL and fails open when the settings read fails. `/admin`, `/api`, the login and password-reset flow, and shared statics stay reachable, and requests carrying a valid admin access token bypass the gate. Enabling requires a typed `HOOLDUS` confirmation; both directions write `maintenance.start` / `maintenance.end` audit entries.
+
+**Impersonation.** Admin impersonation ("vaate seanss") stores the real operator id in `sessions.impersonated_by` and the JWT `impersonatedBy` claim. Start and stop are audited. While a session is impersonating, portal write actions reject with a user-facing message (reads stay available) and the portal shows an amber banner with the LÕPETA VAATLUS stop control.
+
+**CMS block pipeline.** Pages are composed of typed blocks. `page_blocks` (pageId, type, ordinal, configJson) stores ordered blocks; `page_versions` stores append-only full-page snapshots for diff and restore. A zod-backed registry (`src/lib/content/blocks/`) defines ten block types: hero, text, cards, accordion, form, ticker, stats, cta, testimonials, faq. The admin page editor wraps them in a block builder, live preview, and versions drawer. The marketing `[...slug]` route renders published pages through the shared `PageBlocks` renderer in `packages/ui`.
+
+**Audit hash chain.** `audit_entries` carries `prev_hash` and `hash` columns. The write path (`src/lib/data/repositories/audit-chain.ts`) chains SHA-256 hashes over canonical entry encodings via Web Crypto; the genesis entry has a null `prev_hash`. A backfill script chains legacy rows, the audit page footer shows a verification indicator ("Ahela kontroll: OK" / "VIGA"), and scoped CSV/JSON exports live at `/api/v1/admin/audit/export/{csv,json}`.
+
+**GDPR tools.** `user.gdpr_export` streams a ZIP of a user's data (archived to R2 under `gdpr-exports/` when a media bucket binds). Anonymize removes or masks personal fields, keeps accounting rows for the 7-year retention, and records the retention deadline in the `user.gdpr_delete` audit entry. Both actions are audited.
 
 ---
 
@@ -209,7 +223,7 @@ Buyer submits bid
 
 | Store | Type | Purpose |
 |---|---|---|
-| Cloudflare D1 (SQLite) | Relational (primary) | All transactional data: users, profiles, auctions, bids, contracts, leads, CMS content, audit log, sessions. 35 tables (28 + sessions, password-reset tokens, the three phase-4 support tables `consent_log`, `newsletter_subscribers`, `analytics_events`, and the two service-request tables `service_requests`, `partners`) defined via Drizzle ORM schema in `apps/platform/src/lib/data/schema/`. |
+| Cloudflare D1 (SQLite) | Relational (primary) | All transactional data: users, profiles, auctions, bids, contracts, leads, CMS content, audit log, sessions. 37 tables (28 + sessions, password-reset tokens, the three phase-4 support tables `consent_log`, `newsletter_subscribers`, `analytics_events`, the two service-request tables `service_requests`, `partners`, and the CMS builder tables `page_blocks`, `page_versions`) defined via Drizzle ORM schema in `apps/platform/src/lib/data/schema/`. |
 | Durable Objects | Stateful compute | `AuctionDO`: serialized bid admission, alarms, anti-snipe, end transitions, SSE event hub. `RateLimiterDO`: rate-limit counters. |
 | Cloudflare R2 | Object storage | Media uploads (images, documents) |
 | Cloudflare KV | Key-value cache | Ephemeral cache where needed |
@@ -217,7 +231,7 @@ Buyer submits bid
 
 ### Core entities
 
-`User`, `Profile` (private/company), `CompanyAccessRequest`, `AuctionRight`, `Auction` (with full field model: location, forest data, pricing, content, packages), `Bid` (append-only), `Autobidder`, `AuctionSubscription`, `Contract`, `ContractTemplate`, `Lead`, `Notification`, `AuditEntry`, `Settings` (singleton: fees, anti-snipe and alapakkumine defaults, feature flags), plus CMS content tables (`Article`, `Content`, `Page`, `FaqCategory`, `FaqItem`, `Testimonial`, `PartnerService`, `LegalDocument`, `Redirect`, `Specialist`, `Media`), and geographic tables (`County`, `Parish`), `StatisticsSnapshot`.
+`User`, `Profile` (private/company), `CompanyAccessRequest`, `AuctionRight`, `Auction` (with full field model: location, forest data, pricing, content, packages), `Bid` (append-only), `Autobidder`, `AuctionSubscription`, `Contract`, `ContractTemplate`, `Lead`, `Notification`, `AuditEntry` (append-only, hash-chained via `prev_hash`/`hash`), `Settings` (singleton: fees, anti-snipe and alapakkumine defaults, feature flags, maintenance mode), plus CMS content tables (`Article`, `Content`, `Page`, `PageBlock`, `PageVersion`, `FaqCategory`, `FaqItem`, `Testimonial`, `PartnerService`, `LegalDocument`, `Redirect`, `Specialist`, `Media`), and geographic tables (`County`, `Parish`), `StatisticsSnapshot`.
 
 Schema source: `apps/platform/src/lib/data/schema/`. The repository layer at `apps/platform/src/lib/data/repositories/` wraps Drizzle queries. Access rules live in `apps/platform/src/lib/data/guards.ts`. Money uses INTEGER cents with EUR conversion at the repository boundary.
 
@@ -245,7 +259,7 @@ Schema source: `apps/platform/src/lib/data/schema/`. The repository layer at `ap
 | **Runtime** | Cloudflare Workers (via OpenNext) | Serverless edge runtime for the Next.js app |
 | **Framework** | Next.js 15 (App Router) | SSG/ISR for marketing, API routes for backend |
 | **Database** | Cloudflare D1 (SQLite) | Primary store — Drizzle ORM for schema and queries |
-| **ORM** | Drizzle ORM | Schema definition, migrations, type-safe queries. 35 tables in `apps/platform/src/lib/data/schema/`. |
+| **ORM** | Drizzle ORM | Schema definition, migrations, type-safe queries. 37 tables in `apps/platform/src/lib/data/schema/`. |
 | **Bid serialization** | Durable Objects (`AuctionDO`) | Single-threaded per auction — owns bid admission, alarms, anti-snipe, end transitions, SSE hub |
 | **Rate limiting** | Durable Objects (`RateLimiterDO`) | Per-identifier rate-limit counters |
 | **Queue** | Cloudflare queues (`erametsad-jobs`) | Background jobs with DLQ (`erametsad-dlq`, max_retries 3). Cron sweep wakes evicted DOs. |
@@ -292,8 +306,9 @@ Not yet implemented: production `.ee` domain cutover, eID Easy production contra
 | **Rate limiting** | `RateLimiterDO` on auth endpoints, bid submission, form submissions |
 | **CSP** | Content Security Policy on all responses |
 | **Honeypot fields** | Invisible form fields to block bots on all forms |
-| **GDPR** | Explicit consents (no pre-checked boxes), data export/erasure self-service, retention schedules |
-| **Audit log** | Immutable log of all admin actions touching users/bids/contracts |
+| **GDPR** | Explicit consents (no pre-checked boxes); audited admin-side tools for per-user ZIP export and anonymize with 7-year retention; retention schedules |
+| **Audit log** | Immutable, hash-chained log of admin actions touching users/bids/contracts: SHA-256 `prev_hash`/`hash` chain, backfill script, chain-verification indicator, scoped CSV/JSON exports |
+| **Impersonation** | Admin "vaate seanss" binds the operator id in the session and JWT; portal write actions reject while impersonating; start/stop audited |
 | **Anti-sniping** | Time extension mechanism to prevent last-second bid sniping. AuctionDO alarm-driven with a cron sweep safety net. |
 
 Security posture targets OWASP ASVS Level 2 with penetration testing before launch.
@@ -307,7 +322,8 @@ Not yet implemented. Planned for Phase 1 and onwards:
 - **Error tracking:** Sentry
 - **Uptime monitoring:** UptimeRobot or equivalent
 - **Analytics:** Plausible (GDPR-light) or Google Analytics 4 with consent gate
-- **Audit log:** In-application immutable audit log for compliance
+
+In place: the in-application audit log (hash-chained, with chain verification and exports) covers the compliance logging role planned for this section.
 
 Not evident from the repository: APM tooling, structured logging framework, health check endpoints.
 
@@ -351,7 +367,7 @@ Three test layers are wired into `pnpm test`:
 
 | Layer | Framework | Scope |
 |---|---|---|
-| **Unit + integration** | Vitest node pool (better-sqlite3) | Repository layer, guards, money handling, JSON fields, hooks, bid engine (rules, autobidder, anti-snipe, sealed-bid) |
+| **Unit + integration** | Vitest node pool (better-sqlite3) | Repository layer, guards, money handling, JSON fields, hooks, bid engine (rules, autobidder, anti-snipe, sealed-bid), admin modules (primitives, routes, role gating, maintenance gate, audit chain tamper/backfill/export, impersonation guards, GDPR retention, statistics aggregation) |
 | **Durable Object** | `@cloudflare/vitest-pool-workers` | AuctionDO (bid admission, alarms, end transitions), RateLimiterDO, queue consumer |
 | **Spikes** | Various | Targeted prototypes for specific subsystems |
 
@@ -366,7 +382,7 @@ All suites run under `pnpm test`. Schema lint enforces data conventions (no REAL
 | **Monorepo (Turborepo/pnpm)** | Mirrors reference architecture proven for this exact product class; shared types and components across three sites |
 | **Cloudflare Workers via OpenNext** | All stateful components on one platform: D1, Durable Objects, queues, Email Service, R2, KV. No external database or cache vendor. |
 | **D1 (SQLite) over PostgreSQL** | Eliminates external Postgres dependency; D1 runs on the same edge as Workers. INTEGER cents, TEXT timestamps, TEXT UUIDs, TEXT-JSON columns. |
-| **Drizzle ORM** | Type-safe schema and queries over D1. Replaces Payload CMS collections. 35 tables with repository-layer access rules. |
+| **Drizzle ORM** | Type-safe schema and queries over D1. Replaces Payload CMS collections. 37 tables with repository-layer access rules. |
 | **Durable Objects for bid serialization** | `AuctionDO` is single-threaded per auction — replaces `SELECT ... FOR UPDATE` row locks that D1 cannot provide. |
 | **SSE over WebSockets** | Lower complexity for server-to-client bid/countdown updates; WebSocket overhead not justified until chat/multiplayer features added |
 | **Cloudflare queues over BullMQ** | Queue and DLQ run on the same platform. Cron sweep wakes evicted DOs. |
@@ -438,4 +454,4 @@ All suites run under `pnpm test`. Schema lint enforces data conventions (no REAL
 | Specialist | Metsaspetsialist | An Erametsad staff member who manages forest owner relationships |
 | Association | Metsaühistu | Forest owners' cooperative (optional Phase 5) |
 
-<!-- Last updated: 2026-08-30 -->
+<!-- Last updated: 2026-09-08 -->
