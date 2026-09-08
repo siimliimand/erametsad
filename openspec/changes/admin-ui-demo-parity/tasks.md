@@ -62,7 +62,7 @@
 - [x] 8.3 Impersonation backend: audited start/stop, impersonation session binding, portal write actions reject while impersonating <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/lib/auth/**, apps/platform/src/app/(portal)/**/_actions/**] -->
 - [x] 8.4 Impersonation UI: reason modal, sticky amber banner with LÕPETA VAATLUS; ban action with isikukood-level registration guard <!-- agent: fullstack-engineer.build, depends_on: [8.1, 8.3], touches: [apps/platform/src/app/(admin)/admin/users/_components/UserDrawer.tsx, apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/app/(portal)/_actions/register/**] -->
 - [x] 8.5 GDPR: export ZIP stream and anonymize-with-retention action, both audited, wired into the GDPR tab <!-- agent: fullstack-engineer.build, depends_on: [8.2], touches: [apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/app/(admin)/admin/users/_components/**] -->
-- [ ] 8.6 Tests: impersonation guards, ban registration block, anonymize retention, drawer tabs <!-- agent: fullstack-engineer.build, depends_on: [8.4, 8.5], touches: [apps/platform/src/app/(admin)/_actions/__tests__/**, apps/platform/src/app/(admin)/admin/users/**/__tests__/**] -->
+- [x] 8.6 Tests: impersonation guards, ban registration block, anonymize retention, drawer tabs <!-- agent: fullstack-engineer.build, depends_on: [8.4, 8.5], touches: [apps/platform/src/app/(admin)/_actions/__tests__/**, apps/platform/src/app/(admin)/admin/users/**/__tests__/**] -->
 
 ## 9. Companies approvals polish
 
@@ -90,14 +90,14 @@
 - [x] 12.4 Live preview pane: read-only block rendering with desktop/mobile width toggle <!-- agent: fullstack-engineer.build, depends_on: [12.3], touches: [apps/platform/src/app/(admin)/admin/content/pages/_components/BlockPreview.tsx] -->
 - [x] 12.5 Versions: publish creates a snapshot, versions drawer with two-column diff, restore action <!-- agent: fullstack-engineer.build, depends_on: [12.3, 1.3], touches: [apps/platform/src/app/(admin)/admin/content/pages/_components/VersionsDrawer.tsx, apps/platform/src/app/(admin)/_actions/content.ts] -->
 - [x] 12.6 Marketing renderer: PageBlocks renderer component adopted by the CMS pages route <!-- agent: fullstack-engineer.build, depends_on: [12.2], touches: [packages/ui/src/components/content/**, apps/platform/src/app/(marketing)/**] -->
-- [ ] 12.7 Tests: registry validation, ordinal integrity, snapshot diff, renderer <!-- agent: fullstack-engineer.build, depends_on: [12.4, 12.5, 12.6], touches: [apps/platform/src/lib/content/**/__tests__/**, apps/platform/src/app/(admin)/admin/content/pages/**/__tests__/**] -->
+- [x] 12.7 Tests: registry validation, ordinal integrity, snapshot diff, renderer <!-- agent: fullstack-engineer.build, depends_on: [12.4, 12.5, 12.6], touches: [apps/platform/src/lib/content/**/__tests__/**, apps/platform/src/app/(admin)/admin/content/pages/**/__tests__/**] -->
 
 ## 13. Statistics dashboard
 
 - [x] 13.1 _lib/statistics.ts: period aggregations (30/90/365) from auctions, bids, snapshots <!-- agent: fullstack-engineer.build, depends_on: [2.6], touches: [apps/platform/src/app/(admin)/admin/statistics/_lib/statistics.ts] -->
 - [x] 13.2 Server-rendered SVG charts: grouped monthly bars, type donut, 30-day trend (no chart dependency) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/statistics/_components/Charts.tsx] -->
 - [x] 13.3 Page assembly: 6 KPIs, charts, Top-5 table, county table, CSV export link <!-- agent: fullstack-engineer.build, depends_on: [13.1, 13.2], touches: [apps/platform/src/app/(admin)/admin/statistics/page.tsx] -->
-- [ ] 13.4 Tests: aggregation math, chart data shapes, period switch <!-- agent: fullstack-engineer.build, depends_on: [13.3], touches: [apps/platform/src/app/(admin)/admin/statistics/_lib/__tests__/**] -->
+- [x] 13.4 Tests: aggregation math, chart data shapes, period switch <!-- agent: fullstack-engineer.build, depends_on: [13.3], touches: [apps/platform/src/app/(admin)/admin/statistics/_lib/__tests__/**] -->
 
 ## 14. Settings
 
@@ -106,7 +106,7 @@
 - [x] 14.3 Role matrix: read-only view generated from permissions.ts, locked Superadmin column, note on code-defined permissions <!-- agent: fullstack-engineer.build, depends_on: [14.1], touches: [apps/platform/src/app/(admin)/admin/settings/_components/RoleMatrix.tsx] -->
 - [x] 14.4 Maintenance mode: settings field, typed HOOLDUS confirm modal, middleware gate with admin bypass, audit start/end <!-- agent: fullstack-engineer.build, depends_on: [14.1], touches: [apps/platform/src/lib/data/schema/**, apps/platform/src/middleware.ts, apps/platform/src/app/(admin)/admin/settings/**] -->
 - [x] 14.5 Integration key cards: masked env-backed values, audited reveal action, status dots <!-- agent: fullstack-engineer.build, depends_on: [14.1], touches: [apps/platform/src/app/(admin)/admin/settings/_components/IntegrationKeys.tsx, apps/platform/src/app/(admin)/_actions/settings.ts] -->
-- [ ] 14.6 Tests: maintenance gate, reveal audit, matrix rendering <!-- agent: fullstack-engineer.build, depends_on: [14.3, 14.4, 14.5], touches: [apps/platform/src/app/(admin)/admin/settings/**/__tests__/**] -->
+- [x] 14.6 Tests: maintenance gate, reveal audit, matrix rendering <!-- agent: fullstack-engineer.build, depends_on: [14.3, 14.4, 14.5], touches: [apps/platform/src/app/(admin)/admin/settings/**/__tests__/**] -->
 
 ## 15. Audit log chain and drawer
 
@@ -114,7 +114,7 @@
 - [x] 15.2 Backfill script for existing entries plus a chain-verification method and footer indicator (label: "Ahela kontroll: OK") <!-- agent: fullstack-engineer.build, depends_on: [15.1], touches: [apps/platform/scripts/**, apps/platform/src/app/(admin)/admin/audit/page.tsx] -->
 - [x] 15.3 Detail drawer 680px: payload JSON box, AuditDiff, related entries, result chip <!-- agent: fullstack-engineer.build, depends_on: [1.3], touches: [apps/platform/src/app/(admin)/admin/audit/_components/AuditDrawer.tsx, apps/platform/src/app/(admin)/admin/audit/page.tsx] -->
 - [x] 15.4 CSV and JSON export routes, scoped like list reads <!-- agent: fullstack-engineer.build, depends_on: [15.1], touches: [apps/platform/src/app/api/v1/admin/audit/**] -->
-- [ ] 15.5 Tests: tamper detection, backfill determinism, export scoping <!-- agent: fullstack-engineer.build, depends_on: [15.2, 15.3, 15.4], touches: [apps/platform/src/lib/data/repositories/__tests__/**] -->
+- [x] 15.5 Tests: tamper detection, backfill determinism, export scoping <!-- agent: fullstack-engineer.build, depends_on: [15.2, 15.3, 15.4], touches: [apps/platform/src/lib/data/repositories/__tests__/**] -->
 
 ## 16. Cross-cutting and verification
 
