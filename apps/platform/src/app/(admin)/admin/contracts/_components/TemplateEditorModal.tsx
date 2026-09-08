@@ -1,12 +1,13 @@
 'use client'
 
-import { useId, useRef, useState } from 'react'
+import { useId, useRef, useState, useTransition } from 'react'
 
 import { HtmlPreviewDrawer } from './HtmlPreviewDrawer'
 import { PLACEHOLDER_GROUPS } from './placeholder-catalogue'
-import { testRenderTemplateAction } from '../../../_actions/contracts'
+import { saveTemplateDraftAction, testRenderTemplateAction } from '../../../_actions/contracts'
 import { PencilIcon } from '../../../_components/icons'
 import { Modal } from '../../../_components/ui/Modal'
+import { useToast, type PushToast } from '../../../_components/ui/Toast'
 
 export interface TemplateTokenInsertion {
   value: string
@@ -38,6 +39,11 @@ interface TemplateEditorModalProps {
   templateId: string
   name: string
   version: string
+  /** Head version's stored editor source; absent or NULL keeps an empty editor. */
+  initialSourceContent?: string | null
+  initialSourceFormat?: 'html' | 'txt' | null
+  /** Suggested next version for the draft save ("3.0" -> "3.1"). */
+  nextVersion?: string
 }
 
 const editorButtonClass =
@@ -55,20 +61,67 @@ const primaryButtonClass =
 const ghostButtonClass =
   'inline-flex h-8 items-center rounded-button border border-border bg-bgPage px-3 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary'
 
+const versionInputClass =
+  'h-8 w-24 rounded-input border border-border bg-bgPage px-2 text-bodySm text-ink focus:border-primary focus:outline-none'
+
+// Card and modal unit tests mount without ToastProvider (AdminShell provides
+// it app-wide), so a missing provider degrades to a no-op instead of throwing.
+function useOptionalToast(): PushToast | null {
+  try {
+    return useToast()
+  } catch {
+    return null
+  }
+}
+
+// Mirrors SettingsSaveForm.redirectTargetUrl: a redirecting server action
+// rejects with a NEXT_REDIRECT digest (`NEXT_REDIRECT;replace;<url>;<status>`).
+function redirectTargetUrl(error: unknown): string | null {
+  const digest = (error as { digest?: unknown } | null)?.digest
+  if (typeof digest !== 'string' || !digest.startsWith('NEXT_REDIRECT')) {
+    return null
+  }
+  return digest.split(';')[2] ?? ''
+}
+
+function redirectErrorDescription(target: string | null): string | undefined {
+  if (target === null) return undefined
+  const raw = target.split('viga=')[1]
+  return raw === undefined ? undefined : decodeURIComponent(raw)
+}
+
 /**
  * Demo 08 "Malli redaktor": HTML/TXT source drafting with clickable
  * placeholder chips from the shared catalogue that insert at the textarea
- * cursor, and a test-render button that reuses HtmlPreviewDrawer (it shows
- * the saved version with fixture data — the draft itself is not persisted).
+ * cursor, and a test-render button that reuses HtmlPreviewDrawer. "Salvesta"
+ * persists the draft as a NEW inactive version via saveTemplateDraftAction;
+ * activation stays the explicit card action.
  */
-export function TemplateEditorModal({ templateId, name, version }: TemplateEditorModalProps) {
+export function TemplateEditorModal({
+  templateId,
+  name,
+  version,
+  initialSourceContent = null,
+  initialSourceFormat = null,
+  nextVersion,
+}: TemplateEditorModalProps) {
+  const pushToast = useOptionalToast()
+  const [pending, startTransition] = useTransition()
   const [open, setOpen] = useState(false)
   const [source, setSource] = useState('')
+  const [draftVersion, setDraftVersion] = useState(nextVersion ?? '')
   const areaRef = useRef<HTMLTextAreaElement>(null)
   const areaId = useId()
+  const versionId = useId()
+
+  // DOCX-only templates carry no editor source, so the editor opens empty and
+  // the draft defaults to HTML — the format the editor itself produces.
+  const headSource = initialSourceContent ?? ''
+  const sourceFormat = initialSourceFormat ?? 'html'
 
   function openEditor(): void {
-    setSource('')
+    setSource(headSource)
+    setDraftVersion(nextVersion ?? '')
     setOpen(true)
   }
 
@@ -92,6 +145,40 @@ export function TemplateEditorModal({ templateId, name, version }: TemplateEdito
     })
   }
 
+  /**
+   * The action always redirects (?teade= success / ?viga= failure), so the
+   * digest target decides the outcome; a failure keeps the draft on screen.
+   */
+  function saveDraft(): void {
+    const submittedVersion = draftVersion.trim()
+    startTransition(async () => {
+      const formData = new FormData()
+      formData.set('id', templateId)
+      formData.set('sourceContent', source)
+      formData.set('sourceFormat', sourceFormat)
+      formData.set('version', submittedVersion)
+      try {
+        await saveTemplateDraftAction(formData)
+      } catch (error) {
+        const target = redirectTargetUrl(error)
+        if (target === null || target.includes('viga=')) {
+          const description = redirectErrorDescription(target)
+          pushToast?.({
+            tone: 'error',
+            title: 'Mustandi salvestamine ebaõnnestus.',
+            ...(description === undefined ? {} : { description }),
+          })
+          return
+        }
+      }
+      pushToast?.({
+        tone: 'success',
+        title: `Mustand salvestatud (versioon ${submittedVersion}).`,
+      })
+      closeEditor()
+    })
+  }
+
   return (
     <>
       <button type="button" onClick={openEditor} className={editorButtonClass}>
@@ -105,6 +192,20 @@ export function TemplateEditorModal({ templateId, name, version }: TemplateEdito
         size="lg"
         footer={
           <>
+            <div className="mr-auto flex items-center gap-2">
+              <label htmlFor={versionId} className="text-label font-semibold text-ink">
+                Uus versioon
+              </label>
+              <input
+                id={versionId}
+                value={draftVersion}
+                onChange={(event) => {
+                  setDraftVersion(event.target.value)
+                }}
+                spellCheck={false}
+                className={versionInputClass}
+              />
+            </div>
             <button type="button" onClick={closeEditor} className={ghostButtonClass}>
               Sulge
             </button>
@@ -115,12 +216,21 @@ export function TemplateEditorModal({ templateId, name, version }: TemplateEdito
               fetchDocument={testRenderTemplateAction}
               triggerClassName={primaryButtonClass}
             />
+            <button
+              type="button"
+              onClick={saveDraft}
+              disabled={pending || draftVersion.trim() === ''}
+              className={`${primaryButtonClass} disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              Salvesta
+            </button>
           </>
         }
       >
         <p className="text-bodySm text-ink-muted">
           Klõpsa kohatäidet, et lisada see kursori kohale lähteteksti. Redaktor sobib HTML- ja
-          TXT-mallidele; valmis lähtetekst laaditakse üles failina „Uus mall“ vormis.
+          TXT-mallidele; „Salvesta“ salvestab lähteteksti uue passiivse versioonina, aktiveerimine
+          on eraldi tegevus.
         </p>
 
         <div className="flex flex-col gap-xs" role="group" aria-label="Kohatäited">

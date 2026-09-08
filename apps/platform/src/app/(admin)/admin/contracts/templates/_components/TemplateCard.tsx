@@ -27,6 +27,11 @@ export interface TemplateCardData {
   tokens: { key: string }[]
   updatedAt: string
   versions: TemplateVersionEntry[]
+  /** Head version's stored editor source; NULL for DOCX-only templates. */
+  sourceContent?: string | null
+  sourceFormat?: 'html' | 'txt' | null
+  /** Draft-save suggestion: head version with the minor bumped ("3.0" -> "3.1"). */
+  nextVersion?: string
 }
 
 const MAX_VERSION_CHIPS = 3
@@ -101,6 +106,9 @@ export function TemplateCard({ card }: { card: TemplateCardData }) {
           templateId={card.id}
           name={card.name}
           version={headVersion.version}
+          initialSourceContent={card.sourceContent ?? null}
+          initialSourceFormat={card.sourceFormat ?? null}
+          nextVersion={card.nextVersion ?? ''}
         />
         <HtmlPreviewDrawer
           label="Testrender"

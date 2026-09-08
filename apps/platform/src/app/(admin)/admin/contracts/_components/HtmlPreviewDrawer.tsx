@@ -1,6 +1,14 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useId, useRef, useState, useTransition } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+
+import {
+  trapTabKey,
+  useBodyScrollLock,
+  useDialogFocus,
+  useEscapeKey,
+} from '../../../_components/ui/useOverlay'
 
 export interface DocumentPayload {
   ok: boolean
@@ -36,6 +44,13 @@ export function HtmlPreviewDrawer({
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
+  const titleId = useId()
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  function closeDrawer(): void {
+    setOpen(false)
+  }
+
   function openDrawer(): void {
     setOpen(true)
     setHtml(null)
@@ -50,6 +65,14 @@ export function HtmlPreviewDrawer({
     })
   }
 
+  useEscapeKey(open, closeDrawer)
+  useBodyScrollLock(open)
+  useDialogFocus(open, panelRef)
+
+  const handlePanelKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (panelRef.current) trapTabKey(event, panelRef.current)
+  }
+
   return (
     <>
       <button
@@ -62,18 +85,24 @@ export function HtmlPreviewDrawer({
       {open ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-md"
-          role="dialog"
-          aria-modal="true"
-          aria-label={drawerTitle}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeDrawer()
+          }}
         >
-          <div className="flex h-[85vh] w-full max-w-container-xl flex-col overflow-hidden rounded-card border border-border bg-bgPage shadow-modal">
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            tabIndex={-1}
+            onKeyDown={handlePanelKeyDown}
+            className="flex h-[85vh] w-full max-w-container-xl flex-col overflow-hidden rounded-card border border-border bg-bgPage shadow-modal"
+          >
             <div className="flex items-center justify-between border-b border-border px-md py-sm">
-              <h2 className="text-h4 font-semibold text-ink">{drawerTitle}</h2>
+              <h2 id={titleId} className="text-h4 font-semibold text-ink">{drawerTitle}</h2>
               <button
                 type="button"
-                onClick={() => {
-                  setOpen(false)
-                }}
+                onClick={closeDrawer}
                 className="rounded-button border border-border bg-bgPage px-3 py-1 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary"
               >
                 Sulge

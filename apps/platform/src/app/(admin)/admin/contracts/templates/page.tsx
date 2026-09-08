@@ -30,6 +30,17 @@ function readTokens(placeholders: unknown): { key: string }[] {
 
 interface GroupedVersion extends TemplateVersionEntry {
   tokens: { key: string }[]
+  sourceContent: string | null
+  sourceFormat: 'html' | 'txt' | null
+}
+
+/** Draft save bumps the head version's minor ("3.0" -> "3.1"); uploads use "N.0". */
+function suggestNextVersion(version: string): string {
+  const dotIndex = version.lastIndexOf('.')
+  if (dotIndex === -1) return `${version}.1`
+  const minor = Number(version.slice(dotIndex + 1))
+  const next = Number.isFinite(minor) ? minor + 1 : 1
+  return `${version.slice(0, dotIndex)}.${String(next)}`
 }
 
 /**
@@ -43,6 +54,8 @@ function groupTemplateCards(
     type: ContractTemplateType
     version: string
     placeholders: unknown
+    sourceContent: string | null
+    sourceFormat: 'html' | 'txt' | null
     active: boolean
     createdAt: string
     updatedAt: string
@@ -67,6 +80,8 @@ function groupTemplateCards(
       updatedAt: template.updatedAt,
       active: template.active,
       tokens: readTokens(template.placeholders),
+      sourceContent: template.sourceContent,
+      sourceFormat: template.sourceFormat,
     })
     groups.set(key, group)
   }
@@ -89,6 +104,9 @@ function groupTemplateCards(
         tokens: head.tokens,
         updatedAt: head.updatedAt,
         versions,
+        sourceContent: head.sourceContent,
+        sourceFormat: head.sourceFormat,
+        nextVersion: suggestNextVersion(head.version),
       },
     ]
   })

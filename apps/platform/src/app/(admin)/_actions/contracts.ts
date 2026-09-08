@@ -22,7 +22,9 @@ import { renderTemplate, type ContractTemplate } from '@/lib/contracts/render'
 import type { CoreRepositories } from '@/lib/data/repositories'
 import {
   contractStatuses,
+  contractTemplateSourceFormats,
   contractTemplateTypes,
+  type ContractTemplateSourceFormat,
   type ContractTemplateType,
 } from '@/lib/data/schema'
 
@@ -390,6 +392,33 @@ function readTemplatePlaceholders(placeholders: unknown): { key: string }[] {
   })
 }
 
+/** Head = newest version row of one named template; the page groups by type::name. */
+function byNewestVersion(
+  a: { createdAt: string; updatedAt: string },
+  b: { createdAt: string; updatedAt: string },
+): number {
+  const byUpdated = Date.parse(b.updatedAt) - Date.parse(a.updatedAt)
+  if (byUpdated !== 0) return byUpdated
+  return Date.parse(b.createdAt) - Date.parse(a.createdAt)
+}
+
+async function findTemplateVersionsByName(
+  repositories: CoreRepositories,
+  template: { name: string; type: string },
+) {
+  return repositories.find({
+    collection: 'contract-templates',
+    where: {
+      and: [
+        { name: { equals: template.name } },
+        { type: { equals: template.type } },
+      ],
+    },
+    pagination: false,
+    limit: 500,
+  })
+}
+
 /**
  * DOCX/HTML template upload (docs 08 Mallid): tokens are validated against
  * the placeholder catalogue before the draft row is created — unknown
@@ -616,6 +645,8 @@ export interface TemplateTestRenderPayload {
 /**
  * Test-render drawer source: renders the template against the fictional
  * fixture set; pure preview, nothing is persisted (docs 08 "Testrender").
+ * Always serves the head version's stored source so previewing an older
+ * version shows what a new draft would render.
  */
 export async function testRenderTemplateAction(id: string): Promise<TemplateTestRenderPayload> {
   const { session, repositories } = await requireAdminRepositories()
@@ -624,6 +655,10 @@ export async function testRenderTemplateAction(id: string): Promise<TemplateTest
 
   const template = await repositories.findByID({ collection: 'contract-templates', id })
   if (!template) return { ok: false, html: '', error: 'Malli ei leitud.' }
+
+  const { docs: versions } = await findTemplateVersionsByName(repositories, template)
+  const head = [...versions].sort(byNewestVersion)[0]
+  if (!head) return { ok: false, html: '', error: 'Malli ei leitud.' }
 
   const fixture = templateFixtureData()
   const placeholders = readTemplatePlaceholders(template.placeholders)
@@ -637,7 +672,83 @@ export async function testRenderTemplateAction(id: string): Promise<TemplateTest
     version: template.version,
     placeholders,
     active: template.active,
+    sourceContent: head.sourceContent,
+    sourceFormat: head.sourceFormat,
   }
   const rendered = renderTemplate(view, data)
   return { ok: true, html: rendered.html, error: null }
+}
+
+/**
+ * Editor draft save (docs 08 "Malli redaktor"): the textarea source becomes a
+ * NEW inactive version row; name/type/placeholders copy from the head so the
+ * draft joins the same version group. Activation stays a separate audited step.
+ */
+export async function saveTemplateDraftAction(formData: FormData): Promise<void> {
+  const { session, repositories } = await requireAdminRepositories()
+
+  const id = readText(formData, 'id')
+  const sourceContent = readText(formData, 'sourceContent')
+  const sourceFormat = readText(formData, 'sourceFormat')
+  const version = readText(formData, 'version')
+
+  if (!id) redirectWithError(templatesPath, 'Salvestamiseks puudub malli identifikaator.')
+  assertPermissionOrRedirect(session.role, 'contracts:write', templatesPath)
+  if (version.length === 0) {
+    redirectWithError(templatesPath, 'Sisesta versiooninumber.')
+  }
+  if (!contractTemplateSourceFormats.includes(sourceFormat as ContractTemplateSourceFormat)) {
+    redirectWithError(templatesPath, 'Vali lähtevorming: HTML või TXT.')
+  }
+
+  const template = await repositories.findByID({ collection: 'contract-templates', id })
+  if (!template) redirectWithError(templatesPath, 'Malli ei leitud.')
+
+  const { docs: versions } = await findTemplateVersionsByName(repositories, template)
+  const head = [...versions].sort(byNewestVersion)[0]
+  if (!head) redirectWithError(templatesPath, 'Malli ei leitud.')
+  if (versions.some((row) => row.version === version)) {
+    redirectWithError(templatesPath, `Versioon "${version}" on selle malli jaoks juba kasutusel.`)
+  }
+
+  let failure: string | null = null
+  let createdId: string | null = null
+  try {
+    const created = await repositories.create({
+      collection: 'contract-templates',
+      data: {
+        name: head.name,
+        type: head.type,
+        version,
+        placeholders: readTemplatePlaceholders(head.placeholders),
+        sourceContent,
+        sourceFormat: sourceFormat as ContractTemplateSourceFormat,
+        active: false,
+      },
+    })
+    createdId = created.id
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'template.draft_save',
+      entityType: 'contract-template',
+      entityId: created.id,
+      after: {
+        name: head.name,
+        type: head.type,
+        version,
+        sourceFormat,
+        bytes: sourceContent.length,
+        baseTemplateId: head.id,
+      },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure || !createdId) {
+    redirectWithError(templatesPath, `Mustandi salvestamine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
+  }
+
+  revalidatePath(templatesPath)
+  revalidatePath(contractsPath)
+  redirectWithNotice(templatesPath, `Mustand salvestatud (versioon ${version}).`)
 }
