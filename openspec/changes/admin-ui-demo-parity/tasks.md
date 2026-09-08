@@ -118,7 +118,7 @@
 
 ## 16. Cross-cutting and verification
 
-- [ ] 16.1 Responsive sweep: drawers full-width below 768px, table scroll, kanban scroll, topbar collapse <!-- agent: fullstack-engineer.build, depends_on: [8.1, 12.3, 14.1], touches: [apps/platform/src/app/(admin)/**] -->
+- [x] 16.1 Responsive sweep: drawers full-width below 768px, table scroll, kanban scroll, topbar collapse <!-- agent: fullstack-engineer.build, depends_on: [8.1, 12.3, 14.1], touches: [apps/platform/src/app/(admin)/**] -->
 - [ ] 16.2 Accessibility pass: overlay focus, aria on tabs and dialogs, reduced motion honored everywhere <!-- agent: fullstack-engineer.build, depends_on: [16.1], touches: [apps/platform/src/app/(admin)/**] -->
-- [ ] 16.3 Update DESIGN.md and ARCHITECTURE.md to the new admin reality <!-- agent: fullstack-engineer.fast, depends_on: [12.6, 13.3, 14.4, 15.2], touches: [DESIGN.md, ARCHITECTURE.md] -->
+- [x] 16.3 Update DESIGN.md and ARCHITECTURE.md to the new admin reality <!-- agent: fullstack-engineer.fast, depends_on: [12.6, 13.3, 14.4, 15.2], touches: [DESIGN.md, ARCHITECTURE.md] -->
 - [ ] 16.4 Run pnpm lint, pnpm typecheck, pnpm test, pnpm build; fix fallout; report results <!-- agent: fullstack-engineer.fast, depends_on: [16.2, 16.3], touches: [] -->
