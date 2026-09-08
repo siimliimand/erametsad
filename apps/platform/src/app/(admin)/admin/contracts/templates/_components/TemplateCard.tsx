@@ -13,6 +13,7 @@ import {
 } from '../../../../_components/icons'
 import { contractTemplateTypeLabels, formatDateTime } from '../../../../_lib/labels'
 import { HtmlPreviewDrawer } from '../../_components/HtmlPreviewDrawer'
+import { TemplateEditorModal } from '../../_components/TemplateEditorModal'
 
 import type { ContractTemplateType } from '@/lib/data/schema'
 
@@ -96,6 +97,11 @@ export function TemplateCard({ card }: { card: TemplateCardData }) {
       </div>
 
       <div className="mt-auto flex flex-wrap items-start gap-sm pt-xs">
+        <TemplateEditorModal
+          templateId={card.id}
+          name={card.name}
+          version={headVersion.version}
+        />
         <HtmlPreviewDrawer
           label="Testrender"
           drawerTitle={`Testrender — ${card.name} (v${headVersion.version})`}
