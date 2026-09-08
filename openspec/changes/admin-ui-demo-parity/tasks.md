@@ -74,7 +74,7 @@
 - [x] 10.1 Template card grid: version chips, expandable version history, active/draft pills <!-- agent: fullstack-engineer.build, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/admin/contracts/templates/page.tsx] -->
 - [x] 10.2 Editor modal: clickable placeholder chips inserting at cursor for HTML/TXT templates, test-render button reusing HtmlPreviewDrawer <!-- agent: fullstack-engineer.build, depends_on: [1.2, 10.1], touches: [apps/platform/src/app/(admin)/admin/contracts/_components/**] -->
 - [x] 10.3 Contract list glyph pills and status parity via the unified chip <!-- agent: fullstack-engineer.fast, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/admin/contracts/page.tsx] -->
-- [ ] 10.4 Tests <!-- agent: fullstack-engineer.build, depends_on: [10.2, 10.3], touches: [apps/platform/src/app/(admin)/admin/contracts/_components/__tests__/**] -->
+- [x] 10.4 Tests <!-- agent: fullstack-engineer.build, depends_on: [10.2, 10.3], touches: [apps/platform/src/app/(admin)/admin/contracts/_components/__tests__/**] -->
 
 ## 11. Service requests and leads polish
 
@@ -119,6 +119,6 @@
 ## 16. Cross-cutting and verification
 
 - [x] 16.1 Responsive sweep: drawers full-width below 768px, table scroll, kanban scroll, topbar collapse <!-- agent: fullstack-engineer.build, depends_on: [8.1, 12.3, 14.1], touches: [apps/platform/src/app/(admin)/**] -->
-- [ ] 16.2 Accessibility pass: overlay focus, aria on tabs and dialogs, reduced motion honored everywhere <!-- agent: fullstack-engineer.build, depends_on: [16.1], touches: [apps/platform/src/app/(admin)/**] -->
+- [x] 16.2 Accessibility pass: overlay focus, aria on tabs and dialogs, reduced motion honored everywhere <!-- agent: fullstack-engineer.build, depends_on: [16.1], touches: [apps/platform/src/app/(admin)/**] -->
 - [x] 16.3 Update DESIGN.md and ARCHITECTURE.md to the new admin reality <!-- agent: fullstack-engineer.fast, depends_on: [12.6, 13.3, 14.4, 15.2], touches: [DESIGN.md, ARCHITECTURE.md] -->
 - [ ] 16.4 Run pnpm lint, pnpm typecheck, pnpm test, pnpm build; fix fallout; report results <!-- agent: fullstack-engineer.fast, depends_on: [16.2, 16.3], touches: [] -->
