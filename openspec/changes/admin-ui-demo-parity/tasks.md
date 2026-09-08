@@ -51,8 +51,8 @@
 ## 7. Ceremony visuals
 
 - [x] 7.1 Amber audit banner, toast adoption, dark danger button parity <!-- agent: fullstack-engineer.build, depends_on: [1.4], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/**] -->
-- [ ] 7.2 Reveal presentation: blurred table with veil before reveal, staggered row reveal, reduced-motion fallback <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/reveal-panel.tsx] -->
-- [ ] 7.3 Live audit strip: sealed-event audit lines for the auction, refreshed on SSE events <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/ceremony-checklist.tsx, apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/_lib/**] -->
+- [x] 7.2 Reveal presentation: blurred table with veil before reveal, staggered row reveal, reduced-motion fallback <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/reveal-panel.tsx] -->
+- [x] 7.3 Live audit strip: sealed-event audit lines for the auction, refreshed on SSE events <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/ceremony-checklist.tsx, apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/_lib/**] -->
 - [ ] 7.4 Ceremony tests <!-- agent: fullstack-engineer.build, depends_on: [7.2, 7.3], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/__tests__/**] -->
 
 ## 8. Users, rights, impersonation, GDPR
@@ -96,13 +96,13 @@
 
 - [x] 13.1 _lib/statistics.ts: period aggregations (30/90/365) from auctions, bids, snapshots <!-- agent: fullstack-engineer.build, depends_on: [2.6], touches: [apps/platform/src/app/(admin)/admin/statistics/_lib/statistics.ts] -->
 - [x] 13.2 Server-rendered SVG charts: grouped monthly bars, type donut, 30-day trend (no chart dependency) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/statistics/_components/Charts.tsx] -->
-- [ ] 13.3 Page assembly: 6 KPIs, charts, Top-5 table, county table, CSV export link <!-- agent: fullstack-engineer.build, depends_on: [13.1, 13.2], touches: [apps/platform/src/app/(admin)/admin/statistics/page.tsx] -->
+- [x] 13.3 Page assembly: 6 KPIs, charts, Top-5 table, county table, CSV export link <!-- agent: fullstack-engineer.build, depends_on: [13.1, 13.2], touches: [apps/platform/src/app/(admin)/admin/statistics/page.tsx] -->
 - [ ] 13.4 Tests: aggregation math, chart data shapes, period switch <!-- agent: fullstack-engineer.build, depends_on: [13.3], touches: [apps/platform/src/app/(admin)/admin/statistics/_lib/__tests__/**] -->
 
 ## 14. Settings
 
 - [x] 14.1 Two-pane layout: sticky section nav and 6 demo sections remapping existing fields <!-- agent: fullstack-engineer.build, depends_on: [2.3], touches: [apps/platform/src/app/(admin)/admin/settings/**] -->
-- [ ] 14.2 Switch components, save toasts with audit subline, reason-on-save kept <!-- agent: fullstack-engineer.build, depends_on: [14.1, 1.4, 1.5], touches: [apps/platform/src/app/(admin)/admin/settings/_components/SettingsForm.tsx] -->
+- [x] 14.2 Switch components, save toasts with audit subline, reason-on-save kept <!-- agent: fullstack-engineer.build, depends_on: [14.1, 1.4, 1.5], touches: [apps/platform/src/app/(admin)/admin/settings/_components/SettingsForm.tsx] -->
 - [x] 14.3 Role matrix: read-only view generated from permissions.ts, locked Superadmin column, note on code-defined permissions <!-- agent: fullstack-engineer.build, depends_on: [14.1], touches: [apps/platform/src/app/(admin)/admin/settings/_components/RoleMatrix.tsx] -->
 - [x] 14.4 Maintenance mode: settings field, typed HOOLDUS confirm modal, middleware gate with admin bypass, audit start/end <!-- agent: fullstack-engineer.build, depends_on: [14.1], touches: [apps/platform/src/lib/data/schema/**, apps/platform/src/middleware.ts, apps/platform/src/app/(admin)/admin/settings/**] -->
 - [x] 14.5 Integration key cards: masked env-backed values, audited reveal action, status dots <!-- agent: fullstack-engineer.build, depends_on: [14.1], touches: [apps/platform/src/app/(admin)/admin/settings/_components/IntegrationKeys.tsx, apps/platform/src/app/(admin)/_actions/settings.ts] -->
@@ -113,7 +113,7 @@
 - [x] 15.1 Hash chain: prevHash/hash columns, migration, Web Crypto chaining in the audit write path <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/data/schema/**, apps/platform/src/lib/data/repositories/**] -->
 - [x] 15.2 Backfill script for existing entries plus a chain-verification method and footer indicator (label: "Ahela kontroll: OK") <!-- agent: fullstack-engineer.build, depends_on: [15.1], touches: [apps/platform/scripts/**, apps/platform/src/app/(admin)/admin/audit/page.tsx] -->
 - [x] 15.3 Detail drawer 680px: payload JSON box, AuditDiff, related entries, result chip <!-- agent: fullstack-engineer.build, depends_on: [1.3], touches: [apps/platform/src/app/(admin)/admin/audit/_components/AuditDrawer.tsx, apps/platform/src/app/(admin)/admin/audit/page.tsx] -->
-- [ ] 15.4 CSV and JSON export routes, scoped like list reads <!-- agent: fullstack-engineer.build, depends_on: [15.1], touches: [apps/platform/src/app/api/v1/admin/audit/**] -->
+- [x] 15.4 CSV and JSON export routes, scoped like list reads <!-- agent: fullstack-engineer.build, depends_on: [15.1], touches: [apps/platform/src/app/api/v1/admin/audit/**] -->
 - [ ] 15.5 Tests: tamper detection, backfill determinism, export scoping <!-- agent: fullstack-engineer.build, depends_on: [15.2, 15.3, 15.4], touches: [apps/platform/src/lib/data/repositories/__tests__/**] -->
 
 ## 16. Cross-cutting and verification
