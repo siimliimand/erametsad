@@ -75,7 +75,7 @@ export function EndingToday({
     <span className="inline-flex items-center gap-1.5 text-label font-semibold text-[color:var(--st-active-text)]">
       <span
         aria-hidden="true"
-        className="h-2 w-2 rounded-pill bg-[var(--st-active-dot)] [animation:live-pulse_2s_ease-out_infinite]"
+        className="h-2 w-2 rounded-pill bg-[var(--st-active-dot)] [animation:live-pulse_2s_ease-out_infinite] motion-reduce:[animation:none]"
       />
       {workspaceCardLabels.live}
     </span>

@@ -192,7 +192,7 @@ export function TopbarSearch() {
               aria-label="Globaalne otsing"
               tabIndex={-1}
               onKeyDown={handlePanelKeyDown}
-              className="animate-[modal-in_0.18s_ease-out] w-full max-w-[560px] overflow-hidden rounded-card border border-border bg-bgPage shadow-modal"
+              className="animate-[modal-in_0.18s_ease-out] motion-reduce:animate-none w-full max-w-[560px] overflow-hidden rounded-card border border-border bg-bgPage shadow-modal"
             >
               <div className="flex items-center gap-2 border-b border-border px-4 py-3">
                 <SearchIcon className="h-4 w-4 shrink-0 text-inkMuted" />

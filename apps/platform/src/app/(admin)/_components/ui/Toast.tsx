@@ -114,7 +114,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.key}
-            className={`pointer-events-auto flex animate-[modal-in_0.2s_ease-out] items-start gap-2.5 rounded-card border-l-[3px] bg-ink px-4 py-3 text-inkInverse shadow-modal ${toneBorderClass[toast.tone]}`}
+            className={`pointer-events-auto flex animate-[modal-in_0.2s_ease-out] motion-reduce:animate-none items-start gap-2.5 rounded-card border-l-[3px] bg-ink px-4 py-3 text-inkInverse shadow-modal ${toneBorderClass[toast.tone]}`}
           >
             <span className={`mt-0.5 shrink-0 [&>svg]:h-4 [&>svg]:w-4 ${toneIconClass[toast.tone]}`}>
               {toneIcon(toast.tone)}
@@ -122,7 +122,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             {toast.ping && (
               <span
                 aria-hidden="true"
-                className="mt-[5px] h-2 w-2 shrink-0 animate-[save-ping_0.6s_ease-out] rounded-pill bg-statusActive"
+                className="mt-[5px] h-2 w-2 shrink-0 animate-[save-ping_0.6s_ease-out] motion-reduce:animate-none rounded-pill bg-statusActive"
               />
             )}
             <span className="flex min-w-0 flex-col gap-px">

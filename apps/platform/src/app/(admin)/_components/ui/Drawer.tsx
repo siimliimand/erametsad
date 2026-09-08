@@ -72,7 +72,7 @@ export function Drawer({
     <OverlayPortal>
       <div
         aria-hidden="true"
-        className={`fixed inset-0 z-[var(--z-drawer-backdrop)] bg-[var(--overlay)] transition-opacity duration-dropdown ease-dropdown ${entered ? 'opacity-100' : 'opacity-0'}`}
+        className={`fixed inset-0 z-[var(--z-drawer-backdrop)] bg-[var(--overlay)] transition-opacity duration-dropdown ease-dropdown motion-reduce:transition-none ${entered ? 'opacity-100' : 'opacity-0'}`}
         onClick={onClose}
       />
       <div
@@ -82,7 +82,7 @@ export function Drawer({
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={handlePanelKeyDown}
-        className={`fixed inset-y-0 right-0 z-[var(--z-drawer)] flex w-full flex-col border-l border-border bg-bgPage shadow-modal transition-transform duration-dropdown ease-dropdown ${sizeClass[size]} ${entered ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed inset-y-0 right-0 z-[var(--z-drawer)] flex w-full flex-col border-l border-border bg-bgPage shadow-modal transition-transform duration-dropdown ease-dropdown motion-reduce:transition-none ${sizeClass[size]} ${entered ? 'translate-x-0' : 'translate-x-full'}`}
       >
         <div className="flex items-center gap-3 border-b border-border px-5 py-4">
           <div className="min-w-0 flex-1">

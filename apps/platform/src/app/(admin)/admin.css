@@ -109,6 +109,13 @@
   animation: cd-blink 1s step-end infinite;
 }
 
+/* Reduced motion: keep the critical color, drop the continuous blink. */
+@media (prefers-reduced-motion: reduce) {
+  .admin-scope .cd-crit {
+    animation: none;
+  }
+}
+
 .admin-scope .row-actions {
   display: inline-flex;
   gap: 4px;

@@ -61,7 +61,7 @@ type StatusFilter = 'all' | 'leading' | 'outbid' | 'pending_approval'
 
 const liveDotClass: Record<ConnectionState, string> = {
   connecting: 'bg-info',
-  live: 'bg-primary animate-pulse',
+  live: 'bg-primary animate-pulse motion-reduce:animate-none',
   offline: 'bg-danger',
 }
 
@@ -948,7 +948,7 @@ export function BidMonitor({
             <span className="font-heading text-h3 font-bold text-ink">Lõppenud</span>
           ) : (
             <span
-              className={`font-heading text-h3 font-bold ${countdownUrgent ? 'animate-pulse text-primaryDark' : 'text-ink'}`}
+              className={`font-heading text-h3 font-bold ${countdownUrgent ? 'animate-pulse motion-reduce:animate-none text-primaryDark' : 'text-ink'}`}
             >
               {remainingMs === null ? '—' : formatCountdown(remainingMs)}
             </span>

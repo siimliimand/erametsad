@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 
 import { kanbanColumns } from './lead-flow'
@@ -75,6 +75,7 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
   const [menu, setMenu] = useState<CardMenuState | null>(null)
   const menuListRef = useRef<HTMLDivElement | null>(null)
   const menuReturnFocusRef = useRef<HTMLElement | null>(null)
+  const noteHeadingId = useId()
 
   useEffect(() => {
     setBoard(cards)
@@ -381,9 +382,10 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
         <div
           role="dialog"
           aria-modal="false"
+          aria-labelledby={noteHeadingId}
           className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-container-sm rounded-card border border-border bg-bgPage p-md shadow-lg"
         >
-          <h4 className="mb-xs font-heading text-h4 font-bold text-ink">
+          <h4 id={noteHeadingId} className="mb-xs font-heading text-h4 font-bold text-ink">
             {pendingInput.kind === 'qualified' ? 'Kvalifitseerimise märkus' : 'Tagasilükkamise põhjus'}
           </h4>
           <p className="mb-xs text-bodySm text-ink-muted">
@@ -391,6 +393,7 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
             on tekst kohustuslik.
           </p>
           <textarea
+            aria-labelledby={noteHeadingId}
             className="h-20 w-full rounded-input border border-border bg-bgPage px-3 py-2 text-bodySm text-ink outline-none focus:border-primary"
             value={noteText}
             onChange={(event) => {

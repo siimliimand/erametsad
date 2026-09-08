@@ -73,7 +73,7 @@ export function Modal({
           aria-labelledby={titleId}
           tabIndex={-1}
           onKeyDown={handlePanelKeyDown}
-          className={`animate-[modal-in_0.18s_ease-out] flex max-h-[calc(100vh-32px)] w-full flex-col overflow-hidden rounded-card border border-border bg-bgPage shadow-modal ${sizeClass[size]}`}
+          className={`animate-[modal-in_0.18s_ease-out] motion-reduce:animate-none flex max-h-[calc(100vh-32px)] w-full flex-col overflow-hidden rounded-card border border-border bg-bgPage shadow-modal ${sizeClass[size]}`}
         >
           <div className="flex items-center gap-3 border-b border-border px-5 py-4">
             {icon ? (

@@ -368,7 +368,7 @@ export function AuctionWizard({
             aria-hidden="true"
             className={`h-2 w-2 rounded-pill ${
               autosaveState === 'saved'
-                ? 'animate-[save-ping_0.6s_ease-out] bg-statusActive'
+                ? 'animate-[save-ping_0.6s_ease-out] motion-reduce:animate-none bg-statusActive'
                 : autosaveState === 'saving'
                   ? 'bg-[var(--st-ended-dot)]'
                   : 'bg-[var(--st-draft-dot)]'
