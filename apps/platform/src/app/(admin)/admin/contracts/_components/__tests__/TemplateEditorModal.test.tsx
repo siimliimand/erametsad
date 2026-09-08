@@ -3,8 +3,9 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ToastProvider } from '@/app/(admin)/_components/ui/Toast'
 import { TemplateEditorModal } from '../TemplateEditorModal'
+
+import { ToastProvider } from '@/app/(admin)/_components/ui/Toast'
 
 const actions = vi.hoisted(() => ({
   testRender: vi.fn((_id: string) =>
@@ -152,18 +153,6 @@ function versionInput(): HTMLInputElement {
   const el = dialog().querySelector<HTMLInputElement>('input')
   if (el === null) throw new Error('version input not found')
   return el
-}
-
-async function setVersion(value: string): Promise<void> {
-  const input = versionInput()
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
-      input,
-      value,
-    )
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-    await Promise.resolve()
-  })
 }
 
 function toastRegion(): HTMLElement {
@@ -334,7 +323,9 @@ describe('TemplateEditorModal save flow', () => {
     await flushTransitions()
 
     expect(actions.saveTemplateDraft).toHaveBeenCalledTimes(1)
-    const submitted = actions.saveTemplateDraft.mock.calls[0]?.[0] as FormData
+    const call = actions.saveTemplateDraft.mock.calls[0]
+    if (call === undefined) throw new Error('saveTemplateDraft was not called')
+    const [submitted] = call
     expect(submitted.get('id')).toBe('tpl-1')
     expect(submitted.get('sourceContent')).toBe('<p>Uus lähtetekst</p>')
     expect(submitted.get('sourceFormat')).toBe('html')
@@ -365,7 +356,7 @@ describe('TemplateEditorModal save flow', () => {
     expect(actions.saveTemplateDraft).toHaveBeenCalledTimes(1)
     expect(dialogCount()).toBe(1)
     expect(editorTextarea().value).toBe('<p>Päise tekst</p>')
-    const region = toastRegion().textContent ?? ''
+    const region = toastRegion().textContent
     expect(region).toContain('Mustandi salvestamine ebaõnnestus.')
     expect(region).toContain('Versioon "3.2" on selle malli jaoks juba kasutusel.')
   })

@@ -1,4 +1,7 @@
+import { revalidatePath } from 'next/cache'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { saveTemplateDraftAction } from '../contracts'
 
 const { RedirectError } = vi.hoisted(() => {
   class RedirectError extends Error {
@@ -35,10 +38,6 @@ vi.mock('../../_lib/admin', () => ({
     Promise.resolve({ session: state.session, repositories: state.repositories }),
   ),
 }))
-
-import { revalidatePath } from 'next/cache'
-
-import { saveTemplateDraftAction } from '../contracts'
 
 interface FindArgs {
   collection: string
