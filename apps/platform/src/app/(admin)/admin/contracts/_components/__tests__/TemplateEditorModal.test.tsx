@@ -59,10 +59,11 @@ function dialogCount(): number {
 }
 
 function drawer(): HTMLElement {
-  const el = document.body.querySelector<HTMLElement>(
-    '[role="dialog"][aria-label="Testrender — Raamleping (v3.1)"]',
+  // Identified by its labelled heading — the drawer has no aria-label.
+  const el = [...document.body.querySelectorAll<HTMLElement>('[role="dialog"]')].find(
+    (element) => element.querySelector('h2')?.textContent === 'Testrender — Raamleping (v3.1)',
   )
-  if (el === null) throw new Error('test-render drawer not found')
+  if (el === undefined) throw new Error('test-render drawer not found')
   return el
 }
 
