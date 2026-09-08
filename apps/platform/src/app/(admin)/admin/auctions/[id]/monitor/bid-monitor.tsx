@@ -1098,7 +1098,7 @@ export function BidMonitor({
           </div>
 
           <div
-            className="max-h-[32rem] overflow-y-auto rounded-card border border-border bg-bgPage"
+            className="max-h-[32rem] overflow-x-auto overflow-y-auto rounded-card border border-border bg-bgPage"
             onScroll={onFeedScroll}
             role="log"
             aria-live={paused ? 'off' : 'polite'}

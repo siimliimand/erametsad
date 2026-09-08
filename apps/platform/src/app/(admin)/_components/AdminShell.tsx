@@ -104,12 +104,12 @@ export function AdminShell({
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-[var(--z-topbar)] flex h-16 items-center gap-sm border-b border-border bg-bgPage px-md">
-            <p className="font-heading text-[15px] leading-[20px] font-semibold text-ink">
+            <p className="min-w-0 truncate font-heading text-[15px] leading-[20px] font-semibold text-ink">
               Erametsad haldus
             </p>
             {environmentLabel && (
               <span
-                className={`rounded-pill px-2.5 py-[3px] font-heading text-[11px] leading-[14px] font-bold uppercase tracking-[0.04em] ${
+                className={`shrink-0 whitespace-nowrap rounded-pill px-2.5 py-[3px] font-heading text-[11px] leading-[14px] font-bold uppercase tracking-[0.04em] ${
                   environmentLabel === 'Test'
                     ? 'bg-[var(--st-ended-bg)] text-[var(--st-ended-text)]'
                     : 'bg-dangerLight text-danger'
@@ -119,7 +119,7 @@ export function AdminShell({
               </span>
             )}
             <TopbarSearch />
-            <div className="ml-auto flex items-center gap-sm">
+            <div className="ml-auto flex shrink-0 items-center gap-sm">
               <NotificationBell items={notifications.items} unreadCount={notifications.unreadCount} />
               <div className="hidden items-center gap-2xs md:flex">
                 <span className="max-w-40 truncate text-label font-medium text-ink">{userName}</span>

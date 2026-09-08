@@ -206,7 +206,7 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
           </div>
         ) : null}
       </div>
-      <div className="grid grid-cols-1 gap-sm overflow-x-auto md:grid-cols-3 xl:grid-cols-5">
+      <div className="flex snap-x gap-sm overflow-x-auto pb-sm md:grid md:grid-cols-3 md:pb-0 xl:grid-cols-5">
         {kanbanColumns.map((column) => {
           const columnCards = board.filter((card) => card.status === column.status)
           const isTarget = dragOver === column.status
@@ -226,7 +226,7 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
                 const leadId = event.dataTransfer.getData('text/plain')
                 if (leadId) attemptMove(leadId, column.status)
               }}
-              className={`min-h-40 rounded-card border p-sm transition-colors duration-hover ease-hover ${
+              className={`min-h-40 w-72 flex-none snap-start rounded-card border p-sm transition-colors duration-hover ease-hover md:w-auto ${
                 isTarget ? 'border-primary bg-bgPage' : 'border-border bg-bg-mist'
               }`}
             >

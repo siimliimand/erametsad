@@ -131,7 +131,7 @@ export default async function AdminUsersPage({
         method="get"
         className="mb-md flex max-w-container-sm flex-wrap items-end gap-sm rounded-card border border-border bg-bgPage p-md"
       >
-        <div className="w-80">
+        <div className="w-full max-w-80">
           <FormField
             label="Otsing"
             name="q"

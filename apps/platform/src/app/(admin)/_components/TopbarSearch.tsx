@@ -164,13 +164,13 @@ export function TopbarSearch() {
         aria-expanded={open}
         aria-label="Globaalne otsing"
         aria-keyshortcuts="Meta+K Control+K"
-        className="relative mx-auto hidden h-9 w-full max-w-[420px] cursor-pointer items-center gap-2 rounded-[8px] border border-transparent bg-bgMist px-2.5 text-left transition-colors duration-hover ease-hover hover:border-primary hover:bg-bgPage md:flex"
+        className="relative mx-auto flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-transparent bg-bgMist text-left transition-colors duration-hover ease-hover hover:border-primary hover:bg-bgPage md:w-full md:max-w-[420px] md:justify-start md:px-2.5"
       >
         <SearchIcon className="h-4 w-4 shrink-0 text-inkMuted" />
-        <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px] text-inkMuted">
+        <span className="hidden min-w-0 flex-1 truncate text-[13px] leading-[18px] text-inkMuted md:block">
           Otsi...
         </span>
-        <kbd aria-hidden="true" className={kbdClass}>
+        <kbd aria-hidden="true" className={`${kbdClass} hidden md:inline`}>
           ⌘K
         </kbd>
       </button>
