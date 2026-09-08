@@ -3,13 +3,17 @@
 /**
  * Client wrapper for the auctions table (design D1): the server page sends
  * serialized rows plus server action references and this component owns row
- * selection, the fixed bulk bar and the ⌘N shortcut. Cell strings are
- * precomputed server-side so the client bundle stays lean.
+ * selection, the fixed bulk bar, the ⌘N shortcut and the Veerud column
+ * chooser. Cell strings are precomputed server-side so the client bundle
+ * stays lean.
  */
 
-import { Download as DownloadIcon } from 'lucide-react'
+import {
+  Download as DownloadIcon,
+  Settings2 as Settings2Icon,
+} from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 
 import { Countdown } from './Countdown'
@@ -20,6 +24,11 @@ import {
   type DataTableColumnSort,
 } from '../../../_components/DataTable'
 import { StatusChip } from '../../../_components/StatusChip'
+import {
+  trapTabKey,
+  useDialogFocus,
+  useEscapeKey,
+} from '../../../_components/ui/useOverlay'
 import {
   CalendarClockIcon,
   CopyIcon,
@@ -113,6 +122,62 @@ const bulkBarBtnClass =
 const bulkCancelBtnClass =
   'inline-flex items-center gap-1 rounded-[8px] px-2 py-1.5 text-label text-white/75 transition-colors duration-hover ease-hover hover:text-white'
 
+// Veerud column chooser: optional columns persist per browser in
+// localStorage; fixed columns (selection, id, title, status, actions) always
+// render.
+const COLUMNS_STORAGE_KEY = 'erametsad.admin.auctions.columns'
+
+const OPTIONAL_COLUMN_KEYS = [
+  'objectType',
+  'countyName',
+  'minBidCents',
+  'bidCount',
+  'endsAt',
+  'specialistName',
+] as const
+
+type OptionalColumnKey = (typeof OPTIONAL_COLUMN_KEYS)[number]
+
+const OPTIONAL_COLUMN_LABELS: Record<OptionalColumnKey, string> = {
+  objectType: 'Tüüp',
+  countyName: 'Maakond',
+  minBidCents: 'Alghind',
+  bidCount: 'Pakkumisi',
+  endsAt: 'Lõpp',
+  specialistName: 'Spetsialist',
+}
+
+// localStorage is touched only from effects/handlers, so SSR and the first
+// client render always see the full default set and hydration stays
+// identical.
+function readStoredColumns(): ReadonlySet<string> {
+  try {
+    const raw = window.localStorage.getItem(COLUMNS_STORAGE_KEY)
+    if (raw === null) return new Set(OPTIONAL_COLUMN_KEYS)
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set(OPTIONAL_COLUMN_KEYS)
+    return new Set(
+      parsed.filter(
+        (value): value is OptionalColumnKey =>
+          typeof value === 'string' &&
+          (OPTIONAL_COLUMN_KEYS as readonly string[]).includes(value),
+      ),
+    )
+  } catch {
+    return new Set(OPTIONAL_COLUMN_KEYS)
+  }
+}
+
+function writeStoredColumns(visible: ReadonlySet<string>): void {
+  try {
+    const ordered = OPTIONAL_COLUMN_KEYS.filter((key) => visible.has(key))
+    window.localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(ordered))
+  } catch {
+    // Storage can throw in private mode or on quota errors: the column
+    // choice then only lives for this page session.
+  }
+}
+
 /**
  * Info line for the end-manual modal, from row data only: the demo line
  * includes the leading bid, which the serialized row does not carry.
@@ -143,6 +208,51 @@ export function AuctionsTable({
     () => new Set<string>(),
   )
   const [endTarget, setEndTarget] = useState<AuctionTableRow | null>(null)
+  const [visibleColumns, setVisibleColumns] = useState<ReadonlySet<string>>(
+    () => new Set<string>(OPTIONAL_COLUMN_KEYS),
+  )
+  const [columnsOpen, setColumnsOpen] = useState(false)
+  const columnsPanelRef = useRef<HTMLDivElement>(null)
+  const columnsTriggerRef = useRef<HTMLButtonElement>(null)
+  const columnsHydratedRef = useRef(false)
+
+  useEscapeKey(columnsOpen, () => {
+    setColumnsOpen(false)
+  })
+  useDialogFocus(columnsOpen, columnsPanelRef)
+
+  // Load the persisted column choice after mount; persisting waits for that
+  // load so a stored selection is never clobbered by the default set.
+  useEffect(() => {
+    setVisibleColumns(readStoredColumns())
+    columnsHydratedRef.current = true
+  }, [])
+
+  useEffect(() => {
+    if (!columnsHydratedRef.current) return
+    writeStoredColumns(visibleColumns)
+  }, [visibleColumns])
+
+  // Outside pointer press closes the chooser; presses on the trigger are
+  // left to the button's own click toggle so one gesture never re-opens it.
+  useEffect(() => {
+    if (!columnsOpen) return
+    const onPointerDown = (event: MouseEvent): void => {
+      const target = event.target
+      if (
+        target instanceof Node &&
+        (columnsPanelRef.current?.contains(target) ||
+          columnsTriggerRef.current?.contains(target))
+      ) {
+        return
+      }
+      setColumnsOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+    }
+  }, [columnsOpen])
 
   // Global ⌘N / Ctrl+N opens the new-auction form, mirroring the header
   // button's kbd hint; write-gated roles never register the listener. Typing
@@ -191,6 +301,18 @@ export function AuctionsTable({
 
   const clearSelection = (): void => {
     setSelected(new Set<string>())
+  }
+
+  const toggleColumn = (key: OptionalColumnKey): void => {
+    setVisibleColumns((previous) => {
+      const next = new Set(previous)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
   }
 
   const handleBulkSchedule = async (formData: FormData): Promise<void> => {
@@ -258,7 +380,7 @@ export function AuctionsTable({
     },
     {
       key: 'objectType',
-      label: 'Tüüp',
+      label: OPTIONAL_COLUMN_LABELS.objectType,
       render: (row) => {
         const TypeIcon = typeChipIcons[row.objectType]
         return (
@@ -287,12 +409,12 @@ export function AuctionsTable({
     },
     {
       key: 'countyName',
-      label: 'Maakond',
+      label: OPTIONAL_COLUMN_LABELS.countyName,
       render: (row) => row.countyName ?? '—',
     },
     {
       key: 'minBidCents',
-      label: 'Alghind',
+      label: OPTIONAL_COLUMN_LABELS.minBidCents,
       sort: sorts.minBidCents,
       render: (row) => (
         <span className="text-right tabular-nums">{row.minBidLabel}</span>
@@ -300,7 +422,7 @@ export function AuctionsTable({
     },
     {
       key: 'bidCount',
-      label: 'Pakkumisi',
+      label: OPTIONAL_COLUMN_LABELS.bidCount,
       sort: sorts.bidCount,
       render: (row) => (
         <span className="tabular-nums">
@@ -318,7 +440,7 @@ export function AuctionsTable({
     },
     {
       key: 'endsAt',
-      label: 'Lõpp',
+      label: OPTIONAL_COLUMN_LABELS.endsAt,
       sort: sorts.endsAt,
       render: (row) => {
         if (!row.endsAt) return '—'
@@ -332,7 +454,7 @@ export function AuctionsTable({
     },
     {
       key: 'specialistName',
-      label: 'Spetsialist',
+      label: OPTIONAL_COLUMN_LABELS.specialistName,
       render: (row) =>
         row.specialistName ? (
           <>
@@ -451,10 +573,68 @@ export function AuctionsTable({
     },
   ]
 
+  // Hidden optional columns render neither header nor cell: filtering the
+  // array before DataTable sees it covers both.
+  const visibleTableColumns = columns.filter(
+    (column) =>
+      !(OPTIONAL_COLUMN_KEYS as readonly string[]).includes(column.key) ||
+      visibleColumns.has(column.key),
+  )
+
   return (
     <div>
+      <div className="relative mb-2 flex justify-end">
+        <button
+          type="button"
+          ref={columnsTriggerRef}
+          onClick={() => {
+            setColumnsOpen((open) => !open)
+          }}
+          aria-haspopup="dialog"
+          aria-expanded={columnsOpen}
+          className="inline-flex h-8 items-center gap-1.5 rounded-button border border-border bg-bgPage px-2.5 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:bg-bgMist hover:text-primary"
+        >
+          <Settings2Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
+          Veerud
+        </button>
+        {columnsOpen ? (
+          <div
+            ref={columnsPanelRef}
+            role="dialog"
+            aria-modal="false"
+            aria-label="Vali veerud"
+            tabIndex={-1}
+            onKeyDown={(event) => {
+              if (columnsPanelRef.current) {
+                trapTabKey(event, columnsPanelRef.current)
+              }
+            }}
+            className="absolute right-0 top-full z-20 mt-1 w-56 rounded-card border border-border bg-bgPage p-1.5 shadow-modal"
+          >
+            <p className="px-2 pb-1 pt-1.5 text-label font-semibold text-inkMuted">
+              Vali veerud
+            </p>
+            {OPTIONAL_COLUMN_KEYS.map((key) => (
+              <label
+                key={key}
+                className="flex cursor-pointer items-center gap-2 rounded-[8px] px-2 py-1.5 text-bodySm text-ink transition-colors duration-hover ease-hover hover:bg-bgMist"
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleColumns.has(key)}
+                  onChange={() => {
+                    toggleColumn(key)
+                  }}
+                  className="h-4 w-4 accent-primary"
+                />
+                {OPTIONAL_COLUMN_LABELS[key]}
+              </label>
+            ))}
+          </div>
+        ) : null}
+      </div>
       <DataTable
-        columns={columns}
+        columns={visibleTableColumns}
         rows={rows}
         emptyLabel="Filtritele vastavaid oksjoneid ei leitud"
         rowClassName={(row) =>
