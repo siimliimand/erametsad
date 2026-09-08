@@ -98,9 +98,13 @@ export function detectNewAccountBursts(
     let maxInWindow = 0
     for (let windowEnd = 0; windowEnd < timeline.placedAtMs.length; windowEnd += 1) {
       const windowEndMs = timeline.placedAtMs[windowEnd]
-      const windowStartMs = timeline.placedAtMs[windowStart]
-      if (windowEndMs === undefined || windowStartMs === undefined) break
-      while (windowEndMs - windowStartMs > NEW_ACCOUNT_BURST_WINDOW_MS) {
+      if (windowEndMs === undefined) break
+      // Re-read the window start each step; a stale value here never
+      // converges and hangs the render.
+      while (
+        windowEndMs - (timeline.placedAtMs[windowStart] ?? windowEndMs) >
+        NEW_ACCOUNT_BURST_WINDOW_MS
+      ) {
         windowStart += 1
       }
       maxInWindow = Math.max(maxInWindow, windowEnd - windowStart + 1)
@@ -171,9 +175,13 @@ export function detectRapidOvertakes(rows: readonly AnomalyFeedRow[]): RapidOver
     let maxInWindow = 0
     for (let windowEnd = 0; windowEnd < pair.flipAtMs.length; windowEnd += 1) {
       const windowEndMs = pair.flipAtMs[windowEnd]
-      const windowStartMs = pair.flipAtMs[windowStart]
-      if (windowEndMs === undefined || windowStartMs === undefined) break
-      while (windowEndMs - windowStartMs > RAPID_OVERTAKE_WINDOW_MS) {
+      if (windowEndMs === undefined) break
+      // Re-read the window start each step; a stale value here never
+      // converges and hangs the render.
+      while (
+        windowEndMs - (pair.flipAtMs[windowStart] ?? windowEndMs) >
+        RAPID_OVERTAKE_WINDOW_MS
+      ) {
         windowStart += 1
       }
       maxInWindow = Math.max(maxInWindow, windowEnd - windowStart + 1)

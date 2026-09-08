@@ -138,7 +138,13 @@ export function groupAutobidderBursts(rows: readonly MonitorBidRow[]): FeedEntry
       burst.push(row)
     } else {
       flushBurst()
-      entries.push({ kind: 'row', row })
+      // A too-large gap ends the run, but the row that revealed the gap
+      // still seeds the next candidate burst (its own gaps decide).
+      if (row.source === 'autobidder') {
+        burst.push(row)
+      } else {
+        entries.push({ kind: 'row', row })
+      }
     }
   }
   flushBurst()
