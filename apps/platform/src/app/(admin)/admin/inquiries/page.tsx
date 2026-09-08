@@ -1,8 +1,15 @@
 import { EE_COUNTIES, HOOLDUSRAIE_SERVICE_OPTIONS, ISTUTAMINE_SERVICE_OPTIONS } from '@erametsad/types'
+import { Clock as ClockIcon } from 'lucide-react'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 
-import { rankRoutingCandidates, type RoutingPartnerInput } from './_components/routing'
+import {
+  RESPONSE_WINDOW_DAYS,
+  rankRoutingCandidates,
+  responseDeadlineState,
+  type ResponseDeadlineState,
+  type RoutingPartnerInput,
+} from './_components/routing'
 import { forwardServiceRequestAction, markRequestRespondedAction, retryRequestForwardAction } from '../../_actions/ops'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
@@ -57,6 +64,14 @@ interface ForwardLogRow {
   recipient: string | null
   delivered: boolean
   retry: boolean
+}
+
+interface ResponseTrackingRow {
+  partnerId: string
+  partnerName: string
+  sentAt: string | null
+  respondedAt: string | null
+  state: ResponseDeadlineState | null
 }
 
 function payloadDefinitionList(payload: Record<string, unknown>): ReactNode {
@@ -193,12 +208,22 @@ export default async function ServiceRequestsPage({
     return true
   })
 
+  const nowMs = Date.now()
   const rows = filteredRequests.map((request) => {
     const payload = asRecord(request.payload)
     const contact = asRecord(payload.contact)
     const responded = respondedByPartner.get(request.id)
     const sentCount = asStringArray(request.routedTo).length
     const respondedCount = responded ? responded.size : 0
+    let firstRespondedAt: string | null = null
+    if (responded) {
+      for (const respondedAt of responded.values()) {
+        if (firstRespondedAt === null || respondedAt < firstRespondedAt) {
+          firstRespondedAt = respondedAt
+        }
+      }
+    }
+    const routedAt = request.status === 'routed' ? request.updatedAt : null
     return {
       id: request.id,
       type: request.type,
@@ -206,12 +231,20 @@ export default async function ServiceRequestsPage({
       county: payload.county ? countyName(payload.county) : '—',
       cadastres: asStringArray(payload.cadastres).length,
       createdAt: request.createdAt,
-      routedAt: request.status === 'routed' ? request.updatedAt : null,
+      routedAt,
       sentCount,
       respondedCount,
       status: request.status,
+      deadline: responseDeadlineState({ routedAt, respondedAt: firstRespondedAt, nowMs }),
     }
   })
+
+  let approachingCount = 0
+  let expiredCount = 0
+  for (const row of rows) {
+    if (row.deadline === 'approaching') approachingCount += 1
+    if (row.deadline === 'expired') expiredCount += 1
+  }
 
   const detailRequest = detail ? (requests.find((request) => request.id === detail) ?? null) : null
 
@@ -263,6 +296,36 @@ export default async function ServiceRequestsPage({
 
   const detailPath = (requestId: string) => `/admin/inquiries?detail=${requestId}`
 
+  const sentAtByPartner = new Map<string, string>()
+  if (detailRequest) {
+    for (const entry of auditsByRequest.get(detailRequest.id) ?? []) {
+      if (entry.action !== 'request.forward') continue
+      const after = asRecord(entry.after)
+      if (typeof after.partnerId !== 'string') continue
+      const existing = sentAtByPartner.get(after.partnerId)
+      if (existing === undefined || entry.createdAt < existing) {
+        sentAtByPartner.set(after.partnerId, entry.createdAt)
+      }
+    }
+  }
+
+  const responseTracking: ResponseTrackingRow[] = detailRequest
+    ? asStringArray(detailRequest.routedTo).map((partnerId) => {
+        const respondedAt = respondedByPartner.get(detailRequest.id)?.get(partnerId) ?? null
+        const sentAt =
+          sentAtByPartner.get(partnerId) ??
+          (detailRequest.status === 'routed' ? detailRequest.updatedAt : null)
+        return {
+          partnerId,
+          partnerName:
+            partners.find((partner: PartnerDoc) => partner.id === partnerId)?.name ?? partnerId,
+          sentAt,
+          respondedAt,
+          state: responseDeadlineState({ routedAt: sentAt, respondedAt, nowMs }),
+        }
+      })
+    : []
+
   return (
     <div>
       {viga ? <ErrorNotice message={viga} /> : null}
@@ -280,6 +343,31 @@ export default async function ServiceRequestsPage({
           </Link>
         }
       />
+
+      <div className="mb-md flex items-start gap-xs rounded-input border border-border border-l-[3px] border-l-info bg-infoLight px-md py-sm">
+        <ClockIcon className="mt-0.5 h-4 w-4 shrink-0 text-info" />
+        <span className="text-bodySm text-ink">
+          Pakkujad vastavad <strong className="font-semibold">{`${String(RESPONSE_WINDOW_DAYS)} päeva jooksul`}</strong> edastamisest.
+          {approachingCount + expiredCount === 0 ? (
+            ' Ükski aktiivne päring ei ole veel tähtaega lähedas.'
+          ) : (
+            <span className="ml-1 inline-flex flex-wrap gap-sm">
+              {approachingCount > 0 ? (
+                <span className="whitespace-nowrap">
+                  Tähtaeg lähedas:
+                  <strong className="ml-1 font-semibold">{String(approachingCount)}</strong>
+                </span>
+              ) : null}
+              {expiredCount > 0 ? (
+                <span className="whitespace-nowrap">
+                  Tähtaeg ületatud:
+                  <strong className="ml-1 font-semibold text-danger">{String(expiredCount)}</strong>
+                </span>
+              ) : null}
+            </span>
+          )}
+        </span>
+      </div>
 
       <div className="mb-sm flex flex-wrap items-center gap-xs">
         {[
@@ -327,7 +415,11 @@ export default async function ServiceRequestsPage({
             key: 'status',
             label: 'Olek',
             render: (row) =>
-              row.respondedCount > 0 ? (
+              row.deadline === 'expired' ? (
+                <span className="rounded-pill bg-dangerLight px-2 py-0.5 text-label font-semibold text-danger">
+                  aegunud
+                </span>
+              ) : row.respondedCount > 0 ? (
                 <span className="rounded-pill bg-info-light px-2 py-0.5 text-label font-semibold text-info">
                   vastatud ({String(row.respondedCount)})
                 </span>
@@ -352,6 +444,7 @@ export default async function ServiceRequestsPage({
           },
         ]}
         rows={rows}
+        rowClassName={(row) => (row.deadline === 'expired' ? 'bg-dangerLight hover:bg-dangerLight' : '')}
         emptyLabel="Uusi päringuid ei ole — vormide esitamised ilmuvad siia."
       />
 
@@ -454,6 +547,48 @@ export default async function ServiceRequestsPage({
                   Saada valitud partneritele
                 </button>
               </form>
+
+              <div className="rounded-input border border-border bg-bg-mist p-sm">
+                <h3 className="mb-xs text-label font-semibold text-ink">Vastuste jälgimine</h3>
+                {responseTracking.length === 0 ? (
+                  <p className="text-bodySm text-ink-muted">
+                    Päring ei ole veel pakkujatele edastatud.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-left">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th scope="col" className="h-8 px-2 text-label font-semibold text-ink-muted">Pakuja</th>
+                          <th scope="col" className="h-8 px-2 text-label font-semibold text-ink-muted">Vastus</th>
+                          <th scope="col" className="h-8 px-2 text-label font-semibold text-ink-muted">Aeg</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {responseTracking.map((row) => (
+                          <tr key={row.partnerId} className="border-b border-border last:border-b-0">
+                            <td className="h-8 px-2 text-bodySm text-ink">{row.partnerName}</td>
+                            <td className="h-8 px-2 text-bodySm">
+                              {row.respondedAt ? (
+                                <span className="font-semibold text-info">Vastas</span>
+                              ) : row.state === 'expired' ? (
+                                <span className="font-semibold text-danger">
+                                  {`Ei vastanud — ${String(RESPONSE_WINDOW_DAYS)} päeva möödus`}
+                                </span>
+                              ) : (
+                                <span className="text-ctaHover">Ootab vastust</span>
+                              )}
+                            </td>
+                            <td className="h-8 px-2 text-bodySm text-ink">
+                              {formatDateTime(row.respondedAt ?? row.sentAt)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
 
               <div className="rounded-input border border-border bg-bg-mist p-sm">
                 <h3 className="mb-xs text-label font-semibold text-ink">Edastamise log</h3>

@@ -126,6 +126,36 @@ export function buildMinimizedForwardPayload(
   return minimized
 }
 
+/**
+ * Design 10: partners must respond within 7 days of the forward. From 5
+ * days on, the request counts as approaching the deadline; past 7 days
+ * without any response it is expired.
+ */
+export const RESPONSE_WINDOW_DAYS = 7
+export const RESPONSE_WINDOW_APPROACHING_DAYS = 5
+
+export type ResponseDeadlineState = 'pending' | 'approaching' | 'expired'
+
+export interface ResponseDeadlineInput {
+  /** Forward time; null for requests never sent to a partner. */
+  routedAt: string | null
+  /** First partner response; any response stops the deadline clock. */
+  respondedAt: string | null
+  nowMs: number
+}
+
+export function responseDeadlineState(
+  input: ResponseDeadlineInput,
+): ResponseDeadlineState | null {
+  if (input.respondedAt != null || input.routedAt == null) return null
+  const routedMs = Date.parse(input.routedAt)
+  if (Number.isNaN(routedMs)) return null
+  const elapsedDays = (input.nowMs - routedMs) / (24 * 3600 * 1000)
+  if (elapsedDays >= RESPONSE_WINDOW_DAYS) return 'expired'
+  if (elapsedDays >= RESPONSE_WINDOW_APPROACHING_DAYS) return 'approaching'
+  return 'pending'
+}
+
 export const ATTACHMENT_LINK_TTL_DAYS = 14
 
 export interface ForwardAttachmentLink {

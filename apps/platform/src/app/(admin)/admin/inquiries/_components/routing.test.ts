@@ -5,6 +5,7 @@ import {
   buildMinimizedForwardPayload,
   partnerServesRequest,
   rankRoutingCandidates,
+  responseDeadlineState,
   type RoutingPartnerInput,
 } from './routing'
 
@@ -143,6 +144,35 @@ describe('buildMinimizedForwardPayload', () => {
     const minimized = buildMinimizedForwardPayload(payload)
     expect(minimized.paper_copy).toBe(true)
     expect(minimized.cadastres).toEqual(['78402:003:0210'])
+  })
+})
+
+describe('responseDeadlineState', () => {
+  const now = Date.parse('2026-09-08T12:00:00.000Z')
+  const daysAgo = (days: number): string =>
+    new Date(now - days * 24 * 3600 * 1000).toISOString()
+
+  it('returns null before routing and once any partner responded', () => {
+    expect(responseDeadlineState({ routedAt: null, respondedAt: null, nowMs: now })).toBeNull()
+    expect(
+      responseDeadlineState({ routedAt: daysAgo(9), respondedAt: daysAgo(1), nowMs: now }),
+    ).toBeNull()
+  })
+
+  it('stays pending inside the first five days', () => {
+    expect(responseDeadlineState({ routedAt: daysAgo(4), respondedAt: null, nowMs: now })).toBe('pending')
+    expect(responseDeadlineState({ routedAt: daysAgo(5), respondedAt: null, nowMs: now })).toBe('approaching')
+  })
+
+  it('is expired from seven days without a response', () => {
+    expect(responseDeadlineState({ routedAt: daysAgo(7), respondedAt: null, nowMs: now })).toBe('expired')
+    expect(responseDeadlineState({ routedAt: daysAgo(10), respondedAt: null, nowMs: now })).toBe('expired')
+  })
+
+  it('ignores unparseable timestamps', () => {
+    expect(
+      responseDeadlineState({ routedAt: 'not-a-date', respondedAt: null, nowMs: now }),
+    ).toBeNull()
   })
 })
 
