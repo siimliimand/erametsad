@@ -230,10 +230,12 @@ export function salesByDay(
 ): Map<string, SalesDayTotals> {
   const from = windowStartMs(now, period)
   const merged = new Map<string, SalesDayTotals>()
+  const snapshotDays = new Set<string>()
   for (const snapshot of snapshots) {
     const time = parseTime(snapshot.date)
     if (time === null || time < from || time > now) continue
     const key = localDayKey(time)
+    snapshotDays.add(key)
     const totals = merged.get(key) ?? { count: 0, finalCents: 0 }
     totals.count += snapshot.count
     totals.finalCents += Math.round(snapshot.eur * 100)
@@ -242,8 +244,12 @@ export function salesByDay(
   for (const auction of auctions) {
     if (!isSold(auction) || !inWindow(auction.completedAt ?? '', from, now)) continue
     const key = localDayKey(parseTime(auction.completedAt ?? '') ?? now)
-    if (merged.has(key)) continue
-    merged.set(key, { count: 1, finalCents: auction.finalPriceCents ?? 0 })
+    if (snapshotDays.has(key)) continue
+    const existing = merged.get(key)
+    merged.set(key, {
+      count: (existing?.count ?? 0) + 1,
+      finalCents: (existing?.finalCents ?? 0) + (auction.finalPriceCents ?? 0),
+    })
   }
   return merged
 }
