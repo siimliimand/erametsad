@@ -156,3 +156,39 @@ export function groupLabel(groupId: string): string {
   if (groupId === UNGROUPED_GROUP_ID) return 'Muud tegevused'
   return auditActionGroups.find((group) => group.id === groupId)?.label ?? groupId
 }
+
+/**
+ * Entity-type labels for the audit list and detail drawer (same map the
+ * page used to carry; page files do not export helpers).
+ */
+const entityTypeLabels: Record<string, string> = {
+  user: 'Kasutaja',
+  auction: 'Oksjon',
+  bid: 'Pakkumine',
+  contract: 'Leping',
+  lead: 'Juhtlõim',
+  partner: 'Partner',
+  settings: 'Seaded',
+  article: 'Artikkel',
+  page: 'Leht',
+  redirect: 'Ümbersuunamine',
+  'company-access-request': 'Ettevõtte päring',
+  'service-request': 'Teenuse päring',
+  'contract-template': 'Lepingu mall',
+}
+
+export function entityTypeLabel(entityType: string | null): string {
+  if (!entityType) return '—'
+  return entityTypeLabels[entityType] ?? entityType
+}
+
+/**
+ * Actions whose recorded outcome is a refusal or a negative decision; the
+ * detail drawer's result chip renders these as "Keeldutud", everything
+ * else as "OK" (demo 14-audit-log result column).
+ */
+const DENY_AUDIT_ACTIONS: ReadonlySet<string> = new Set(['bid.reject', 'company.reject'])
+
+export function auditEntryDenies(action: string): boolean {
+  return DENY_AUDIT_ACTIONS.has(action)
+}
