@@ -1,11 +1,14 @@
+import { auctionObjectTypeLabels } from '../../../../_lib/labels'
+
 import type { AuditEntryDoc } from '@/lib/data/repositories'
 import type { AuctionObjectType } from '@/lib/data/schema'
 import { auctionObjectTypes } from '@/lib/data/schema'
 
-import { auctionObjectTypeLabels } from '../../../../_lib/labels'
 
 export interface SuspensionInfo {
   active: boolean
+  /** Permanent ban marker (user.ban audit entry); implies active. */
+  banned: boolean
   duration: string | null
   suspendedUntil: string | null
   reason: string | null
@@ -18,6 +21,7 @@ export interface RightAuditPayload {
   status?: unknown
   duration?: unknown
   suspendedUntil?: unknown
+  banned?: unknown
 }
 
 export function readPayload(after: unknown): RightAuditPayload {
@@ -33,10 +37,13 @@ export function asString(value: unknown): string | null {
 
 export function suspensionFromAudit(entries: AuditEntryDoc[]): SuspensionInfo {
   const latest = entries[0]
-  if (!latest) return { active: false, duration: null, suspendedUntil: null, reason: null, changedAt: null }
+  if (!latest) {
+    return { active: false, banned: false, duration: null, suspendedUntil: null, reason: null, changedAt: null }
+  }
   const payload = readPayload(latest.after)
   return {
     active: payload.status === 'suspended',
+    banned: payload.banned === true,
     duration: asString(payload.duration),
     suspendedUntil: asString(payload.suspendedUntil),
     reason: asString(payload.reason),
@@ -52,6 +59,8 @@ export function actionLabel(action: string): string {
       return 'Õigus tühistatud'
     case 'user.suspend':
       return 'Konto peatus'
+    case 'user.ban':
+      return 'Konto keelatud'
     default:
       return action
   }

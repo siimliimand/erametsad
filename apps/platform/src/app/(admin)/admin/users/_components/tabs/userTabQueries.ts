@@ -1,22 +1,22 @@
-import { listUserSessions } from '@/lib/auth/session'
-import type {
-  AuditEntryDoc,
-  CoreCollectionDocs,
-  CoreRepositories,
-  ProfileDoc,
-  UserDoc,
-} from '@/lib/data/repositories'
 
-import { maskIsikukood } from '../../../../_lib/labels'
 
-import type { AuctionRightRow } from './RightsTab'
 import type { BidRow } from './BidsTab'
 import type { ContractRow } from './ContractsTab'
 import type { IdentityTabUser, SessionRow } from './IdentityTab'
 import type { NotificationRow } from './NotificationsTab'
-import type { DataTabId } from './userTabs'
+import type { AuctionRightRow } from './RightsTab'
 import { suspensionFromAudit } from './userTabHelpers'
 import type { SuspensionInfo } from './userTabHelpers'
+import type { DataTabId } from './userTabs'
+import { maskIsikukood } from '../../../../_lib/labels'
+
+import { listUserSessions } from '@/lib/auth/session'
+import type {
+  AuditEntryDoc,
+  CoreRepositories,
+  ProfileDoc,
+  UserDoc,
+} from '@/lib/data/repositories'
 
 export type UserTabPayload =
   | { tab: 'identiteet'; user: IdentityTabUser; sessions: SessionRow[]; suspension: SuspensionInfo }
@@ -66,7 +66,7 @@ async function fetchRightsAuditEntries(
           { entityId: { equals: userId } },
           {
             action: {
-              in: ['user.right_grant', 'user.right_revoke', 'user.suspend'],
+              in: ['user.right_grant', 'user.right_revoke', 'user.suspend', 'user.ban'],
             },
           },
         ],

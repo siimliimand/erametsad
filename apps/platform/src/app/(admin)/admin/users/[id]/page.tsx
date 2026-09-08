@@ -6,9 +6,9 @@ import { PageHeader } from '../../../_components/PageHeader'
 import { requireAdminRepositories } from '../../../_lib/admin'
 import { userRoleLabels, userStatusLabels } from '../../../_lib/labels'
 import { can } from '../../../_lib/permissions'
+import { GdprTab } from '../_components/tabs/GdprTab'
 import { UserTabPanel } from '../_components/tabs/UserTabPanel'
 import { fetchUserTabPayload } from '../_components/tabs/userTabQueries'
-import type { UserTabPayload } from '../_components/tabs/userTabQueries'
 import { userTabLabels } from '../_components/tabs/userTabs'
 import type { UserTabId } from '../_components/tabs/userTabs'
 
@@ -16,14 +16,15 @@ import type { UserDoc } from '@/lib/data/repositories'
 
 export const metadata = { title: 'Kasutaja' }
 
-// The URL keeps the canonical five detail views; the drawer adds Teavitused
-// and GDPR on top of the same shared panels.
+// The URL keeps the canonical five detail views plus GDPR; the drawer adds
+// Teavitused on top of the same shared panels.
 const PAGE_TAB_IDS = [
   'identiteet',
   'profiilid',
   'oigused',
   'lepingud',
   'pakkumised',
+  'gdpr',
 ] as const satisfies readonly UserTabId[]
 
 const TABS = PAGE_TAB_IDS.map((id) => ({ id, label: userTabLabels[id] }))
@@ -97,7 +98,24 @@ export default async function UserDetailPage({
 
   const canWrite = can(session.role, 'users:write')
 
-  const payload: UserTabPayload | null = await fetchUserTabPayload(repositories, id, tab)
+  // GDPR has no data payload; the tab renders its audited server actions.
+  if (tab === 'gdpr') {
+    return (
+      <div>
+        {viga ? <ErrorNotice message={viga} /> : null}
+        {teade ? <SuccessNotice message={teade} /> : null}
+        <PageHeader
+          title={user.name ?? user.email}
+          description={`Kasutaja haldus · roll ${userRoleLabels[user.role]} · olek ${userStatusPillFor(user)}`}
+          backHref="/admin/users"
+        />
+        <DetailTabs userId={user.id} active={tab} />
+        <GdprTab userId={user.id} canWrite={canWrite} />
+      </div>
+    )
+  }
+
+  const payload = await fetchUserTabPayload(repositories, id, tab)
   if (!payload) notFound()
 
   return (

@@ -21,7 +21,6 @@ import {
 } from '../../../../_lib/labels'
 import { IsikukoodReveal } from '../IsikukoodReveal'
 import { suspendDurationLabels, suspendDurations } from '../suspend'
-
 import type { SuspensionInfo } from './userTabHelpers'
 
 const smallButtonClass =
@@ -101,11 +100,16 @@ export function IdentityTab({
 
         {suspension.active ? (
           <div className="rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
-            <p className="font-semibold">Konto on peatatud.</p>
+            <p className="font-semibold">
+              {suspension.banned ? 'Konto on keelatud.' : 'Konto on peatatud.'}
+            </p>
+            {suspension.banned ? (
+              <p>Sama isikukoodiga uute kontode loomine on blokeeritud. </p>
+            ) : null}
             <p>
-              {suspension.duration
+              {!suspension.banned && suspension.duration
                 ? `Kestus: ${suspendDurationLabels[suspension.duration as keyof typeof suspendDurationLabels]}.`
-                : 'Kestus: tähtajatu.'}{' '}
+                : null}{' '}
               {suspension.suspendedUntil
                 ? `Lõpeb: ${formatDateTime(suspension.suspendedUntil)}.`
                 : null}{' '}
@@ -115,7 +119,7 @@ export function IdentityTab({
         ) : null}
 
         {canWrite ? (
-          suspension.active ? (
+          suspension.active && !suspension.banned ? (
             <form
               action={resumeUserAction}
               className="mt-sm flex flex-wrap items-end gap-sm border-t border-border pt-md"

@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation'
 
 import { requireAdminRepositories } from '../_lib/admin'
 import { can, isStaffRole, type AdminPermission } from '../_lib/permissions'
+import { getMediaBucket } from '../admin/media/_lib/media-upload'
+import { buildGdprZip, bytesToBase64 } from '../admin/users/_components/gdpr-zip'
 import { isSuspendDuration, suspendedUntil } from '../admin/users/_components/suspend'
 
 import { verifyAccessToken } from '@/lib/auth/jwt'
@@ -14,6 +16,7 @@ import {
   createSession,
   getUserSession,
   revokeSession,
+  revokeUserSessions,
   writeSessionCookies,
 } from '@/lib/auth/session'
 import type { CoreRepositories, UserDoc } from '@/lib/data/repositories'
@@ -29,6 +32,25 @@ const AUDIT_SUSPEND = 'user.suspend'
 // Registry key from docs/design/admin/14-audit-log.md; `after.phase` splits
 // start from stop, `after.reason` carries the mandatory view reason.
 const AUDIT_IMPERSONATE = 'user.impersonate'
+
+// Registry key for the permanent ban; the registration guard treats an
+// existing `user.ban` entry on the isikukood-matched user as the ban marker.
+const AUDIT_BAN = 'user.ban'
+
+// Registry keys for the GDPR tools; the delete key covers anonymize with
+// retention (no row is removed, so `after.retentionUntil` carries the
+// 7-year accounting retention deadline).
+const AUDIT_GDPR_EXPORT = 'user.gdpr_export'
+const AUDIT_GDPR_DELETE = 'user.gdpr_delete'
+
+const GDPR_RETENTION_YEARS = 7
+
+/** Result shape for the client-invoked drawer actions (ban, GDPR tools). */
+export type UserActionResult = { ok: true; message: string } | { ok: false; error: string }
+
+function actionError(error: string): { ok: false; error: string } {
+  return { ok: false, error }
+}
 
 function readText(formData: FormData, key: string): string {
   const value = formData.get(key)
@@ -617,4 +639,330 @@ export async function stopImpersonationAction(): Promise<void> {
 
   clearSessionCookiesOnStore(await cookies())
   redirect('/login')
+}
+
+/**
+ * Permanently ban a portal user (demo 06-users "Keela kasutaja (Ban)").
+ * The users table has no dedicated status column, so the durable ban marker
+ * is the append-only `user.ban` audit entry: the registration guard reads it
+ * back by isikukood hash, and a second ban attempt fails on its existence.
+ * Account state reuses the suspend machinery (suspended status, paused
+ * autobidders, revoked sessions).
+ */
+export async function banUserAction(userId: string, reason: string): Promise<UserActionResult> {
+  const { session } = await requireAdminRepositories()
+  if (!can(session.role, 'users:write')) {
+    return actionError('Teil puudub õigus selle toimingu sooritamiseks.')
+  }
+  if (!userId) return actionError('Kasutaja identifikaator puudub.')
+  if (!hasMinReason(reason)) {
+    return actionError('Keelamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+  }
+
+  const repositories = await getRepositories()
+
+  const user = await repositories.findByID({ collection: 'users', id: userId })
+  if (!user) return actionError('Kasutajat ei leitud.')
+  if (isStaffRole(user.role)) {
+    return actionError('Töötaja konto keelamine ei ole lubatud.')
+  }
+
+  const existingBan = await repositories.find({
+    collection: 'audit-entry',
+    where: {
+      and: [
+        { entityType: { equals: 'user' } },
+        { entityId: { equals: userId } },
+        { action: { equals: AUDIT_BAN } },
+      ],
+    },
+    limit: 1,
+  })
+  if (existingBan.docs.length > 0) {
+    return actionError('Kasutaja konto on juba keelatud.')
+  }
+
+  const activeAutobidders = await repositories.find({
+    collection: 'autobidders',
+    where: {
+      and: [{ user: { equals: userId } }, { status: { equals: 'active' } }],
+    },
+    pagination: false,
+  })
+
+  let failure: string | null = null
+  try {
+    await repositories.update({
+      collection: 'users',
+      id: userId,
+      data: { status: 'suspended' },
+    })
+
+    for (const autobidder of activeAutobidders.docs) {
+      await repositories.update({
+        collection: 'autobidders',
+        id: autobidder.id,
+        data: { status: 'paused' },
+      })
+    }
+
+    await revokeUserSessions(userId)
+
+    await audit(repositories, {
+      actorId: session.userId,
+      action: AUDIT_BAN,
+      entityType: 'user',
+      entityId: userId,
+      before: { status: user.status, activeAutobidders: activeAutobidders.docs.length },
+      after: {
+        status: 'suspended',
+        banned: true,
+        reason,
+        autobiddersCancelled: activeAutobidders.docs.length,
+        registrationBlocked: true,
+      },
+    })
+
+    await notifyUser(repositories, {
+      userId,
+      event: AUDIT_BAN,
+      title: 'Teie konto on keelatud',
+      body: `Teie konto on keelatud ja uute kontode loomine sama isikukoodiga on blokeeritud. Põhjus: ${reason}`,
+      payload: { reason },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    return actionError(`Kasutaja keelamine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath('/admin/users')
+  revalidatePath(`/admin/users/${userId}`)
+  return { ok: true, message: 'Konto keelatud; sama isikukoodiga registreerimine on blokeeritud.' }
+}
+
+/**
+ * GDPR export (demo 06-users GDPR tab): profile, bids, contracts, rights,
+ * notifications and audit marks collected into a ZIP. The plaintext
+ * isikukood travels inside the ZIP only (the operator's own download);
+ * it never reaches the audit payload or logs. The archive is also stored
+ * in R2 (media bucket pattern) for retention; a missing binding in local
+ * dev degrades to download-only.
+ */
+export async function exportUserGdprAction(
+  userId: string,
+): Promise<{ ok: true; filename: string; base64: string } | { ok: false; error: string }> {
+  const { session } = await requireAdminRepositories()
+  if (!can(session.role, 'users:read')) {
+    return actionError('Teil puudub õigus selle toimingu sooritamiseks.')
+  }
+  if (!userId) return actionError('Kasutaja identifikaator puudub.')
+
+  const repositories = await getRepositories()
+
+  const user = await repositories.findByID({ collection: 'users', id: userId })
+  if (!user) return actionError('Kasutajat ei leitud.')
+
+  const [profiles, bids, contracts, rights, notifications, auditEntries] = await Promise.all([
+    repositories.find({ collection: 'profile', where: { user: { equals: userId } }, pagination: false }),
+    repositories.find({ collection: 'bids', where: { user: { equals: userId } }, pagination: false }),
+    repositories.find({ collection: 'contracts', where: { signedBy: { equals: userId } }, pagination: false }),
+    repositories.find({ collection: 'auction-rights', where: { user: { equals: userId } }, pagination: false }),
+    repositories.find({ collection: 'notifications', where: { user: { equals: userId } }, pagination: false }),
+    repositories.find({
+      collection: 'audit-entry',
+      where: {
+        and: [{ entityType: { equals: 'user' } }, { entityId: { equals: userId } }],
+      },
+      sort: '-createdAt',
+      pagination: false,
+    }),
+  ])
+
+  // Explicit projection: credential columns never leave the server and the
+  // decrypted isikukood is included once, as the data subject's own copy.
+  const userExport = {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    phone: user.phone,
+    role: user.role,
+    status: user.status,
+    authMethod: user.authMethod,
+    isikukood: user.isikukood ?? null,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  }
+
+  const json = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value, null, 2))
+  const entries = [
+    { name: 'kasutaja.json', data: json(userExport) },
+    { name: 'profiilid.json', data: json(profiles.docs) },
+    { name: 'pakkumised.json', data: json(bids.docs) },
+    { name: 'lepingud.json', data: json(contracts.docs) },
+    { name: 'oigused.json', data: json(rights.docs) },
+    { name: 'teavitused.json', data: json(notifications.docs) },
+    { name: 'audit.json', data: json(auditEntries.docs) },
+  ]
+  const zipBytes = buildGdprZip(entries)
+  const filename = `isikuandmed-${user.id}.zip`
+
+  // R2 archive copy follows the media bucket pattern; absence of the binding
+  // (local dev) degrades to download-only instead of failing the export.
+  let r2Key: string | null = null
+  let archived = false
+  try {
+    const bucket = await getMediaBucket()
+    if (bucket) {
+      r2Key = `gdpr-exports/${user.id}/${new Date().toISOString().replace(/[:.]/g, '-')}.zip`
+      const copy = new ArrayBuffer(zipBytes.byteLength)
+      new Uint8Array(copy).set(zipBytes)
+      await bucket.put(r2Key, copy, {
+        httpMetadata: { contentType: 'application/zip' },
+      })
+      archived = true
+    }
+  } catch {
+    archived = false
+  }
+
+  let failure: string | null = null
+  try {
+    await audit(repositories, {
+      actorId: session.userId,
+      action: AUDIT_GDPR_EXPORT,
+      entityType: 'user',
+      entityId: user.id,
+      after: {
+        format: 'zip',
+        files: entries.map((entry) => entry.name),
+        bytes: zipBytes.length,
+        ...(r2Key ? { r2Key } : {}),
+        archived,
+      },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    return actionError(`Eksportimise logimine ebaõnnestus: ${failure}`)
+  }
+
+  return { ok: true, filename, base64: bytesToBase64(zipBytes) }
+}
+
+/**
+ * GDPR anonymize with retention (demo 06-users "kustutamine / anonümiseerimine"):
+ * the users row survives so contract and billing references stay intact for
+ * the 7-year accounting retention, while every personal field is removed or
+ * masked and the account becomes unusable. The retention deadline is recorded
+ * in the `user.gdpr_delete` audit entry.
+ */
+export async function anonymizeUserAction(userId: string, reason: string): Promise<UserActionResult> {
+  const { session } = await requireAdminRepositories()
+  if (!can(session.role, 'users:write')) {
+    return actionError('Teil puudub õigus selle toimingu sooritamiseks.')
+  }
+  if (!userId) return actionError('Kasutaja identifikaator puudub.')
+  if (!hasMinReason(reason)) {
+    return actionError('Anonüümiseerimise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+  }
+
+  const repositories = await getRepositories()
+
+  const user = await repositories.findByID({ collection: 'users', id: userId })
+  if (!user) return actionError('Kasutajat ei leitud.')
+  // Anonymizing a staff account would erase audit-chain actor identities.
+  if (isStaffRole(user.role)) {
+    return actionError('Töötaja konto anonüümiseerimine ei ole lubatud.')
+  }
+
+  const existingDelete = await repositories.find({
+    collection: 'audit-entry',
+    where: {
+      and: [
+        { entityType: { equals: 'user' } },
+        { entityId: { equals: userId } },
+        { action: { equals: AUDIT_GDPR_DELETE } },
+      ],
+    },
+    limit: 1,
+  })
+  if (existingDelete.docs.length > 0) {
+    return actionError('Kasutaja konto on juba anonüümiseeritud.')
+  }
+
+  const { docs: profiles } = await repositories.find({
+    collection: 'profile',
+    where: { user: { equals: userId } },
+    pagination: false,
+  })
+
+  const anonymizedAt = new Date()
+  const retentionUntil = new Date(anonymizedAt)
+  retentionUntil.setFullYear(retentionUntil.getFullYear() + GDPR_RETENTION_YEARS)
+
+  let failure: string | null = null
+  try {
+    await revokeUserSessions(userId)
+
+    // The masked address keeps the unique email index satisfied without
+    // carrying personal data; credential and isikukood columns are cleared.
+    await repositories.update({
+      collection: 'users',
+      id: userId,
+      data: {
+        email: `anonymized-${userId}@gdpr.invalid`,
+        name: null,
+        phone: null,
+        status: 'suspended',
+        passwordHash: null,
+        passwordSalt: null,
+        isikukoodEncrypted: null,
+        isikukoodIv: null,
+        isikukoodAuthTag: null,
+        isikukoodHash: null,
+      },
+    })
+
+    for (const profile of profiles) {
+      await repositories.update({
+        collection: 'profile',
+        id: profile.id,
+        data: { displayName: 'Anonümiseeritud', phone: null },
+      })
+    }
+
+    await audit(repositories, {
+      actorId: session.userId,
+      action: AUDIT_GDPR_DELETE,
+      entityType: 'user',
+      entityId: userId,
+      before: { status: user.status, personalData: true },
+      after: {
+        status: 'suspended',
+        personalData: false,
+        reason,
+        anonymizedAt: anonymizedAt.toISOString(),
+        retentionUntil: retentionUntil.toISOString(),
+        profilesAnonymized: profiles.length,
+      },
+    })
+
+    // No user notification: the account is unusable and the address masked,
+    // so there is nobody left to deliver it to.
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    return actionError(`Anonüümiseerimine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath('/admin/users')
+  revalidatePath(`/admin/users/${userId}`)
+  return {
+    ok: true,
+    message: 'Kasutaja anonüümiseeritud; arvestuslikud andmed säilitatakse 7 aastat.',
+  }
 }

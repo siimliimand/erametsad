@@ -1,3 +1,4 @@
+import { actionLabel, asString, objectTypeLabel, readPayload } from './userTabHelpers'
 import {
   grantAuctionRightAction,
   revokeAuctionRightAction,
@@ -12,7 +13,6 @@ import { auctionObjectTypeLabels, formatDateTime } from '../../../../_lib/labels
 import type { CoreCollectionDocs, AuditEntryDoc } from '@/lib/data/repositories'
 import { auctionObjectTypes } from '@/lib/data/schema'
 
-import { actionLabel, asString, objectTypeLabel, readPayload } from './userTabHelpers'
 
 const smallButtonClass =
   'inline-flex h-8 items-center rounded-button border border-border bg-bgPage px-3 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-danger hover:text-danger'

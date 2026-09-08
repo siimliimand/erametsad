@@ -4,7 +4,6 @@ import { IdentityTab } from './IdentityTab'
 import { NotificationsTab } from './NotificationsTab'
 import { ProfilesTab } from './ProfilesTab'
 import { RightsTab } from './RightsTab'
-
 import type { UserTabPayload } from './userTabQueries'
 
 // The one renderer both hosts share: the detail page and the list drawer

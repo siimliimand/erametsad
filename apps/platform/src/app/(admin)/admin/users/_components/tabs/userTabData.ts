@@ -1,11 +1,11 @@
 'use server'
 
-import { requireAdminRepositories } from '../../../../_lib/admin'
-import { can } from '../../../../_lib/permissions'
 
 import { fetchUserTabPayload } from './userTabQueries'
 import type { UserTabResult } from './userTabQueries'
 import type { DataTabId } from './userTabs'
+import { requireAdminRepositories } from '../../../../_lib/admin'
+import { can, isStaffRole } from '../../../../_lib/permissions'
 
 /**
  * Drawer data loader: same fetch path as the detail page (fetchUserTabPayload),
@@ -22,4 +22,50 @@ export async function loadUserTabData(userId: string, tab: DataTabId): Promise<U
     throw new Error('Kasutajat ei leitud.')
   }
   return { canWrite: can(session.role, 'users:write'), payload }
+}
+
+export interface UserActionState {
+  canWrite: boolean
+  /** Staff targets reject impersonation and ban server-side. */
+  staffTarget: boolean
+  /** Durable ban marker exists (append-only user.ban audit entry). */
+  banned: boolean
+  status: 'active' | 'suspended'
+}
+
+/**
+ * Drawer action context for the footer controls (impersonate, ban): loaded
+ * per open so the list row alone never decides what the operator may do.
+ * The ban check runs only for suspended users, the only state a ban leaves.
+ */
+export async function loadUserActionState(userId: string): Promise<UserActionState> {
+  const { session, repositories } = await requireAdminRepositories()
+  if (!can(session.role, 'users:read')) {
+    throw new Error('Kasutaja detaili vaatamise õigus puudub.')
+  }
+  const user = await repositories.findByID({ collection: 'users', id: userId })
+  if (!user) {
+    throw new Error('Kasutajat ei leitud.')
+  }
+  let banned = false
+  if (user.status === 'suspended') {
+    const { docs } = await repositories.find({
+      collection: 'audit-entry',
+      where: {
+        and: [
+          { entityType: { equals: 'user' } },
+          { entityId: { equals: userId } },
+          { action: { equals: 'user.ban' } },
+        ],
+      },
+      limit: 1,
+    })
+    banned = docs.length > 0
+  }
+  return {
+    canWrite: can(session.role, 'users:write'),
+    staffTarget: isStaffRole(user.role),
+    banned,
+    status: user.status,
+  }
 }
