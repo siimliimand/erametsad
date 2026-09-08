@@ -3,15 +3,13 @@ import type { ReactNode } from 'react'
 import { IntegrationKeys } from './IntegrationKeys'
 import { MaintenanceMode } from './MaintenanceMode'
 import { RoleMatrix } from './RoleMatrix'
-import { updateSettingsAction } from '../../../_actions/content'
+import { SettingsSaveForm } from './SettingsSaveForm'
 import {
   FormField,
   FormSelectField,
   FormTextareaField,
-  primaryButtonClass,
 } from '../../../_components/FormField'
 import { TriangleAlertIcon } from '../../../_components/icons'
-import { CheckboxField } from '../../content/_components/CheckboxField'
 import { FeeChangeBanner } from '../../content/_components/FeeChangeBanner'
 import {
   readAuctionDefaults,
@@ -64,42 +62,6 @@ function SettingsSection({
   )
 }
 
-function SectionForm({
-  section,
-  children,
-}: {
-  section: string
-  children: ReactNode
-}) {
-  return (
-    <form
-      action={updateSettingsAction}
-      className="border-b border-border last:border-b-0"
-    >
-      <input type="hidden" name="section" value={section} />
-      <div className="space-y-sm px-md py-sm">
-        {children}
-        <FormTextareaField
-          id={`reason-${section}`}
-          label="Põhjendus (kohustuslik)"
-          name="reason"
-          rows={2}
-          required
-          hint="Vähemalt 5 tähemärki. Salvestus koos põhjendusega logitakse auditisse."
-        />
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-sm border-t border-border px-md py-sm">
-        <p className="text-label text-inkMuted">
-          Muudatused logitakse auditilogisse
-        </p>
-        <button type="submit" className={primaryButtonClass}>
-          Salvesta
-        </button>
-      </div>
-    </form>
-  )
-}
-
 export function SettingsForm({
   settings,
 }: {
@@ -136,7 +98,7 @@ export function SettingsForm({
 
         <div className="flex min-w-0 flex-col gap-lg">
           <SettingsSection id="sec-platvorm" title="Platvorm">
-            <SectionForm section="uldine">
+            <SettingsSaveForm section="uldine">
               <FormField
                 label="Organisatsiooni nimi"
                 name="orgName"
@@ -154,9 +116,9 @@ export function SettingsForm({
                   defaultValue={settings?.orgAddress ?? ''}
                 />
               </div>
-            </SectionForm>
+            </SettingsSaveForm>
             <MaintenanceMode enabled={settings?.maintenanceEnabled ?? false} />
-            <SectionForm section="lipud">
+            <SettingsSaveForm section="lipud">
               <h3 className="text-label font-semibold text-ink">
                 Funktsioonide lipud
               </h3>
@@ -167,11 +129,19 @@ export function SettingsForm({
                 hint='Näiteks {"requireFrameworkContract": true}. Oksjonite vaikesätted (auctionDefaults) hallatakse Oksjonite reeglite rubriigis.'
                 defaultValue={featureFlagsText}
               />
-            </SectionForm>
+            </SettingsSaveForm>
           </SettingsSection>
 
           <SettingsSection id="sec-reeglid" title="Oksjonite reeglid">
-            <SectionForm section="oksjonid">
+            <SettingsSaveForm
+              section="oksjonid"
+              switchField={{
+                name: 'alapakkumineEnabled',
+                label: 'Alapakkumine lubatud',
+                hint: 'Vaikeolek uutele lottidele. Lepingu sõlmimise tingimus: nõuab raamlepingut.',
+                checked: settings?.alapakkumineEnabled ?? true,
+              }}
+            >
               <FormField
                 label="Anti-snipe vaikeaeg (min)"
                 name="antiSnipeDurationMinutes"
@@ -182,12 +152,6 @@ export function SettingsForm({
                 required
                 hint="Vahemikus 1–30 minutit. Vaikeväärtus uutele lottidele; olemasolevad lotid säilitavad oma väärtuse."
                 defaultValue={settings?.antiSnipeDurationMinutes ?? 5}
-              />
-              <CheckboxField
-                label="Alapakkumine lubatud"
-                name="alapakkumineEnabled"
-                hint="Vaikeolek uutele lottidele. Lepingu sõlmimise tingimus: nõuab raamlepingut."
-                defaultChecked={settings?.alapakkumineEnabled ?? true}
               />
               <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
                 <FormField
@@ -235,11 +199,11 @@ export function SettingsForm({
                   defaultValue={auctionDefaults.sealedApproverRole}
                 />
               </div>
-            </SectionForm>
+            </SettingsSaveForm>
           </SettingsSection>
 
           <SettingsSection id="sec-tasud" title="Teenustasud">
-            <SectionForm section="tasud">
+            <SettingsSaveForm section="tasud">
               <FeeChangeBanner />
               <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
                 <FormField
@@ -264,7 +228,7 @@ export function SettingsForm({
                   defaultValue={settings?.vatPercent ?? 22}
                 />
               </div>
-            </SectionForm>
+            </SettingsSaveForm>
           </SettingsSection>
 
           <SettingsSection id="sec-paringud" title="Teenuse päringud">
