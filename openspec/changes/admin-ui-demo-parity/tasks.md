@@ -46,14 +46,14 @@
 - [x] 6.2 Autobidder duel collapse: group rapid autobid bursts behind an expandable row <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx] -->
 - [x] 6.3 Bidder reveal chips in the live feed, reusing the audited identity unmask action <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx, apps/platform/src/app/(admin)/admin/bids/_actions/**] -->
 - [x] 6.4 Anomalies panel: heuristics module (new-account burst, rapid overtake), internal-review audit flag, shill card UI <!-- agent: fullstack-engineer.build, depends_on: [6.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/_lib/anomalies.ts, apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/bid-monitor.tsx] -->
-- [ ] 6.5 Tests: duel grouping, heuristic thresholds, reveal audit entry <!-- agent: fullstack-engineer.build, depends_on: [6.2, 6.3, 6.4], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/__tests__/**] -->
+- [x] 6.5 Tests: duel grouping, heuristic thresholds, reveal audit entry <!-- agent: fullstack-engineer.build, depends_on: [6.2, 6.3, 6.4], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/monitor/__tests__/**] -->
 
 ## 7. Ceremony visuals
 
 - [x] 7.1 Amber audit banner, toast adoption, dark danger button parity <!-- agent: fullstack-engineer.build, depends_on: [1.4], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/**] -->
 - [x] 7.2 Reveal presentation: blurred table with veil before reveal, staggered row reveal, reduced-motion fallback <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/reveal-panel.tsx] -->
 - [x] 7.3 Live audit strip: sealed-event audit lines for the auction, refreshed on SSE events <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/ceremony-checklist.tsx, apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/_lib/**] -->
-- [ ] 7.4 Ceremony tests <!-- agent: fullstack-engineer.build, depends_on: [7.2, 7.3], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/__tests__/**] -->
+- [x] 7.4 Ceremony tests <!-- agent: fullstack-engineer.build, depends_on: [7.2, 7.3], touches: [apps/platform/src/app/(admin)/admin/auctions/[id]/ceremony/__tests__/**] -->
 
 ## 8. Users, rights, impersonation, GDPR
 
@@ -67,12 +67,12 @@
 ## 9. Companies approvals polish
 
 - [x] 9.1 Demo card layout on /admin/companies: two-panel comparison, wait badges, decision notes, rights-selection modal via primitives <!-- agent: fullstack-engineer.build, depends_on: [2.1, 1.4], touches: [apps/platform/src/app/(admin)/admin/companies/**] -->
-- [ ] 9.2 Tests: decision flow, badge countdown, modal rights capture <!-- agent: fullstack-engineer.build, depends_on: [9.1], touches: [apps/platform/src/app/(admin)/admin/companies/__tests__/**] -->
+- [x] 9.2 Tests: decision flow, badge countdown, modal rights capture <!-- agent: fullstack-engineer.build, depends_on: [9.1], touches: [apps/platform/src/app/(admin)/admin/companies/__tests__/**] -->
 
 ## 10. Contracts visuals
 
 - [x] 10.1 Template card grid: version chips, expandable version history, active/draft pills <!-- agent: fullstack-engineer.build, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/admin/contracts/templates/page.tsx] -->
-- [ ] 10.2 Editor modal: clickable placeholder chips inserting at cursor for HTML/TXT templates, test-render button reusing HtmlPreviewDrawer <!-- agent: fullstack-engineer.build, depends_on: [1.2, 10.1], touches: [apps/platform/src/app/(admin)/admin/contracts/_components/**] -->
+- [x] 10.2 Editor modal: clickable placeholder chips inserting at cursor for HTML/TXT templates, test-render button reusing HtmlPreviewDrawer <!-- agent: fullstack-engineer.build, depends_on: [1.2, 10.1], touches: [apps/platform/src/app/(admin)/admin/contracts/_components/**] -->
 - [x] 10.3 Contract list glyph pills and status parity via the unified chip <!-- agent: fullstack-engineer.fast, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/admin/contracts/page.tsx] -->
 - [ ] 10.4 Tests <!-- agent: fullstack-engineer.build, depends_on: [10.2, 10.3], touches: [apps/platform/src/app/(admin)/admin/contracts/_components/__tests__/**] -->
 
@@ -80,7 +80,7 @@
 
 - [x] 11.1 Requests: 7-day-rule info strip, expired-row tint, response-tracking table in the routing drawer <!-- agent: fullstack-engineer.build, depends_on: [2.2], touches: [apps/platform/src/app/(admin)/admin/inquiries/**] -->
 - [x] 11.2 Leads: keyboard move menu, card menu, demo-parity card metadata <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/leads/_components/LeadsKanban.tsx] -->
-- [ ] 11.3 Tests <!-- agent: fullstack-engineer.build, depends_on: [11.1, 11.2], touches: [apps/platform/src/app/(admin)/admin/leads/**/__tests__/**, apps/platform/src/app/(admin)/admin/inquiries/**/__tests__/**] -->
+- [x] 11.3 Tests <!-- agent: fullstack-engineer.build, depends_on: [11.1, 11.2], touches: [apps/platform/src/app/(admin)/admin/leads/**/__tests__/**, apps/platform/src/app/(admin)/admin/inquiries/**/__tests__/**] -->
 
 ## 12. CMS block builder
 
