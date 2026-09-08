@@ -15,7 +15,7 @@ CREATE TABLE `__new_contract_templates` (
 	CONSTRAINT "contract_templates_source_format_check" CHECK("__new_contract_templates"."source_format" IN ('html', 'txt'))
 );
 --> statement-breakpoint
-INSERT INTO `__new_contract_templates`("id", "name", "type", "version", "placeholders", "docx_file_id", "source_content", "source_format", "active", "created_at", "updated_at") SELECT "id", "name", "type", "version", "placeholders", "docx_file_id", "source_content", "source_format", "active", "created_at", "updated_at" FROM `contract_templates`;--> statement-breakpoint
+INSERT INTO `__new_contract_templates`("id", "name", "type", "version", "placeholders", "docx_file_id", "source_content", "source_format", "active", "created_at", "updated_at") SELECT "id", "name", "type", "version", "placeholders", "docx_file_id", NULL, NULL, "active", "created_at", "updated_at" FROM `contract_templates`;--> statement-breakpoint
 DROP TABLE `contract_templates`;--> statement-breakpoint
 ALTER TABLE `__new_contract_templates` RENAME TO `contract_templates`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint

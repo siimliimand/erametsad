@@ -3,16 +3,19 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { ToastProvider } from '@/app/(admin)/_components/ui/Toast'
 import { TemplateEditorModal } from '../TemplateEditorModal'
 
 const actions = vi.hoisted(() => ({
   testRender: vi.fn((_id: string) =>
     Promise.resolve({ ok: true, html: '<p>Tere, Test Testov</p>', error: null }),
   ),
+  saveTemplateDraft: vi.fn((_formData: FormData): Promise<void> => Promise.resolve()),
 }))
 
 vi.mock('@/app/(admin)/_actions/contracts', () => ({
   testRenderTemplateAction: actions.testRender,
+  saveTemplateDraftAction: actions.saveTemplateDraft,
 }))
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -21,18 +24,27 @@ vi.mock('@/app/(admin)/_actions/contracts', () => ({
 let container: HTMLDivElement
 let root: Root
 
-async function mountEditor(): Promise<void> {
+interface EditorMountProps {
+  templateId?: string
+  initialSourceContent?: string | null
+  initialSourceFormat?: 'html' | 'txt' | null
+  nextVersion?: string
+}
+
+async function mountEditor(props: EditorMountProps = {}, withToast = false): Promise<void> {
   await act(async () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
-    root.render(
-      createElement(TemplateEditorModal, {
-        templateId: 'tpl-1',
-        name: 'Raamleping',
-        version: '3.1',
-      }),
-    )
+    const editor = createElement(TemplateEditorModal, {
+      templateId: props.templateId ?? 'tpl-1',
+      name: 'Raamleping',
+      version: '3.1',
+      initialSourceContent: props.initialSourceContent ?? null,
+      initialSourceFormat: props.initialSourceFormat ?? null,
+      ...(props.nextVersion === undefined ? {} : { nextVersion: props.nextVersion }),
+    })
+    root.render(withToast ? createElement(ToastProvider, null, editor) : editor)
     await Promise.resolve()
   })
 }
@@ -46,6 +58,7 @@ afterEach(() => {
   document.body.textContent = ''
   document.body.style.overflow = ''
   actions.testRender.mockClear()
+  actions.saveTemplateDraft.mockClear()
 })
 
 function dialog(): HTMLElement {
@@ -134,6 +147,38 @@ async function openEditor(): Promise<void> {
   await click(buttonByLabel('Muuda redaktoris'))
 }
 
+function versionInput(): HTMLInputElement {
+  // The footer "Uus versioon" input is the only input inside the dialog.
+  const el = dialog().querySelector<HTMLInputElement>('input')
+  if (el === null) throw new Error('version input not found')
+  return el
+}
+
+async function setVersion(value: string): Promise<void> {
+  const input = versionInput()
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      input,
+      value,
+    )
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await Promise.resolve()
+  })
+}
+
+function toastRegion(): HTMLElement {
+  const el = document.body.querySelector<HTMLElement>('[role="status"]')
+  if (el === null) throw new Error('toast region not found')
+  return el
+}
+
+/** Mirrors the NEXT_REDIRECT digest a redirecting server action rejects with. */
+function nextRedirect(url: string): Error {
+  const error = new Error(`NEXT_REDIRECT:${url}`) as Error & { digest: string }
+  error.digest = `NEXT_REDIRECT;replace;${url};307`
+  return error
+}
+
 describe('TemplateEditorModal opening', () => {
   it('opens from the trigger with a 720px dialog titled by template and version', async () => {
     await mountEditor()
@@ -219,5 +264,122 @@ describe('TemplateEditorModal test render', () => {
     const preview = drawer()
     const frame = preview.querySelector('iframe')
     expect(frame?.getAttribute('srcdoc')).toBe('<p>Tere, Test Testov</p>')
+  })
+})
+
+describe('TemplateEditorModal head source reload', () => {
+  it('opens pre-filled with the head source and the suggested next version', async () => {
+    await mountEditor({
+      initialSourceContent: '<p>Raamlepingu lähtetekst</p>',
+      initialSourceFormat: 'html',
+      nextVersion: '3.2',
+    })
+    await openEditor()
+    expect(editorTextarea().value).toBe('<p>Raamlepingu lähtetekst</p>')
+    expect(versionInput().value).toBe('3.2')
+  })
+
+  it('reloads the head source fresh after reopening, discarding draft edits', async () => {
+    await mountEditor({
+      initialSourceContent: '<p>Päise tekst</p>',
+      initialSourceFormat: 'txt',
+      nextVersion: '3.2',
+    })
+    await openEditor()
+    await setDraft('<p>Muudetud mustand</p>', 5)
+    expect(editorTextarea().value).toBe('<p>Muudetud mustand</p>')
+    await click(buttonByLabel('Sulge', dialog()))
+    await openEditor()
+    expect(editorTextarea().value).toBe('<p>Päise tekst</p>')
+    expect(versionInput().value).toBe('3.2')
+  })
+})
+
+describe('TemplateEditorModal chip insertion across reopen', () => {
+  it('inserts chips in both sessions starting from the reloaded head source', async () => {
+    await mountEditor({ initialSourceContent: 'Lepingu tekst', nextVersion: '3.2' })
+    await openEditor()
+    await setDraft('Lepingu tekst', 8)
+    await click(chip('bid.amount'))
+    await nextFrame()
+    expect(editorTextarea().value).toBe('Lepingu {{bid.amount}}tekst')
+
+    await click(buttonByLabel('Sulge', dialog()))
+    await openEditor()
+    expect(editorTextarea().value).toBe('Lepingu tekst')
+    await setDraft('Lepingu tekst', 0)
+    await click(chip('lot.id'))
+    await nextFrame()
+    expect(editorTextarea().value).toBe('{{lot.id}}Lepingu tekst')
+  })
+})
+
+describe('TemplateEditorModal save flow', () => {
+  it('submits id, source, format and version, then closes with a success toast', async () => {
+    await mountEditor(
+      {
+        initialSourceContent: '<p>Päise tekst</p>',
+        initialSourceFormat: 'html',
+        nextVersion: '3.2',
+      },
+      true,
+    )
+    await openEditor()
+    await setDraft('<p>Uus lähtetekst</p>', 5)
+    actions.saveTemplateDraft.mockRejectedValueOnce(
+      nextRedirect('/admin/contracts/templates?teade=Mustand%20salvestatud%20(versioon%203.2).'),
+    )
+
+    await click(buttonByLabel('Salvesta', dialog()))
+    await flushTransitions()
+
+    expect(actions.saveTemplateDraft).toHaveBeenCalledTimes(1)
+    const submitted = actions.saveTemplateDraft.mock.calls[0]?.[0] as FormData
+    expect(submitted.get('id')).toBe('tpl-1')
+    expect(submitted.get('sourceContent')).toBe('<p>Uus lähtetekst</p>')
+    expect(submitted.get('sourceFormat')).toBe('html')
+    expect(submitted.get('version')).toBe('3.2')
+    expect(dialogCount()).toBe(0)
+    expect(toastRegion().textContent).toContain('Mustand salvestatud (versioon 3.2).')
+  })
+
+  it('keeps the modal open and shows the server error toast on a ?viga redirect', async () => {
+    await mountEditor(
+      {
+        initialSourceContent: '<p>Päise tekst</p>',
+        initialSourceFormat: 'html',
+        nextVersion: '3.2',
+      },
+      true,
+    )
+    await openEditor()
+    actions.saveTemplateDraft.mockRejectedValueOnce(
+      nextRedirect(
+        '/admin/contracts/templates?viga=Versioon%20%223.2%22%20on%20selle%20malli%20jaoks%20juba%20kasutusel.',
+      ),
+    )
+
+    await click(buttonByLabel('Salvesta', dialog()))
+    await flushTransitions()
+
+    expect(actions.saveTemplateDraft).toHaveBeenCalledTimes(1)
+    expect(dialogCount()).toBe(1)
+    expect(editorTextarea().value).toBe('<p>Päise tekst</p>')
+    const region = toastRegion().textContent ?? ''
+    expect(region).toContain('Mustandi salvestamine ebaõnnestus.')
+    expect(region).toContain('Versioon "3.2" on selle malli jaoks juba kasutusel.')
+  })
+
+  it('keeps the modal open when the action fails without a redirect digest', async () => {
+    await mountEditor({ nextVersion: '3.2' }, true)
+    await openEditor()
+    await setDraft('Lähtetekst', 5)
+    actions.saveTemplateDraft.mockRejectedValueOnce(new Error('võrgu viga'))
+
+    await click(buttonByLabel('Salvesta', dialog()))
+    await flushTransitions()
+
+    expect(dialogCount()).toBe(1)
+    expect(toastRegion().textContent).toContain('Mustandi salvestamine ebaõnnestus.')
   })
 })
