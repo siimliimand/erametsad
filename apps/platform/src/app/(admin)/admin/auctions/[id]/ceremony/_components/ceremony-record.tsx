@@ -10,7 +10,7 @@ import { formatDateTime } from '../../../../../_lib/labels'
 export function CeremonyRecord({ context }: { context: SealedCeremonyContext }) {
   return (
     <section className="space-y-md">
-      <div className="rounded-card border border-l-4 border-info bg-info-light p-md">
+      <div className="rounded-card border border-l-4 border-info bg-infoLight p-md">
         <h2 className="mb-xs font-heading text-h4 font-bold text-info">
           Tseremoonia protokoll (kirjutuskaitstud)
         </h2>
@@ -23,7 +23,7 @@ export function CeremonyRecord({ context }: { context: SealedCeremonyContext }) 
         <h3 className="mb-sm font-heading text-h4 font-bold text-ink">Allkirjad</h3>
         <dl className="grid grid-cols-1 gap-xs sm:grid-cols-2">
           <div className="rounded-input border border-border bg-bgMist px-md py-sm">
-            <dt className="text-label font-semibold text-ink-muted">Avaja</dt>
+            <dt className="text-label font-semibold text-inkMuted">Avaja</dt>
             <dd className="mt-1 text-bodySm text-ink">
               {context.opener !== null ? (
                 <>
@@ -36,7 +36,7 @@ export function CeremonyRecord({ context }: { context: SealedCeremonyContext }) 
             </dd>
           </div>
           <div className="rounded-input border border-border bg-bgMist px-md py-sm">
-            <dt className="text-label font-semibold text-ink-muted">Kinnitaja</dt>
+            <dt className="text-label font-semibold text-inkMuted">Kinnitaja</dt>
             <dd className="mt-1 text-bodySm text-ink">
               {context.approver !== null ? (
                 <>
@@ -50,7 +50,7 @@ export function CeremonyRecord({ context }: { context: SealedCeremonyContext }) 
           </div>
         </dl>
         {context.signaturesExpired ? (
-          <p className="mt-sm text-bodySm text-ink-muted">Allkirjade kehtivusaeg on lõppenud.</p>
+          <p className="mt-sm text-bodySm text-inkMuted">Allkirjade kehtivusaeg on lõppenud.</p>
         ) : null}
       </section>
 
@@ -58,13 +58,13 @@ export function CeremonyRecord({ context }: { context: SealedCeremonyContext }) 
         <h3 className="mb-sm font-heading text-h4 font-bold text-ink">Paljastus</h3>
         {context.revealed ? (
           <>
-            <p className="mb-sm text-bodySm text-ink-muted">
+            <p className="mb-sm text-bodySm text-inkMuted">
               Paljastatud: {formatDateTime(context.revealedAt)}
             </p>
             <RevealRecord bids={context.bids} topMeetsReserve={context.topMeetsReserve} />
           </>
         ) : (
-          <p className="text-bodySm text-ink-muted">Pakkumisi ei paljastatud.</p>
+          <p className="text-bodySm text-inkMuted">Pakkumisi ei paljastatud.</p>
         )}
       </section>
 
@@ -76,7 +76,7 @@ export function CeremonyRecord({ context }: { context: SealedCeremonyContext }) 
             {context.winnerConfirmed ? (
               <span className="font-semibold text-primary">jah</span>
             ) : (
-              <span className="text-ink-muted">ei</span>
+              <span className="text-inkMuted">ei</span>
             )}
           </li>
           <li>
@@ -84,7 +84,7 @@ export function CeremonyRecord({ context }: { context: SealedCeremonyContext }) 
             {context.voided ? (
               <span className="font-semibold text-danger">jah — kuulutatud müümata</span>
             ) : (
-              <span className="text-ink-muted">ei</span>
+              <span className="text-inkMuted">ei</span>
             )}
           </li>
         </ul>

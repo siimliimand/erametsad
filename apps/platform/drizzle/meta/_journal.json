@@ -78,6 +78,27 @@
       "when": 1788629172040,
       "tag": "0010_stiff_outlaw_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1788791732568,
+      "tag": "0011_medical_sway",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788792907311,
+      "tag": "0012_minor_joseph",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1788794161071,
+      "tag": "0013_certain_masque",
+      "breakpoints": true
     }
   ]
 }

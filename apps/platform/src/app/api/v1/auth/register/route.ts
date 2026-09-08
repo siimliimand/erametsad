@@ -3,10 +3,12 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 
+import { isikukoodBanError } from '@/app/(portal)/_actions/register/ban-guard'
 import { createSession, setSessionCookies } from '@/lib/auth/session'
 import type { CreateDataFor } from '@/lib/data/repositories/registry'
 import { getRepositories } from '@/lib/data/runtime'
 import { authRateLimiter } from '@/lib/rate-limit'
+
 
 export async function POST(request: NextRequest) {
   const forwarded = request.headers.get('x-forwarded-for') ?? 'global'
@@ -87,6 +89,15 @@ export async function POST(request: NextRequest) {
   }
 
   const repos = await getRepositories()
+
+  // Banned identities (permanent `user.ban` audit mark) get a neutral
+  // rejection before any account row is created.
+  if (isikukood) {
+    const banError = await isikukoodBanError(repos, isikukood)
+    if (banError) {
+      return NextResponse.json({ error: banError }, { status: 403 })
+    }
+  }
 
   const userData: Record<string, unknown> = {
     email: identifier,

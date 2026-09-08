@@ -1,7 +1,18 @@
+import { drizzle } from 'drizzle-orm/d1'
 import Link from 'next/link'
 
-import { auditActionGroups, groupForAction, groupLabel, UNGROUPED_GROUP_ID } from './_components/action-registry'
-import { AuditDiff } from '../../_components/AuditDiff'
+import {
+  AuditDrawerProvider,
+  OpenAuditEntryButton,
+  type AuditDrawerEntry,
+} from './_components/AuditDrawer'
+import {
+  auditActionGroups,
+  entityTypeLabel,
+  groupForAction,
+  groupLabel,
+  UNGROUPED_GROUP_ID,
+} from './_components/action-registry'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import { PageHeader } from '../../_components/PageHeader'
@@ -9,19 +20,21 @@ import { requireAdminRepositories } from '../../_lib/admin'
 import { formatDateTime, userRoleLabels } from '../../_lib/labels'
 import { can, staffRoles, type StaffRole } from '../../_lib/permissions'
 
-import type { AuditEntryDoc, UserDoc, WhereClause } from '@/lib/data/repositories'
+import { verifyAuditChain, type AuditEntryDoc, type UserDoc, type WhereClause } from '@/lib/data/repositories'
+import { getD1Database } from '@/lib/db'
 
 const PAGE_SIZE = 25
 // The repository layer has no range operators beyond less_than_equal; the
 // date-range filter runs in JS on a single bounded fetch (same pattern as
 // the auctions and users lists).
 const FETCH_LIMIT = 2000
+// Related-entry cap per detail drawer (same actor or same target entity).
+const RELATED_LIMIT = 8
 
 const EMPTY_LABEL = 'Filtritele vastavaid kirjeid ei leitud'
 
 const BANNER = 'Kirjed on muutumatud — muuta ega kustutada ei saa.'
 const SELF_VIEW_NOTE = 'Näidatakse ainult sinu enda tehtud kirjeid.'
-const SECRET_NOTE = 'Salajased väljad (näiteks tagatishind, võtmed, isikukood) on maskeeritud.'
 
 /**
  * Date-only bounds expand to full local days in Europe/Tallinn. The from
@@ -46,27 +59,6 @@ function firstParam(params: RawParams, key: string): string {
   const value = params[key]
   const first = Array.isArray(value) ? value[0] : value
   return first ?? ''
-}
-
-const entityTypeLabels: Record<string, string> = {
-  user: 'Kasutaja',
-  auction: 'Oksjon',
-  bid: 'Pakkumine',
-  contract: 'Leping',
-  lead: 'Juhtlõim',
-  partner: 'Partner',
-  settings: 'Seaded',
-  article: 'Artikkel',
-  page: 'Leht',
-  redirect: 'Ümbersuunamine',
-  'company-access-request': 'Ettevõtte päring',
-  'service-request': 'Teenuse päring',
-  'contract-template': 'Lepingu mall',
-}
-
-function entityTypeLabel(entityType: string | null): string {
-  if (!entityType) return '—'
-  return entityTypeLabels[entityType] ?? entityType
 }
 
 interface AuditRow {
@@ -115,6 +107,15 @@ export default async function AdminAuditPage({
   const selfView = role === 'admin'
   const actorFilter = selfView ? session.userId : actorParam || undefined
 
+  // Chain integrity is global, not actor-scoped; visibility stays guarded
+  // by the audit:read check above. Same drizzle-over-D1 construction as
+  // getRepositories in lib/data/runtime.ts (the runtime DbDatabase type is
+  // narrower than drizzle's D1 driver input).
+  const d1 = await getD1Database()
+  const chainVerification = await verifyAuditChain(
+    drizzle(d1 as unknown as Parameters<typeof drizzle>[0]),
+  )
+
   const fromIso = tallinnDayStartIso(fromParam)
   const toIso = tallinnDayEndIso(toParam)
 
@@ -160,6 +161,81 @@ export default async function AdminAuditPage({
     .then((result) => result.docs)
   const actorByid = new Map(staffUsers.map((user) => [user.id, user]))
 
+  // Detail drawer data: one payload per entry on the current page plus the
+  // deep-linked entry when it falls outside the page. Related entries obey
+  // the same self-view scope as the list itself.
+  function drawerEntryOf(doc: AuditEntryDoc): AuditDrawerEntry {
+    const actor = doc.actorId ? actorByid.get(doc.actorId) : undefined
+    return {
+      id: doc.id,
+      createdAt: doc.createdAt,
+      action: doc.action,
+      actionGroup: groupForAction(doc.action) ?? UNGROUPED_GROUP_ID,
+      entityType: doc.entityType,
+      entityId: doc.entityId,
+      actorId: doc.actorId,
+      actorName: actor ? (actor.name ?? actor.email) : (doc.actorId ?? '—'),
+      actorRole: actor ? actor.role : null,
+      before: doc.before,
+      after: doc.after,
+      prevHash: doc.prevHash,
+      hash: doc.hash,
+      related: [],
+    }
+  }
+
+  // Detail entry: prefer the already filtered page data; fall back to a
+  // single read, still enforcing the self-view scope for admins. The value
+  // pre-opens the drawer for ?entry= deep links.
+  let detail: AuditEntryDoc | null = null
+  if (entryParam) {
+    const inList = pageEntries.find((doc) => doc.id === entryParam)
+    if (inList) {
+      detail = inList
+    } else {
+      const fetched = await repositories.findByID({ collection: 'audit-entry', id: entryParam })
+      if (fetched && (!selfView || fetched.actorId === session.userId)) {
+        detail = fetched
+      }
+    }
+  }
+
+  const drawerEntries = pageEntries.map(drawerEntryOf)
+  if (detail && !drawerEntries.some((entry) => entry.id === detail.id)) {
+    drawerEntries.push(drawerEntryOf(detail))
+  }
+  const drawerEntryIds = new Set(drawerEntries.map((entry) => entry.id))
+  const relatedCandidates = selfView
+    ? docs.filter((doc) => doc.actorId === session.userId)
+    : docs
+  for (const entry of drawerEntries) {
+    // docs is already sorted newest-first, so slicing keeps the nearest
+    // related entries.
+    entry.related = relatedCandidates
+      .filter((other) => {
+        if (other.id === entry.id) return false
+        const sameActor = entry.actorId !== null && other.actorId === entry.actorId
+        const sameEntity =
+          entry.entityId !== null &&
+          other.entityType === entry.entityType &&
+          other.entityId === entry.entityId
+        return sameActor || sameEntity
+      })
+      .slice(0, RELATED_LIMIT)
+      .map((other) => {
+        const actor = other.actorId ? actorByid.get(other.actorId) : undefined
+        return {
+          id: other.id,
+          createdAt: other.createdAt,
+          action: other.action,
+          entityType: other.entityType,
+          entityId: other.entityId,
+          actorName: actor ? (actor.name ?? actor.email) : (other.actorId ?? '—'),
+          inList: drawerEntryIds.has(other.id),
+        }
+      })
+  }
+
   const rows: AuditRow[] = pageEntries.map((doc) => {
     const actor = doc.actorId ? actorByid.get(doc.actorId) : undefined
     return {
@@ -200,21 +276,6 @@ export default async function AdminAuditPage({
     }
     const qs = search.toString()
     return qs === '' ? '/admin/audit' : `/admin/audit?${qs}`
-  }
-
-  // Detail entry: prefer the already filtered page data; fall back to a
-  // single read, still enforcing the self-view scope for admins.
-  let detail: AuditEntryDoc | null = null
-  if (entryParam) {
-    const inList = pageEntries.find((doc) => doc.id === entryParam)
-    if (inList) {
-      detail = inList
-    } else {
-      const fetched = await repositories.findByID({ collection: 'audit-entry', id: entryParam })
-      if (fetched && (!selfView || fetched.actorId === session.userId)) {
-        detail = fetched
-      }
-    }
   }
 
   const filterSelectClass =
@@ -310,43 +371,10 @@ export default async function AdminAuditPage({
         </Link>
       </form>
 
-      {detail ? (
-        <section className="mb-md rounded-card border border-border bg-bgPage p-md" aria-label="Kirje detail">
-          <div className="mb-sm flex flex-wrap items-center justify-between gap-sm">
-            <h2 className="font-mono text-bodySm font-semibold text-ink">{detail.action}</h2>
-            <Link
-              href={buildUrl({ entry: undefined })}
-              className="text-label font-semibold text-ink-muted transition-colors duration-hover ease-hover hover:text-primary"
-            >
-              Sulge ×
-            </Link>
-          </div>
-          <dl className="mb-sm grid grid-cols-[10rem_1fr] gap-x-sm gap-y-2xs text-bodySm text-ink">
-            <dt className="text-ink-muted">Aeg</dt>
-            <dd>{formatDateTime(detail.createdAt)}</dd>
-            <dt className="text-ink-muted">Tegija</dt>
-            <dd>
-              {(() => {
-                const actor = detail.actorId ? actorByid.get(detail.actorId) : undefined
-                const name = actor ? (actor.name ?? actor.email) : (detail.actorId ?? '—')
-                return actor ? `${name} (${userRoleLabels[actor.role]})` : name
-              })()}
-            </dd>
-            <dt className="text-ink-muted">Olem</dt>
-            <dd>
-              {entityTypeLabel(detail.entityType)}
-              {detail.entityId ? (
-                <span className="ml-1 font-mono text-ink-muted" title={detail.entityId}>
-                  #{detail.entityId.slice(0, 8)}
-                </span>
-              ) : null}
-            </dd>
-          </dl>
-          <AuditDiff before={detail.before} after={detail.after} />
-          <p className="mt-xs text-label text-ink-muted">{SECRET_NOTE}</p>
-        </section>
-      ) : null}
-
+      <AuditDrawerProvider
+        entries={drawerEntries}
+        initialEntryId={detail ? detail.id : null}
+      >
       <DataTable
         columns={[
           { key: 'createdAt', label: 'Aeg', render: (row) => <time dateTime={row.createdAt}>{formatDateTime(row.createdAt)}</time> },
@@ -400,14 +428,7 @@ export default async function AdminAuditPage({
           {
             key: 'detail',
             label: 'Detail',
-            render: (row) => (
-              <Link
-                href={buildUrl({ entry: row.id, page: undefined })}
-                className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
-              >
-                Ava
-              </Link>
-            ),
+            render: (row) => <OpenAuditEntryButton entryId={row.id} />,
           },
         ]}
         rows={rows}
@@ -436,6 +457,27 @@ export default async function AdminAuditPage({
           ) : null}
         </span>
       </div>
+      </AuditDrawerProvider>
+
+      <footer className="mt-md flex flex-wrap items-center justify-between gap-sm rounded-card border border-border bg-bgPage px-md py-sm">
+        <span className="text-label text-ink-muted">
+          Iga kirje räsi hõlmab eelmise kirje räsi (SHA-256).
+        </span>
+        {chainVerification.ok ? (
+          <span className="inline-flex items-center gap-1.5 rounded-pill bg-[var(--st-active-bg)] px-2 py-0.5 text-label font-medium text-[color:var(--st-active-text)]">
+            Ahela kontroll: OK
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-pill bg-danger-light px-2 py-0.5 text-label font-medium text-danger">
+            Ahela kontroll: VIGA
+            {chainVerification.problem ? (
+              <span className="font-mono" title={chainVerification.problem.reason}>
+                kirje {chainVerification.problem.id.slice(0, 8)}
+              </span>
+            ) : null}
+          </span>
+        )}
+      </footer>
     </div>
   )
 }

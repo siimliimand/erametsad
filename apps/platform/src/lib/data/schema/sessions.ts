@@ -18,6 +18,9 @@ export const sessions = sqliteTable(
       .references(() => users.id),
     role: text('role', { enum: userRoles }).notNull(),
     profileId: text('profile_id'),
+    // Admin impersonation ("vaate seanss"): the real operator's user id while
+    // this row is a read-only view session for user_id, null on normal sessions.
+    impersonatedBy: text('impersonated_by'),
     tokenFamily: text('token_family').notNull(),
     accessTokenHash: text('access_token_hash').notNull(),
     refreshTokenHash: text('refresh_token_hash').notNull(),

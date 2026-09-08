@@ -40,6 +40,8 @@ import type {
   NewNewsletterSubscriber,
   NewNotification,
   NewPage,
+  NewPageBlock,
+  NewPageVersion,
   NewParish,
   NewPartner,
   NewPartnerService,
@@ -55,6 +57,8 @@ import type {
   NewsletterSubscriber,
   NotificationRow,
   Page,
+  PageBlock,
+  PageVersion,
   Parish,
   Partner,
   PartnerService,
@@ -89,6 +93,8 @@ import {
   media,
   newsletterSubscribers,
   notifications,
+  pageBlocks,
+  pageVersions,
   pages,
   parishes,
   partners,
@@ -132,6 +138,8 @@ export type CoreCollectionSlug =
 export type ContentCollectionSlug =
   | 'articles'
   | 'pages'
+  | 'page-blocks'
+  | 'page-versions'
   | 'faq-categories'
   | 'faq-items'
   | 'testimonials'
@@ -185,6 +193,8 @@ export const partnersJsonFields = { serviceTypes: 'array', counties: 'array' } a
 // specialists.bio) stay raw TEXT: the admin UI renders them as stored.
 export const articlesJsonFields = { tags: 'array' } as const satisfies JsonFieldSpec
 export const pagesJsonFields = { layout: 'json' } as const satisfies JsonFieldSpec
+export const pageBlocksJsonFields = { configJson: 'json' } as const satisfies JsonFieldSpec
+export const pageVersionsJsonFields = { snapshotJson: 'json' } as const satisfies JsonFieldSpec
 
 type JsonDoc<T, J extends JsonFieldSpec> = Omit<T, keyof J> & {
   [K in keyof J & string]: J[K] extends 'array' ? unknown[] | null : unknown
@@ -226,6 +236,8 @@ export type PartnerCreateData = CreateData<NewPartner, typeof partnersJsonFields
 
 export type ArticleDoc = JsonDoc<Article, typeof articlesJsonFields>
 export type PageDoc = JsonDoc<Page, typeof pagesJsonFields>
+export type PageBlockDoc = JsonDoc<PageBlock, typeof pageBlocksJsonFields>
+export type PageVersionDoc = JsonDoc<PageVersion, typeof pageVersionsJsonFields>
 // Payload 'eur' number on the public surface; eur_cents integer in storage.
 export type StatisticsSnapshotDoc = Omit<StatisticsSnapshot, 'eurCents'> & { eur: number }
 export type StatisticsSnapshotCreateData = Omit<CreateData<NewStatisticsSnapshot>, 'eurCents'> & {
@@ -281,6 +293,8 @@ export interface CoreCollectionCreates {
 export interface ContentCollectionDocs {
   articles: ArticleDoc
   pages: PageDoc
+  'page-blocks': PageBlockDoc
+  'page-versions': PageVersionDoc
   'faq-categories': FaqCategory
   'faq-items': FaqItem
   testimonials: Testimonial
@@ -297,6 +311,8 @@ export interface ContentCollectionDocs {
 export interface ContentCollectionCreates {
   articles: CreateData<NewArticle, typeof articlesJsonFields>
   pages: CreateData<NewPage, typeof pagesJsonFields>
+  'page-blocks': CreateData<NewPageBlock, typeof pageBlocksJsonFields>
+  'page-versions': CreateData<NewPageVersion, typeof pageVersionsJsonFields>
   'faq-categories': CreateData<NewFaqCategory>
   'faq-items': CreateData<NewFaqItem>
   testimonials: CreateData<NewTestimonial>
@@ -491,6 +507,20 @@ export const contentCollections: Readonly<Record<ContentCollectionSlug, Reposito
       table: pages,
       aliases: {},
       jsonFields: pagesJsonFields,
+      isikukood: false,
+      templateActivation: false,
+    },
+    'page-blocks': {
+      table: pageBlocks,
+      aliases: { page: 'pageId' },
+      jsonFields: pageBlocksJsonFields,
+      isikukood: false,
+      templateActivation: false,
+    },
+    'page-versions': {
+      table: pageVersions,
+      aliases: { page: 'pageId' },
+      jsonFields: pageVersionsJsonFields,
       isikukood: false,
       templateActivation: false,
     },

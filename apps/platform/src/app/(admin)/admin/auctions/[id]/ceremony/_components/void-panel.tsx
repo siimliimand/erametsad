@@ -7,13 +7,19 @@ import {
   voidSealedBidsAction,
   type SealedCeremonyActionState,
 } from '../../../../../_actions/auctions'
-import { FormField, primaryButtonClass } from '../../../../../_components/FormField'
+import { FormField } from '../../../../../_components/FormField'
+import { useToast } from '../../../../../_components/ui/Toast'
 
 const initialState: SealedCeremonyActionState = {
   ok: false,
   phase: 'checklist',
   error: null,
 }
+
+// Demo 05-sealed btn-danger-outline: the destructive trigger stays hollow;
+// the solid dark danger style is reserved for the final dialog confirm.
+const dangerOutlineButtonClass =
+  'inline-flex h-10 items-center gap-xs rounded-button border border-danger bg-transparent px-4 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-dangerLight disabled:cursor-not-allowed disabled:opacity-50'
 
 /**
  * Superadmin escape hatch before the winner decision: a typed reason voids
@@ -22,6 +28,7 @@ const initialState: SealedCeremonyActionState = {
  */
 export function VoidPanel({ auctionId }: { auctionId: string }) {
   const router = useRouter()
+  const toast = useToast()
   const [voidState, voidFormAction, voidPending] = useActionState(
     voidSealedBidsAction,
     initialState,
@@ -29,30 +36,32 @@ export function VoidPanel({ auctionId }: { auctionId: string }) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [reason, setReason] = useState('')
 
+  // Server-action error semantics stay intact: the state drives the toast.
   useEffect(() => {
     if (voidState.ok) {
       setDialogOpen(false)
+      toast({ tone: 'success', title: 'Avamine tühistatud. Põhjus salvestatud auditlogisse.' })
       router.refresh()
+    } else if (voidState.error !== null) {
+      toast({
+        tone: 'error',
+        title: 'Tühistamine ebaõnnestus',
+        description: voidState.error,
+      })
     }
-  }, [voidState.ok, router])
+  }, [voidState, toast, router])
 
   return (
     <section className="rounded-card border border-border bg-bgPage p-md">
       <h2 className="mb-xs font-heading text-h4 font-bold text-ink">Avamise tühistamine</h2>
-      <p className="mb-sm text-bodySm text-ink-muted">
+      <p className="mb-sm text-bodySm text-inkMuted">
         Tühistamine on ainult superadminile: kõik suletud pakkumised kuulutatakse kehtetuks ja
         oksjon märgitakse müümata. Summasid ei paljastata.
       </p>
 
-      {voidState.error ? (
-        <p className="mb-sm rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
-          {voidState.error}
-        </p>
-      ) : null}
-
       <button
         type="button"
-        className={primaryButtonClass}
+        className={dangerOutlineButtonClass}
         disabled={voidPending}
         onClick={() => {
           setDialogOpen(true)
@@ -74,7 +83,7 @@ export function VoidPanel({ auctionId }: { auctionId: string }) {
           >
             <input type="hidden" name="auctionId" value={auctionId} />
             <h3 className="font-heading text-h4 font-bold text-ink">Tühista avamine</h3>
-            <p className="mt-sm rounded-input border-l-4 border-danger bg-danger-light px-md py-sm text-bodySm font-semibold text-danger">
+            <p className="mt-sm rounded-input border-l-4 border-danger bg-dangerLight px-md py-sm text-bodySm font-semibold text-danger">
               HOIATUS: tühistamine on lõplik. Kõik pakkumised kehtetuks, võitjat ei kuulutata ja
               oksjon märgitakse müümata.
             </p>
@@ -93,12 +102,6 @@ export function VoidPanel({ auctionId }: { auctionId: string }) {
               />
             </div>
 
-            {voidState.error ? (
-              <p className="mt-sm rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
-                {voidState.error}
-              </p>
-            ) : null}
-
             <div className="mt-md flex justify-end gap-sm">
               <button
                 type="button"
@@ -112,7 +115,7 @@ export function VoidPanel({ auctionId }: { auctionId: string }) {
               <button
                 type="submit"
                 disabled={voidPending || reason.trim().length < 5}
-                className="inline-flex h-10 items-center rounded-button bg-danger px-4 text-label font-semibold text-ink-inverse transition-opacity duration-hover ease-hover hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 items-center rounded-button bg-danger px-4 text-label font-semibold text-inkInverse transition-[filter] duration-hover ease-hover hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {voidPending ? 'Tühistan…' : 'Jah, tühistada lõplikult'}
               </button>

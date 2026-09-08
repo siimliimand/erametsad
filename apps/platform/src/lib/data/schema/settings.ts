@@ -14,6 +14,9 @@ export const settings = sqliteTable(
     alapakkumineEnabled: integer('alapakkumine_enabled', { mode: 'boolean' })
       .notNull()
       .default(true),
+    maintenanceEnabled: integer('maintenance_enabled', { mode: 'boolean' })
+      .notNull()
+      .default(false),
     sealedRevisionCap: integer('sealed_revision_cap').notNull().default(3),
     featureFlags: text('feature_flags'),
     createdAt: text('created_at').notNull(),

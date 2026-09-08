@@ -60,3 +60,9 @@ export { Toast } from './components/Toast';
 export type { ToastProps } from './components/Toast';
 export { EmptyState } from './components/EmptyState';
 export type { EmptyStateProps } from './components/EmptyState';
+export { PageBlocks } from './components/content/page-blocks/PageBlocks';
+export type {
+  PageBlocksProps,
+  PageBlockView,
+  ResolvedBlockConfig,
+} from './components/content/page-blocks/types';

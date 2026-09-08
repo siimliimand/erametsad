@@ -8,11 +8,15 @@ export interface DocumentPayload {
   error: string | null
 }
 
+const defaultTriggerClass =
+  'text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover'
+
 interface HtmlPreviewDrawerProps {
   label: string
   drawerTitle: string
   documentId: string
   fetchDocument: (id: string) => Promise<DocumentPayload>
+  triggerClassName?: string
 }
 
 /**
@@ -25,6 +29,7 @@ export function HtmlPreviewDrawer({
   drawerTitle,
   documentId,
   fetchDocument,
+  triggerClassName = defaultTriggerClass,
 }: HtmlPreviewDrawerProps) {
   const [open, setOpen] = useState(false)
   const [html, setHtml] = useState<string | null>(null)
@@ -50,7 +55,7 @@ export function HtmlPreviewDrawer({
       <button
         type="button"
         onClick={openDrawer}
-        className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
+        className={triggerClassName}
       >
         {label}
       </button>

@@ -170,11 +170,16 @@ describe('placeBid sealed ciphertext at rest', () => {
     const insert = insertFor()
     expect(insert.params[3]).toBe(0)
     const storedSnapshot = String(insert.params[7])
-    expect(storedSnapshot).not.toContain('500')
     expect(storedSnapshot).not.toContain('Mari Maasikas')
     expect(storedSnapshot).not.toContain('30000000003')
     expect(storedSnapshot).not.toContain('mari@example.com')
     const payload = JSON.parse(storedSnapshot) as Record<string, string>
+    // Every envelope value is hex ciphertext (bytesToHex). Hex-only values
+    // cannot hide plaintext, which must contain non-hex characters — this
+    // also covers the submitted amount without probing random hex for '500'.
+    for (const value of Object.values(payload)) {
+      expect(value).toMatch(/^[0-9a-f]+$/)
+    }
     expect(payload.encrypted).toBeTruthy()
     expect(payload.iv).toBeTruthy()
     expect(payload.authTag).toBeTruthy()

@@ -19,6 +19,8 @@ export interface PortalAuthState {
   role: string
   profileId: string | null
   profileName: string | null
+  /** Real operator while this session is an admin view session; null otherwise. */
+  impersonatedBy: string | null
 }
 
 export interface PortalSession {
@@ -27,6 +29,8 @@ export interface PortalSession {
     role: string
     sessionId: string
     profileId: string | null
+    /** Real operator while this session is an admin view session; null otherwise. */
+    impersonatedBy: string | null
   }
   profile: ProfileDoc | null
   repositories: CoreRepositories
@@ -118,10 +122,34 @@ export async function requirePortalSession(nextPath?: string): Promise<PortalSes
       role: payload.role,
       sessionId,
       profileId,
+      impersonatedBy: payload.impersonatedBy ?? null,
     },
     profile,
     repositories,
   }
+}
+
+/** User-facing rejection text for portal writes during an impersonation view. */
+export const IMPERSONATION_WRITE_ERROR = 'Vaate seanss: kirjutoimingud on keelatud'
+
+/**
+ * Choke point for every portal write server action: resolves the session
+ * like requirePortalSession, then rejects admin view sessions before any
+ * write can run. Portal reads stay on requirePortalSession — impersonation
+ * is view-only, so pages must keep working.
+ */
+export async function requirePortalWriteSession(nextPath?: string): Promise<PortalSession> {
+  const portal = await requirePortalSession(nextPath)
+  if (portal.session.impersonatedBy !== null) {
+    const current = await resolveCurrentPath(nextPath)
+    const separator = current?.includes('?') ? '&' : '?'
+    redirect(
+      current
+        ? `${current}${separator}viga=${encodeURIComponent(IMPERSONATION_WRITE_ERROR)}`
+        : `/user?viga=${encodeURIComponent(IMPERSONATION_WRITE_ERROR)}`,
+    )
+  }
+  return portal
 }
 
 /** Non-redirecting auth state for header chips and conditionals; null when anonymous. */
@@ -138,7 +166,13 @@ export async function getPortalAuthState(): Promise<PortalAuthState | null> {
       await findActiveProfile(repositories, payload.userId, profileId),
     )
   }
-  return { userId: payload.userId, role: payload.role, profileId, profileName }
+  return {
+    userId: payload.userId,
+    role: payload.role,
+    profileId,
+    profileName,
+    impersonatedBy: payload.impersonatedBy ?? null,
+  }
 }
 
 /** Active profile for the current session; null when anonymous or none selected. */

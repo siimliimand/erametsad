@@ -517,9 +517,9 @@ export default async function AdminAuctionsPage({
             >
               {entry.label}
               <span
-                className={`rounded-pill px-2 text-[11px] font-medium ${
+                className={`rounded-pill px-2 py-px font-mono text-[11px] font-medium leading-4 ${
                   active
-                    ? 'bg-white/20 text-inkInverse'
+                    ? 'bg-white/[0.18] text-inkInverse'
                     : 'bg-bgMist text-inkMuted'
                 }`}
               >

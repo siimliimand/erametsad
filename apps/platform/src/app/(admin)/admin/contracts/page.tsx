@@ -12,8 +12,9 @@ import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import { secondaryButtonClass } from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
+import { StatusChip } from '../../_components/StatusChip'
 import { requireAdminRepositories } from '../../_lib/admin'
-import { ContractStatusPill, formatDateTime } from '../../_lib/labels'
+import { formatDateTime } from '../../_lib/labels'
 import { can } from '../../_lib/permissions'
 
 import type { UserDoc } from '@/lib/data/repositories'
@@ -260,7 +261,7 @@ export default async function AdminContractsPage({
             label: 'Olek',
             render: (row) => (
               <span className="inline-flex flex-col items-start gap-1">
-                <ContractStatusPill status={row.status as ContractStatus} />
+                <StatusChip status={`contract:${row.status as ContractStatus}`} />
                 {row.stuck ? (
                   <span className="inline-flex items-center rounded-pill bg-amber-100 px-2 py-0.5 text-label font-semibold text-amber-800">
                     ⏳ peatunud &gt;7 pd — saada uuesti

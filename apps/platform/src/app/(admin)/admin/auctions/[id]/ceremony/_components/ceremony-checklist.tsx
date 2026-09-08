@@ -1,4 +1,5 @@
 import type { SealedCeremonyChecklist } from '../../../../../_actions/auctions'
+import { LiveAuditStrip } from '../_lib/live-audit-strip'
 
 /** Signing is server-blocked unless all three hard preconditions pass. */
 export function ceremonyChecklistPass(checklist: SealedCeremonyChecklist): boolean {
@@ -30,7 +31,7 @@ function ChecklistItem({
       </span>
       <div>
         <p className="text-bodySm font-semibold text-ink">{label}</p>
-        <p className={`text-bodySm ${pass ? 'text-ink-muted' : 'text-danger'}`}>{detail}</p>
+        <p className={`text-bodySm ${pass ? 'text-inkMuted' : 'text-danger'}`}>{detail}</p>
         {warning ? (
           <p className="mt-1 text-bodySm text-statusEndingSoon">{warning}</p>
         ) : null}
@@ -43,42 +44,45 @@ function ChecklistItem({
 export function CeremonyChecklist({ checklist }: { checklist: SealedCeremonyChecklist }) {
   const { endingWorker, pendingAlapakkumised, template } = checklist
   return (
-    <section className="rounded-card border border-border bg-bgPage p-md">
-      <h2 className="mb-sm font-heading text-h4 font-bold text-ink">Eelkontroll</h2>
-      <ul className="space-y-sm">
-        <ChecklistItem
-          pass={endingWorker.done}
-          label="Lõppaeg on kinnitatud"
-          detail={
-            endingWorker.done
-              ? `Lõpetustöötlus tehtud (idempotentsusvõti: ${endingWorker.key ?? '—'})`
-              : 'Lõpetustöötlus puudub — lõppaega ei ole kinnitatud'
-          }
-        />
-        <ChecklistItem
-          pass={pendingAlapakkumised === 0}
-          label="Ootel alapakkumised"
-          detail={
-            pendingAlapakkumised === 0
-              ? 'Puuduvad'
-              : `Ootel: ${String(pendingAlapakkumised)} — otsusta alapakkumised enne avamist`
-          }
-        />
-        <ChecklistItem
-          pass={template.active}
-          label="Aktiivne lepingu mall"
-          detail={
-            template.active
-              ? `${template.name ?? 'Mall'} (${template.version ?? '—'})`
-              : 'Aktiivset lepingu malli ei ole'
-          }
-          warning={
-            template.active && template.changedWithin24h
-              ? 'Malli on muudetud 24 tunni jooksul oksjoni alguse ümber — kontrolli versiooni enne allkirja.'
-              : undefined
-          }
-        />
-      </ul>
-    </section>
+    <>
+      <section className="rounded-card border border-border bg-bgPage p-md">
+        <h2 className="mb-sm font-heading text-h4 font-bold text-ink">Eelkontroll</h2>
+        <ul className="space-y-sm">
+          <ChecklistItem
+            pass={endingWorker.done}
+            label="Lõppaeg on kinnitatud"
+            detail={
+              endingWorker.done
+                ? `Lõpetustöötlus tehtud (idempotentsusvõti: ${endingWorker.key ?? '—'})`
+                : 'Lõpetustöötlus puudub — lõppaega ei ole kinnitatud'
+            }
+          />
+          <ChecklistItem
+            pass={pendingAlapakkumised === 0}
+            label="Ootel alapakkumised"
+            detail={
+              pendingAlapakkumised === 0
+                ? 'Puuduvad'
+                : `Ootel: ${String(pendingAlapakkumised)} — otsusta alapakkumised enne avamist`
+            }
+          />
+          <ChecklistItem
+            pass={template.active}
+            label="Aktiivne lepingu mall"
+            detail={
+              template.active
+                ? `${template.name ?? 'Mall'} (${template.version ?? '—'})`
+                : 'Aktiivset lepingu malli ei ole'
+            }
+            warning={
+              template.active && template.changedWithin24h
+                ? 'Malli on muudetud 24 tunni jooksul oksjoni alguse ümber — kontrolli versiooni enne allkirja.'
+                : undefined
+            }
+          />
+        </ul>
+      </section>
+      <LiveAuditStrip />
+    </>
   )
 }

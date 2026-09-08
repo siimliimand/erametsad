@@ -19,17 +19,17 @@ export function RevealRecord({
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="border-b border-border bg-bgMist">
-              <th scope="col" className="h-10 px-3 text-label font-semibold text-ink-muted">Koht</th>
-              <th scope="col" className="h-10 px-3 text-label font-semibold text-ink-muted">Summa</th>
-              <th scope="col" className="h-10 px-3 text-label font-semibold text-ink-muted">Esitatud</th>
-              <th scope="col" className="h-10 px-3 text-label font-semibold text-ink-muted">Kehtivus</th>
+              <th scope="col" className="h-10 px-3 text-label font-semibold text-inkMuted">Koht</th>
+              <th scope="col" className="h-10 px-3 text-label font-semibold text-inkMuted">Summa</th>
+              <th scope="col" className="h-10 px-3 text-label font-semibold text-inkMuted">Esitatud</th>
+              <th scope="col" className="h-10 px-3 text-label font-semibold text-inkMuted">Kehtivus</th>
             </tr>
           </thead>
           <tbody>
             {bids.map((bid) => (
               <tr
                 key={bid.id}
-                className={`border-b border-border last:border-b-0 ${bid.valid ? '' : 'bg-bgMist text-ink-muted'}`}
+                className={`border-b border-border last:border-b-0 ${bid.valid ? '' : 'bg-bgMist text-inkMuted'}`}
               >
                 <td className="h-10 px-3 text-bodySm">
                   {bid.rank !== null ? String(bid.rank) : '—'}
@@ -40,7 +40,7 @@ export function RevealRecord({
                   ) : null}
                 </td>
                 <td
-                  className={`h-10 px-3 font-mono text-bodySm ${bid.valid ? 'font-semibold text-ink' : 'text-ink-muted line-through'}`}
+                  className={`h-10 px-3 font-mono text-bodySm ${bid.valid ? 'font-semibold text-ink' : 'text-inkMuted line-through'}`}
                 >
                   {formatEurAmount(bid.amount)}
                 </td>
@@ -49,7 +49,7 @@ export function RevealRecord({
                   {bid.valid ? (
                     <span className="text-primary">Kehtiv</span>
                   ) : (
-                    <span className="text-ink-muted" title={bid.invalidReason ?? undefined}>
+                    <span className="text-inkMuted" title={bid.invalidReason ?? undefined}>
                       Kehtetu — {bid.invalidReason ?? 'põhjus teadmata'}
                     </span>
                   )}

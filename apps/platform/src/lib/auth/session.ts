@@ -8,6 +8,9 @@ export interface SessionRecord {
   userId: string
   role: string
   profileId: string | undefined
+  // Real operator while this session is an admin impersonation view
+  // ("vaate seanss"); undefined on sessions the user logged into themselves.
+  impersonatedBy: string | undefined
   tokenFamily: string
   active: boolean
   refreshTokenHash: string
@@ -19,6 +22,7 @@ export interface SessionRow {
   user_id: string
   role: string
   profile_id: string | null
+  impersonated_by: string | null
   token_family: string
   access_token_hash: string
   refresh_token_hash: string
@@ -44,6 +48,7 @@ export interface SessionCreateInput {
   userId: string
   role: string
   profileId?: string
+  impersonatedBy?: string
   tokenFamily: string
   accessToken: string
   refreshToken: string
@@ -51,7 +56,10 @@ export interface SessionCreateInput {
 }
 
 const SESSION_COLUMNS =
-  'id, user_id, role, profile_id, token_family, access_token_hash, refresh_token_hash, expires_at, revoked_at, created_at, updated_at'
+  'id, user_id, role, profile_id, impersonated_by, token_family, access_token_hash, refresh_token_hash, expires_at, revoked_at, created_at, updated_at'
+
+const SESSION_INSERT_COLUMNS =
+  'id, user_id, role, profile_id, impersonated_by, token_family, access_token_hash, refresh_token_hash, expires_at, revoked_at, created_at, updated_at'
 
 // Mirrors REFRESH_TTL in ./jwt.ts: every rotation re-signs the refresh
 // token with a fresh 7-day exp, so the row horizon slides with it.
@@ -78,6 +86,7 @@ function toRecord(row: SessionRow): SessionRecord {
     userId: row.user_id,
     role: row.role,
     profileId: row.profile_id ?? undefined,
+    impersonatedBy: row.impersonated_by ?? undefined,
     tokenFamily: row.token_family,
     active: true,
     refreshTokenHash: row.refresh_token_hash,
@@ -96,12 +105,13 @@ async function getSessionRow(sessionId: string): Promise<SessionRow | null> {
 export async function createSessionRecord(input: SessionCreateInput): Promise<void> {
   const now = nowIso()
   await db.query(
-    `INSERT INTO sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+    `INSERT INTO sessions (${SESSION_INSERT_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
     [
       input.sessionId,
       input.userId,
       input.role,
       input.profileId ?? null,
+      input.impersonatedBy ?? null,
       input.tokenFamily,
       hashToken(input.accessToken),
       hashToken(input.refreshToken),
@@ -126,6 +136,7 @@ export async function createSession(
   userId: string,
   role: string,
   profileId?: string,
+  impersonatedBy?: string,
 ): Promise<{ accessToken: string; refreshToken: string; sessionId: string }> {
   const sessionId = crypto.randomUUID()
   const tokenFamily = crypto.randomUUID()
@@ -135,6 +146,7 @@ export async function createSession(
     role,
     activeProfileId: profileId,
     sessionId,
+    ...(impersonatedBy !== undefined ? { impersonatedBy } : {}),
   })
   const refreshToken = signRefreshToken({
     sessionId,
@@ -146,6 +158,7 @@ export async function createSession(
     userId,
     role,
     ...(profileId !== undefined ? { profileId } : {}),
+    ...(impersonatedBy !== undefined ? { impersonatedBy } : {}),
     tokenFamily,
     accessToken,
     refreshToken,
@@ -173,6 +186,9 @@ export async function refreshSession(
     role: row.role,
     activeProfileId: row.profile_id ?? undefined,
     sessionId: row.id,
+    // Impersonation binding survives rotation: a view session must never
+    // silently rotate into a full session of the target user.
+    impersonatedBy: row.impersonated_by ?? undefined,
   })
 
   // Compare-and-swap on the stored refresh hash: a replayed token loses
@@ -247,6 +263,7 @@ export async function issueSessionAccessToken(
     role: row.role,
     activeProfileId: row.profile_id ?? undefined,
     sessionId: row.id,
+    impersonatedBy: row.impersonated_by ?? undefined,
   })
 
   await db.query(
@@ -291,17 +308,60 @@ export async function resolveAccessTokenSession(
   return { state: 'active', sessionId: row.id }
 }
 
+// Shared auth-cookie policy: route handlers (NextResponse) and server
+// actions (the next/headers cookies() store) funnel through the same
+// writers so flags never drift apart.
+const ACCESS_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'lax',
+  path: '/',
+  maxAge: 5 * 60,
+} as const
+
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'lax',
+  path: '/api/v1/auth',
+  maxAge: 7 * 24 * 60 * 60,
+} as const
+
+interface CookieWriteOptions {
+  httpOnly?: boolean
+  secure?: boolean
+  sameSite?: boolean | 'lax' | 'strict' | 'none'
+  path?: string
+  maxAge?: number
+}
+
+interface CookieWriter {
+  set(name: string, value: string, options: CookieWriteOptions): unknown
+}
+
+function writeAccessCookie(store: CookieWriter, accessToken: string): void {
+  store.set('access_token', accessToken, ACCESS_COOKIE_OPTIONS)
+}
+
+function writeRefreshCookie(store: CookieWriter, refreshToken: string): void {
+  store.set('refresh_token', refreshToken, REFRESH_COOKIE_OPTIONS)
+}
+
+/** Cookie writer for server actions: `cookies()` from next/headers. */
+export function writeSessionCookies(
+  store: CookieWriter,
+  accessToken: string,
+  refreshToken: string,
+): void {
+  writeAccessCookie(store, accessToken)
+  writeRefreshCookie(store, refreshToken)
+}
+
 export function setAccessTokenCookie(
   response: NextResponse,
   accessToken: string,
 ): void {
-  response.cookies.set('access_token', accessToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 5 * 60,
-  })
+  writeAccessCookie(response.cookies, accessToken)
 }
 
 export function setSessionCookies(
@@ -309,31 +369,15 @@ export function setSessionCookies(
   accessToken: string,
   refreshToken: string,
 ): void {
-  setAccessTokenCookie(response, accessToken)
+  writeSessionCookies(response.cookies, accessToken, refreshToken)
+}
 
-  response.cookies.set('refresh_token', refreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    path: '/api/v1/auth',
-    maxAge: 7 * 24 * 60 * 60,
-  })
+/** Cookie clearing for server actions (maxAge 0 drops both cookies). */
+export function clearSessionCookiesOnStore(store: CookieWriter): void {
+  writeAccessCookie(store, '')
+  writeRefreshCookie(store, '')
 }
 
 export function clearSessionCookies(response: NextResponse): void {
-  response.cookies.set('access_token', '', {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 0,
-  })
-
-  response.cookies.set('refresh_token', '', {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    path: '/api/v1/auth',
-    maxAge: 0,
-  })
+  clearSessionCookiesOnStore(response.cookies)
 }

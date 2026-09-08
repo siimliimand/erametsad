@@ -1,12 +1,14 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
+import { verifyAdminAccessToken } from '@/lib/auth/jwt'
 import { apiRateLimiter, authRateLimiter } from '@/lib/rate-limit'
 import {
   normalizeHostname,
   resolveDefaultHostRewrite,
   resolveHostRedirect,
   resolveLegacyPathRedirect,
+  resolveHostArea,
 } from '@/lib/routing/host-areas'
 
 const CSP = [
@@ -49,6 +51,99 @@ function applyRateLimitHeaders(headers: Headers, result: ReturnType<typeof apiRa
   headers.set('X-RateLimit-Reset', String(result.reset))
 }
 
+// Maintenance gate (settings.maintenance_enabled, demo 13-settings).
+// middleware() must stay synchronous, so the flag lives in a module cache
+// refreshed in the background with a short TTL: enabling maintenance starts
+// blocking within ~one TTL on mapped hosts, and any read failure (no
+// Cloudflare context, no D1 binding, no settings row) fails open.
+const MAINTENANCE_TTL_MS = 2000
+
+const maintenanceCache: { enabled: boolean; expiresAt: number } = {
+  enabled: false,
+  expiresAt: 0,
+}
+
+async function readMaintenanceEnabled(): Promise<boolean> {
+  const { db } = await import('@/lib/db')
+  const result = await db.query<{ maintenance_enabled: number }>(
+    'SELECT maintenance_enabled FROM settings LIMIT 1',
+  )
+  return result.results[0]?.maintenance_enabled === 1
+}
+
+function scheduleMaintenanceRefresh(): void {
+  const now = Date.now()
+  if (now < maintenanceCache.expiresAt) return
+  maintenanceCache.expiresAt = now + MAINTENANCE_TTL_MS
+  readMaintenanceEnabled()
+    .then((enabled) => {
+      maintenanceCache.enabled = enabled
+    })
+    .catch(() => {
+      maintenanceCache.enabled = false
+    })
+}
+
+// Admin keeps access during maintenance; the gate must never lock the
+// operator out of the login flow or the admin UI itself. API routes stay
+// available by design: auction timing is server-authoritative and the
+// auction flow (REST + SSE) must keep working for in-flight auctions.
+const MAINTENANCE_EXEMPT_PREFIXES = ['/api/', '/_next/', '/_vercel/', '/admin/', '/styleguide/']
+const MAINTENANCE_EXEMPT_PATHS = [
+  '/api',
+  '/admin',
+  '/styleguide',
+  '/login',
+  '/reset-password',
+  '/update-password',
+  '/select-profile',
+  '/favicon.ico',
+  '/robots.txt',
+  '/sitemap.xml',
+  '/manifest.json',
+  '/manifest.webmanifest',
+]
+
+function isMaintenanceExempt(pathname: string): boolean {
+  return (
+    MAINTENANCE_EXEMPT_PATHS.includes(pathname) ||
+    MAINTENANCE_EXEMPT_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  )
+}
+
+function isAdminRequest(request: NextRequest): boolean {
+  try {
+    const token = request.cookies.get('access_token')?.value
+    return typeof token === 'string' && verifyAdminAccessToken(token) !== null
+  } catch {
+    return false
+  }
+}
+
+const MAINTENANCE_HTML = `<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hooldusrežiim | Erametsad</title>
+</head>
+<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fbf8ff;color:#181a2e;font:400 15px/22px system-ui,-apple-system,sans-serif;text-align:center;padding:24px">
+<main>
+<h1 style="font-size:22px;margin:0 0 8px">Hooldusrežiim</h1>
+<p style="margin:0">Portaal on ajutiselt hooldustööde tõttu suletud. Palun tule hiljem tagasi.</p>
+</main>
+</body>
+</html>`
+
+function maintenanceResponse(): NextResponse {
+  const response = new NextResponse(MAINTENANCE_HTML, {
+    status: 503,
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Retry-After': '300' },
+  })
+  applySecurityHeaders(response.headers)
+  return response
+}
+
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl
   const hostname = normalizeHostname(request.headers.get('host'))
@@ -74,6 +169,20 @@ export function middleware(request: NextRequest) {
 
   const origin = request.headers.get('origin') ?? ''
   const isApiRoute = pathname.startsWith('/api')
+
+  // Maintenance gate (mapped hosts only, D7): blocks public page routes
+  // while settings.maintenance_enabled is on. Admin sessions pass, the
+  // admin UI, login flow, shared statics, and every /api route stay up.
+  if (resolveHostArea(hostname) !== null) {
+    scheduleMaintenanceRefresh()
+    if (
+      maintenanceCache.enabled &&
+      !isMaintenanceExempt(pathname) &&
+      !isAdminRequest(request)
+    ) {
+      return maintenanceResponse()
+    }
+  }
 
   if (isApiRoute) {
     const isAuthRoute = pathname === '/api/auth' || pathname.startsWith('/api/auth/')

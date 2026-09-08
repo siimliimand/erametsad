@@ -59,6 +59,33 @@ export default async function AuctionMonitorPage({
     ...(isSealed ? { pagination: false } : { limit: 30 }),
   })
 
+  // Masked bidder aliases ("Pakkuja #N") are feed-local and carry no
+  // identity: numbers follow first appearance from the oldest bid onward.
+  // Real identity leaves the server only through the audited
+  // revealBidderIdentityAction (`user.identity_view`).
+  const aliasById = new Map<string, number>()
+  for (const bid of [...bidsResult.docs].reverse()) {
+    if (aliasById.has(bid.userId)) continue
+    aliasById.set(bid.userId, aliasById.size + 1)
+  }
+  const bidderIds = [...aliasById.keys()]
+  const accountCreatedAtById = new Map<string, string>()
+  if (bidderIds.length > 0) {
+    try {
+      const usersResult = await trusted.find({
+        collection: 'users',
+        where: { id: { in: bidderIds } },
+        pagination: false,
+      })
+      for (const user of usersResult.docs) {
+        accountCreatedAtById.set(user.id, user.createdAt)
+      }
+    } catch {
+      // Account ages feed the advisory new-account heuristic only; the
+      // monitor feed works without them.
+    }
+  }
+
   const initialRows: MonitorBidRow[] = isSealed
     ? []
     : bidsResult.docs.map((bid) => ({
@@ -69,6 +96,9 @@ export default async function AuctionMonitorPage({
         source: bid.source,
         status: bid.status,
         backfilled: false,
+        bidderId: bid.userId,
+        bidderAlias: aliasById.get(bid.userId) ?? null,
+        bidderAccountCreatedAt: accountCreatedAtById.get(bid.userId) ?? null,
       }))
   const sealedBidCount = isSealed ? bidsResult.docs.length : null
 
@@ -152,7 +182,7 @@ export default async function AuctionMonitorPage({
       ) : null}
       <PageHeader
         title={`Monitor: ${auction.title}`}
-        description="Sama otseülekanne, mida kasutab avalik portaal. Näidatakse summasid ja aegu, mitte pakkujaid."
+        description="Sama otseülekanne, mida kasutab avalik portaal. Vaikimisi näidatakse summasid ja aegu; identiteet avaneb ainult auditeeritud paljastamisega."
         backHref={`/admin/auctions/${id}`}
         actions={<StatusPill status={auction.status} />}
       />
@@ -172,6 +202,9 @@ export default async function AuctionMonitorPage({
         antiSnipeMinutes={antiSnipeMinutes}
         initialExtensions={initialExtensions}
         canEndManually={can(session.role, 'auctions:end-manual')}
+        // audit-entry create is admin-only (guards.ts) — the same role set
+        // that holds audit:read, so it gates the internal-review flag.
+        canFlagAnomalies={can(session.role, 'audit:read')}
       />
       {isSealed ? (
         <p className="mt-md rounded-input border border-info bg-info-light px-md py-sm text-bodySm text-info">

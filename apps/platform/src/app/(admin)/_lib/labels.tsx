@@ -1,3 +1,6 @@
+import { StatusChip } from '../_components/StatusChip'
+import type { StatusChipVariant } from '../_components/StatusChip'
+
 import type {
   AuctionObjectType,
   AuctionStatus,
@@ -97,10 +100,11 @@ export const contractStatusLabels: Record<ContractStatus, string> = {
   voided: 'Tühistatud',
 }
 
-export const contractTemplateTypeLabels: Record<ContractTemplateType, string> = {
-  framework: 'Raamleping',
-  auction: 'Oksjonileping',
-}
+export const contractTemplateTypeLabels: Record<ContractTemplateType, string> =
+  {
+    framework: 'Raamleping',
+    auction: 'Oksjonileping',
+  }
 
 export const leadStatusLabels: Record<LeadStatus, string> = {
   new: 'Uus',
@@ -110,103 +114,73 @@ export const leadStatusLabels: Record<LeadStatus, string> = {
   disqualified: 'Diskvalifitseeritud',
 }
 
-export const companyAccessRequestStatusLabels: Record<CompanyAccessRequestStatus, string> = {
+export const companyAccessRequestStatusLabels: Record<
+  CompanyAccessRequestStatus,
+  string
+> = {
   pending: 'Ootel',
   approved: 'Nõustutud',
   rejected: 'Keeldutud',
   held: 'Hoitud',
 }
 
-const statusPillClass: Record<AuctionStatus, string> = {
-  draft: 'bg-bg-mist text-ink-muted',
-  scheduled: 'bg-info-light text-info',
-  active: 'bg-primary-light text-primaryDark',
-  ended: 'bg-bg-mist text-ink-muted',
-  appraised: 'bg-info-light text-info',
-  unsold: 'bg-danger-light text-danger',
-  contract: 'bg-primary-light text-primaryDark',
-  completed: 'bg-primary-light text-primaryDark',
-  archived: 'bg-bg-mist text-ink-muted',
+/** Single lookup table for every StatusChip variant (spec admin-ui). */
+export const statusChipLabels: Record<StatusChipVariant, string> = {
+  ...auctionStatusLabels,
+  ending: 'Lõpeb',
+  'user:active': userStatusLabels.active,
+  'user:suspended': userStatusLabels.suspended,
+  'user:banned': 'Keelatud',
+  'contract:prepared': contractStatusLabels.prepared,
+  'contract:sent': contractStatusLabels.sent,
+  'contract:signed': contractStatusLabels.signed,
+  'contract:voided': contractStatusLabels.voided,
+  'lead:new': leadStatusLabels.new,
+  'lead:contacted': leadStatusLabels.contacted,
+  'lead:qualified': leadStatusLabels.qualified,
+  'lead:contract': leadStatusLabels.contract,
+  'lead:disqualified': leadStatusLabels.disqualified,
+  'content:draft': contentStatusLabels.draft,
+  'content:published': contentStatusLabels.published,
+  'company:pending': companyAccessRequestStatusLabels.pending,
+  'company:approved': companyAccessRequestStatusLabels.approved,
+  'company:rejected': companyAccessRequestStatusLabels.rejected,
+  'company:held': companyAccessRequestStatusLabels.held,
 }
 
-export function StatusPill({ status }: { status: AuctionStatus }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-pill px-2 py-0.5 text-label font-semibold ${statusPillClass[status]}`}
-    >
-      {auctionStatusLabels[status]}
-    </span>
-  )
-}
+/**
+ * Deprecated shim to the unified StatusChip. Kept only so out-of-scope
+ * consumers keep compiling; tasks 4.2/10.1/10.3 migrate their own files.
+ */
+export { StatusChip as StatusPill } from '../_components/StatusChip'
 
+/** Deprecated shim: use `<StatusChip status="user:…" />`. */
 export function UserStatusPill({ status }: { status: UserStatus }) {
-  const className =
-    status === 'active' ? 'bg-primary-light text-primaryDark' : 'bg-danger-light text-danger'
-  return (
-    <span className={`inline-flex items-center rounded-pill px-2 py-0.5 text-label font-semibold ${className}`}>
-      {userStatusLabels[status]}
-    </span>
-  )
+  return <StatusChip status={`user:${status}`} />
 }
 
+/** Deprecated shim: use `<StatusChip status="content:…" />`. */
 export function ContentStatusPill({ status }: { status: ContentStatus }) {
-  const className =
-    status === 'published' ? 'bg-primary-light text-primaryDark' : 'bg-bg-mist text-ink-muted'
-  return (
-    <span className={`inline-flex items-center rounded-pill px-2 py-0.5 text-label font-semibold ${className}`}>
-      {contentStatusLabels[status]}
-    </span>
-  )
+  return <StatusChip status={`content:${status}`} />
 }
 
+/** Deprecated shim: use `<StatusChip status="contract:…" />`. */
 export function ContractStatusPill({ status }: { status: ContractStatus }) {
-  const className =
-    status === 'signed'
-      ? 'bg-primary-light text-primaryDark'
-      : status === 'voided'
-        ? 'bg-danger-light text-danger'
-        : status === 'sent'
-          ? 'bg-info-light text-info'
-          : 'bg-bg-mist text-ink-muted'
-  return (
-    <span className={`inline-flex items-center rounded-pill px-2 py-0.5 text-label font-semibold ${className}`}>
-      {contractStatusLabels[status]}
-    </span>
-  )
+  return <StatusChip status={`contract:${status}`} />
 }
 
+/** Deprecated shim: use `<StatusChip status="lead:…" />`. */
 export function LeadStatusPill({ status }: { status: LeadStatus }) {
-  const className =
-    status === 'disqualified'
-      ? 'bg-danger-light text-danger'
-      : status === 'new' || status === 'contract'
-        ? 'bg-primary-light text-primaryDark'
-        : 'bg-info-light text-info'
-  return (
-    <span className={`inline-flex items-center rounded-pill px-2 py-0.5 text-label font-semibold ${className}`}>
-      {leadStatusLabels[status]}
-    </span>
-  )
+  return <StatusChip status={`lead:${status}`} />
 }
 
+/** Deprecated shim: use `<StatusChip status="company:…" />`. */
 export function CompanyAccessRequestStatusPill({
   status,
 }: {
   status: CompanyAccessRequestStatus
 }) {
-  const className =
-    status === 'approved'
-      ? 'bg-primary-light text-primaryDark'
-      : status === 'rejected'
-        ? 'bg-danger-light text-danger'
-        : status === 'held'
-          ? 'bg-bg-mist text-ink-muted'
-          : 'bg-info-light text-info'
-  return (
-    <span className={`inline-flex items-center rounded-pill px-2 py-0.5 text-label font-semibold ${className}`}>
-      {companyAccessRequestStatusLabels[status]}
-    </span>
-  )
+  return <StatusChip status={`company:${status}`} />
 }
 
 /** GDPR: admins see only the last four digits of a personal ID. */
@@ -225,7 +199,10 @@ export function formatDateTime(value: string | null | undefined): string {
 
 export function formatEur(cents: number | null | undefined): string {
   if (cents === null || cents === undefined) return '—'
-  return (cents / 100).toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+  return (cents / 100).toLocaleString('et-EE', {
+    style: 'currency',
+    currency: 'EUR',
+  })
 }
 
 export function formatEurAmount(euros: number | null | undefined): string {
@@ -234,7 +211,10 @@ export function formatEurAmount(euros: number | null | undefined): string {
 }
 
 /** Relative time in Estonian; `now` is injectable so client tickers stay live. */
-export function formatRelativeTime(value: string, now: number = Date.now()): string {
+export function formatRelativeTime(
+  value: string,
+  now: number = Date.now(),
+): string {
   const time = new Date(value).getTime()
   if (Number.isNaN(time)) return value
   const seconds = Math.round((now - time) / 1000)

@@ -13,7 +13,7 @@ import {
 const contentSlugs = Object.keys(contentCollections) as ContentCollectionSlug[]
 
 describe('contentCollections registry', () => {
-  it('covers the 13 content collections', () => {
+  it('covers the 15 content collections', () => {
     expect(Object.keys(contentCollections).sort()).toEqual(
       [
         'articles',
@@ -22,6 +22,8 @@ describe('contentCollections registry', () => {
         'faq-items',
         'legal-documents',
         'media',
+        'page-blocks',
+        'page-versions',
         'pages',
         'parishes',
         'partner-services',
@@ -35,7 +37,7 @@ describe('contentCollections registry', () => {
 
   it('keeps the core registry at the 20 core collections', () => {
     expect(Object.keys(coreCollections)).toHaveLength(20)
-    expect(contentSlugs).toHaveLength(13)
+    expect(contentSlugs).toHaveLength(15)
   })
 
   it('maps every slug to a table whose columns include the id', () => {
@@ -57,6 +59,8 @@ describe('contentCollections registry', () => {
   it('declares the content TEXT-JSON fields and leaves richText columns raw', () => {
     expect(contentCollections.articles.jsonFields).toEqual({ tags: 'array' })
     expect(contentCollections.pages.jsonFields).toEqual({ layout: 'json' })
+    expect(contentCollections['page-blocks'].jsonFields).toEqual({ configJson: 'json' })
+    expect(contentCollections['page-versions'].jsonFields).toEqual({ snapshotJson: 'json' })
     const richTextOwners = [
       'articles',
       'faq-items',

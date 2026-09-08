@@ -12,6 +12,7 @@ import {
 } from '../_lib/auction-schema'
 import type { AuctionGateSubject } from '../_lib/auction-schema'
 
+import { auctionObjectTypes } from '@/lib/data/schema'
 import type { AuctionObjectType } from '@/lib/data/schema'
 
 /**
@@ -678,3 +679,342 @@ export const SPECIES_OPTIONS: readonly { value: string; label: string }[] = spec
 
 export const LOGGING_TYPE_OPTIONS: readonly { value: string; label: string }[] =
   loggingTypeCodes.map((code) => ({ value: code, label: code }))
+
+// ── Step rail marks (task 5.2; demo 03 wiz-side) ────────────────────────────
+
+export type WizardStepMark = 'done' | 'current' | 'todo' | 'disabled'
+
+export interface WizardRailStep {
+  /** Canonical step number (1-7). */
+  step: number
+  id: string
+  label: string
+  mark: WizardStepMark
+  /** Blocking defects landing on this step; always 0 for a hidden row. */
+  defects: number
+}
+
+/**
+ * Rail marks from the live per-step validation: a step is done when no
+ * blocking defect lands on it and todo otherwise, the current step overrides
+ * both, and hidden steps (Pakett for non-package lots) stay disabled.
+ * Warnings are never defects — they do not block a save or a publish.
+ */
+export function wizardRailSteps(
+  steps: readonly { id: string; label: string }[],
+  hiddenStepIds: readonly string[],
+  initial: AuctionWizardInitial,
+  state: AuctionWizardState,
+  options: Pick<AuctionWizardOptions, 'canFeeOverride' | 'canReassignSpecialist'>,
+  currentStep: number,
+): WizardRailStep[] {
+  const hidden = new Set(hiddenStepIds)
+  const defectsByStep = new Map<number, number>()
+  for (const issue of reviewIssues(initial, state, options)) {
+    if (issue.severity !== 'error') continue
+    defectsByStep.set(issue.step, (defectsByStep.get(issue.step) ?? 0) + 1)
+  }
+  return steps.map((entry, index) => {
+    const step = index + 1
+    const isHidden = hidden.has(entry.id)
+    const defects = isHidden ? 0 : (defectsByStep.get(step) ?? 0)
+    const mark: WizardStepMark = isHidden
+      ? 'disabled'
+      : step === currentStep
+        ? 'current'
+        : defects > 0
+          ? 'todo'
+          : 'done'
+    return { step, id: entry.id, label: entry.label, mark, defects }
+  })
+}
+
+/** Rail footer line: "1 puudus", otherwise "N puudust". */
+export function wizardDefectLabel(count: number): string {
+  return count === 1 ? '1 puudus' : `${String(count)} puudust`
+}
+
+// ── Client draft autosave (task 5.3) ────────────────────────────────────────
+
+const WIZARD_DRAFT_VERSION = 1
+
+/** localStorage keys stay separate for unsaved and stored lots. */
+export function wizardDraftKey(auctionId: string | null): string {
+  return auctionId === null ? 'auction-draft:new' : `auction-draft:${auctionId}`
+}
+
+/** Stored wizard draft: the editable state plus the save time. */
+export interface WizardDraft {
+  state: AuctionWizardState
+  /** ISO-8601 UTC save time. */
+  savedAt: string
+}
+
+/**
+ * Deterministic snapshot of the editable state for dirty compares. The
+ * UI-only `reserveEditing` flag never takes part; `files` stays absent until
+ * MediaStep owns the list, and JSON.stringify drops that key by itself.
+ */
+export function serializeWizardState(state: AuctionWizardState): string {
+  return JSON.stringify({ ...state, reserveEditing: false })
+}
+
+/** Full draft record for localStorage. */
+export function serializeWizardDraft(state: AuctionWizardState, savedAt: Date): string {
+  return JSON.stringify({
+    version: WIZARD_DRAFT_VERSION,
+    state: { ...state, reserveEditing: false },
+    savedAt: savedAt.toISOString(),
+  })
+}
+
+/** True when any editable field differs; the reserve UI flag is ignored. */
+export function wizardDraftDiffers(
+  left: AuctionWizardState,
+  right: AuctionWizardState,
+): boolean {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)])
+  for (const key of keys) {
+    if (key === 'reserveEditing') continue
+    const a = left[key as keyof AuctionWizardState]
+    const b = right[key as keyof AuctionWizardState]
+    if (a === b) continue
+    if (
+      typeof a === 'object' &&
+      a !== null &&
+      typeof b === 'object' &&
+      b !== null &&
+      JSON.stringify(a) === JSON.stringify(b)
+    ) {
+      continue
+    }
+    return true
+  }
+  return false
+}
+
+const DRAFT_STRING_KEYS = [
+  'title',
+  'slug',
+  'antiSnipeMinutes',
+  'startsAt',
+  'endsAt',
+  'minBidEur',
+  'bidStepEur',
+  'reserveEur',
+  'feeOverridePercent',
+  'countyId',
+  'parishId',
+  'address',
+  'lat',
+  'lng',
+  'areaHa',
+  'volumeM3',
+  'loggingDeadline',
+  'removalDeadline',
+  'leaseDeadline',
+  'specialistId',
+  'descriptionPublic',
+  'descriptionSecondary',
+  'packageHeader',
+] as const
+
+const DRAFT_BOOLEAN_KEYS = ['isQuickAuction', 'antiSnipeEnabled'] as const
+
+const DRAFT_STRING_ARRAY_KEYS = [
+  'cadastres',
+  'registryNumbers',
+  'compartments',
+  'forestNotifications',
+  'species',
+  'loggingTypes',
+] as const
+
+type DraftStrings = Record<(typeof DRAFT_STRING_KEYS)[number], string>
+type DraftStringArrays = Record<(typeof DRAFT_STRING_ARRAY_KEYS)[number], string[]>
+
+function draftString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null
+}
+
+function draftStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null
+  const items: string[] = []
+  for (const entry of value) {
+    if (typeof entry !== 'string') return null
+    items.push(entry)
+  }
+  return items
+}
+
+function draftMedia(value: unknown): AuctionMediaItemState[] | null {
+  if (!Array.isArray(value)) return null
+  const items: AuctionMediaItemState[] = []
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) return null
+    const record = entry as Record<string, unknown>
+    const url = draftString(record.url)
+    const alt = draftString(record.alt)
+    if (url === null || alt === null) return null
+    const { focalX, focalY } = record
+    items.push({
+      url,
+      alt,
+      ...(typeof focalX === 'number' && Number.isFinite(focalX) ? { focalX } : {}),
+      ...(typeof focalY === 'number' && Number.isFinite(focalY) ? { focalY } : {}),
+    })
+  }
+  return items
+}
+
+function draftFiles(value: unknown): AuctionFileItemState[] | null {
+  if (!Array.isArray(value)) return null
+  const items: AuctionFileItemState[] = []
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) return null
+    const record = entry as Record<string, unknown>
+    const url = draftString(record.url)
+    if (url === null) return null
+    items.push({ url, tag: attachmentTagFrom(record.tag) })
+  }
+  return items
+}
+
+function draftPackageRows(value: unknown): PackageRowState[] | null {
+  if (!Array.isArray(value)) return null
+  const rows: PackageRowState[] = []
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) return null
+    const record = entry as Record<string, unknown>
+    const row: PackageRowState = {
+      cadastre: '',
+      registryNumber: '',
+      county: '',
+      areaHa: '',
+      minBidEur: '',
+    }
+    for (const key of Object.keys(row) as (keyof PackageRowState)[]) {
+      const cell = draftString(record[key])
+      if (cell === null) return null
+      row[key] = cell
+    }
+    rows.push(row)
+  }
+  return rows
+}
+
+/**
+ * Field-shape guard for a stored draft. One mistyped field rejects the whole
+ * draft: the version stamp (bumped on state-shape changes) is the migration
+ * path, so a half-understood draft can never crash the wizard or silently
+ * drop a field on restore.
+ */
+function draftStateFrom(value: unknown): AuctionWizardState | null {
+  if (typeof value !== 'object' || value === null) return null
+  const record = value as Record<string, unknown>
+  const objectType = draftString(record.objectType)
+  const auctionType = draftString(record.auctionType)
+  if (
+    objectType === null ||
+    !(auctionObjectTypes as readonly string[]).includes(objectType) ||
+    (auctionType !== 'open' && auctionType !== 'sealed')
+  ) {
+    return null
+  }
+  const typedObjectType = objectType as AuctionObjectType
+  const strings = {} as DraftStrings
+  for (const key of DRAFT_STRING_KEYS) {
+    const parsed = draftString(record[key])
+    if (parsed === null) return null
+    strings[key] = parsed
+  }
+  for (const key of DRAFT_BOOLEAN_KEYS) {
+    if (typeof record[key] !== 'boolean') return null
+  }
+  const stringArrays = {} as DraftStringArrays
+  for (const key of DRAFT_STRING_ARRAY_KEYS) {
+    const parsed = draftStringArray(record[key])
+    if (parsed === null) return null
+    stringArrays[key] = parsed
+  }
+  const propertyCount: unknown = record.propertyCount
+  if (
+    propertyCount !== null &&
+    (typeof propertyCount !== 'number' || !Number.isFinite(propertyCount))
+  ) {
+    return null
+  }
+  const media = draftMedia(record.media)
+  if (media === null) return null
+  const packageRows = draftPackageRows(record.packageRows)
+  if (packageRows === null) return null
+  let files: AuctionFileItemState[] | undefined
+  if (record.files !== undefined) {
+    const parsed = draftFiles(record.files)
+    if (parsed === null) return null
+    files = parsed
+  }
+
+  return {
+    title: strings.title,
+    slug: strings.slug,
+    objectType: typedObjectType,
+    auctionType,
+    isQuickAuction: record.isQuickAuction === true,
+    antiSnipeEnabled: record.antiSnipeEnabled === true,
+    antiSnipeMinutes: strings.antiSnipeMinutes,
+    startsAt: strings.startsAt,
+    endsAt: strings.endsAt,
+    minBidEur: strings.minBidEur,
+    bidStepEur: strings.bidStepEur,
+    reserveEur: strings.reserveEur,
+    reserveEditing: false,
+    feeOverridePercent: strings.feeOverridePercent,
+    countyId: strings.countyId,
+    parishId: strings.parishId,
+    address: strings.address,
+    lat: strings.lat,
+    lng: strings.lng,
+    cadastres: stringArrays.cadastres,
+    registryNumbers: stringArrays.registryNumbers,
+    compartments: stringArrays.compartments,
+    forestNotifications: stringArrays.forestNotifications,
+    species: stringArrays.species,
+    loggingTypes: stringArrays.loggingTypes,
+    areaHa: strings.areaHa,
+    volumeM3: strings.volumeM3,
+    loggingDeadline: strings.loggingDeadline,
+    removalDeadline: strings.removalDeadline,
+    leaseDeadline: strings.leaseDeadline,
+    propertyCount: typeof propertyCount === 'number' ? propertyCount : null,
+    specialistId: strings.specialistId,
+    descriptionPublic: strings.descriptionPublic,
+    descriptionSecondary: strings.descriptionSecondary,
+    media,
+    ...(files !== undefined ? { files } : {}),
+    packageHeader: strings.packageHeader,
+    packageRows,
+  }
+}
+
+/**
+ * Parses a stored draft. Junk JSON, a foreign version or any field failing
+ * the shape guard yields null, and the wizard discards the draft instead of
+ * restoring half of it.
+ */
+export function parseWizardDraft(raw: string): WizardDraft | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null
+  const record = parsed as Record<string, unknown>
+  if (record.version !== WIZARD_DRAFT_VERSION) return null
+  if (typeof record.savedAt !== 'string' || Number.isNaN(Date.parse(record.savedAt))) {
+    return null
+  }
+  const state = draftStateFrom(record.state)
+  return state === null ? null : { state, savedAt: record.savedAt }
+}

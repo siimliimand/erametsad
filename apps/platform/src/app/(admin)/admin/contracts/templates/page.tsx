@@ -1,34 +1,18 @@
 import {
-  activateContractTemplateAction,
-  deactivateContractTemplateAction,
-  testRenderTemplateAction,
-  uploadContractTemplateAction,
-} from '../../../_actions/contracts'
-import { DataTable } from '../../../_components/DataTable'
+  TemplateCard,
+  type TemplateCardData,
+  type TemplateLifecycle,
+} from './_components/TemplateCard'
+import type { TemplateVersionEntry } from './_components/TemplateVersionHistory'
+import { uploadContractTemplateAction } from '../../../_actions/contracts'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import { PageHeader } from '../../../_components/PageHeader'
 import { requireAdminRepositories } from '../../../_lib/admin'
-import {
-  contractTemplateTypeLabels,
-  formatDateTime,
-} from '../../../_lib/labels'
 import { can } from '../../../_lib/permissions'
-import { HtmlPreviewDrawer } from '../_components/HtmlPreviewDrawer'
 
 import type { ContractTemplateType } from '@/lib/data/schema'
 
 export const metadata = { title: 'Lepingu mallid' }
-
-interface TemplateRow {
-  id: string
-  name: string
-  type: string
-  version: string
-  active: boolean
-  lifecycle: 'draft' | 'active' | 'archived'
-  tokens: { key: string }[]
-  updatedAt: string
-}
 
 const smallButtonClass =
   'inline-flex h-8 items-center rounded-button border border-border bg-bgPage px-3 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary'
@@ -36,23 +20,77 @@ const smallButtonClass =
 const inputClass =
   'rounded-input border border-border bg-bgPage px-3 py-2 text-bodySm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none'
 
-const lifecycleLabels: Record<TemplateRow['lifecycle'], string> = {
-  draft: 'Mustand',
-  active: 'Aktiivne',
-  archived: 'Arhiivis',
-}
-
-const lifecycleClasses: Record<TemplateRow['lifecycle'], string> = {
-  draft: 'bg-bg-mist text-ink-muted',
-  active: 'bg-primary-light text-primaryDark',
-  archived: 'bg-bg-mist text-ink-muted',
-}
-
 function readTokens(placeholders: unknown): { key: string }[] {
   if (!Array.isArray(placeholders)) return []
   return placeholders.flatMap((item) => {
     const key = (item as { key?: unknown } | null)?.key
     return typeof key === 'string' ? [{ key }] : []
+  })
+}
+
+interface GroupedVersion extends TemplateVersionEntry {
+  tokens: { key: string }[]
+}
+
+/**
+ * Each contract_templates row is one version; a card groups the versions of
+ * one named template (same name + type), newest upload first.
+ */
+function groupTemplateCards(
+  templates: {
+    id: string
+    name: string
+    type: ContractTemplateType
+    version: string
+    placeholders: unknown
+    active: boolean
+    createdAt: string
+    updatedAt: string
+  }[],
+  rowLifecycle: Map<string, TemplateLifecycle>,
+): TemplateCardData[] {
+  const groups = new Map<
+    string,
+    { name: string; type: ContractTemplateType; versions: GroupedVersion[] }
+  >()
+  for (const template of templates) {
+    const key = `${template.type}::${template.name}`
+    const group = groups.get(key) ?? {
+      name: template.name,
+      type: template.type,
+      versions: [],
+    }
+    group.versions.push({
+      id: template.id,
+      version: template.version,
+      createdAt: template.createdAt,
+      updatedAt: template.updatedAt,
+      active: template.active,
+      tokens: readTokens(template.placeholders),
+    })
+    groups.set(key, group)
+  }
+
+  return [...groups.values()].flatMap((group) => {
+    const versions = [...group.versions].sort(
+      (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+    )
+    const head = versions[0]
+    if (!head) return []
+    const lifecycle: TemplateLifecycle = versions.some((entry) => entry.active)
+      ? 'active'
+      : (rowLifecycle.get(head.id) ?? 'draft')
+    return [
+      {
+        id: head.id,
+        name: group.name,
+        type: group.type,
+        lifecycle,
+        tokens: head.tokens,
+        updatedAt: head.updatedAt,
+        versions,
+      },
+    ]
   })
 }
 
@@ -105,24 +143,19 @@ export default async function ContractTemplatesPage({
     }
   }
 
-  const rows: TemplateRow[] = templates.map((template) => {
-    const lastEvent = lastLifecycleEvent.get(template.id)
-    const lifecycle: TemplateRow['lifecycle'] = template.active
-      ? 'active'
-      : lastEvent === 'template.deactivate'
-        ? 'archived'
-        : 'draft'
-    return {
-      id: template.id,
-      name: template.name,
-      type: template.type,
-      version: template.version,
-      active: template.active,
-      lifecycle,
-      tokens: readTokens(template.placeholders),
-      updatedAt: template.updatedAt,
-    }
-  })
+  const rowLifecycle = new Map<string, TemplateLifecycle>()
+  for (const template of templates) {
+    rowLifecycle.set(
+      template.id,
+      template.active
+        ? 'active'
+        : lastLifecycleEvent.get(template.id) === 'template.deactivate'
+          ? 'archived'
+          : 'draft',
+    )
+  }
+
+  const cards = groupTemplateCards(templates, rowLifecycle)
 
   return (
     <div>
@@ -183,104 +216,17 @@ export default async function ContractTemplatesPage({
         </form>
       </details>
 
-      <DataTable
-        columns={[
-          { key: 'name', label: 'Nimi' },
-          {
-            key: 'type',
-            label: 'Tüüp',
-            render: (row) => contractTemplateTypeLabels[row.type as ContractTemplateType],
-          },
-          { key: 'version', label: 'Versioon' },
-          {
-            key: 'lifecycle',
-            label: 'Olek',
-            render: (row) => (
-              <span
-                className={`inline-flex items-center rounded-pill px-2 py-0.5 text-label font-semibold ${lifecycleClasses[row.lifecycle]}`}
-              >
-                {lifecycleLabels[row.lifecycle]}
-              </span>
-            ),
-          },
-          {
-            key: 'tokens',
-            label: 'Kohatäited',
-            render: (row) =>
-              row.tokens.length === 0 ? (
-                '—'
-              ) : (
-                <details>
-                  <summary className="cursor-pointer text-label text-ink-muted">
-                    {String(row.tokens.length)} kohatäidet
-                  </summary>
-                  <ul className="mt-xs flex max-w-64 flex-col gap-0.5">
-                    {row.tokens.map((token) => (
-                      <li key={token.key} className="font-mono text-label text-ink-muted">
-                        {`{{${token.key}}}`}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              ),
-          },
-          {
-            key: 'updatedAt',
-            label: 'Muudetud',
-            render: (row) => formatDateTime(row.updatedAt),
-          },
-          {
-            key: 'actions',
-            label: 'Tegevused',
-            render: (row) => (
-              <div className="flex flex-col items-start gap-xs">
-                <HtmlPreviewDrawer
-                  label="Testrender"
-                  drawerTitle={`Testrender — ${row.name} (v${row.version})`}
-                  documentId={row.id}
-                  fetchDocument={testRenderTemplateAction}
-                />
-                {row.active ? (
-                  <details>
-                    <summary className="cursor-pointer text-label font-semibold text-danger">
-                      Deaktiveeri
-                    </summary>
-                    <form
-                      action={deactivateContractTemplateAction}
-                      className="mt-xs flex w-64 flex-col gap-xs"
-                    >
-                      <input type="hidden" name="id" value={row.id} />
-                      <textarea
-                        name="reason"
-                        required
-                        minLength={5}
-                        rows={2}
-                        placeholder="Deaktiveerimise põhjus (kohustuslik)"
-                        className={inputClass}
-                      />
-                      <button
-                        type="submit"
-                        className="inline-flex h-8 items-center justify-center rounded-button border border-danger bg-bgPage px-3 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light"
-                      >
-                        Kinnita deaktiveerimine
-                      </button>
-                    </form>
-                  </details>
-                ) : (
-                  <form action={activateContractTemplateAction}>
-                    <input type="hidden" name="id" value={row.id} />
-                    <button type="submit" className={smallButtonClass}>
-                      Aktiveeri
-                    </button>
-                  </form>
-                )}
-              </div>
-            ),
-          },
-        ]}
-        rows={rows}
-        emptyLabel="Malle ei ole."
-      />
+      {cards.length === 0 ? (
+        <div className="rounded-card border border-border bg-bgPage px-md py-md text-bodySm text-ink-muted">
+          Malle ei ole.
+        </div>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-md">
+          {cards.map((card) => (
+            <TemplateCard key={card.id} card={card} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
