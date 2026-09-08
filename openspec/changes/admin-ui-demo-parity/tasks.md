@@ -7,7 +7,7 @@
 - [x] 1.5 Small primitives: Switch, TabBar (pill tabs with counts, roving tabindex), FilterChip, EmptyRow, KpiCard <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(admin)/_components/ui/**] -->
 - [x] 1.6 Collapse StatusChip and StatusPill into one component with the full demo variant set (auction triads, user states, contract glyphs, lead and content variants) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_components/StatusChip.tsx, apps/platform/src/app/(admin)/_lib/labels.tsx] -->
 - [x] 1.7 AdminNav badge support (amber dot, red count) fed by server pending counts <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_components/AdminNav.tsx, apps/platform/src/app/(admin)/_components/AdminShell.tsx, apps/platform/src/app/(admin)/layout.tsx] -->
-- [ ] 1.8 Wire Cmd/Ctrl+K in TopbarSearch: grouped route-jump palette (auctions, users, leads, contracts, settings) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_components/TopbarSearch.tsx] -->
+- [x] 1.8 Wire Cmd/Ctrl+K in TopbarSearch: grouped route-jump palette (auctions, users, leads, contracts, settings) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_components/TopbarSearch.tsx] -->
 - [x] 1.9 Tests for all primitives (overlay focus, Esc, drawer widths, toast timing, pill variants) <!-- agent: fullstack-engineer.build, depends_on: [1.4, 1.5, 1.6], touches: [apps/platform/src/app/(admin)/_components/**/__tests__/**] -->
 
 ## 2. Navigation and route repairs
@@ -25,20 +25,20 @@
 - [x] 3.2 KPI strip: 7 cards, alert badge, sparkline SVG, trend sublines, card links <!-- agent: fullstack-engineer.build, depends_on: [3.1, 1.5], touches: [apps/platform/src/app/(admin)/admin/page.tsx] -->
 - [x] 3.3 "Lõpevad täna" live table: countdown cells with critical blink, type chips, Monitor/Ava buttons <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/app/(admin)/admin/page.tsx, apps/platform/src/app/(admin)/admin/_components/EndingToday.tsx] -->
 - [x] 3.4 "Süsteemi tervis", "Kiire tegevus", "Viimased juhtlõimed" cards <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/app/(admin)/admin/page.tsx, apps/platform/src/app/(admin)/admin/_components/**] -->
-- [ ] 3.5 Workspace tests (aggregations, empty states, role-scoped counts) <!-- agent: fullstack-engineer.build, depends_on: [3.2, 3.3, 3.4], touches: [apps/platform/src/app/(admin)/admin/_lib/__tests__/**] -->
+- [x] 3.5 Workspace tests (aggregations, empty states, role-scoped counts) <!-- agent: fullstack-engineer.build, depends_on: [3.2, 3.3, 3.4], touches: [apps/platform/src/app/(admin)/admin/_lib/__tests__/**] -->
 
 ## 4. Auctions list parity
 
 - [x] 4.1 Column chooser ("Veerud") with localStorage persistence over AuctionsTable <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/AuctionsTable.tsx] -->
 - [x] 4.2 Visual parity: selected-row mint tint, tab-count inversion, global ⌘N listener, status glyphs via the unified chip <!-- agent: fullstack-engineer.build, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/admin/auctions/page.tsx, apps/platform/src/app/(admin)/admin/auctions/_components/AuctionsTable.tsx] -->
-- [ ] 4.3 Tests: chooser persistence, selection tint, keyboard shortcut <!-- agent: fullstack-engineer.build, depends_on: [4.1, 4.2], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/__tests__/**] -->
+- [x] 4.3 Tests: chooser persistence, selection tint, keyboard shortcut <!-- agent: fullstack-engineer.build, depends_on: [4.1, 4.2], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/__tests__/**] -->
 
 ## 5. Wizard chrome and autosave
 
 - [x] 5.1 Editor bar: title with mono id, status pill, autosave indicator with ping, Eelvaade link <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/AuctionWizard.tsx] -->
 - [x] 5.2 Step rail marks: done/current/todo/disabled from existing per-step validation, "N puudust" footer <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/AuctionWizard.tsx, apps/platform/src/app/(admin)/admin/auctions/_components/wizard-model.ts] -->
 - [x] 5.3 Client draft autosave to localStorage with restore prompt and beforeunload guard <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/(admin)/admin/auctions/auction-form.tsx, apps/platform/src/app/(admin)/admin/auctions/_components/AuctionWizard.tsx] -->
-- [ ] 5.4 Tests: mark computation, autosave restore, guard <!-- agent: fullstack-engineer.build, depends_on: [5.2, 5.3], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/__tests__/**] -->
+- [x] 5.4 Tests: mark computation, autosave restore, guard <!-- agent: fullstack-engineer.build, depends_on: [5.2, 5.3], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/__tests__/**] -->
 
 ## 6. Bid monitor parity
 
