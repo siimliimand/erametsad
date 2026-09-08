@@ -117,17 +117,27 @@ function DrawerWithConfirm(): ReactElement {
   const [modalOpen, setModalOpen] = useState(false)
   return createElement(Drawer, {
     open: drawerOpen,
-    onClose: () => setDrawerOpen(false),
+    onClose: () => {
+      setDrawerOpen(false)
+    },
     title: 'Kaart',
     children: [
       createElement(
         'button',
-        { type: 'button', onClick: () => setModalOpen(true), key: 'open' },
+        {
+          type: 'button',
+          onClick: () => {
+            setModalOpen(true)
+          },
+          key: 'open',
+        },
         'Ava kinnitus',
       ),
       createElement(Modal, {
         open: modalOpen,
-        onClose: () => setModalOpen(false),
+        onClose: () => {
+          setModalOpen(false)
+        },
         title: 'Väike kinnitus',
         key: 'modal',
         children: 'Kas kinnitad?',

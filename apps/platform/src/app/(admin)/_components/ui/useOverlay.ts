@@ -94,8 +94,12 @@ export function useDialogFocus(open: boolean, panelRef: RefObject<HTMLElement | 
         : (fn: () => void) => setTimeout(fn, 0) as unknown as number
     const cancel =
       typeof cancelAnimationFrame === 'function'
-        ? (id: number) => cancelAnimationFrame(id)
-        : (id: number) => clearTimeout(id)
+        ? (id: number) => {
+            cancelAnimationFrame(id)
+          }
+        : (id: number) => {
+            clearTimeout(id)
+          }
     let timer = 0
     const focusPanel = () => {
       const panel = panelRef.current

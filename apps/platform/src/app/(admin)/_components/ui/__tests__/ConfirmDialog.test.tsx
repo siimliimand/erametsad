@@ -86,7 +86,7 @@ function guardInput(): HTMLInputElement {
 
 function buttonByLabel(label: string): HTMLButtonElement {
   const el = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
-    (button) => button.textContent?.trim() === label,
+    (button) => button.textContent.trim() === label,
   )
   if (el === undefined) throw new Error(`button not found: ${label}`)
   return el

@@ -25,11 +25,6 @@ import {
 } from '../../../_components/DataTable'
 import { StatusChip } from '../../../_components/StatusChip'
 import {
-  trapTabKey,
-  useDialogFocus,
-  useEscapeKey,
-} from '../../../_components/ui/useOverlay'
-import {
   CalendarClockIcon,
   CopyIcon,
   EllipsisIcon,
@@ -41,6 +36,11 @@ import {
   XIcon,
   ZapIcon,
 } from '../../../_components/icons'
+import {
+  trapTabKey,
+  useDialogFocus,
+  useEscapeKey,
+} from '../../../_components/ui/useOverlay'
 import {
   auctionObjectTypeLabels,
   auctionStatusLabels,

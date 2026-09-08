@@ -16,7 +16,12 @@ function ToastHost(): ReactElement {
   const push = useToast()
   return createElement(
     'button',
-    { type: 'button', onClick: () => push(queued.current) },
+    {
+      type: 'button',
+      onClick: () => {
+        push(queued.current)
+      },
+    },
     'push',
   )
 }
@@ -127,7 +132,7 @@ describe('Toast', () => {
     expect(region.className).toContain('bottom-6')
     expect(region.className).toContain('left-1/2')
 
-    const toastText = region.textContent ?? ''
+    const toastText = region.textContent
     expect(toastText).toContain('Ok')
     expect(toastText).toContain('Viga')
     expect(toastText).toContain('Infoks')
