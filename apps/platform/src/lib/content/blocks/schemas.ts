@@ -7,12 +7,24 @@ import { z } from 'zod'
  */
 
 export const ctaLinkSchema = z.object({
-  label: z.string().min(1, 'Nupu tekst on kohustuslik.').max(100),
-  href: z.string().min(1, 'Nupu link on kohustuslik.').max(1000),
+  label: z
+    .string({ required_error: 'Nupu tekst on kohustuslik.' })
+    .trim()
+    .min(1, 'Nupu tekst on kohustuslik.')
+    .max(100),
+  href: z
+    .string({ required_error: 'Nupu link on kohustuslik.' })
+    .trim()
+    .min(1, 'Nupu link on kohustuslik.')
+    .max(1000),
 })
 
-const shortText = (message: string) => z.string().trim().min(1, message).max(200)
-const bodyText = (message: string) => z.string().trim().min(1, message).max(5000)
+// required_error keeps the Estonian message for fully missing fields too
+// (zod's default is the English "Required").
+const shortText = (message: string) =>
+  z.string({ required_error: message }).trim().min(1, message).max(200)
+const bodyText = (message: string) =>
+  z.string({ required_error: message }).trim().min(1, message).max(5000)
 const optionalImage = z.string().max(1000).optional()
 
 export const heroConfigSchema = z.object({
