@@ -1,3 +1,4 @@
+import { startOfDayMs, successFeeCents } from '../../_lib/workspace'
 import type {
   ChartColor,
   MonthlyBarsData,
@@ -5,7 +6,6 @@ import type {
   TrendData,
 } from '../_components/Charts'
 
-import { startOfDayMs, successFeeCents } from '../../_lib/workspace'
 
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { centsToEuros } from '@/lib/data/repositories/money'

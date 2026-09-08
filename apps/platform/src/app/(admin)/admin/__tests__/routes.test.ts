@@ -68,9 +68,9 @@ function pageFileFor(href: string): string {
   return [...parts, 'page.tsx'].join('/')
 }
 
-// Task 13.3 of this change creates the /admin/statistics page; until it lands
-// the route is the registry's only known gap.
-const KNOWN_ROUTE_GAPS: ReadonlySet<AdminModuleId> = new Set(['statistics'])
+// Task 13.3 landed the /admin/statistics page, so every registry href now
+// resolves to a real page file and the gap set stays empty.
+const KNOWN_ROUTE_GAPS: ReadonlySet<AdminModuleId> = new Set()
 
 /** Mirror of the private MODULE_READ_PERMISSION map in _lib/permissions. */
 const MODULE_READ_PERMISSION: Record<AdminModuleId, AdminPermission> = {
@@ -108,7 +108,7 @@ async function redirectTarget(run: () => unknown): Promise<string> {
 describe('admin module routes', () => {
   it('resolves every registry href to an existing page file', () => {
     const routable = ADMIN_MODULES.filter((module) => !KNOWN_ROUTE_GAPS.has(module.id))
-    expect(routable).toHaveLength(12)
+    expect(routable).toHaveLength(13)
 
     for (const module of routable) {
       const file = pageFileFor(module.href)
@@ -119,8 +119,8 @@ describe('admin module routes', () => {
     }
   })
 
-  it('keeps the known gap set at exactly the pending statistics route', () => {
-    expect([...KNOWN_ROUTE_GAPS]).toEqual(['statistics'])
+  it('keeps the route gap set empty with statistics routed', () => {
+    expect(KNOWN_ROUTE_GAPS.size).toBe(0)
     expect(ADMIN_MODULES.map((module) => module.id)).toContain('statistics')
   })
 
