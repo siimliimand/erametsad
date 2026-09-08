@@ -66,20 +66,20 @@
 
 ## 9. Companies approvals polish
 
-- [ ] 9.1 Demo card layout on /admin/companies: two-panel comparison, wait badges, decision notes, rights-selection modal via primitives <!-- agent: fullstack-engineer.build, depends_on: [2.1, 1.4], touches: [apps/platform/src/app/(admin)/admin/companies/**] -->
+- [x] 9.1 Demo card layout on /admin/companies: two-panel comparison, wait badges, decision notes, rights-selection modal via primitives <!-- agent: fullstack-engineer.build, depends_on: [2.1, 1.4], touches: [apps/platform/src/app/(admin)/admin/companies/**] -->
 - [ ] 9.2 Tests: decision flow, badge countdown, modal rights capture <!-- agent: fullstack-engineer.build, depends_on: [9.1], touches: [apps/platform/src/app/(admin)/admin/companies/__tests__/**] -->
 
 ## 10. Contracts visuals
 
-- [ ] 10.1 Template card grid: version chips, expandable version history, active/draft pills <!-- agent: fullstack-engineer.build, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/admin/contracts/templates/page.tsx] -->
+- [x] 10.1 Template card grid: version chips, expandable version history, active/draft pills <!-- agent: fullstack-engineer.build, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/admin/contracts/templates/page.tsx] -->
 - [ ] 10.2 Editor modal: clickable placeholder chips inserting at cursor for HTML/TXT templates, test-render button reusing HtmlPreviewDrawer <!-- agent: fullstack-engineer.build, depends_on: [1.2, 10.1], touches: [apps/platform/src/app/(admin)/admin/contracts/_components/**] -->
-- [ ] 10.3 Contract list glyph pills and status parity via the unified chip <!-- agent: fullstack-engineer.fast, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/admin/contracts/page.tsx] -->
+- [x] 10.3 Contract list glyph pills and status parity via the unified chip <!-- agent: fullstack-engineer.fast, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/admin/contracts/page.tsx] -->
 - [ ] 10.4 Tests <!-- agent: fullstack-engineer.build, depends_on: [10.2, 10.3], touches: [apps/platform/src/app/(admin)/admin/contracts/_components/__tests__/**] -->
 
 ## 11. Service requests and leads polish
 
-- [ ] 11.1 Requests: 7-day-rule info strip, expired-row tint, response-tracking table in the routing drawer <!-- agent: fullstack-engineer.build, depends_on: [2.2], touches: [apps/platform/src/app/(admin)/admin/inquiries/**] -->
-- [ ] 11.2 Leads: keyboard move menu, card menu, demo-parity card metadata <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/leads/_components/LeadsKanban.tsx] -->
+- [x] 11.1 Requests: 7-day-rule info strip, expired-row tint, response-tracking table in the routing drawer <!-- agent: fullstack-engineer.build, depends_on: [2.2], touches: [apps/platform/src/app/(admin)/admin/inquiries/**] -->
+- [x] 11.2 Leads: keyboard move menu, card menu, demo-parity card metadata <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/leads/_components/LeadsKanban.tsx] -->
 - [ ] 11.3 Tests <!-- agent: fullstack-engineer.build, depends_on: [11.1, 11.2], touches: [apps/platform/src/app/(admin)/admin/leads/**/__tests__/**, apps/platform/src/app/(admin)/admin/inquiries/**/__tests__/**] -->
 
 ## 12. CMS block builder
