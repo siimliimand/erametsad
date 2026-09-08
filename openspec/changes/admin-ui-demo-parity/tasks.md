@@ -22,14 +22,14 @@
 ## 3. Workspace (Töölaud)
 
 - [x] 3.1 _lib/workspace.ts: aggregations for 7 KPIs, ending-today auctions, queue counts, recent leads <!-- agent: fullstack-engineer.build, depends_on: [2.6], touches: [apps/platform/src/app/(admin)/admin/_lib/workspace.ts] -->
-- [ ] 3.2 KPI strip: 7 cards, alert badge, sparkline SVG, trend sublines, card links <!-- agent: fullstack-engineer.build, depends_on: [3.1, 1.5], touches: [apps/platform/src/app/(admin)/admin/page.tsx] -->
-- [ ] 3.3 "Lõpevad täna" live table: countdown cells with critical blink, type chips, Monitor/Ava buttons <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/app/(admin)/admin/page.tsx, apps/platform/src/app/(admin)/admin/_components/EndingToday.tsx] -->
-- [ ] 3.4 "Süsteemi tervis", "Kiire tegevus", "Viimased juhtlõimed" cards <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/app/(admin)/admin/page.tsx, apps/platform/src/app/(admin)/admin/_components/**] -->
+- [x] 3.2 KPI strip: 7 cards, alert badge, sparkline SVG, trend sublines, card links <!-- agent: fullstack-engineer.build, depends_on: [3.1, 1.5], touches: [apps/platform/src/app/(admin)/admin/page.tsx] -->
+- [x] 3.3 "Lõpevad täna" live table: countdown cells with critical blink, type chips, Monitor/Ava buttons <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/app/(admin)/admin/page.tsx, apps/platform/src/app/(admin)/admin/_components/EndingToday.tsx] -->
+- [x] 3.4 "Süsteemi tervis", "Kiire tegevus", "Viimased juhtlõimed" cards <!-- agent: fullstack-engineer.build, depends_on: [3.1], touches: [apps/platform/src/app/(admin)/admin/page.tsx, apps/platform/src/app/(admin)/admin/_components/**] -->
 - [ ] 3.5 Workspace tests (aggregations, empty states, role-scoped counts) <!-- agent: fullstack-engineer.build, depends_on: [3.2, 3.3, 3.4], touches: [apps/platform/src/app/(admin)/admin/_lib/__tests__/**] -->
 
 ## 4. Auctions list parity
 
-- [ ] 4.1 Column chooser ("Veerud") with localStorage persistence over AuctionsTable <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/AuctionsTable.tsx] -->
+- [x] 4.1 Column chooser ("Veerud") with localStorage persistence over AuctionsTable <!-- agent: fullstack-engineer.build, depends_on: [1.9], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/AuctionsTable.tsx] -->
 - [x] 4.2 Visual parity: selected-row mint tint, tab-count inversion, global ⌘N listener, status glyphs via the unified chip <!-- agent: fullstack-engineer.build, depends_on: [1.6], touches: [apps/platform/src/app/(admin)/admin/auctions/page.tsx, apps/platform/src/app/(admin)/admin/auctions/_components/AuctionsTable.tsx] -->
 - [ ] 4.3 Tests: chooser persistence, selection tint, keyboard shortcut <!-- agent: fullstack-engineer.build, depends_on: [4.1, 4.2], touches: [apps/platform/src/app/(admin)/admin/auctions/_components/__tests__/**] -->
 
@@ -60,8 +60,8 @@
 - [x] 8.1 User drawer shell on the list: 720px, 7 tabs, row deep link preserved to the detail page <!-- agent: fullstack-engineer.build, depends_on: [1.3, 1.9], touches: [apps/platform/src/app/(admin)/admin/users/page.tsx, apps/platform/src/app/(admin)/admin/users/_components/UserDrawer.tsx] -->
 - [x] 8.2 Tab content reuse: move the 5 detail tab panels into shared components consumed by page and drawer; add the Teavitused tab <!-- agent: fullstack-engineer.build, depends_on: [8.1], touches: [apps/platform/src/app/(admin)/admin/users/_components/**, apps/platform/src/app/(admin)/admin/users/[id]/page.tsx] -->
 - [x] 8.3 Impersonation backend: audited start/stop, impersonation session binding, portal write actions reject while impersonating <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/lib/auth/**, apps/platform/src/app/(portal)/**/_actions/**] -->
-- [ ] 8.4 Impersonation UI: reason modal, sticky amber banner with LÕPETA VAATLUS; ban action with isikukood-level registration guard <!-- agent: fullstack-engineer.build, depends_on: [8.1, 8.3], touches: [apps/platform/src/app/(admin)/admin/users/_components/UserDrawer.tsx, apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/app/(portal)/_actions/register/**] -->
-- [ ] 8.5 GDPR: export ZIP stream and anonymize-with-retention action, both audited, wired into the GDPR tab <!-- agent: fullstack-engineer.build, depends_on: [8.2], touches: [apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/app/(admin)/admin/users/_components/**] -->
+- [x] 8.4 Impersonation UI: reason modal, sticky amber banner with LÕPETA VAATLUS; ban action with isikukood-level registration guard <!-- agent: fullstack-engineer.build, depends_on: [8.1, 8.3], touches: [apps/platform/src/app/(admin)/admin/users/_components/UserDrawer.tsx, apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/app/(portal)/_actions/register/**] -->
+- [x] 8.5 GDPR: export ZIP stream and anonymize-with-retention action, both audited, wired into the GDPR tab <!-- agent: fullstack-engineer.build, depends_on: [8.2], touches: [apps/platform/src/app/(admin)/_actions/users.ts, apps/platform/src/app/(admin)/admin/users/_components/**] -->
 - [ ] 8.6 Tests: impersonation guards, ban registration block, anonymize retention, drawer tabs <!-- agent: fullstack-engineer.build, depends_on: [8.4, 8.5], touches: [apps/platform/src/app/(admin)/_actions/__tests__/**, apps/platform/src/app/(admin)/admin/users/**/__tests__/**] -->
 
 ## 9. Companies approvals polish
@@ -94,7 +94,7 @@
 
 ## 13. Statistics dashboard
 
-- [ ] 13.1 _lib/statistics.ts: period aggregations (30/90/365) from auctions, bids, snapshots <!-- agent: fullstack-engineer.build, depends_on: [2.6], touches: [apps/platform/src/app/(admin)/admin/statistics/_lib/statistics.ts] -->
+- [x] 13.1 _lib/statistics.ts: period aggregations (30/90/365) from auctions, bids, snapshots <!-- agent: fullstack-engineer.build, depends_on: [2.6], touches: [apps/platform/src/app/(admin)/admin/statistics/_lib/statistics.ts] -->
 - [x] 13.2 Server-rendered SVG charts: grouped monthly bars, type donut, 30-day trend (no chart dependency) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/statistics/_components/Charts.tsx] -->
 - [ ] 13.3 Page assembly: 6 KPIs, charts, Top-5 table, county table, CSV export link <!-- agent: fullstack-engineer.build, depends_on: [13.1, 13.2], touches: [apps/platform/src/app/(admin)/admin/statistics/page.tsx] -->
 - [ ] 13.4 Tests: aggregation math, chart data shapes, period switch <!-- agent: fullstack-engineer.build, depends_on: [13.3], touches: [apps/platform/src/app/(admin)/admin/statistics/_lib/__tests__/**] -->
@@ -111,8 +111,8 @@
 ## 15. Audit log chain and drawer
 
 - [x] 15.1 Hash chain: prevHash/hash columns, migration, Web Crypto chaining in the audit write path <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/data/schema/**, apps/platform/src/lib/data/repositories/**] -->
-- [ ] 15.2 Backfill script for existing entries plus a chain-verification method and footer indicator (label: "Ahela kontroll: OK") <!-- agent: fullstack-engineer.build, depends_on: [15.1], touches: [apps/platform/scripts/**, apps/platform/src/app/(admin)/admin/audit/page.tsx] -->
-- [ ] 15.3 Detail drawer 680px: payload JSON box, AuditDiff, related entries, result chip <!-- agent: fullstack-engineer.build, depends_on: [1.3], touches: [apps/platform/src/app/(admin)/admin/audit/_components/AuditDrawer.tsx, apps/platform/src/app/(admin)/admin/audit/page.tsx] -->
+- [x] 15.2 Backfill script for existing entries plus a chain-verification method and footer indicator (label: "Ahela kontroll: OK") <!-- agent: fullstack-engineer.build, depends_on: [15.1], touches: [apps/platform/scripts/**, apps/platform/src/app/(admin)/admin/audit/page.tsx] -->
+- [x] 15.3 Detail drawer 680px: payload JSON box, AuditDiff, related entries, result chip <!-- agent: fullstack-engineer.build, depends_on: [1.3], touches: [apps/platform/src/app/(admin)/admin/audit/_components/AuditDrawer.tsx, apps/platform/src/app/(admin)/admin/audit/page.tsx] -->
 - [ ] 15.4 CSV and JSON export routes, scoped like list reads <!-- agent: fullstack-engineer.build, depends_on: [15.1], touches: [apps/platform/src/app/api/v1/admin/audit/**] -->
 - [ ] 15.5 Tests: tamper detection, backfill determinism, export scoping <!-- agent: fullstack-engineer.build, depends_on: [15.2, 15.3, 15.4], touches: [apps/platform/src/lib/data/repositories/__tests__/**] -->
 
