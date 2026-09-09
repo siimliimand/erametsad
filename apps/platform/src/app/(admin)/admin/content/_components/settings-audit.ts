@@ -22,13 +22,16 @@ export interface AuctionDefaults {
   sealedApproverRole: SealedApproverRole
 }
 
-/** Inclusive [min, max] bounds per task 6.2 and design 13. */
+/** Inclusive [min, max] bounds per tasks 1.6 and 4.1 and design 13. */
 export const settingsBounds = {
   feePercent: { min: 0, max: 10, default: 3 },
+  quickAuctionFeePercent: { min: 0, max: 10, default: 3 },
+  minimumFeeCents: { min: 0, max: 1_000_000, default: 0 },
   antiSnipeDurationMinutes: { min: 1, max: 30, default: 5 },
   alapakkumineDecisionDeadlineDays: { min: 1, max: 14, default: 3 },
   sealedRevisionCap: { min: 0, max: 5, default: 3 },
   kiiroksjonDurationHours: { min: 24, max: 72, default: 48 },
+  minAuctionDurationHours: { min: 1, max: 72, default: 1 },
 } as const
 
 export const defaultAuctionDefaults: AuctionDefaults = {
@@ -154,6 +157,80 @@ export function parseAuctionDefaults(input: AuctionDefaultsInput): ParseAuctionD
       sealedApproverRole: input.sealedApproverRole as SealedApproverRole,
     },
   }
+}
+
+/**
+ * Lipud save: the named toggles replace the JSON textarea. The seven
+ * managed keys are set from the form; unknown legacy keys (for example
+ * `requireFrameworkContract`) survive untouched and the reserved
+ * `auctionDefaults` key is preserved so the Oksjonite reeglid section
+ * never gets clobbered.
+ */
+export const featureFlagDefinitions = [
+  {
+    key: 'sealed_bids',
+    label: 'Suletud pakkumised',
+    description: 'Lubab korraldada oksjoneid, kus pakkumised avatakse alles avamistseremoonial.',
+  },
+  {
+    key: 'sms_notifications',
+    label: 'SMS-teavitused',
+    description: 'Saadab kasutajatele SMS-teavitusi oluliste sündmuste kohta.',
+  },
+  {
+    key: 'map_view',
+    label: 'Kaardivaade',
+    description: 'Näitab oksjoniel olevate lootide asukohta kaardil.',
+  },
+  {
+    key: 'quick_auction',
+    label: 'Kiiroksjonid',
+    description: 'Lubab luua lühikese kestusega kiiroksjoneid.',
+  },
+  {
+    key: 'saved_search_digests',
+    label: 'Salvestatud otsingute kokkuvõtted',
+    description: 'Saadab perioodilise e-kirja uutest lootidest salvestatud otsingute alusel.',
+  },
+  {
+    key: 'statistics_public',
+    label: 'Avalik statistika',
+    description: 'Kuvab oksjonite statistika avalikul portaali lehel.',
+  },
+  {
+    key: 'partner_portal',
+    label: 'Partneriportaal',
+    description: 'Lubab partneritel kasutada partneriportaali haldusliidest.',
+  },
+] as const
+
+export type FeatureFlagDefinition = (typeof featureFlagDefinitions)[number]
+export type FeatureFlagKey = FeatureFlagDefinition['key']
+
+export function isFeatureFlagKey(key: string): key is FeatureFlagKey {
+  return featureFlagDefinitions.some((definition) => definition.key === key)
+}
+
+export function withNamedFlags(
+  currentFlags: Record<string, unknown>,
+  toggles: Readonly<Record<FeatureFlagKey, boolean>>,
+): Record<string, unknown> {
+  const { [AUCTION_DEFAULTS_KEY]: _reserved, ...rest } = currentFlags
+  const merged: Record<string, unknown> = { ...rest, ...toggles }
+  if (AUCTION_DEFAULTS_KEY in currentFlags) {
+    merged[AUCTION_DEFAULTS_KEY] = currentFlags[AUCTION_DEFAULTS_KEY]
+  }
+  return merged
+}
+
+/**
+ * Live fee sample (Teenustasud): the success fee for a winning bid is the
+ * percentage amount, but never below the configured minimum. Returns euro
+ * cents so the caller stays in the money representation.
+ */
+export function feeSampleCents(bidCents: number, feePercent: number, minimumFeeCents: number): number {
+  const percentCents = Math.round((bidCents * feePercent) / 100)
+  return Math.max(percentCents, minimumFeeCents)
 }
 
 /** Oksjonid save: merge the validated defaults into the current flags object. */

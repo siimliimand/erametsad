@@ -13,14 +13,15 @@ import {
   type PublishedSlugCollection,
 } from '../admin/content/_components/scheduled-publish'
 import {
+  featureFlagDefinitions,
   isValidReason,
   maskSecretValues,
-  mergeFlagPayload,
   parseAuctionDefaults,
-  parseFlagObject,
   readFlagObject,
   settingsBounds,
   withAuctionDefaults,
+  withNamedFlags,
+  type FeatureFlagKey,
 } from '../admin/content/_components/settings-audit'
 
 import type { BlockConfig } from '@/lib/content/blocks'
@@ -79,6 +80,13 @@ function readOptionalNumber(formData: FormData, key: string): number | null {
 
 function readBool(formData: FormData, key: string): boolean {
   return formData.getAll(key).some((value) => value === 'true')
+}
+
+function readOptionalInt(formData: FormData, key: string): number | null {
+  const raw = readText(formData, key)
+  if (raw.length === 0) return null
+  const value = Number.parseInt(raw, 10)
+  return Number.isNaN(value) ? null : value
 }
 
 function readTags(formData: FormData): string[] {
@@ -764,7 +772,7 @@ export async function saveFaqCategoryAction(formData: FormData): Promise<void> {
     redirectWithError(errorPath, 'Järjekord peab olema mitte negatiivne täisarv.')
   }
 
-  const data = { title, slug, order }
+  const data = { title, slug, order, active: readBool(formData, 'active') }
 
   await persist(errorPath, 'Kategooria salvestamine ebaõnnestus: ', () =>
     id
@@ -820,6 +828,8 @@ export async function saveFaqItemAction(formData: FormData): Promise<void> {
     categoryId,
     order,
     slug: readOptionalText(formData, 'slug'),
+    shortAnswer: readOptionalText(formData, 'shortAnswer'),
+    active: readBool(formData, 'active'),
   }
 
   await persist(errorPath, 'Küsimuse salvestamine ebaõnnestus: ', () =>
@@ -855,9 +865,15 @@ export async function saveTestimonialAction(formData: FormData): Promise<void> {
   const errorPath = formPath(testimonialsPath, id)
   const name = readText(formData, 'name')
   const content = readText(formData, 'content')
+  const status = readText(formData, 'status') as ContentStatus
+  const rating = readOptionalNumber(formData, 'rating')
 
   if (!name) redirectWithError(errorPath, 'Nimi on kohustuslik.')
   if (!content) redirectWithError(errorPath, 'Tsitaat on kohustuslik.')
+  if (!contentStatuses.includes(status)) redirectWithError(errorPath, 'Vali sobiv olek.')
+  if (rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
+    redirectWithError(errorPath, 'Hinne peab olema täisarv vahemikus 1 kuni 5.')
+  }
 
   const data = {
     name,
@@ -865,6 +881,8 @@ export async function saveTestimonialAction(formData: FormData): Promise<void> {
     role: readOptionalText(formData, 'role'),
     avatarId: readOptionalText(formData, 'avatarId'),
     featured: readBool(formData, 'featured'),
+    status,
+    rating,
   }
 
   await persist(errorPath, 'Tagasiside salvestamine ebaõnnestus: ', () =>
@@ -1249,25 +1267,62 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
   let feeChanged = false
 
   if (section === 'uldine') {
+    const supportEmail = readOptionalText(formData, 'supportEmail')
+    const supportPhone = readOptionalText(formData, 'supportPhone')
+    const aliasDomain = readOptionalText(formData, 'aliasDomain')
+    if (supportEmail !== null && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(supportEmail)) {
+      redirectWithError(settingsPath, 'Klienditoe e-post peab olema korrektne e-posti aadress.')
+    }
+    if (supportPhone !== null && !/^\+?[\d ()-]{5,20}$/.test(supportPhone)) {
+      redirectWithError(settingsPath, 'Klienditoe telefon peab koosnema numbritest (lubatud +, tühik ja sidekriips).')
+    }
+    if (
+      aliasDomain !== null &&
+      !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(
+        aliasDomain.toLowerCase(),
+      )
+    ) {
+      redirectWithError(
+        settingsPath,
+        'Alias-domeen peab olema korrektne domeeninimi (näiteks oksjonid.erametsad.ee).',
+      )
+    }
     data = {
       orgName: readOptionalText(formData, 'orgName'),
       orgRegCode: readOptionalText(formData, 'orgRegCode'),
+      orgVatCode: readOptionalText(formData, 'orgVatCode'),
       orgAddress: readOptionalText(formData, 'orgAddress'),
+      supportEmail,
+      supportPhone,
+      aliasDomain,
     }
     beforeValues = {
       orgName: current?.orgName ?? null,
       orgRegCode: current?.orgRegCode ?? null,
+      orgVatCode: current?.orgVatCode ?? null,
       orgAddress: current?.orgAddress ?? null,
+      supportEmail: current?.supportEmail ?? null,
+      supportPhone: current?.supportPhone ?? null,
+      aliasDomain: current?.aliasDomain ?? null,
     }
     afterValues = {
       orgName: data.orgName,
       orgRegCode: data.orgRegCode,
+      orgVatCode: data.orgVatCode,
       orgAddress: data.orgAddress,
+      supportEmail,
+      supportPhone,
+      aliasDomain,
     }
   } else if (section === 'tasud') {
     const feePercent = readInt(formData, 'feePercent')
     const vatPercent = readInt(formData, 'vatPercent')
-    const { feePercent: feeBounds } = settingsBounds
+    const quickAuctionFeePercent = readOptionalInt(formData, 'quickAuctionFeePercent')
+    // The form collects the minimum fee in euros; storage is integer cents.
+    const minimumFeeEur = readOptionalNumber(formData, 'minimumFeeEur')
+    const minimumFeeCents = minimumFeeEur === null ? 0 : Math.round(minimumFeeEur * 100)
+    const { feePercent: feeBounds, quickAuctionFeePercent: quickFeeBounds, minimumFeeCents: minFeeBounds } =
+      settingsBounds
     if (!Number.isInteger(feePercent) || feePercent < feeBounds.min || feePercent > feeBounds.max) {
       redirectWithError(
         settingsPath,
@@ -1277,16 +1332,47 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
     if (!Number.isInteger(vatPercent) || vatPercent < 0 || vatPercent > 100) {
       redirectWithError(settingsPath, 'Käibemaks peab olema täisarv vahemikus 0 kuni 100.')
     }
-    feeChanged = current ? current.feePercent !== feePercent || current.vatPercent !== vatPercent : true
-    data = { feePercent, vatPercent }
+    if (
+      quickAuctionFeePercent !== null &&
+      (!Number.isInteger(quickAuctionFeePercent) ||
+        quickAuctionFeePercent < quickFeeBounds.min ||
+        quickAuctionFeePercent > quickFeeBounds.max)
+    ) {
+      redirectWithError(
+        settingsPath,
+        `Kiiroksjoni teenustasu peab olema täisarv vahemikus ${String(quickFeeBounds.min)} kuni ${String(quickFeeBounds.max)} või tühi (kasutatakse vaikemäära).`,
+      )
+    }
+    if (
+      !Number.isFinite(minimumFeeCents) ||
+      minimumFeeCents < minFeeBounds.min ||
+      minimumFeeCents > minFeeBounds.max
+    ) {
+      redirectWithError(
+        settingsPath,
+        `Minimaalne tasu peab olema vahemikus 0 kuni ${String(minFeeBounds.max / 100)} eurot.`,
+      )
+    }
+    feeChanged =
+      current
+        ? current.feePercent !== feePercent ||
+          current.vatPercent !== vatPercent ||
+          current.quickAuctionFeePercent !== quickAuctionFeePercent ||
+          current.minimumFeeCents !== minimumFeeCents
+        : true
+    data = { feePercent, vatPercent, quickAuctionFeePercent, minimumFeeCents }
     beforeValues = {
       feePercent: current?.feePercent ?? null,
+      quickAuctionFeePercent: current?.quickAuctionFeePercent ?? null,
+      minimumFeeCents: current?.minimumFeeCents ?? null,
       vatPercent: current?.vatPercent ?? null,
     }
-    afterValues = { feePercent, vatPercent }
+    afterValues = { feePercent, quickAuctionFeePercent, minimumFeeCents, vatPercent }
   } else if (section === 'oksjonid') {
     const antiSnipeDurationMinutes = readInt(formData, 'antiSnipeDurationMinutes')
     const sealedRevisionCap = readInt(formData, 'sealedRevisionCap')
+    const minAuctionDurationHours = readInt(formData, 'minAuctionDurationHours')
+    const { minAuctionDurationHours: minDurationBounds } = settingsBounds
     if (
       !Number.isInteger(antiSnipeDurationMinutes) ||
       antiSnipeDurationMinutes < 1 ||
@@ -1296,6 +1382,16 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
     }
     if (!Number.isInteger(sealedRevisionCap) || sealedRevisionCap < 0 || sealedRevisionCap > 5) {
       redirectWithError(settingsPath, 'Paranduste limiit peab olema täisarv vahemikus 0 kuni 5.')
+    }
+    if (
+      !Number.isInteger(minAuctionDurationHours) ||
+      minAuctionDurationHours < minDurationBounds.min ||
+      minAuctionDurationHours > minDurationBounds.max
+    ) {
+      redirectWithError(
+        settingsPath,
+        `Minimaalne oksjoni kestus peab olema täisarv vahemikus ${String(minDurationBounds.min)} kuni ${String(minDurationBounds.max)} tundi.`,
+      )
     }
     const parsedDefaults = parseAuctionDefaults({
       alapakkumineDecisionDeadlineDays: readInt(formData, 'alapakkumineDecisionDeadlineDays'),
@@ -1310,26 +1406,35 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
       antiSnipeDurationMinutes,
       sealedRevisionCap,
       alapakkumineEnabled: readBool(formData, 'alapakkumineEnabled'),
+      autobidderEnabled: readBool(formData, 'autobidderEnabled'),
+      minAuctionDurationHours,
       featureFlags: withAuctionDefaults(currentFlags, parsedDefaults.value),
     }
     beforeValues = {
       antiSnipeDurationMinutes: current?.antiSnipeDurationMinutes ?? null,
       alapakkumineEnabled: current?.alapakkumineEnabled ?? null,
+      autobidderEnabled: current?.autobidderEnabled ?? null,
+      minAuctionDurationHours: current?.minAuctionDurationHours ?? null,
       sealedRevisionCap: current?.sealedRevisionCap ?? null,
       auctionDefaults: previousDefaults,
     }
     afterValues = {
       antiSnipeDurationMinutes,
       alapakkumineEnabled: data.alapakkumineEnabled,
+      autobidderEnabled: data.autobidderEnabled,
+      minAuctionDurationHours,
       sealedRevisionCap,
       auctionDefaults: parsedDefaults.value,
     }
   } else {
-    const parsedFlags = parseFlagObject(readText(formData, 'featureFlags'))
-    if (!parsedFlags.ok) {
-      redirectWithError(settingsPath, parsedFlags.error)
+    // Lipud save: named toggles only. Toggles absent from the form data save
+    // as false; unknown legacy keys and the reserved auctionDefaults key
+    // survive via withNamedFlags.
+    const toggles = {} as Record<FeatureFlagKey, boolean>
+    for (const definition of featureFlagDefinitions) {
+      toggles[definition.key] = readBool(formData, definition.key)
     }
-    const mergedFlags = mergeFlagPayload(currentFlags, parsedFlags.value)
+    const mergedFlags = withNamedFlags(currentFlags, toggles)
     data = { featureFlags: mergedFlags }
     beforeValues = { featureFlags: currentFlags }
     afterValues = { featureFlags: mergedFlags }

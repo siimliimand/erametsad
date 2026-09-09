@@ -134,6 +134,13 @@
       "when": 1788932572734,
       "tag": "0018_admin_auction_area_volume",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1788934385137,
+      "tag": "0019_settings_admin_fields",
+      "breakpoints": true
     }
   ]
 }
