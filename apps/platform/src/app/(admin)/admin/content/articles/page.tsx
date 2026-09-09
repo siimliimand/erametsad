@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { articleCategoryLabels } from './_lib/article-seo'
 import { deleteArticleAction, setArticleStatusAction } from '../../../_actions/content'
 import { DataTable } from '../../../_components/DataTable'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
@@ -14,6 +15,8 @@ import type { ArticleDoc } from '@/lib/data/repositories'
 interface ArticleRow {
   id: string
   title: string
+  category: ArticleDoc['category']
+  authorName: string
   status: ArticleDoc['status']
   publishedAt: string | null
 }
@@ -28,14 +31,24 @@ export default async function AdminArticlesPage({
   const { viga } = await searchParams
   const { repositories } = await requireAdminRepositories()
 
-  const { docs } = await repositories.find({
-    collection: 'articles',
-    sort: '-createdAt',
-    limit: 50,
-  })
+  const [{ docs }, { docs: specialists }] = await Promise.all([
+    repositories.find({
+      collection: 'articles',
+      sort: '-createdAt',
+      limit: 50,
+    }),
+    repositories.find({ collection: 'specialists', pagination: false }),
+  ])
+  const specialistNames = new Map(specialists.map((specialist) => [specialist.id, specialist.name]))
+
   const rows: ArticleRow[] = docs.map((article) => ({
     id: article.id,
     title: article.title,
+    category: article.category,
+    authorName:
+      (article.authorSpecialistId ? specialistNames.get(article.authorSpecialistId) : null) ??
+      article.author ??
+      '—',
     status: article.status,
     publishedAt: article.publishedAt,
   }))
@@ -66,6 +79,16 @@ export default async function AdminArticlesPage({
                 {row.title}
               </Link>
             ),
+          },
+          {
+            key: 'category',
+            label: 'Kategooria',
+            render: (row) => articleCategoryLabels[row.category],
+          },
+          {
+            key: 'authorName',
+            label: 'Autor',
+            render: (row) => row.authorName,
           },
           {
             key: 'status',
