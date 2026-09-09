@@ -521,6 +521,150 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
   redirect(detailPath)
 }
 
+export interface AuctionAutosaveResult {
+  ok: boolean
+  /**
+   * True when the stored copy was written by someone else after the
+   * client's base updatedAt; the stored lot is left untouched and the
+   * wizard shows the conflict banner with the takeover option (task 5.6).
+   */
+  conflict: boolean
+  /** Server save time (UTC ISO) on success; null otherwise. */
+  savedAt: string | null
+  /** Current server updatedAt — the client's next conflict base. */
+  updatedAt: string | null
+  error: string | null
+}
+
+/**
+ * Background draft autosave behind the wizard's idle/step/blur triggers
+ * (task 5.6): the 5.5 mustand path without the redirect. Same permission,
+ * scope, schema and partial-update semantics as updateAuctionAction, but
+ * failures and conflicts come back as values so the editor bar can show
+ * them instead of navigating away. Draft content only — the status never
+ * changes here and the mechanics of a scheduled/active lot are refused.
+ */
+export async function autosaveAuctionDraftAction(
+  id: string,
+  payloadJson: string,
+  baseUpdatedAt: string | null,
+): Promise<AuctionAutosaveResult> {
+  const { session, repositories } = await requireAdminRepositories()
+  const fail = (
+    error: string,
+    conflict = false,
+    updatedAt: string | null = null,
+  ): AuctionAutosaveResult => ({ ok: false, conflict, savedAt: null, updatedAt, error })
+
+  try {
+    assertCan(session.role, 'auctions:write')
+  } catch (error) {
+    if (error instanceof PermissionDeniedError) return fail(error.message)
+    throw error
+  }
+  if (id.trim() === '') {
+    return fail('Mustandi salvestamiseks puudub oksjoni identifikaator.')
+  }
+  const auction = await repositories
+    .findByID({ collection: 'auctions', id })
+    .catch(() => null)
+  if (!auction) return fail('Oksjonit ei leitud.')
+  if (
+    !auctionInScope(auctionScope(session.role, session.userId), {
+      specialistId: auction.specialistId,
+      sellerId: auction.sellerId,
+    })
+  ) {
+    return fail('Oksjon ei ole teie tööulatuses.')
+  }
+
+  let raw: Record<string, unknown>
+  try {
+    const parsed: unknown = JSON.parse(payloadJson)
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('not an object')
+    }
+    raw = parsed as Record<string, unknown>
+  } catch {
+    return fail('Vigane mustandi andmete JSON.')
+  }
+  const parsedInput = auctionInputSchema.safeParse(raw)
+  if (!parsedInput.success) {
+    const summary = parsedInput.error.issues
+      .slice(0, 5)
+      .map((issue) => `${issue.path.join('.') || 'vorm'}: ${issue.message}`)
+      .join('; ')
+    return fail(`Oksjoni andmed ei läbinud valideerimist: ${summary}`)
+  }
+  const input = applyQuickAuctionDefaults(parsedInput.data)
+  const writeData = toAuctionWriteData(input)
+
+  // Optimistic concurrency: a newer server copy means another staff member
+  // saved in between — never overwrite; the client takes over explicitly.
+  if (baseUpdatedAt !== null && auction.updatedAt !== baseUpdatedAt) {
+    return fail('Mustand on vahepeal serveris uuendatud.', true, auction.updatedAt)
+  }
+
+  // Mirror of updateAuctionAction's mechanics lock; autosave carries no
+  // override path — the wizard payload omits mechanics on locked lots, so a
+  // present changed mechanic means a stale or tampered client.
+  if (auction.status === 'active' || auction.status === 'scheduled') {
+    const mechanicsConflict =
+      (input.startsAt !== undefined && input.startsAt !== auction.startsAt) ||
+      (input.endsAt !== undefined && input.endsAt !== auction.endsAt) ||
+      (input.auctionType !== auction.type) ||
+      (input.objectType !== auction.objectType)
+    if (mechanicsConflict) {
+      return fail('Aktiivse oksjoni mehaanikat muuta ei saa.')
+    }
+  }
+
+  if (session.role === 'specialist') {
+    writeData.specialistId = session.userId
+  }
+  const feeChanged =
+    input.feeOverridePercent !== undefined &&
+    input.feeOverridePercent !== auction.feeOverridePercent
+  if (feeChanged) {
+    try {
+      assertCan(session.role, 'auctions:fee-override')
+    } catch (error) {
+      if (error instanceof PermissionDeniedError) return fail(error.message)
+      throw error
+    }
+  }
+
+  const updateData = restrictToPresentKeys(writeData, raw)
+  try {
+    const updated = await repositories.update({
+      collection: 'auctions',
+      id,
+      data: updateData,
+    })
+    const updatedAt =
+      typeof updated.updatedAt === 'string'
+        ? updated.updatedAt
+        : new Date().toISOString()
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'auction.autosave',
+      entityType: 'auction',
+      entityId: id,
+      after: {
+        // Field names only: values (and the reserve fact) never travel
+        // into the audit entry (D5/D7).
+        fields: Object.keys(updateData).sort(),
+        ...(baseUpdatedAt === null ? { adoptedBase: true } : {}),
+      },
+    })
+    return { ok: true, conflict: false, savedAt: new Date().toISOString(), updatedAt, error: null }
+  } catch (error) {
+    return fail(
+      `Mustandi salvestamine ebaõnnestus: ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
+}
+
 export async function deleteAuctionAction(formData: FormData): Promise<void> {
   const { repositories } = await requireAdminRepositories()
 
@@ -2584,12 +2728,21 @@ export async function voidSealedBidsAction(
   return { ok: true, phase: 'unsold', error: null }
 }
 
-// ── Bulk schedule (task 2.2) ────────────────────────────────────────────────
+// ── Bulk schedule (task 2.2, extended by 5.3) ───────────────────────────────
 //
 // Draft-only scheduling from the auctions list: every selected lot is
 // scope-checked, then moved one immutable step (draft → scheduled) to a
 // shared Tallinn wall-time start. Non-draft selections are rejected with an
-// explicit list naming the offending rows (spec scenario).
+// explicit list naming the offending rows (spec scenario). Task 5.3 adds
+// the "nihuta kõiki lõppe ×h" shift: every row keeps its own end-time base
+// (its stored endsAt, else the shared one) shifted by the same N hours, so
+// the individual end-time offsets between rows survive the shift.
+
+function shiftedEndIso(baseIso: string, shiftHours: number): string {
+  return new Date(Date.parse(baseIso) + shiftHours * 60 * 60 * 1000).toISOString()
+}
+
+const MAX_SHIFT_HOURS = 8760
 
 export async function bulkScheduleAuctionsAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
@@ -2622,6 +2775,18 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
       redirectWithError(listPath, 'Lõppaeg peab olema pärast algusaega.')
     }
   }
+  const shiftRaw = readText(formData, 'shiftEndHours')
+  let shiftHours = 0
+  if (shiftRaw !== '') {
+    const parsed = Number.parseInt(shiftRaw, 10)
+    if (!Number.isInteger(parsed) || parsed < -MAX_SHIFT_HOURS || parsed > MAX_SHIFT_HOURS) {
+      redirectWithError(
+        listPath,
+        `Nihke sisend peab olema täisarv tundides (−${String(MAX_SHIFT_HOURS)}…${String(MAX_SHIFT_HOURS)}).`,
+      )
+    }
+    shiftHours = parsed
+  }
 
   // Reads run unscoped so in-scope drafts of any status are visible; the
   // per-row scope check below is the authorization boundary.
@@ -2629,6 +2794,7 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
   const scope = auctionScope(session.role, session.userId)
   const offending: string[] = []
   const schedulable: AuctionDoc[] = []
+  const rowEnds = new Map<string, string | null>()
   for (const id of ids) {
     const auction = await trusted
       .findByID({ collection: 'auctions', id })
@@ -2645,7 +2811,23 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
       offending.push(`${auction.title} (${auctionStatusLabels[auction.status]})`)
       continue
     }
+    let rowEnd: string | null = null
+    if (endsIso !== null || shiftHours !== 0) {
+      const base =
+        typeof auction.endsAt === 'string' && !Number.isNaN(Date.parse(auction.endsAt))
+          ? auction.endsAt
+          : endsIso
+      if (base !== null) {
+        const shifted = shiftedEndIso(base, shiftHours)
+        if (Date.parse(shifted) <= Date.parse(startsIso)) {
+          offending.push(`${auction.title} (nihutatud lõpp enne algust)`)
+          continue
+        }
+        rowEnd = shifted
+      }
+    }
     schedulable.push(auction)
+    rowEnds.set(auction.id, rowEnd)
   }
 
   if (offending.length > 0) {
@@ -2661,16 +2843,21 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
   let failure: string | null = null
   try {
     for (const auction of schedulable) {
+      const rowEnd = rowEnds.get(auction.id) ?? null
       await repositories.update({
         collection: 'auctions',
         id: auction.id,
         data: {
           status: 'scheduled',
           startsAt: startsIso,
-          ...(endsIso !== null ? { endsAt: endsIso } : {}),
           scheduledAt: startsIso,
+          ...(rowEnd !== null ? { endsAt: rowEnd } : {}),
         },
       })
+    }
+    const endsByAuction: Record<string, string> = {}
+    for (const [auctionId, rowEnd] of rowEnds) {
+      if (rowEnd !== null) endsByAuction[auctionId] = rowEnd
     }
     await audit(repositories, {
       actorId: session.userId,
@@ -2681,6 +2868,8 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
         count: schedulable.length,
         startsAt: startsIso,
         ...(endsIso !== null ? { endsAt: endsIso } : {}),
+        ...(shiftHours !== 0 ? { shiftHours } : {}),
+        ...(Object.keys(endsByAuction).length > 0 ? { endsByAuction } : {}),
         auctionIds: schedulable.map((auction) => auction.id),
       },
     })

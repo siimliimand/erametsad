@@ -23,6 +23,7 @@ import type {
   AuctionWizardState,
   WizardDraft,
 } from './wizard-model'
+import { autosaveAuctionDraftAction } from '../../../_actions/auctions'
 import {
   primaryButtonClass,
   secondaryButtonClass,
@@ -49,6 +50,9 @@ import type { AuctionStatus } from '@/lib/data/schema'
 export type AutosaveState = 'idle' | 'saving' | 'saved'
 
 const AUTOSAVE_DEBOUNCE_MS = 800
+
+/** Idle window before the server draft autosave fires (task 5.6: 10 s). */
+const SERVER_AUTOSAVE_IDLE_MS = 10_000
 
 /** Submit intent carried by the three footer buttons (task 5.5). */
 type WizardSubmitIntent = 'draft' | 'schedule' | 'publish'
@@ -97,8 +101,12 @@ function RailRow({
  * buttons (Salvesta mustandina / Ajasta / Avalda kohe) and the step-7 publish
  * button run it — Ajasta adds the start-lead gate, Avalda kohe the full
  * publish-readiness gates. The editable state autosaves to localStorage as a
- * draft (restore prompt on return, unload guard while dirty); the form
- * submit stays the only durable save.
+ * draft (restore prompt on return, unload guard while dirty) and, for saved
+ * lots, to the server after 10 s idle, a step change or a blur (task 5.6),
+ * with the "Salvestatud HH:MM" indicator riding the server's confirmation.
+ * A newer server copy parks the editor on the conflict banner until the
+ * operator takes it over with a reload. The form submit stays the only
+ * durable save for statuses and publishing.
  */
 export function AuctionWizard({
   action,
@@ -131,6 +139,14 @@ export function AuctionWizard({
   const [pendingDraft, setPendingDraft] = useState<WizardDraft | null>(null)
   const lastPersistedRef = useRef<string | null>(null)
   const submittedRef = useRef(false)
+
+  // Server draft autosave (task 5.6): optimistic concurrency against the
+  // stored updatedAt. serverSnapshot tracks the state the server last
+  // confirmed; a mismatch on the next save surfaces the conflict banner.
+  const [conflict, setConflict] = useState(false)
+  const serverSnapshotRef = useRef<string>(serializeWizardState(initial.state))
+  const serverUpdatedAtRef = useRef<string | null>(initial.updatedAt ?? null)
+  const serverInFlightRef = useRef(false)
 
   // Remounting the save dot on each entry into `saved` replays the one-shot
   // save-ping keyframe; a stable class alone would animate only once.
@@ -168,6 +184,10 @@ export function AuctionWizard({
   // Debounced draft write: 'saving' shows while the timer runs, 'saved' once
   // the state has landed in localStorage. Suspended while the restore prompt
   // is open so the offered draft cannot be overwritten from behind the modal.
+  // For existing lots the saved label waits for the server autosave; the
+  // localStorage write only protects the data. While a conflict blocks the
+  // server path, the local write takes the label back so the operator sees
+  // the draft is safe.
   useEffect(() => {
     if (pendingDraft !== null || lastPersistedRef.current === null) return
     if (stateSnapshot === lastPersistedRef.current) {
@@ -181,9 +201,11 @@ export function AuctionWizard({
         window.localStorage.setItem(draftKey, serializeWizardDraft(state, new Date()))
         lastPersistedRef.current = stateSnapshot
         setIsDirty(false)
-        setAutosaveState('saved')
-        const clock = tallinnClock(new Date().toISOString())
-        setAutosavedAt(clock === '' ? null : clock)
+        if (initial.auctionId === null || conflict) {
+          setAutosaveState('saved')
+          const clock = tallinnClock(new Date().toISOString())
+          setAutosavedAt(clock === '' ? null : clock)
+        }
       } catch {
         setAutosaveState('idle')
       }
@@ -191,7 +213,7 @@ export function AuctionWizard({
     return () => {
       window.clearTimeout(timer)
     }
-  }, [draftKey, pendingDraft, state, stateSnapshot])
+  }, [conflict, draftKey, initial.auctionId, pendingDraft, state, stateSnapshot])
 
   // Unload guard only while the draft is dirty; a submit clears the flag
   // first, so the durable save never triggers the browser dialog.
@@ -228,6 +250,72 @@ export function AuctionWizard({
     () => JSON.stringify(buildAuctionPayload(initial, state, options)),
     [initial, state, options],
   )
+
+  // Server draft save (task 5.6): mustand-only write without the redirect.
+  // A stale base updatedAt comes back as a conflict and parks the wizard on
+  // the banner until the operator reloads onto the server copy ("Võta üle").
+  const runServerAutosave = useCallback(async (): Promise<void> => {
+    if (initial.auctionId === null) return
+    if (pendingDraft !== null || conflict) return
+    if (serverInFlightRef.current) return
+    const snapshot = stateSnapshot
+    if (snapshot === serverSnapshotRef.current) return
+    serverInFlightRef.current = true
+    setAutosaveState('saving')
+    try {
+      const result = await autosaveAuctionDraftAction(
+        initial.auctionId,
+        payloadJson,
+        serverUpdatedAtRef.current,
+      )
+      if (result.conflict) {
+        setConflict(true)
+        return
+      }
+      if (!result.ok) {
+        // Schema/mechanics/permission rejection: the localStorage draft
+        // stays for the manual Salvesta mustandina retry.
+        setAutosaveState('idle')
+        return
+      }
+      serverSnapshotRef.current = snapshot
+      serverUpdatedAtRef.current = result.updatedAt ?? serverUpdatedAtRef.current
+      setAutosaveState('saved')
+      const clock = tallinnClock(result.savedAt ?? new Date().toISOString())
+      setAutosavedAt(clock === '' ? null : clock)
+    } finally {
+      serverInFlightRef.current = false
+    }
+  }, [conflict, initial.auctionId, payloadJson, pendingDraft, stateSnapshot])
+
+  // 10 s idle after the last change (the callback identity changes on every
+  // keystroke, so the timer restarts — that is the idle semantics).
+  useEffect(() => {
+    if (initial.auctionId === null || pendingDraft !== null || conflict) return
+    if (stateSnapshot === serverSnapshotRef.current) return
+    const timer = window.setTimeout(() => {
+      void runServerAutosave()
+    }, SERVER_AUTOSAVE_IDLE_MS)
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [conflict, initial.auctionId, pendingDraft, runServerAutosave, stateSnapshot])
+
+  // Blur and step changes flush immediately; the ref indirection keeps the
+  // step effect from re-running on every keystroke.
+  const runServerAutosaveRef = useRef(runServerAutosave)
+  useEffect(() => {
+    runServerAutosaveRef.current = runServerAutosave
+  })
+
+  const firstStepEffectRef = useRef(true)
+  useEffect(() => {
+    if (firstStepEffectRef.current) {
+      firstStepEffectRef.current = false
+      return
+    }
+    void runServerAutosaveRef.current()
+  }, [stepIndex])
 
   // The Pakett step disappears for non-package lots; keep the index in range
   // while the canonical numbering stays stable for validation jumps.
@@ -321,6 +409,7 @@ export function AuctionWizard({
       // Storage unavailable: nothing stored to clear.
     }
     lastPersistedRef.current = serializeWizardState(state)
+    serverSnapshotRef.current = serializeWizardState(state)
     setIsDirty(false)
     setAutosaveState('idle')
     setAutosavedAt(null)
@@ -366,6 +455,9 @@ export function AuctionWizard({
   return (
     <form
       action={action}
+      onBlur={() => {
+        void runServerAutosaveRef.current()
+      }}
       onSubmit={(event) => {
         const intent = submitterIntent(event)
         if (shouldSkipValidation(event)) {
@@ -447,6 +539,31 @@ export function AuctionWizard({
           </a>
         ) : null}
       </header>
+
+      {conflict ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card border border-[var(--st-ended-text)] bg-[var(--st-ended-bg)] px-5 py-3"
+        >
+          <p className="min-w-0 flex-1 text-bodySm font-medium text-[var(--st-ended-text)]">
+            Teine kasutaja on mustandi vahepeal serverisse salvestanud. Sinu
+            muudatused on alles kohalikus mustandis; võta serveri versioon
+            üle, et jätkata salvestamist.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              // Disarm the unload guard so the takeover reload never shows
+              // the browser's unsaved-changes dialog.
+              submittedRef.current = true
+              window.location.reload()
+            }}
+            className={secondaryButtonClass}
+          >
+            Võta üle
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-md lg:grid-cols-[240px_1fr]">
         <nav aria-label="Koostamise sammud" className="flex flex-col">

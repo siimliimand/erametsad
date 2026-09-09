@@ -8,6 +8,14 @@ import { emptyPackageRow, serializeWizardDraft, wizardDraftKey } from '../wizard
 import type { AuctionWizardInitial, AuctionWizardOptions } from '../wizard-model'
 import { baseWizardState, createWizardInitial } from './fixtures'
 
+const { autosaveActionMock } = vi.hoisted(() => ({
+  autosaveActionMock: vi.fn(),
+}))
+
+vi.mock('../../../../_actions/auctions', () => ({
+  autosaveAuctionDraftAction: autosaveActionMock,
+}))
+
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true
 
@@ -57,10 +65,12 @@ async function unmountWizard(): Promise<void> {
 beforeEach(() => {
   window.localStorage.clear()
   submitAction.mockClear()
+  autosaveActionMock.mockReset()
 })
 
 afterEach(async () => {
   await unmountWizard()
+  vi.useRealTimers()
 })
 
 const sleep = (ms: number): Promise<void> =>
@@ -288,5 +298,182 @@ describe('AuctionWizard rich text adoption', () => {
     })
 
     expect(storedDraftState().packageHeader).toBe('<p>Paketi info</p>')
+  })
+})
+
+// ── Server autosave (task 5.6) ──────────────────────────────────────────────
+
+const existingLotInitial: AuctionWizardInitial = {
+  ...createWizardInitial,
+  auctionId: 'a1b2c3d4-0000-0000-0000-000000000001',
+  updatedAt: '2026-09-01T08:00:00.000Z',
+}
+
+function autosaveArgs(): [string, string, string | null] {
+  const call = autosaveActionMock.mock.calls[0]
+  if (call === undefined) throw new Error('autosave was not called')
+  return call as [string, string, string | null]
+}
+
+async function advanceTimers(ms: number): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms)
+  })
+}
+
+async function fireBlur(input: HTMLInputElement): Promise<void> {
+  await act(async () => {
+    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    await Promise.resolve()
+  })
+}
+
+describe('AuctionWizard server autosave', () => {
+  it('saves to the server after 10 s idle and reports Salvestatud HH:MM', async () => {
+    vi.useFakeTimers()
+    autosaveActionMock.mockResolvedValue({
+      ok: true,
+      conflict: false,
+      savedAt: '2026-09-09T10:00:00.000Z',
+      updatedAt: '2026-09-09T09:59:00.000Z',
+      error: null,
+    })
+    await mountWizard(existingLotInitial)
+    expect(autosaveActionMock).not.toHaveBeenCalled()
+
+    await setMinutesInput('9')
+    await advanceTimers(9_000)
+    expect(autosaveActionMock).not.toHaveBeenCalled()
+
+    await advanceTimers(1_000)
+    expect(autosaveActionMock).toHaveBeenCalledTimes(1)
+    const [id, payloadJson, baseUpdatedAt] = autosaveArgs()
+    expect(id).toBe('a1b2c3d4-0000-0000-0000-000000000001')
+    const payload = JSON.parse(payloadJson) as {
+      title: string
+      deadlines: { antiSnipeMinutes?: number }
+    }
+    expect(payload.title).toBe('Harjumaa raieõigus')
+    expect(payload.deadlines.antiSnipeMinutes).toBe(9)
+    expect(baseUpdatedAt).toBe('2026-09-01T08:00:00.000Z')
+    expect(statusText()).toContain('Salvestatud')
+    expect(statusText()).toContain('13:00')
+  })
+
+  it('flushes a pending save on blur', async () => {
+    vi.useFakeTimers()
+    autosaveActionMock.mockResolvedValue({
+      ok: true,
+      conflict: false,
+      savedAt: '2026-09-09T10:00:00.000Z',
+      updatedAt: '2026-09-09T09:59:00.000Z',
+      error: null,
+    })
+    await mountWizard(existingLotInitial)
+    await setMinutesInput('9')
+
+    const input = document.getElementById(
+      'wizard-antisnipe-minutes',
+    ) as HTMLInputElement | null
+    if (input === null) throw new Error('anti-snipe minutes input not found')
+    await fireBlur(input)
+    expect(autosaveActionMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('flushes a pending save on step change', async () => {
+    vi.useFakeTimers()
+    autosaveActionMock.mockResolvedValue({
+      ok: true,
+      conflict: false,
+      savedAt: '2026-09-09T10:00:00.000Z',
+      updatedAt: '2026-09-09T09:59:00.000Z',
+      error: null,
+    })
+    await mountWizard(existingLotInitial)
+    await setMinutesInput('9')
+
+    await clickElement(railStepButton('Sisu'))
+    expect(autosaveActionMock).toHaveBeenCalledTimes(1)
+
+    await advanceTimers(10_000)
+    expect(autosaveActionMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('adopts the server updatedAt when no base is known, then sends it as base', async () => {
+    vi.useFakeTimers()
+    autosaveActionMock
+      .mockResolvedValueOnce({
+        ok: true,
+        conflict: false,
+        savedAt: '2026-09-09T10:00:00.000Z',
+        updatedAt: '2026-09-09T09:59:00.000Z',
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        conflict: false,
+        savedAt: '2026-09-09T10:05:00.000Z',
+        updatedAt: '2026-09-09T10:04:00.000Z',
+        error: null,
+      })
+    // No known base: the lot's initial carries no updatedAt at all.
+    const { updatedAt: _omitted, ...withoutBase } = existingLotInitial
+    await mountWizard(withoutBase)
+    await setMinutesInput('9')
+    await advanceTimers(10_000)
+    expect(autosaveArgs()[2]).toBeNull()
+
+    await setMinutesInput('11')
+    await advanceTimers(10_000)
+    const secondCall = autosaveActionMock.mock.calls[1]
+    if (secondCall === undefined) throw new Error('second autosave was not called')
+    expect(secondCall[2]).toBe('2026-09-09T09:59:00.000Z')
+  })
+})
+
+describe('AuctionWizard conflict banner', () => {
+  function stubReload(): { reload: ReturnType<typeof vi.fn> } {
+    const reload = vi.fn()
+    Object.defineProperty(window, 'location', {
+      value: { href: 'http://localhost/admin/auctions/x/edit', reload },
+      configurable: true,
+      writable: true,
+    })
+    return { reload }
+  }
+
+  function conflictBanner(): HTMLElement | null {
+    return container.querySelector<HTMLElement>('[role="alert"]')
+  }
+
+  it('shows the banner on a conflict and pauses autosave until takeover', async () => {
+    vi.useFakeTimers()
+    const location = stubReload()
+    autosaveActionMock.mockResolvedValue({
+      ok: false,
+      conflict: true,
+      savedAt: null,
+      updatedAt: '2026-09-09T09:59:00.000Z',
+      error: 'Mustand on vahepeal serveris uuendatud.',
+    })
+    await mountWizard(existingLotInitial)
+    await setMinutesInput('9')
+    await advanceTimers(10_000)
+
+    const banner = conflictBanner()
+    if (banner === null) throw new Error('conflict banner not found')
+    expect(banner.textContent).toContain('serverisse salvestanud')
+
+    // Editing continues locally, but the server save stays paused.
+    await setMinutesInput('11')
+    await advanceTimers(10_000)
+    expect(autosaveActionMock).toHaveBeenCalledTimes(1)
+
+    const takeOver = [...banner.querySelectorAll<HTMLButtonElement>('button')].find(
+      (candidate) => candidate.textContent === 'Võta üle',
+    )
+    if (takeOver === undefined) throw new Error('take-over button not found')
+    await clickElement(takeOver)
+    expect(location.reload).toHaveBeenCalledTimes(1)
   })
 })

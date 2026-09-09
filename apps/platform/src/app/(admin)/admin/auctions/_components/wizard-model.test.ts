@@ -14,6 +14,8 @@ import {
   stepForField,
   validateAuctionDraft,
   validateWizardForSubmit,
+  wizardFieldDiff,
+  wizardSummaryRows,
   type AuctionWizardInitial,
   type AuctionWizardState,
 } from './wizard-model'
@@ -422,5 +424,85 @@ describe('rendi-/kasutusleping gating (task 5.7)', () => {
     // Unchecked stays absent so the restore stays byte-equal to the server
     // state (the dirty compare must not fire a spurious restore prompt).
     expect(restoredWithoutLease?.state.hasLeaseAgreement).toBeUndefined()
+  })
+})
+
+// ── Step 7 summary and published-lot diff (task 5.6) ────────────────────────
+
+const summaryOptions = {
+  counties: [{ id: 'c1', name: 'Harjumaa' }],
+  parishes: [{ id: 'p1', name: 'Kuusalu vald', countyId: 'c1' }],
+  specialists: [{ id: 'spec-1', name: 'Mari Maasikas' }],
+}
+
+describe('wizardSummaryRows', () => {
+  it('summarises the key fields read-only', () => {
+    const rows = wizardSummaryRows(createInitial, baseState, summaryOptions)
+    const value = (label: string): string => {
+      const row = rows.find((entry) => entry.label === label)
+      if (row === undefined) throw new Error(`summary row ${label} not found`)
+      return row.value
+    }
+    expect(value('Nimi')).toBe('Harjumaa raieõigus')
+    expect(value('Objekt')).toBe('Raieõigus')
+    expect(value('Mehaanika')).toBe('Avatud')
+    expect(value('Algusaeg')).toBe('01.12.2026 12:00')
+    expect(value('Lõppaeg')).toBe('10.12.2026 12:00')
+    expect(value('Alghind')).toBe('3000 €')
+    expect(value('Pindala')).toBe('12.4 ha')
+    expect(value('Asukoht')).toBe('Harjumaa, Kuusalu vald, Metsa tänav 1')
+    expect(value('Katastrid')).toBe('34801:001:0217')
+    expect(value('Spetsialist')).toBe('Mari Maasikas')
+  })
+
+  it('masks a stored reserve and never shows its amount', () => {
+    const rows = wizardSummaryRows(
+      { ...createInitial, hasReserve: true },
+      baseState,
+      summaryOptions,
+    )
+    const reserve = rows.find((row) => row.label === 'Piirhind')
+    expect(reserve?.value).toBe('määratud (varjatud)')
+  })
+})
+
+describe('wizardFieldDiff', () => {
+  const publishedInitial: AuctionWizardInitial = {
+    ...createInitial,
+    auctionId: 'a1b2c3d4-0000-0000-0000-000000000001',
+    mechanicsLocked: true,
+  }
+
+  it('lists only changed fields with saved and current values', () => {
+    const rows = wizardFieldDiff(
+      publishedInitial,
+      { ...baseState, title: 'Uus pealkiri', minBidEur: '2500' },
+      summaryOptions,
+    )
+    expect(rows.map((row) => row.label)).toEqual(['Nimi', 'Alghind'])
+    expect(rows[0]).toMatchObject({
+      saved: 'Harjumaa raieõigus',
+      current: 'Uus pealkiri',
+      masked: false,
+    })
+    expect(rows[1]).toMatchObject({ saved: '3000 €', current: '2500 €' })
+  })
+
+  it('renders a reserve change masked on both sides', () => {
+    const rows = wizardFieldDiff(
+      { ...publishedInitial, hasReserve: true },
+      { ...baseState, reserveEur: '1000' },
+      summaryOptions,
+    )
+    const reserve = rows.find((row) => row.label === 'Piirhind')
+    expect(reserve).toMatchObject({
+      saved: 'muudetud (varjatud)',
+      current: 'muudetud (varjatud)',
+      masked: true,
+    })
+  })
+
+  it('stays empty when nothing changed', () => {
+    expect(wizardFieldDiff(publishedInitial, baseState, summaryOptions)).toEqual([])
   })
 })

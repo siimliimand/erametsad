@@ -1,15 +1,16 @@
 'use client'
 
 import type { WizardStepContext } from './wizard-model'
-import { reviewIssues } from './wizard-model'
+import { reviewIssues, wizardFieldDiff, wizardSummaryRows } from './wizard-model'
 import { FieldHint, FieldLabel, WarningNote } from './wizard-ui'
 import { primaryButtonClass, inputClass } from '../../../_components/FormField'
 
 /**
  * Step 7 Ülevaade ja avaldamine (docs/design/admin/03 step 7): the
  * cross-step validation summary where every failure links to its step, the
- * publish action behind the gate list, and the guest draft-preview link.
- * Warnings never block; errors stop the wizard submit and the publish.
+ * read-only field summary, the two-column diff against the saved copy when
+ * editing a published (mechanics-locked) lot, and the guest draft-preview
+ * link. Warnings never block; errors stop the wizard submit and the publish.
  */
 
 export function StepUlevaade({
@@ -23,6 +24,9 @@ export function StepUlevaade({
   const warnings = issues.filter((issue) => issue.severity === 'warning')
   const canPublish =
     initial.auctionId !== null && options.publishAuction !== undefined && errors.length === 0
+
+  const summaryRows = wizardSummaryRows(initial, state, options)
+  const diffRows = initial.mechanicsLocked ? wizardFieldDiff(initial, state, options) : []
 
   const stepList: { step: number; label: string }[] = [
     { step: 1, label: 'Tüüp ja mehaanika' },
@@ -59,6 +63,68 @@ export function StepUlevaade({
       </section>
 
       <section className="flex flex-col gap-xs rounded-card border border-border p-sm">
+        <h3 className="text-label font-semibold text-ink">Väljade kokkuvõte</h3>
+        <dl className="m-0 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[minmax(9rem,auto)_1fr]">
+          {summaryRows.map((row) => (
+            <div key={row.label} className="contents">
+              <dt className="text-bodySm text-inkMuted">{row.label}</dt>
+              <dd className="m-0 whitespace-pre-wrap text-bodySm font-medium text-ink">
+                {row.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        <FieldHint>Kokkuvõte on kirjutuskaitses; muudatused tehakse vastaval sammul.</FieldHint>
+      </section>
+
+      {diffRows.length > 0 ? (
+        <section className="flex flex-col gap-xs rounded-card border border-border p-sm">
+          <h3 className="text-label font-semibold text-ink">
+            Muudatused võrreldes salvestatud olekuga
+          </h3>
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr className="border-b border-border text-label text-inkMuted">
+                <th scope="col" className="py-1.5 pr-3 font-medium">
+                  Väli
+                </th>
+                <th scope="col" className="py-1.5 pr-3 font-medium">
+                  Salvestatud
+                </th>
+                <th scope="col" className="py-1.5 font-medium">
+                  Praegune
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {diffRows.map((row) => (
+                <tr key={row.label} className="border-b border-border last:border-b-0">
+                  <td className="py-1.5 pr-3 align-top text-bodySm text-inkMuted">{row.label}</td>
+                  <td className="py-1.5 pr-3 align-top text-bodySm text-ink">
+                    {row.masked ? (
+                      <span className="italic text-inkMuted">{row.saved}</span>
+                    ) : (
+                      row.saved
+                    )}
+                  </td>
+                  <td className="py-1.5 align-top text-bodySm font-medium text-ink">
+                    {row.masked ? (
+                      <span className="italic text-inkMuted">{row.current}</span>
+                    ) : (
+                      row.current
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <FieldHint>
+            Avaldamiseks salvesta muudatused; server kontrollib lubatud välju uuesti.
+          </FieldHint>
+        </section>
+      ) : null}
+
+      <section className="flex flex-col gap-xs">
         <h3 className="text-label font-semibold text-ink">Kontroll ja avaldamise eeltingimused</h3>
         {issues.length === 0 ? (
           <p className="text-bodySm font-medium text-ink">

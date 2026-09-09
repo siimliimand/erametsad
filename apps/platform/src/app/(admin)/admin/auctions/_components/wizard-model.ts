@@ -139,6 +139,12 @@ export interface AuctionWizardInitial {
   aliasEmail: string | null
   /** Signed portal draft-preview URL; null until the lot exists. */
   guestPreviewHref: string | null
+  /**
+   * Stored copy's updatedAt at load time; the conflict-detection base for
+   * server autosave. Null/absent lets the first autosave adopt the server
+   * version (the server shells do not pass it yet).
+   */
+  updatedAt?: string | null
   state: AuctionWizardState
 }
 
@@ -1062,4 +1068,206 @@ export function parseWizardDraft(raw: string): WizardDraft | null {
   }
   const state = draftStateFrom(record.state)
   return state === null ? null : { state, savedAt: record.savedAt }
+}
+
+// ── Step 7 read-only summary and published-lot diff (task 5.6) ──────────────
+
+const SUMMARY_OBJECT_TYPE_LABELS: Record<AuctionObjectType, string> = {
+  raieoigus: 'Raieõigus',
+  kinnistu: 'Metskinnistu',
+  pakett: 'Pakett',
+  kiire: 'Kiire oksjon',
+}
+
+const SUMMARY_AUCTION_TYPE_LABELS: Record<AuctionTypeValue, string> = {
+  open: 'Avatud',
+  sealed: 'Suletud',
+}
+
+/** Tallinn wall input ("2026-12-01T12:00") -> "01.12.2026 12:00"; '' stays ''. */
+function summaryWallValue(wall: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(wall.trim())
+  if (match === null) return ''
+  const [, year, month, day, hour, minute] = match
+  return `${day ?? ''}.${month ?? ''}.${year ?? ''} ${hour ?? ''}:${minute ?? ''}`
+}
+
+function summaryEuro(value: string): string {
+  const parsed = parseDecimal(value)
+  return parsed === undefined ? '' : `${value.trim()} €`
+}
+
+function summaryOrDash(value: string): string {
+  return value.trim() === '' ? '—' : value.trim()
+}
+
+function nameFromOptions(
+  list: readonly { id: string; name: string }[] | undefined,
+  id: string,
+): string {
+  if (id.trim() === '') return ''
+  return list?.find((entry) => entry.id === id)?.name ?? id
+}
+
+export interface WizardSummaryRow {
+  label: string
+  value: string
+}
+
+/** Read-only field summary for step 7 (Ülevaade), display-ready strings. */
+export function wizardSummaryRows(
+  initial: AuctionWizardInitial,
+  state: AuctionWizardState,
+  options: Pick<AuctionWizardOptions, 'counties' | 'parishes' | 'specialists'>,
+): WizardSummaryRow[] {
+  const countyName = nameFromOptions(options.counties, state.countyId)
+  const parishName = nameFromOptions(options.parishes, state.parishId)
+  const locationParts = [countyName, parishName, state.address.trim()].filter(
+    (part) => part !== '',
+  )
+  const reserveValue =
+    state.reserveEur.trim() !== ''
+      ? summaryEuro(state.reserveEur)
+      : initial.hasReserve
+        ? 'määratud (varjatud)'
+        : ''
+  const rows: WizardSummaryRow[] = [
+    { label: 'Nimi', value: summaryOrDash(state.title) },
+    {
+      label: 'Objekt',
+      value:
+        SUMMARY_OBJECT_TYPE_LABELS[state.objectType] +
+        (state.isQuickAuction ? ' · kiiroksjon' : ''),
+    },
+    { label: 'Mehaanika', value: SUMMARY_AUCTION_TYPE_LABELS[state.auctionType] },
+    { label: 'Algusaeg', value: summaryOrDash(summaryWallValue(state.startsAt)) },
+    { label: 'Lõppaeg', value: summaryOrDash(summaryWallValue(state.endsAt)) },
+    { label: 'Alghind', value: summaryOrDash(summaryEuro(state.minBidEur)) },
+    { label: 'Pakkumuse samm', value: summaryOrDash(summaryEuro(state.bidStepEur)) },
+    { label: 'Piirhind', value: summaryOrDash(reserveValue) },
+    { label: 'Pindala', value: summaryOrDash(state.areaHa.trim() === '' ? '' : `${state.areaHa.trim()} ha`) },
+    {
+      label: 'Maht',
+      value: summaryOrDash(state.volumeM3.trim() === '' ? '' : `${state.volumeM3.trim()} m³`),
+    },
+    { label: 'Asukoht', value: summaryOrDash(locationParts.join(', ')) },
+    {
+      label: 'Katastrid',
+      value: summaryOrDash(state.cadastres.map((value) => value.trim()).filter((value) => value !== '').join(', ')),
+    },
+    {
+      label: 'Spetsialist',
+      value: summaryOrDash(nameFromOptions(options.specialists, state.specialistId)),
+    },
+  ]
+  return rows
+}
+
+export interface WizardDiffRow {
+  label: string
+  saved: string
+  current: string
+  /**
+   * True for reserve changes: both columns render "muudetud (varjatud)",
+   * the stored amount never crosses to the client (spec scenario).
+   */
+  masked: boolean
+}
+
+interface DiffField {
+  key: string
+  label: string
+  get: (state: AuctionWizardState) => string
+}
+
+const DIFF_FIELDS: readonly DiffField[] = [
+  { key: 'title', label: 'Nimi', get: (s) => summaryOrDash(s.title) },
+  {
+    key: 'objectType',
+    label: 'Objekt',
+    get: (s) =>
+      SUMMARY_OBJECT_TYPE_LABELS[s.objectType] + (s.isQuickAuction ? ' · kiiroksjon' : ''),
+  },
+  { key: 'auctionType', label: 'Mehaanika', get: (s) => SUMMARY_AUCTION_TYPE_LABELS[s.auctionType] },
+  { key: 'startsAt', label: 'Algusaeg', get: (s) => summaryOrDash(summaryWallValue(s.startsAt)) },
+  { key: 'endsAt', label: 'Lõppaeg', get: (s) => summaryOrDash(summaryWallValue(s.endsAt)) },
+  { key: 'minBidEur', label: 'Alghind', get: (s) => summaryOrDash(summaryEuro(s.minBidEur)) },
+  {
+    key: 'bidStepEur',
+    label: 'Pakkumuse samm',
+    get: (s) => summaryOrDash(summaryEuro(s.bidStepEur)),
+  },
+  {
+    key: 'areaHa',
+    label: 'Pindala',
+    get: (s) => summaryOrDash(s.areaHa.trim() === '' ? '' : `${s.areaHa.trim()} ha`),
+  },
+  {
+    key: 'volumeM3',
+    label: 'Maht',
+    get: (s) => summaryOrDash(s.volumeM3.trim() === '' ? '' : `${s.volumeM3.trim()} m³`),
+  },
+  { key: 'address', label: 'Aadress', get: (s) => summaryOrDash(s.address) },
+  {
+    key: 'cadastres',
+    label: 'Katastrid',
+    get: (s) =>
+      summaryOrDash(s.cadastres.map((value) => value.trim()).filter((value) => value !== '').join(', ')),
+  },
+]
+
+function truncated(value: string, max = 80): string {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value
+}
+
+/**
+ * Two-column diff (salvestatud vs praegune) for editing a published lot:
+ * only fields whose display value changed, in field order. The reserve row
+ * appears masked on both sides whenever the operator entered an amount —
+ * the stored value is write-only, so there is nothing else to show (D5).
+ */
+export function wizardFieldDiff(
+  initial: AuctionWizardInitial,
+  state: AuctionWizardState,
+  options: Pick<AuctionWizardOptions, 'counties' | 'parishes' | 'specialists'>,
+): WizardDiffRow[] {
+  const rows: WizardDiffRow[] = []
+  for (const field of DIFF_FIELDS) {
+    const saved = field.get(initial.state)
+    const current = field.get(state)
+    if (saved === current) continue
+    rows.push({ label: field.label, saved, current, masked: false })
+  }
+  for (const key of ['countyId', 'parishId', 'specialistId'] as const) {
+    const list =
+      key === 'countyId'
+        ? options.counties
+        : key === 'parishId'
+          ? options.parishes
+          : options.specialists
+    const saved = nameFromOptions(list, initial.state[key])
+    const current = nameFromOptions(list, state[key])
+    if (saved === current) continue
+    const label = key === 'countyId' ? 'Maakond' : key === 'parishId' ? 'Vald' : 'Spetsialist'
+    rows.push({ label, saved: summaryOrDash(saved), current: summaryOrDash(current), masked: false })
+  }
+  const savedDescription = truncated(initial.state.descriptionPublic)
+  const currentDescription = truncated(state.descriptionPublic)
+  if (savedDescription !== currentDescription) {
+    rows.push({
+      label: 'Avalik info',
+      saved: summaryOrDash(savedDescription),
+      current: summaryOrDash(currentDescription),
+      masked: false,
+    })
+  }
+  if (initial.state.reserveEur !== state.reserveEur) {
+    rows.push({
+      label: 'Piirhind',
+      saved: 'muudetud (varjatud)',
+      current: 'muudetud (varjatud)',
+      masked: true,
+    })
+  }
+  return rows
 }

@@ -3,7 +3,11 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { AuctionsTable, type AuctionsTableProps } from '../AuctionsTable'
+import {
+  AuctionsTable,
+  bulkShiftedEndIso,
+  type AuctionsTableProps,
+} from '../AuctionsTable'
 import { makeTableRow } from './fixtures'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -54,6 +58,7 @@ async function unmountTable(): Promise<void> {
 afterEach(async () => {
   await unmountTable()
   window.localStorage.clear()
+  window.sessionStorage.clear()
   noopAction.mockClear()
 })
 
@@ -337,4 +342,224 @@ describe('AuctionsTable global shortcut', () => {
     await pressKey({ key: 'n', ctrlKey: true, cancelable: true })
     expect(location.href).toBe('http://localhost/admin/auctions')
   })
+})
+
+describe('bulk offset math (task 5.3)', () => {
+  it('previews each row end shifted by the same N hours', () => {
+    expect(
+      bulkShiftedEndIso('2026-12-10T10:00:00.000Z', '', 2),
+    ).toBe('2026-12-10T12:00:00.000Z')
+    expect(
+      bulkShiftedEndIso('2026-12-10T10:00:00.000Z', '', -3),
+    ).toBe('2026-12-10T07:00:00.000Z')
+    expect(bulkShiftedEndIso('2026-12-10T10:00:00.000Z', '', 0)).toBe(
+      '2026-12-10T10:00:00.000Z',
+    )
+  })
+
+  it('falls back to the shared end for rows without their own end', () => {
+    // 2026-12-11T10:00 Tallinn winter wall time = 08:00 UTC.
+    expect(bulkShiftedEndIso(null, '2026-12-11T10:00', 1)).toBe(
+      '2026-12-11T09:00:00.000Z',
+    )
+  })
+
+  it('returns null when neither the row nor the shared end exists', () => {
+    expect(bulkShiftedEndIso(null, '', 2)).toBeNull()
+  })
+})
+
+describe('AuctionsTable select-all and selection persistence (task 5.3)', () => {
+  function selectAllCheckbox(): HTMLInputElement {
+    const box = container.querySelector<HTMLInputElement>(
+      '[aria-label="Vali kõik loendi read"]',
+    )
+    if (box === null) throw new Error('select-all checkbox not found')
+    return box
+  }
+
+  function selectedCount(): string {
+    const status = container.querySelector<HTMLElement>('[role="status"]')
+    if (status === null) throw new Error('bulk bar not found')
+    return status.textContent
+  }
+
+  it('selects and deselects every rendered row from the toolbar', async () => {
+    await mountTable({
+      rows: [
+        makeTableRow(),
+        makeTableRow({ id: 'a1b2c3d4-0000-0000-0000-000000000002' }),
+      ],
+    })
+    await click(selectAllCheckbox())
+    expect(selectedCount()).toContain('Valitud 2 oksjonit')
+    expect(selectAllCheckbox().checked).toBe(true)
+
+    await click(selectAllCheckbox())
+    expect(selectAllCheckbox().checked).toBe(false)
+    expect(
+      container.querySelector('[role="status"]'),
+    ).toBeNull()
+  })
+
+  it('keeps other-page selections while toggling the current page', async () => {
+    window.sessionStorage.setItem(
+      'erametsad.admin.auctions.selection',
+      JSON.stringify(['a1b2c3d4-0000-0000-0000-000000000099']),
+    )
+    await mountTable({ rows: [makeTableRow()] })
+    expect(selectedCount()).toContain('Valitud 1 oksjonit')
+
+    await click(selectAllCheckbox())
+    expect(selectedCount()).toContain('Valitud 2 oksjonit')
+
+    await click(selectAllCheckbox())
+    // The off-page id survives the deselect of the rendered row.
+    expect(selectedCount()).toContain('Valitud 1 oksjonit')
+  })
+
+  it('restores the selection after a page navigation remount', async () => {
+    await mountTable({ rows: [makeTableRow()] })
+    const checkbox = container.querySelector<HTMLInputElement>(
+      'tbody input[type="checkbox"]',
+    )
+    if (checkbox === null) throw new Error('row checkbox not found')
+    await click(checkbox)
+    await unmountTable()
+
+    // Navigating to the next list page remounts the table with new rows.
+    await mountTable({
+      rows: [
+        makeTableRow({ id: 'a1b2c3d4-0000-0000-0000-000000000002', title: 'Saaremaa metskinnistu' }),
+      ],
+    })
+    expect(selectedCount()).toContain('Valitud 1 oksjonit')
+
+    const secondCheckbox = container.querySelector<HTMLInputElement>(
+      'tbody input[type="checkbox"]',
+    )
+    if (secondCheckbox === null) throw new Error('row checkbox not found')
+    await click(secondCheckbox)
+    expect(selectedCount()).toContain('Valitud 2 oksjonit')
+
+    const stored: unknown = JSON.parse(
+      window.sessionStorage.getItem('erametsad.admin.auctions.selection') ?? '[]',
+    )
+    expect(stored).toContain('a1b2c3d4-0000-0000-0000-000000000001')
+    expect(stored).toContain('a1b2c3d4-0000-0000-0000-000000000002')
+  })
+
+  it('clears the persisted selection with Tühista', async () => {
+    await mountTable({ rows: [makeTableRow()] })
+    const checkbox = container.querySelector<HTMLInputElement>(
+      'tbody input[type="checkbox"]',
+    )
+    if (checkbox === null) throw new Error('row checkbox not found')
+    await click(checkbox)
+
+    const cancelButton = [...container.querySelectorAll<HTMLButtonElement>('[role="status"] button')].find(
+      (candidate) => candidate.textContent === 'Tühista',
+    )
+    if (cancelButton === undefined) throw new Error('cancel button not found')
+    await click(cancelButton)
+    expect(
+      window.sessionStorage.getItem('erametsad.admin.auctions.selection'),
+    ).toBe('[]')
+  })
+})
+
+describe('AuctionsTable Ajasta avaldamine modal (task 5.3)', () => {
+  function openBulkBar(): HTMLElement {
+    const bar = container.querySelector<HTMLElement>('[role="status"]')
+    if (bar === null) throw new Error('bulk bar not found')
+    return bar
+  }
+
+  async function openModal(): Promise<HTMLElement> {
+    const trigger = [...openBulkBar().querySelectorAll<HTMLButtonElement>('button')].find(
+      (candidate) => candidate.textContent === 'Ajasta avaldamine',
+    )
+    if (trigger === undefined) throw new Error('bulk schedule trigger not found')
+    await click(trigger)
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')
+    if (dialog === null) throw new Error('schedule modal not found')
+    return dialog
+  }
+
+  function previewRow(dialog: HTMLElement): HTMLElement {
+    const row = dialog.querySelector<HTMLElement>('[data-preview-ends-at]')
+    if (row === null) throw new Error('end-time preview row not found')
+    return row
+  }
+
+  async function setNumberInput(input: HTMLInputElement, value: string): Promise<void> {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+        input,
+        value,
+      )
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+  }
+
+  it('shows the per-row end preview and shifts it with the offset control', async () => {
+    await mountTable({ rows: [makeTableRow()] })
+    const checkbox = container.querySelector<HTMLInputElement>(
+      'tbody input[type="checkbox"]',
+    )
+    if (checkbox === null) throw new Error('row checkbox not found')
+    await click(checkbox)
+
+    const dialog = await openModal()
+    expect(previewRow(dialog).getAttribute('data-preview-ends-at')).toBe(
+      '2026-12-10T10:00:00.000Z',
+    )
+
+    const shiftInput = dialog.querySelector<HTMLInputElement>(
+      'input[name="shiftEndHours"]',
+    )
+    if (shiftInput === null) throw new Error('shift input not found')
+    await setNumberInput(shiftInput, '2')
+    expect(previewRow(dialog).getAttribute('data-preview-ends-at')).toBe(
+      '2026-12-10T12:00:00.000Z',
+    )
+
+    await setNumberInput(shiftInput, '-1')
+    expect(previewRow(dialog).getAttribute('data-preview-ends-at')).toBe(
+      '2026-12-10T09:00:00.000Z',
+    )
+  })
+
+  it('submits the selected ids, shared start and shift from the modal form', async () => {
+    await mountTable({
+      rows: [
+        makeTableRow(),
+        makeTableRow({ id: 'a1b2c3d4-0000-0000-0000-000000000002' }),
+      ],
+    })
+    await click(selectAllBox())
+    const dialog = await openModal()
+
+    const form = dialog.querySelector<HTMLFormElement>('form')
+    if (form === null) throw new Error('modal form not found')
+    const ids = [...form.querySelectorAll<HTMLInputElement>('input[name="ids"]')].map(
+      (input) => input.value,
+    )
+    expect(ids).toEqual([
+      'a1b2c3d4-0000-0000-0000-000000000001',
+      'a1b2c3d4-0000-0000-0000-000000000002',
+    ])
+    expect(form.querySelector<HTMLInputElement>('input[name="startsAt"]')).not.toBeNull()
+    expect(form.querySelector<HTMLInputElement>('input[name="shiftEndHours"]')).not.toBeNull()
+    expect(form.querySelector<HTMLInputElement>('input[name="endsAt"]')).not.toBeNull()
+  })
+
+  function selectAllBox(): HTMLInputElement {
+    const box = container.querySelector<HTMLInputElement>(
+      '[aria-label="Vali kõik loendi read"]',
+    )
+    if (box === null) throw new Error('select-all checkbox not found')
+    return box
+  }
 })
