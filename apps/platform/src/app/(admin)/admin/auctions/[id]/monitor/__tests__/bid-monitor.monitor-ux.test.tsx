@@ -10,9 +10,14 @@ const nav = vi.hoisted(() => ({
 const revealAction = vi.hoisted(() => vi.fn())
 const approveAction = vi.hoisted(() => vi.fn())
 const rejectAction = vi.hoisted(() => vi.fn())
+const flagAction = vi.hoisted(() => vi.fn())
 
 vi.mock('next/navigation', () => ({
   useRouter: () => nav,
+}))
+
+vi.mock('../_actions', () => ({
+  flagInternalReviewAction: flagAction,
 }))
 
 vi.mock('../../../../../_actions/auctions', () => ({
@@ -26,6 +31,7 @@ vi.mock('../../../../../_lib/admin', () => ({
   requireAdminRepositories: vi.fn(),
 }))
 
+import type { DetectedAnomaly } from '../_lib/anomalies'
 import {
   BidMonitor,
   type MonitorBidRow,
@@ -71,6 +77,7 @@ function feedRow(offsetMs: number, overrides: Partial<MonitorBidRow> = {}): Moni
     bidderId: 'bidder-1',
     bidderAlias: 7,
     bidderAccountCreatedAt: '2020-01-01T00:00:00.000Z',
+    ipHash: null,
     ...overrides,
   }
 }
@@ -106,7 +113,7 @@ function baseProps(rows: MonitorBidRow[], overrides: Partial<MonitorProps> = {})
     antiSnipeMinutes: 5,
     initialExtensions: [],
     canEndManually: false,
-    canFlagAnomalies: false,
+    canViewAnomalies: false,
     canExportBids: false,
     canViewUsers: false,
     canViewCeremony: false,
@@ -181,6 +188,7 @@ afterEach(async () => {
   revealAction.mockReset()
   approveAction.mockReset()
   rejectAction.mockReset()
+  flagAction.mockReset()
 })
 
 describe('BidMonitor alapakkumised block', () => {
@@ -278,28 +286,114 @@ describe('BidMonitor alapakkumised block', () => {
   })
 })
 
-describe('BidMonitor anomaly zero state', () => {
-  it('shows the green zero state when no anomalies are detected', async () => {
-    await mountMonitor(baseProps([feedRow(0)]))
+describe('BidMonitor anomaly panel gating', () => {
+  it('shows the green zero state for anomaly-capable roles', async () => {
+    await mountMonitor(baseProps([feedRow(0)], { canViewAnomalies: true }))
 
     const status = container.querySelector('p[role="status"]')
     expect(status?.textContent).toContain('Anomaaliaid ei tuvastatud')
     expect(text()).not.toContain('anomaaliat tuvastatud')
   })
 
-  it('keeps the anomaly cards when heuristics flag the feed', async () => {
-    await mountMonitor(
-      baseProps([
-        feedRow(0, { bidderId: 'bidder-a', bidderAlias: 1 }),
-        feedRow(30_000, { bidderId: 'bidder-b', bidderAlias: 2, amountEur: 505 }),
-        feedRow(60_000, { bidderId: 'bidder-a', bidderAlias: 1, amountEur: 510 }),
-        feedRow(90_000, { bidderId: 'bidder-b', bidderAlias: 2, amountEur: 515 }),
-        feedRow(120_000, { bidderId: 'bidder-a', bidderAlias: 1, amountEur: 520 }),
-      ]),
+  it('hides the whole panel, including the zero state, without the role gate', async () => {
+    await mountMonitor(baseProps([feedRow(0)], { canViewAnomalies: false }))
+
+    expect(text()).not.toContain('Anomaaliaid ei tuvastatud')
+    expect(text()).not.toContain('Anomaaliad & shill-hoiatused')
+    expect(text()).not.toContain('Märgi uurimiseks')
+  })
+})
+
+describe('BidMonitor anomaly cards with expandable evidence', () => {
+  // Alternating leading bids one second apart between two bidders: five
+  // rapid overtakes trip the spec threshold (< 10 s × 5).
+  function overtakeRows(): MonitorBidRow[] {
+    return [0, 1_000, 2_000, 3_000, 4_000, 5_000].map((offset, index) =>
+      feedRow(offset, {
+        bidderId: index % 2 === 0 ? 'bidder-a' : 'bidder-b',
+        bidderAlias: index % 2 === 0 ? 1 : 2,
+        amountEur: 500 + index,
+      }),
     )
+  }
+
+  it('keeps the anomaly cards when the overtake heuristic flags the feed', async () => {
+    await mountMonitor(baseProps(overtakeRows(), { canViewAnomalies: true }))
 
     expect(text()).toContain('anomaaliat tuvastatud')
+    expect(text()).toContain('Kiire ülevõtmine (shill kahtlus)')
     expect(text()).not.toContain('Anomaaliaid ei tuvastatud')
+  })
+
+  it('expands evidence with labels, counts, and bid-time deltas', async () => {
+    await mountMonitor(baseProps(overtakeRows(), { canViewAnomalies: true }))
+
+    const details = container.querySelector('details')
+    expect(details).not.toBeNull()
+    expect(details?.open).toBe(false)
+
+    const summary = details?.querySelector('summary')
+    expect(summary).not.toBeNull()
+    await act(async () => {
+      summary?.click()
+      await sleep(5)
+    })
+
+    expect(details?.open).toBe(true)
+    const evidence = details?.textContent ?? ''
+    expect(evidence).toContain('Pakkumiste ajajoon:')
+    expect(evidence).toContain('Pakkuja #1 — 3 pakkumist')
+    expect(evidence).toContain('Pakkuja #2 — 3 pakkumist')
+    expect(evidence).toContain('+1,0 s')
+  })
+
+  it('expands IP-cluster evidence with masked prefixes only', async () => {
+    const sharedHash = 'f47ac10b58cc4372a5670e02b2c3d479'
+    const rows = [
+      feedRow(0, { bidderId: 'bidder-a', bidderAlias: 1, ipHash: sharedHash }),
+      feedRow(5_000, { bidderId: 'bidder-b', bidderAlias: 2, ipHash: sharedHash }),
+      feedRow(8_000, {
+        bidderId: 'bidder-a',
+        bidderAlias: 1,
+        ipHash: sharedHash,
+        amountEur: 505,
+      }),
+    ]
+    await mountMonitor(baseProps(rows, { canViewAnomalies: true }))
+
+    expect(text()).toContain('IP klaster')
+
+    const summary = [...container.querySelectorAll('summary')].find((candidate) =>
+      candidate.textContent.includes('IP klaster'),
+    )
+    expect(summary).not.toBeUndefined()
+    await act(async () => {
+      summary?.click()
+      await sleep(5)
+    })
+
+    const evidence = summary?.closest('details')?.textContent ?? ''
+    expect(evidence).toContain('Pakkuja #1 — 2 pakkumist')
+    expect(evidence).toContain('Pakkuja #2 — 1 pakkumist')
+    expect(evidence).toContain('IP-d: f47ac10b58cc…')
+    expect(evidence).not.toContain(sharedHash)
+  })
+
+  it('offers Märgi uurimiseks per card through the audited action', async () => {
+    flagAction.mockResolvedValue({ ok: true, error: null })
+    await mountMonitor(baseProps(overtakeRows(), { canViewAnomalies: true }))
+
+    const flagButton = buttonByText('Märgi uurimiseks')
+    await clickButton(flagButton)
+
+    expect(flagAction).toHaveBeenCalledTimes(1)
+    const call = flagAction.mock.calls[0] as [string, readonly DetectedAnomaly[]] | undefined
+    if (call === undefined) throw new Error('expected a flag call')
+    const [auctionId, anomalies] = call
+    expect(auctionId).toBe('auction-1')
+    expect(anomalies).toHaveLength(1)
+    expect(anomalies[0]?.kind).toBe('rapid-overtake')
+    expect(text()).toContain('Märgitud uurimiseks — kirje auditilogis')
   })
 })
 

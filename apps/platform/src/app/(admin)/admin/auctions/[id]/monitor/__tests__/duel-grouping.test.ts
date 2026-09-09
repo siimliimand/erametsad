@@ -18,6 +18,7 @@ function feedRow(offsetMs: number, overrides: Partial<MonitorBidRow> = {}): Moni
     bidderId: 'bidder-1',
     bidderAlias: 7,
     bidderAccountCreatedAt: '2020-01-01T00:00:00.000Z',
+    ipHash: null,
     ...overrides,
   }
 }

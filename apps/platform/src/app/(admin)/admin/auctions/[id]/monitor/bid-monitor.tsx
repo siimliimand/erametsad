@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Eye,
+  Network,
   SearchCheck,
   Swords,
   TimerReset,
@@ -18,9 +19,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type 
 import { flagInternalReviewAction } from './_actions'
 import {
   detectAnomalies,
-  NEW_ACCOUNT_BURST_WINDOW_MINUTES,
   NEW_ACCOUNT_MAX_AGE_DAYS,
-  RAPID_OVERTAKE_WINDOW_MINUTES,
+  RAPID_OVERTAKE_WINDOW_SECONDS,
   type DetectedAnomaly,
 } from './_lib/anomalies'
 import {
@@ -51,6 +51,11 @@ export interface MonitorBidRow {
   bidderId: string | null
   bidderAlias: number | null
   bidderAccountCreatedAt: string | null
+  /**
+   * Salted IP hash; the page includes it only for roles allowed to see
+   * anomaly evidence (audit:read), so it never reaches sellers.
+   */
+  ipHash: string | null
 }
 
 export interface MonitorExtensionEntry {
@@ -334,45 +339,162 @@ function anomalyCardView(anomaly: DetectedAnomaly): {
   title: string
   description: string
 } {
+  if (anomaly.kind === 'ip-cluster') {
+    return {
+      icon: Network,
+      title: 'IP klaster',
+      description: `${anomaly.labels.join(' · ')} — sama IP ${String(anomaly.bidCount)} pakkumisel`,
+    }
+  }
   if (anomaly.kind === 'new-account-burst') {
+    const label = anomaly.labels[0]
     return {
       icon: UserPlus,
       title:
-        anomaly.bidderAlias === null
+        label === undefined
           ? 'Uue konto pakkumiste jada'
-          : `Uue konto pakkumiste jada — Pakkuja #${String(anomaly.bidderAlias)}`,
-      description: `Konto alla ${String(NEW_ACCOUNT_MAX_AGE_DAYS)} päeva; ${String(anomaly.bidCount)} pakkumist ${String(NEW_ACCOUNT_BURST_WINDOW_MINUTES)} minuti jooksul`,
+          : `Uue konto pakkumiste jada — ${label}`,
+      description: `Konto alla ${String(NEW_ACCOUNT_MAX_AGE_DAYS)} päeva — ${String(anomaly.bidCount)} pakkumist`,
     }
   }
+  const labelA = anomaly.labels[0]
+  const labelB = anomaly.labels[1]
   const pair =
-    anomaly.bidderAliasA === null || anomaly.bidderAliasB === null
+    labelA === undefined || labelB === undefined
       ? 'Kaks pakkujat'
-      : `Pakkuja #${String(anomaly.bidderAliasA)} ↔ Pakkuja #${String(anomaly.bidderAliasB)}`
+      : `${labelA} ↔ ${labelB}`
   return {
     icon: ArrowLeftRight,
     title: 'Kiire ülevõtmine (shill kahtlus)',
-    description: `${pair} — juhtivus vahetus ${String(anomaly.flips)} korda ${String(RAPID_OVERTAKE_WINDOW_MINUTES)} minuti jooksul`,
+    description: `${pair} — juhtivus vahetus ${String(anomaly.overtakes)} korda, iga vahetus alla ${String(RAPID_OVERTAKE_WINDOW_SECONDS)} sekundi`,
   }
 }
 
+/** Estonian delta text for the evidence timeline, e.g. "+2,5 s". */
+function formatDelta(deltaMs: number): string {
+  if (deltaMs >= 60_000) {
+    const minutes = Math.floor(deltaMs / 60_000)
+    const seconds = Math.round((deltaMs % 60_000) / 1000)
+    return `${String(minutes)} min ${String(seconds)} s`
+  }
+  const seconds = Math.round((deltaMs / 1000) * 10) / 10
+  return `${seconds.toFixed(1).replace('.', ',')} s`
+}
+
 /**
- * Anomalies & shill warnings panel (demo 04-bids-monitoring). Advisory
- * heuristics only — nothing here blocks bids. The footer flags the current
- * findings for internal review through one audited `anomaly.flag` entry.
+ * One expandable anomaly card: the collapsed row names the finding, the
+ * expanded evidence block shows the affected labels with their bid counts,
+ * the masked IP prefixes, and the bid-time deltas of the involved bids.
+ * "Märgi uurimiseks" flags this one finding through the audited
+ * `anomaly.flag` audit entry.
  */
-function AnomaliesPanel({
+function AnomalyCard({
   auctionId,
-  anomalies,
-  canFlag,
+  anomaly,
 }: {
   auctionId: string
-  anomalies: readonly DetectedAnomaly[]
-  canFlag: boolean
+  anomaly: DetectedAnomaly
 }) {
   const [flagged, setFlagged] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const view = anomalyCardView(anomaly)
+  const Icon = view.icon
 
+  return (
+    <li className="rounded-input border border-l-4 border-border border-l-danger bg-danger-light px-sm py-xs">
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-start gap-2.5 [&::-webkit-details-marker]:hidden">
+          <Icon className="mt-0.5 h-4 w-4 flex-none text-danger" aria-hidden="true" />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-bodySm font-semibold text-ink">{view.title}</span>
+            <span className="text-label text-ink-muted">{view.description}</span>
+          </span>
+          <ChevronDown
+            className="mt-0.5 h-3.5 w-3.5 flex-none text-ink-muted transition-transform duration-hover ease-hover group-open:rotate-180"
+            aria-hidden="true"
+          />
+        </summary>
+        <div className="mt-xs flex flex-col gap-xs border-t border-danger/20 pt-xs">
+          <p className="text-label text-ink">
+            {anomaly.labels
+              .map((label, index) => {
+                const count = anomaly.bidCounts[index]
+                return `${label}${count === undefined ? '' : ` — ${String(count)} pakkumist`}`
+              })
+              .join(' · ')}
+          </p>
+          {anomaly.ipPrefixes.length > 0 ? (
+            <p className="text-label text-ink">
+              IP-d: {anomaly.ipPrefixes.map((prefix) => `${prefix}…`).join(' · ')}
+            </p>
+          ) : null}
+          <p className="text-label font-semibold text-ink-muted">Pakkumiste ajajoon:</p>
+          <ul className="flex flex-col gap-0.5">
+            {anomaly.timeline.map((entry) => (
+              <li key={entry.bidId ?? `${entry.placedAt}-${entry.label}`} className="flex gap-2 text-label text-ink">
+                <time dateTime={entry.placedAt} title={formatDateTime(entry.placedAt)}>
+                  {formatClock(entry.placedAt)}
+                </time>
+                <span>{entry.label}</span>
+                {entry.deltaMs !== null ? (
+                  <span className="text-ink-muted">+{formatDelta(entry.deltaMs)}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          {flagged ? (
+            <span
+              role="status"
+              className="inline-flex w-fit items-center gap-1 rounded-pill bg-primary-light px-3 py-1 text-label font-semibold text-primaryDark"
+            >
+              <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+              Märgitud uurimiseks — kirje auditilogis
+            </span>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  startTransition(async () => {
+                    const result = await flagInternalReviewAction(auctionId, [anomaly])
+                    if (result.ok) {
+                      setFlagged(true)
+                    } else {
+                      setError(result.error)
+                    }
+                  })
+                }}
+                className="inline-flex h-7 w-fit items-center gap-1.5 rounded-button border border-danger bg-transparent px-3 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <SearchCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                {pending ? 'Märgin…' : 'Märgi uurimiseks'}
+              </button>
+              {error !== null ? (
+                <span className="text-label font-semibold text-danger">{error}</span>
+              ) : null}
+            </>
+          )}
+        </div>
+      </details>
+    </li>
+  )
+}
+
+/**
+ * Anomalies & shill warnings panel (demo 04-bids-monitoring). Advisory
+ * heuristics only — nothing here blocks bids. The whole panel mounts only
+ * for roles the page gates server-side (audit:read: admin/superadmin), so
+ * sellers never receive anomaly evidence.
+ */
+function AnomaliesPanel({
+  auctionId,
+  anomalies,
+}: {
+  auctionId: string
+  anomalies: readonly DetectedAnomaly[]
+}) {
   return (
     <section
       aria-label="Anomaaliad ja shill-hoiatused"
@@ -397,61 +519,11 @@ function AnomaliesPanel({
         </p>
       ) : (
         <ul className="mt-sm flex flex-col gap-xs">
-          {anomalies.map((anomaly) => {
-            const view = anomalyCardView(anomaly)
-            const Icon = view.icon
-            return (
-              <li
-                key={`${anomaly.kind}-${anomaly.kind === 'new-account-burst' ? anomaly.bidderId : `${anomaly.bidderIdA}-${anomaly.bidderIdB}`}`}
-                className="flex gap-2.5 rounded-input border border-l-4 border-border border-l-danger bg-danger-light px-sm py-xs"
-              >
-                <Icon className="mt-0.5 h-4 w-4 flex-none text-danger" aria-hidden="true" />
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="text-bodySm font-semibold text-ink">{view.title}</span>
-                  <span className="text-label text-ink-muted">{view.description}</span>
-                </span>
-              </li>
-            )
-          })}
+          {anomalies.map((anomaly) => (
+            <AnomalyCard key={anomaly.id} auctionId={auctionId} anomaly={anomaly} />
+          ))}
         </ul>
       )}
-      {canFlag && anomalies.length > 0 ? (
-        <div className="mt-sm border-t border-border pt-sm">
-          {flagged ? (
-            <span
-              role="status"
-              className="inline-flex items-center gap-1 rounded-pill bg-primary-light px-3 py-1 text-label font-semibold text-primaryDark"
-            >
-              <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
-              Märgitud sisejuurdluseks — kirje auditilogis
-            </span>
-          ) : (
-            <>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  startTransition(async () => {
-                    const result = await flagInternalReviewAction(auctionId, anomalies)
-                    if (result.ok) {
-                      setFlagged(true)
-                    } else {
-                      setError(result.error)
-                    }
-                  })
-                }}
-                className="inline-flex h-7 items-center gap-1.5 rounded-button border border-danger bg-transparent px-3 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <SearchCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                {pending ? 'Märgin…' : 'Märgi sisejuurdluseks'}
-              </button>
-              {error !== null ? (
-                <span className="ml-2 text-label font-semibold text-danger">{error}</span>
-              ) : null}
-            </>
-          )}
-        </div>
-      ) : null}
     </section>
   )
 }
@@ -838,7 +910,7 @@ export function BidMonitor({
   antiSnipeMinutes,
   initialExtensions,
   canEndManually,
-  canFlagAnomalies,
+  canViewAnomalies,
   canExportBids,
   canViewUsers,
   canViewCeremony,
@@ -860,7 +932,12 @@ export function BidMonitor({
   antiSnipeMinutes: number
   initialExtensions: MonitorExtensionEntry[]
   canEndManually: boolean
-  canFlagAnomalies: boolean
+  /**
+   * Server-side anomaly gate (audit:read: admin/superadmin). When false the
+   * panel never mounts and the rows arrive without ip_hash data, so the
+   * anomalies and their evidence stay hidden from sellers and specialists.
+   */
+  canViewAnomalies: boolean
   canExportBids: boolean
   canViewUsers: boolean
   canViewCeremony: boolean
@@ -1128,8 +1205,8 @@ export function BidMonitor({
     [rows],
   )
   const anomalies = useMemo(
-    () => detectAnomalies(rows, Date.now() - skewRef.current),
-    [rows],
+    () => (canViewAnomalies ? detectAnomalies(rows, Date.now() - skewRef.current) : []),
+    [rows, canViewAnomalies],
   )
 
   return (
@@ -1434,7 +1511,9 @@ export function BidMonitor({
         nowMs={Date.now() - skewRef.current}
       />
 
-      <AnomaliesPanel auctionId={auctionId} anomalies={anomalies} canFlag={canFlagAnomalies} />
+      {canViewAnomalies ? (
+        <AnomaliesPanel auctionId={auctionId} anomalies={anomalies} />
+      ) : null}
 
       {extensions.length > 0 ? (
         <section className="mt-md rounded-card border border-border bg-bgPage px-md py-sm">

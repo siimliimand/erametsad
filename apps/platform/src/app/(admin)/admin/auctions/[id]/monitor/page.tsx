@@ -99,6 +99,7 @@ export default async function AuctionMonitorPage({
         bidderId: bid.userId,
         bidderAlias: aliasById.get(bid.userId) ?? null,
         bidderAccountCreatedAt: accountCreatedAtById.get(bid.userId) ?? null,
+        ipHash: canViewAnomalies ? (bid.ipHash ?? null) : null,
       }))
   const sealedBidCount = isSealed ? bidsResult.docs.length : null
 
@@ -169,6 +170,12 @@ export default async function AuctionMonitorPage({
   )
   const ended = !['draft', 'scheduled', 'active'].includes(auction.status)
 
+  // Anomaly heuristics and their evidence (ip_hash, account ages) stay with
+  // admin/superadmin: the gate is server-side, so sellers and specialists
+  // neither receive the ip_hash data nor the anomaly panel at all (spec:
+  // anomaly cards hidden from sellers).
+  const canViewAnomalies = can(session.role, 'audit:read')
+
   // Pending alapakkumised for this lot (oldest first). Accepting promotes
   // the alapakkumine itself to leading (approveAlapakkumine), so the
   // resulting leading amount is the bid's own amount — offered only when
@@ -227,9 +234,10 @@ export default async function AuctionMonitorPage({
         antiSnipeMinutes={antiSnipeMinutes}
         initialExtensions={initialExtensions}
         canEndManually={can(session.role, 'auctions:end-manual')}
-        // audit-entry create is admin-only (guards.ts) — the same role set
-        // that holds audit:read, so it gates the internal-review flag.
-        canFlagAnomalies={can(session.role, 'audit:read')}
+        // audit:read binds anomalies to admin/superadmin (sellers and
+        // specialists are denied); the same role set holds the audited
+        // anomaly.flag write, so it also gates "Märgi uurimiseks".
+        canViewAnomalies={canViewAnomalies}
         // bids:write denies sellers, so the ip_hash-carrying export and its
         // affordance stay with admin/superadmin/specialist.
         canExportBids={can(session.role, 'bids:write')}
