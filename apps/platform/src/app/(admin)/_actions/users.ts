@@ -7,7 +7,12 @@ import { redirect } from 'next/navigation'
 import { requireAdminRepositories } from '../_lib/admin'
 import { can, isStaffRole, type AdminPermission } from '../_lib/permissions'
 import { getMediaBucket } from '../admin/media/_lib/media-upload'
-import { buildGdprZip, bytesToBase64 } from '../admin/users/_components/gdpr-zip'
+import {
+  buildGdprZip,
+  bytesToBase64,
+  gdprJsonEntry,
+  type GdprZipEntry,
+} from '../admin/users/_components/gdpr-zip'
 import { isSuspendDuration, suspendedUntil } from '../admin/users/_components/suspend'
 
 import { verifyAccessToken } from '@/lib/auth/jwt'
@@ -22,6 +27,7 @@ import {
 import type { CoreRepositories, UserDoc } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 import { auctionObjectTypes, userRoles } from '@/lib/data/schema'
+import { db } from '@/lib/db'
 
 const REASON_MIN_LENGTH = 5
 
@@ -32,6 +38,14 @@ const AUDIT_SUSPEND = 'user.suspend'
 // Registry key from docs/design/admin/14-audit-log.md; `after.phase` splits
 // start from stop, `after.reason` carries the mandatory view reason.
 const AUDIT_IMPERSONATE = 'user.impersonate'
+
+// Spec delta (admin-people / Impersonation): a view session is clamped to a
+// 30-minute expiresAt and never outlives it, even after token rotation.
+const IMPERSONATION_TTL_MS = 30 * 60 * 1000
+
+// Registry key for the superadmin leading-bid void; bids stay append-only,
+// so the void is the compensating status correction (sealed.void pattern).
+const AUDIT_BID_VOID = 'bid.void'
 
 // Registry key for the permanent ban; the registration guard treats an
 // existing `user.ban` entry on the isikukood-matched user as the ban marker.
@@ -44,6 +58,12 @@ const AUDIT_GDPR_EXPORT = 'user.gdpr_export'
 const AUDIT_GDPR_DELETE = 'user.gdpr_delete'
 
 const GDPR_RETENTION_YEARS = 7
+
+// Spec delta (admin-people / GDPR): a delete request observes a 14-day
+// cooling-off before the hard delete, cancellable in the portal. The state
+// machine rides the append-only audit entries via `after.phase`:
+// requested → cancelled (portal) | executed (admin, after the window).
+const GDPR_COOLING_OFF_DAYS = 14
 
 /** Result shape for the client-invoked drawer actions (ban, GDPR tools). */
 export type UserActionResult = { ok: true; message: string } | { ok: false; error: string }
@@ -125,6 +145,188 @@ async function notifyUser(
       sentAt: new Date().toISOString(),
     },
   })
+}
+
+interface AuditLikeEntry {
+  id: string
+  action: string
+  entityType: string
+  entityId: string
+  after?: unknown
+  createdAt: string
+}
+
+function auditPayload(after: unknown): Record<string, unknown> {
+  if (typeof after === 'string' && after !== '') {
+    try {
+      const parsed: unknown = JSON.parse(after)
+      return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
+    } catch {
+      return {}
+    }
+  }
+  return typeof after === 'object' && after !== null ? (after as Record<string, unknown>) : {}
+}
+
+async function findUserAuditEntries(
+  repositories: CoreRepositories,
+  userId: string,
+  action: string,
+): Promise<AuditLikeEntry[]> {
+  const result = await repositories.find({
+    collection: 'audit-entry',
+    where: {
+      and: [
+        { entityType: { equals: 'user' } },
+        { entityId: { equals: userId } },
+        { action: { equals: action } },
+      ],
+    },
+    sort: '-createdAt',
+    pagination: false,
+  })
+  return result.docs as unknown as AuditLikeEntry[]
+}
+
+/** GDPR delete state machine, read from the latest `user.gdpr_delete` entry. */
+export interface GdprDeleteStatus {
+  phase: 'none' | 'requested' | 'cancelled' | 'executed'
+  requestedAt: string | null
+  coolingOffUntil: string | null
+  /** True when a pending request's 14-day window has fully elapsed. */
+  coolingOffElapsed: boolean
+}
+
+async function readDeleteStatus(repositories: CoreRepositories, userId: string): Promise<GdprDeleteStatus> {
+  const entries = await findUserAuditEntries(repositories, userId, AUDIT_GDPR_DELETE)
+  const latest = entries[0]
+  if (!latest) {
+    return { phase: 'none', requestedAt: null, coolingOffUntil: null, coolingOffElapsed: false }
+  }
+  const payload = auditPayload(latest.after)
+  const phase = payload.phase
+  // Entries from before the cooling-off flow carry no phase: they mark a
+  // completed anonymization.
+  if (phase !== 'requested' && phase !== 'cancelled' && phase !== 'executed') {
+    return { phase: 'executed', requestedAt: null, coolingOffUntil: null, coolingOffElapsed: false }
+  }
+  const coolingOffUntil = typeof payload.coolingOffUntil === 'string' ? payload.coolingOffUntil : null
+  const elapsed =
+    phase === 'requested' && coolingOffUntil !== null
+      ? Date.now() >= new Date(coolingOffUntil).getTime()
+      : false
+  return {
+    phase,
+    requestedAt: latest.createdAt,
+    coolingOffUntil,
+    coolingOffElapsed: elapsed,
+  }
+}
+
+/** Pre-check report rows: references only, amounts stay untouched. */
+export interface GdprDeletePrecheck {
+  activeAuctionBids: {
+    bidId: string
+    auctionId: string
+    auctionTitle: string | null
+    amountCents: number
+    status: string
+  }[]
+  openContracts: { contractId: string; status: string; createdAt: string }[]
+  /** Sealed bids never opened in a ceremony; the delete purges these rows. */
+  unopenedSealedBidCount: number
+  signedContractCount: number
+  retentionYears: number
+  blocking: boolean
+}
+
+function addDays(base: Date, days: number): Date {
+  const copy = new Date(base)
+  copy.setDate(copy.getDate() + days)
+  return copy
+}
+
+async function buildDeletePrecheck(
+  repositories: CoreRepositories,
+  userId: string,
+): Promise<GdprDeletePrecheck> {
+  const [{ docs: bids }, { docs: contracts }] = await Promise.all([
+    repositories.find({ collection: 'bids', where: { user: { equals: userId } }, pagination: false }),
+    repositories.find({
+      collection: 'contracts',
+      where: { signedBy: { equals: userId } },
+      pagination: false,
+    }),
+  ])
+
+  const auctionIds = [...new Set(bids.map((bid) => bid.auctionId))]
+  const auctions =
+    auctionIds.length > 0
+      ? (
+          await repositories.find({
+            collection: 'auctions',
+            where: { id: { in: auctionIds } },
+            pagination: false,
+          })
+        ).docs
+      : []
+  const auctionsById = new Map(auctions.map((auction) => [auction.id, auction]))
+
+  const activeAuctionBids = bids
+    .filter((bid) => auctionsById.get(bid.auctionId)?.status === 'active')
+    .map((bid) => {
+      const auction = auctionsById.get(bid.auctionId)
+      return {
+        bidId: bid.id,
+        auctionId: bid.auctionId,
+        auctionTitle: typeof auction?.title === 'string' ? auction.title : null,
+        amountCents: bid.amountCents,
+        status: bid.status,
+      }
+    })
+
+  const openContracts = contracts
+    .filter((contract) => contract.status === 'prepared' || contract.status === 'sent')
+    .map((contract) => ({
+      contractId: contract.id,
+      status: contract.status,
+      createdAt: contract.createdAt,
+    }))
+
+  const sealedAuctionIds = [
+    ...new Set(bids.filter((bid) => bid.type === 'sealed').map((bid) => bid.auctionId)),
+  ]
+  const revealedAuctionIds = new Set(
+    sealedAuctionIds.length > 0
+      ? (
+          await repositories.find({
+            collection: 'audit-entry',
+            where: {
+              and: [
+                { entityType: { equals: 'auction' } },
+                { action: { equals: 'sealed.reveal' } },
+                { entityId: { in: sealedAuctionIds } },
+              ],
+            },
+            pagination: false,
+          })
+        ).docs.map((entry) => entry.entityId)
+      : [],
+  )
+  const unopenedSealedBidCount = bids.filter(
+    (bid) => bid.type === 'sealed' && !revealedAuctionIds.has(bid.auctionId),
+  ).length
+
+  const signedContractCount = contracts.filter((contract) => contract.status === 'signed').length
+
+  return {
+    activeAuctionBids,
+    openContracts,
+    unopenedSealedBidCount,
+    signedContractCount,
+    retentionYears: GDPR_RETENTION_YEARS,
+    blocking: activeAuctionBids.length > 0 || openContracts.length > 0,
+  }
 }
 
 export async function updateUserAction(formData: FormData): Promise<void> {
@@ -563,16 +765,36 @@ export async function startImpersonationAction(formData: FormData): Promise<void
     session.userId,
   )
 
+  // 30-minute TTL (spec delta admin-people): the view session row's
+  // expiresAt is clamped right after creation, so the D1 liveness check ends
+  // impersonation even when the 7-day session TTL would still be running.
+  // The guard clause only ever touches a row that really is a view session.
+  const expiresAt = new Date(Date.now() + IMPERSONATION_TTL_MS).toISOString()
+  let failure: string | null = null
+  try {
+    const clamped = await db.query(
+      `UPDATE sessions SET expires_at = ?, updated_at = ? WHERE id = ? AND impersonated_by IS NOT NULL`,
+      [expiresAt, new Date().toISOString(), sessionId],
+    )
+    if (typeof clamped.meta.changes === 'number' && clamped.meta.changes !== 1) {
+      throw new Error('vaate seansi rida ei leitud')
+    }
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    redirectWithError(editPath, `Vaatluse ajalimiidi seadmine ebaõnnestus: ${failure}`)
+  }
+
   // Fail closed: the browser's cookies only move once the start is on the
   // append-only audit trail.
-  let failure: string | null = null
   try {
     await audit(repositories, {
       actorId: session.userId,
       action: AUDIT_IMPERSONATE,
       entityType: 'user',
       entityId: user.id,
-      after: { phase: 'start', reason, sessionId },
+      after: { phase: 'start', reason, sessionId, expiresAt, ttlMinutes: 30 },
     })
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
@@ -610,6 +832,12 @@ export async function stopImpersonationAction(): Promise<void> {
 
   const repositories = await getRepositories()
 
+  // TTL enforcement (spec delta admin-people): rotation re-signs the row's
+  // expiresAt, so elapsed time is measured from the stable createdAt. A view
+  // session past the 30-minute mark is explicitly ended instead of silently
+  // riding a rotated expiry.
+  const expired = Date.now() - record.createdAt.getTime() >= IMPERSONATION_TTL_MS
+
   // The stop is audited against the real operator, but it must always win:
   // if the audit write fails the session is still revoked (the start entry
   // already carries the binding, so no revocation goes unexplained).
@@ -619,7 +847,12 @@ export async function stopImpersonationAction(): Promise<void> {
       action: AUDIT_IMPERSONATE,
       entityType: 'user',
       entityId: payload.userId,
-      after: { phase: 'stop', reason: null, sessionId },
+      after: {
+        phase: 'stop',
+        reason: null,
+        sessionId,
+        ...(expired ? { expired: true } : {}),
+      },
     })
   } catch {
     // Availability of the stop path takes precedence over the stop entry.
@@ -634,11 +867,46 @@ export async function stopImpersonationAction(): Promise<void> {
   if (operator && isStaffRole(operator.role) && operator.status === 'active') {
     const restored = await createSession(operator.id, operator.role)
     writeSessionCookies(await cookies(), restored.accessToken, restored.refreshToken)
-    redirectWithNotice(`/admin/users/${payload.userId}`, 'Vaatlus lõpetatud.')
+    redirectWithNotice(
+      `/admin/users/${payload.userId}`,
+      expired ? 'Vaatlus aegus (30 minutit).' : 'Vaatlus lõpetatud.',
+    )
   }
 
   clearSessionCookiesOnStore(await cookies())
   redirect('/login')
+}
+
+/**
+ * Expiry feed for the portal view-session banner countdown. Reads the D1
+ * row directly because SessionRecord does not carry expiresAt; only a live
+ * impersonation row yields an expiry.
+ */
+export async function impersonationStateAction(): Promise<{
+  active: boolean
+  expiresAt: string | null
+}> {
+  const token = (await cookies()).get('access_token')?.value
+  const payload = token ? verifyAccessToken(token) : null
+  if (!payload?.sessionId) return { active: false, expiresAt: null }
+
+  const rows = await db.query<{
+    expires_at: string
+    impersonated_by: string | null
+    revoked_at: string | null
+  }>(`SELECT expires_at, impersonated_by, revoked_at FROM sessions WHERE id = ?`, [
+    payload.sessionId,
+  ])
+  const row = rows.results[0]
+  if (!row) return { active: false, expiresAt: null }
+  if (
+    row.revoked_at !== null ||
+    row.impersonated_by === null ||
+    row.expires_at <= new Date().toISOString()
+  ) {
+    return { active: false, expiresAt: null }
+  }
+  return { active: true, expiresAt: row.expires_at }
 }
 
 /**
@@ -744,20 +1012,26 @@ export async function banUserAction(userId: string, reason: string): Promise<Use
 
 /**
  * GDPR export (demo 06-users GDPR tab): profile, bids, contracts, rights,
- * notifications and audit marks collected into a ZIP. The plaintext
- * isikukood travels inside the ZIP only (the operator's own download);
- * it never reaches the audit payload or logs. The archive is also stored
- * in R2 (media bucket pattern) for retention; a missing binding in local
- * dev degrades to download-only.
+ * notifications, consent log, signed contract documents and audit marks
+ * collected into a ZIP. Both GDPR actions take a mandatory typed reason
+ * (spec delta admin-people); the double confirm is the drawer's two-step
+ * dialog. The plaintext isikukood travels inside the ZIP only (the
+ * operator's own download); it never reaches the audit payload or logs.
+ * The archive is also stored in R2 (media bucket pattern) for retention;
+ * a missing binding in local dev degrades to download-only.
  */
 export async function exportUserGdprAction(
   userId: string,
+  reason: string,
 ): Promise<{ ok: true; filename: string; base64: string } | { ok: false; error: string }> {
   const { session } = await requireAdminRepositories()
   if (!can(session.role, 'users:read')) {
     return actionError('Teil puudub õigus selle toimingu sooritamiseks.')
   }
   if (!userId) return actionError('Kasutaja identifikaator puudub.')
+  if (!hasMinReason(reason)) {
+    return actionError('Eksportimise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+  }
 
   const repositories = await getRepositories()
 
@@ -780,6 +1054,36 @@ export async function exportUserGdprAction(
     }),
   ])
 
+  // The consent log carries no user column; the data subject's entries are
+  // resolved through the salted IP hashes recorded on their own bids.
+  const bidIpHashes = [
+    ...new Set(
+      bids.docs
+        .map((bid) => bid.ipHash)
+        .filter((ipHash): ipHash is string => typeof ipHash === 'string' && ipHash !== ''),
+    ),
+  ]
+  const consents =
+    bidIpHashes.length > 0
+      ? (
+          await repositories.find({
+            collection: 'consent-log',
+            where: { ipHash: { in: bidIpHashes } },
+            sort: '-createdAt',
+            pagination: false,
+          })
+        ).docs
+      : []
+
+  // Signed contracts are stored as rendered HTML in D1 (no PDF blobs), so
+  // the archive carries each signed document in its stored form.
+  const signedContractDocs = contracts.docs.filter(
+    (contract): contract is (typeof contracts.docs)[number] & { renderedHtml: string } =>
+      contract.status === 'signed' &&
+      typeof contract.renderedHtml === 'string' &&
+      contract.renderedHtml !== '',
+  )
+
   // Explicit projection: credential columns never leave the server and the
   // decrypted isikukood is included once, as the data subject's own copy.
   const userExport = {
@@ -795,15 +1099,19 @@ export async function exportUserGdprAction(
     updatedAt: user.updatedAt,
   }
 
-  const json = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value, null, 2))
-  const entries = [
-    { name: 'kasutaja.json', data: json(userExport) },
-    { name: 'profiilid.json', data: json(profiles.docs) },
-    { name: 'pakkumised.json', data: json(bids.docs) },
-    { name: 'lepingud.json', data: json(contracts.docs) },
-    { name: 'oigused.json', data: json(rights.docs) },
-    { name: 'teavitused.json', data: json(notifications.docs) },
-    { name: 'audit.json', data: json(auditEntries.docs) },
+  const entries: GdprZipEntry[] = [
+    gdprJsonEntry('kasutaja.json', userExport),
+    gdprJsonEntry('profiilid.json', profiles.docs),
+    gdprJsonEntry('pakkumised.json', bids.docs),
+    gdprJsonEntry('lepingud.json', contracts.docs),
+    gdprJsonEntry('oigused.json', rights.docs),
+    gdprJsonEntry('teavitused.json', notifications.docs),
+    gdprJsonEntry('nõusolekud.json', consents),
+    gdprJsonEntry('audit.json', auditEntries.docs),
+    ...signedContractDocs.map((contract) => ({
+      name: `leping-${contract.id}.html`,
+      data: new TextEncoder().encode(contract.renderedHtml),
+    })),
   ]
   const zipBytes = buildGdprZip(entries)
   const filename = `isikuandmed-${user.id}.zip`
@@ -853,13 +1161,22 @@ export async function exportUserGdprAction(
 }
 
 /**
- * GDPR anonymize with retention (demo 06-users "kustutamine / anonümiseerimine"):
- * the users row survives so contract and billing references stay intact for
- * the 7-year accounting retention, while every personal field is removed or
- * masked and the account becomes unusable. The retention deadline is recorded
- * in the `user.gdpr_delete` audit entry.
+ * GDPR delete with a 14-day cooling-off (spec delta admin-people). The first
+ * call records the request (`after.phase: 'requested'`) and notifies the
+ * user, who can cancel it in the portal during the window. A call after the
+ * window executes the hard delete: the users row survives so contract and
+ * billing references stay intact for the 7-year accounting retention, every
+ * personal field is removed or masked, bid and contract rows are
+ * pseudonymised (identity columns only — amounts are never rewritten), and
+ * unopened sealed bids are purged. Blockers from the pre-check report
+ * (bids on active auctions, contracts awaiting signature) require the
+ * explicit `override` flag, which the audit entry records.
  */
-export async function anonymizeUserAction(userId: string, reason: string): Promise<UserActionResult> {
+export async function anonymizeUserAction(
+  userId: string,
+  reason: string,
+  options?: { override?: boolean },
+): Promise<UserActionResult> {
   const { session } = await requireAdminRepositories()
   if (!can(session.role, 'users:write')) {
     return actionError('Teil puudub õigus selle toimingu sooritamiseks.')
@@ -878,30 +1195,89 @@ export async function anonymizeUserAction(userId: string, reason: string): Promi
     return actionError('Töötaja konto anonüümiseerimine ei ole lubatud.')
   }
 
-  const existingDelete = await repositories.find({
-    collection: 'audit-entry',
-    where: {
-      and: [
-        { entityType: { equals: 'user' } },
-        { entityId: { equals: userId } },
-        { action: { equals: AUDIT_GDPR_DELETE } },
-      ],
-    },
-    limit: 1,
-  })
-  if (existingDelete.docs.length > 0) {
+  const status = await readDeleteStatus(repositories, userId)
+  if (status.phase === 'executed') {
     return actionError('Kasutaja konto on juba anonüümiseeritud.')
   }
+  if (status.phase === 'requested') {
+    if (status.coolingOffUntil !== null && !status.coolingOffElapsed) {
+      return actionError(
+        `Kustutamise jäägaeg kestab kuni ${status.coolingOffUntil}. Kasutaja saab taotluse portaalis tühistada.`,
+      )
+    }
+    return executeUserDelete(repositories, session, user, reason, options?.override === true)
+  }
 
-  const { docs: profiles } = await repositories.find({
-    collection: 'profile',
-    where: { user: { equals: userId } },
-    pagination: false,
-  })
+  // Fresh or previously cancelled request: start the 14-day cooling-off.
+  const requestedAt = new Date()
+  const coolingOffUntil = addDays(requestedAt, GDPR_COOLING_OFF_DAYS)
+  const precheck = await buildDeletePrecheck(repositories, userId)
+
+  let failure: string | null = null
+  try {
+    await audit(repositories, {
+      actorId: session.userId,
+      action: AUDIT_GDPR_DELETE,
+      entityType: 'user',
+      entityId: userId,
+      after: {
+        phase: 'requested',
+        reason,
+        requestedAt: requestedAt.toISOString(),
+        coolingOffUntil: coolingOffUntil.toISOString(),
+        precheck: {
+          activeAuctionBids: precheck.activeAuctionBids.length,
+          openContracts: precheck.openContracts.length,
+          unopenedSealedBids: precheck.unopenedSealedBidCount,
+          blocking: precheck.blocking,
+        },
+      },
+    })
+
+    await notifyUser(repositories, {
+      userId,
+      event: AUDIT_GDPR_DELETE,
+      title: 'Konto kustutamistaotlus on vastu võetud',
+      body: `Teie konto kustutamistaotlus on registreeritud. Lõplik kustutamine toimub pärast ${String(
+        GDPR_COOLING_OFF_DAYS,
+      )} päeva (${coolingOffUntil.toISOString()}). Saate taotluse siin portaalis tühistada.`,
+      payload: { phase: 'requested', coolingOffUntil: coolingOffUntil.toISOString() },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    return actionError(`Kustutustaotluse registreerimine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath('/admin/users')
+  revalidatePath(`/admin/users/${userId}`)
+  return {
+    ok: true,
+    message: `Kustutustaotlus registreeritud; jäägaeg kestab kuni ${coolingOffUntil.toISOString()}.`,
+  }
+}
+
+/** Hard delete after the cooling-off: mask, pseudonymise, purge, audit. */
+async function executeUserDelete(
+  repositories: CoreRepositories,
+  session: { userId: string },
+  user: UserDoc,
+  reason: string,
+  override: boolean,
+): Promise<UserActionResult> {
+  const userId = user.id
+  const precheck = await buildDeletePrecheck(repositories, userId)
+  if (precheck.blocking && !override) {
+    return actionError(
+      `Eeldab lahendamist või eksplisiitset ülekäiku: ${String(
+        precheck.activeAuctionBids.length,
+      )} pakkumist aktiivsel oksjonil, ${String(precheck.openContracts.length)} allkirjastamata lepingut.`,
+    )
+  }
 
   const anonymizedAt = new Date()
-  const retentionUntil = new Date(anonymizedAt)
-  retentionUntil.setFullYear(retentionUntil.getFullYear() + GDPR_RETENTION_YEARS)
+  const retentionUntil = addYears(anonymizedAt, GDPR_RETENTION_YEARS)
 
   let failure: string | null = null
   try {
@@ -926,12 +1302,77 @@ export async function anonymizeUserAction(userId: string, reason: string): Promi
       },
     })
 
+    const { docs: profiles } = await repositories.find({
+      collection: 'profile',
+      where: { user: { equals: userId } },
+      pagination: false,
+    })
     for (const profile of profiles) {
       await repositories.update({
         collection: 'profile',
         id: profile.id,
         data: { displayName: 'Anonümiseeritud', phone: null },
       })
+    }
+
+    // Bid rows survive (append-only ledger); only identity columns are
+    // pseudonymised. Amounts, statuses and timestamps are never rewritten.
+    const { docs: bids } = await repositories.find({
+      collection: 'bids',
+      where: { user: { equals: userId } },
+      pagination: false,
+    })
+    for (const bid of bids) {
+      await repositories.update({
+        collection: 'bids',
+        id: bid.id,
+        data: { identitySnapshot: null, ipHash: null },
+      })
+    }
+
+    // Contract rows survive for the accounting retention; the rendered
+    // document carries personal data, so it is dropped (contentHash keeps
+    // the integrity reference).
+    const { docs: contracts } = await repositories.find({
+      collection: 'contracts',
+      where: { signedBy: { equals: userId } },
+      pagination: false,
+    })
+    for (const contract of contracts) {
+      await repositories.update({
+        collection: 'contracts',
+        id: contract.id,
+        data: { renderedHtml: null },
+      })
+    }
+
+    // Unopened sealed bids are purged entirely: the encrypted identity
+    // snapshot is personal data that was never revealed in a ceremony.
+    const sealedAuctionIds = [
+      ...new Set(bids.filter((bid) => bid.type === 'sealed').map((bid) => bid.auctionId)),
+    ]
+    const revealedAuctionIds = new Set(
+      sealedAuctionIds.length > 0
+        ? (
+            await repositories.find({
+              collection: 'audit-entry',
+              where: {
+                and: [
+                  { entityType: { equals: 'auction' } },
+                  { action: { equals: 'sealed.reveal' } },
+                  { entityId: { in: sealedAuctionIds } },
+                ],
+              },
+              pagination: false,
+            })
+          ).docs.map((entry) => entry.entityId)
+        : [],
+    )
+    const unopenedSealedBids = bids.filter(
+      (bid) => bid.type === 'sealed' && !revealedAuctionIds.has(bid.auctionId),
+    )
+    for (const bid of unopenedSealedBids) {
+      await repositories.delete({ collection: 'bids', id: bid.id })
     }
 
     await audit(repositories, {
@@ -941,12 +1382,17 @@ export async function anonymizeUserAction(userId: string, reason: string): Promi
       entityId: userId,
       before: { status: user.status, personalData: true },
       after: {
+        phase: 'executed',
         status: 'suspended',
         personalData: false,
         reason,
+        override,
         anonymizedAt: anonymizedAt.toISOString(),
         retentionUntil: retentionUntil.toISOString(),
         profilesAnonymized: profiles.length,
+        bidsPseudonymised: bids.length,
+        contractsMasked: contracts.length,
+        sealedBidsPurged: unopenedSealedBids.length,
       },
     })
 
@@ -965,4 +1411,285 @@ export async function anonymizeUserAction(userId: string, reason: string): Promi
     ok: true,
     message: 'Kasutaja anonüümiseeritud; arvestuslikud andmed säilitatakse 7 aastat.',
   }
+}
+
+function addYears(base: Date, years: number): Date {
+  const copy = new Date(base)
+  copy.setFullYear(copy.getFullYear() + years)
+  return copy
+}
+
+/**
+ * Read-only pre-check report (spec delta admin-people): active bids, open
+ * contracts, purgeable sealed bids and retention items, plus the current
+ * cooling-off state. Feeds the drawer dialog; the delete action re-runs the
+ * same checks server-side before executing.
+ */
+export async function precheckUserDeleteAction(
+  userId: string,
+): Promise<{ ok: true; precheck: GdprDeletePrecheck; status: GdprDeleteStatus } | { ok: false; error: string }> {
+  const { session } = await requireAdminRepositories()
+  if (!can(session.role, 'users:read')) {
+    return actionError('Teil puudub õigus selle toimingu sooritamiseks.')
+  }
+  if (!userId) return actionError('Kasutaja identifikaator puudub.')
+
+  const repositories = await getRepositories()
+  const user = await repositories.findByID({ collection: 'users', id: userId })
+  if (!user) return actionError('Kasutajat ei leitud.')
+
+  const [precheck, status] = await Promise.all([
+    buildDeletePrecheck(repositories, userId),
+    readDeleteStatus(repositories, userId),
+  ])
+  return { ok: true, precheck, status }
+}
+
+/** Leading-bid reference for the revoke warning; amounts are read-only. */
+export interface LeadingBidRef {
+  bidId: string
+  auctionId: string
+  auctionTitle: string | null
+  amountCents: number
+  createdAt: string
+}
+
+export interface RightsContextProfile {
+  id: string
+  type: string
+  approvalStatus: string
+  displayName: string | null
+  companyName: string | null
+}
+
+export interface UserRightsContext {
+  leadingBids: LeadingBidRef[]
+  profiles: RightsContextProfile[]
+  isSuperadmin: boolean
+}
+
+/**
+ * Data feed for the rights tab (spec delta admin-people): leading bids on
+ * active auctions (revoke warning + superadmin void path) and the user's
+ * profiles (per-profile matrix rows).
+ */
+export async function userRightsContextAction(
+  userId: string,
+): Promise<{ ok: true; context: UserRightsContext } | { ok: false; error: string }> {
+  const { session } = await requireAdminRepositories()
+  if (!can(session.role, 'users:read')) {
+    return actionError('Teil puudub õigus selle toimingu sooritamiseks.')
+  }
+  if (!userId) return actionError('Kasutaja identifikaator puudub.')
+
+  const repositories = await getRepositories()
+  const user = await repositories.findByID({ collection: 'users', id: userId })
+  if (!user) return actionError('Kasutajat ei leitud.')
+
+  const [{ docs: leadingBids }, { docs: profiles }] = await Promise.all([
+    repositories.find({
+      collection: 'bids',
+      where: {
+        and: [{ user: { equals: userId } }, { status: { equals: 'leading' } }],
+      },
+      sort: '-createdAt',
+      pagination: false,
+    }),
+    repositories.find({ collection: 'profile', where: { user: { equals: userId } }, pagination: false }),
+  ])
+
+  const auctionIds = [...new Set(leadingBids.map((bid) => bid.auctionId))]
+  const auctions =
+    auctionIds.length > 0
+      ? (
+          await repositories.find({
+            collection: 'auctions',
+            where: { id: { in: auctionIds } },
+            pagination: false,
+          })
+        ).docs
+      : []
+  const auctionsById = new Map(auctions.map((auction) => [auction.id, auction]))
+
+  const context: UserRightsContext = {
+    leadingBids: leadingBids
+      .filter((bid) => auctionsById.get(bid.auctionId)?.status === 'active')
+      .map((bid) => {
+        const auction = auctionsById.get(bid.auctionId)
+        return {
+          bidId: bid.id,
+          auctionId: bid.auctionId,
+          auctionTitle: typeof auction?.title === 'string' ? auction.title : null,
+          amountCents: bid.amountCents,
+          createdAt: bid.createdAt,
+        }
+      }),
+    profiles: profiles.map((profile) => ({
+      id: profile.id,
+      type: profile.type,
+      approvalStatus: profile.approvalStatus,
+      displayName: profile.displayName ?? null,
+      companyName: profile.companyName ?? null,
+    })),
+    isSuperadmin: session.role === 'superadmin',
+  }
+  return { ok: true, context }
+}
+
+/**
+ * Superadmin void of a leading bid on an active auction (spec delta
+ * admin-people). Bids stay append-only: the void is the compensating status
+ * correction to `rejected` — the amount column is never rewritten — and the
+ * `bid.void` audit entry carries the full reference.
+ */
+export async function voidLeadingBidAction(bidId: string, reason: string): Promise<UserActionResult> {
+  const { session } = await requireAdminRepositories()
+  if (session.role !== 'superadmin') {
+    return actionError('Juhtiva pakkumise tühistamine on lubatud ainult superadminile.')
+  }
+  if (!bidId) return actionError('Pakkumise identifikaator puudub.')
+  if (!hasMinReason(reason)) {
+    return actionError('Tühistamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+  }
+
+  const repositories = await getRepositories()
+
+  const bid = await repositories.findByID({ collection: 'bids', id: bidId })
+  if (!bid) return actionError('Pakkumist ei leitud.')
+  if (bid.status !== 'leading') {
+    return actionError('Ainult juhtiv pakkumine on tühistatav.')
+  }
+
+  const auction = await repositories.findByID({ collection: 'auctions', id: bid.auctionId })
+  if (auction?.status !== 'active') {
+    return actionError('Oksjon ei ole aktiivne.')
+  }
+
+  let failure: string | null = null
+  try {
+    await repositories.update({
+      collection: 'bids',
+      id: bidId,
+      data: { status: 'rejected' },
+    })
+
+    await audit(repositories, {
+      actorId: session.userId,
+      action: AUDIT_BID_VOID,
+      entityType: 'bid',
+      entityId: bidId,
+      before: { status: 'leading' },
+      after: {
+        status: 'rejected',
+        userId: bid.userId,
+        auctionId: bid.auctionId,
+        amountCents: bid.amountCents,
+        reason,
+      },
+    })
+
+    await notifyUser(repositories, {
+      userId: bid.userId,
+      event: AUDIT_BID_VOID,
+      title: 'Teie juhtiv pakkumine tühistati',
+      body: `Administraator tühistas teie juhtiva pakkumise oksjonil. Põhjus: ${reason}`,
+      payload: { auctionId: bid.auctionId, reason },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    return actionError(`Juhtiva pakkumise tühistamine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath('/admin/bids')
+  revalidatePath(`/admin/users/${bid.userId}`)
+  return { ok: true, message: 'Juhtiv pakkumine tühistatud ja kasutajat teavitatud.' }
+}
+
+/** Portal-side view of the caller's own cooling-off state (minimal shape). */
+export interface AccountDeletionState {
+  pending: boolean
+  requestedAt: string | null
+  coolingOffUntil: string | null
+}
+
+async function currentPortalUserId(): Promise<string | null> {
+  const token = (await cookies()).get('access_token')?.value
+  const payload = token ? verifyAccessToken(token) : null
+  if (!payload?.sessionId) return null
+  const record = await getUserSession(payload.sessionId)
+  if (record?.userId !== payload.userId) return null
+  return payload.userId
+}
+
+/**
+ * Portal feed for the account-state notice: whether the signed-in user has
+ * a delete request in its cooling-off window.
+ */
+export async function accountDeletionStatusAction(): Promise<AccountDeletionState> {
+  const userId = await currentPortalUserId()
+  if (!userId) {
+    return { pending: false, requestedAt: null, coolingOffUntil: null }
+  }
+
+  const repositories = await getRepositories()
+  const status = await readDeleteStatus(repositories, userId)
+  const pending = status.phase === 'requested' && !status.coolingOffElapsed
+  return {
+    pending,
+    requestedAt: pending ? status.requestedAt : null,
+    coolingOffUntil: pending ? status.coolingOffUntil : null,
+  }
+}
+
+/**
+ * Portal cancel of the caller's own pending delete request during the
+ * 14-day cooling-off. The actor comes from the verified session token, the
+ * pending marker is re-checked server-side, and the cancel is audited on
+ * the same append-only trail with `cancelledBy: 'user'`.
+ */
+export async function cancelAccountDeletionAction(): Promise<UserActionResult> {
+  const userId = await currentPortalUserId()
+  if (!userId) {
+    return actionError('Kustutustaotluse tühistamiseks peate olema sisse logitud.')
+  }
+
+  const repositories = await getRepositories()
+  const status = await readDeleteStatus(repositories, userId)
+  if (status.phase !== 'requested' || status.coolingOffElapsed) {
+    return actionError('Aktiivset kustutustaotlust ei leitud.')
+  }
+
+  let failure: string | null = null
+  try {
+    await audit(repositories, {
+      actorId: userId,
+      action: AUDIT_GDPR_DELETE,
+      entityType: 'user',
+      entityId: userId,
+      after: {
+        phase: 'cancelled',
+        cancelledBy: 'user',
+        requestedAt: status.requestedAt,
+        coolingOffUntil: status.coolingOffUntil,
+      },
+    })
+
+    await notifyUser(repositories, {
+      userId,
+      event: AUDIT_GDPR_DELETE,
+      title: 'Kustutustaotlus tühistatud',
+      body: 'Teie konto kustutamistaotlus on tühistatud ja konto jääb aktiivseks.',
+      payload: { phase: 'cancelled' },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    return actionError(`Kustutustaotluse tühistamine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath('/user')
+  return { ok: true, message: 'Kustutustaotlus tühistatud; konto jääb aktiivseks.' }
 }

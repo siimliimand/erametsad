@@ -1,12 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { startImpersonationAction, stopImpersonationAction } from '../users'
+import { startImpersonationAction, stopImpersonationAction, impersonationStateAction } from '../users'
 
 import { createSqliteTestDb, sqliteBatchRunner, type SqliteTestDb } from '@/lib/data/__tests__/sqlite'
 import { can, userContext } from '@/lib/data/guards'
 import { createCoreRepositories, nodeIsikukoodCodec } from '@/lib/data/repositories'
 import { GuardAccessError } from '@/lib/data/repositories/errors'
 import { getRepositories } from '@/lib/data/runtime'
+
+const dbMocks = vi.hoisted(() => ({
+  query: vi.fn(),
+  batch: vi.fn(),
+}))
+vi.mock('@/lib/db', () => ({
+  db: dbMocks,
+}))
 
 const { RedirectError, state, cookieJar, cookieStores } = vi.hoisted(() => {
   class RedirectError extends Error {
@@ -154,11 +162,20 @@ const form = (entries: Record<string, string>): FormData => {
 
 const VIEW_REASON = 'kliendi probleemi uurimine'
 
+// Shared order recorder so tests can assert the clamp runs between the
+// session creation and the audit write; the start suite re-points it at the
+// current suite's repos order array.
+const reposRef: { order: string[] } = { order: [] }
+
 beforeEach(() => {
   vi.clearAllMocks()
   cookieJar.clear()
   cookieStores.length = 0
   state.session = { userId: 'admin-1', role: 'admin' }
+  dbMocks.query.mockImplementation((sql: string) => {
+    reposRef.order.push(`clamp:${sql.slice(0, 30)}`)
+    return Promise.resolve({ results: [], meta: { changes: 1 } })
+  })
   sessionMocks.createSession.mockResolvedValue({
     accessToken: 'view-access-token',
     refreshToken: 'view-refresh-token',
@@ -172,6 +189,7 @@ describe('startImpersonationAction (audited view session)', () => {
   beforeEach(() => {
     repos = makeRepos()
     useRepos(repos)
+    reposRef.order = repos.order
   })
 
   it('rejects a reason shorter than 5 characters without creating a session or audit entry', async () => {
@@ -212,7 +230,7 @@ describe('startImpersonationAction (audited view session)', () => {
     expect(sessionMocks.createSession).not.toHaveBeenCalled()
   })
 
-  it('creates a session bound to the operator, audits the start, then writes the cookies', async () => {
+  it('creates a session bound to the operator, clamps the TTL, audits the start, then writes the cookies', async () => {
     repos.docsByCollection.users = { id: 'user-9', role: 'private', status: 'active' }
     sessionMocks.createSession.mockImplementation(() => {
       repos.order.push('createSession')
@@ -238,20 +256,50 @@ describe('startImpersonationAction (audited view session)', () => {
       'admin-1',
     )
 
-    // Fail closed: cookies only move after the audit entry exists.
-    expect(repos.order).toEqual(['createSession', 'create:user.impersonate', 'cookies'])
+    // The 30-minute clamp runs on the session row before anything else
+    // trusts the session, and the audit entry carries the clamped expiry.
+    expect(repos.order).toEqual([
+      'createSession',
+      'clamp:UPDATE sessions SET expires_at',
+      'create:user.impersonate',
+      'cookies',
+    ])
+    expect(dbMocks.query).toHaveBeenCalledTimes(1)
+    const [sql, params] = dbMocks.query.mock.calls[0] as [string, string[]]
+    const [expiresAt = '', , sessionId = ''] = params
+    expect(sql).toContain('WHERE id = ? AND impersonated_by IS NOT NULL')
+    expect(sessionId).toBe('view-session-1')
+    const clampDeltaMs = new Date(expiresAt).getTime() - Date.now()
+    expect(clampDeltaMs).toBeGreaterThan(29 * 60 * 1000)
+    expect(clampDeltaMs).toBeLessThanOrEqual(30 * 60 * 1000)
+
     const audit = repos.creates.find((entry) => entry.collection === 'audit-entry')
-    expect(audit?.data).toEqual({
+    expect(audit?.data).toMatchObject({
       actorId: 'admin-1',
       action: 'user.impersonate',
       entityType: 'user',
       entityId: 'user-9',
-      after: { phase: 'start', reason: VIEW_REASON, sessionId: 'view-session-1' },
+      after: { phase: 'start', reason: VIEW_REASON, sessionId: 'view-session-1', ttlMinutes: 30 },
     })
+    expect((audit?.data.after as { expiresAt?: string }).expiresAt).toBe(expiresAt)
 
     expect(sessionMocks.writeSessionCookies).toHaveBeenCalledTimes(1)
     expect(cookieStores).toHaveLength(1)
     expect(url.pathname).toBe('/user')
+  })
+
+  it('fails closed when the TTL clamp fails: no audit, no cookies', async () => {
+    repos.docsByCollection.users = { id: 'user-9', role: 'private', status: 'active' }
+    dbMocks.query.mockRejectedValueOnce(new Error('clamp failed'))
+
+    const url = await redirectOf(() =>
+      startImpersonationAction(form({ userId: 'user-9', reason: VIEW_REASON })),
+    )
+
+    expect(url.pathname).toBe('/admin/users/user-9')
+    expect(url.searchParams.get('viga')).toContain('Vaatluse ajalimiidi seadmine ebaõnnestus')
+    expect(repos.creates).toEqual([])
+    expect(sessionMocks.writeSessionCookies).not.toHaveBeenCalled()
   })
 
   it('fails closed when the start audit write fails: no cookies, error redirect', async () => {
@@ -286,7 +334,8 @@ describe('stopImpersonationAction (operator-bound stop)', () => {
     tokenFamily: 'family-1',
     active: true,
     refreshTokenHash: 'hash-1',
-    createdAt: new Date('2026-09-01T10:00:00.000Z'),
+    // Fresh row: elapsed-time TTL has not run out.
+    createdAt: new Date(),
   }): void {
     cookieJar.set('access_token', 'view-token')
     verifyAccessTokenMock.mockReturnValue(viewPayload)
@@ -392,6 +441,75 @@ describe('stopImpersonationAction (operator-bound stop)', () => {
     // Availability of the stop path wins over the stop audit entry.
     expect(sessionMocks.revokeSession).toHaveBeenCalledWith('view-session-1')
     expect(url.pathname).toBe('/admin/users/user-9')
+  })
+
+  it('ends an over-TTL view session with the expiry notice and marks the audit entry', async () => {
+    armViewSession({
+      userId: 'user-9',
+      role: 'private',
+      impersonatedBy: 'admin-1',
+      profileId: undefined,
+      tokenFamily: 'family-1',
+      active: true,
+      refreshTokenHash: 'hash-1',
+      // Rotation refreshes expires_at, but created_at is stable: 31 min old.
+      createdAt: new Date(Date.now() - 31 * 60 * 1000),
+    })
+    sessionMocks.createSession.mockResolvedValue({
+      accessToken: 'admin-access-token',
+      refreshToken: 'admin-refresh-token',
+      sessionId: 'admin-session-2',
+    })
+
+    const url = await redirectOf(() => stopImpersonationAction())
+
+    const audit = repos.creates.find((entry) => entry.collection === 'audit-entry')
+    expect((audit?.data.after as { expired?: boolean }).expired).toBe(true)
+    expect(sessionMocks.revokeSession).toHaveBeenCalledWith('view-session-1')
+    expect(sessionMocks.createSession).toHaveBeenCalledWith('admin-1', 'admin')
+    expect(url.pathname).toBe('/admin/users/user-9')
+    expect(url.searchParams.get('teade')).toBe('Vaatlus aegus (30 minutit).')
+  })
+})
+
+describe('impersonationStateAction (banner expiry feed)', () => {
+  it('reports no active view session without a token', async () => {
+    const result = await impersonationStateAction()
+
+    expect(result).toEqual({ active: false, expiresAt: null })
+    expect(dbMocks.query).not.toHaveBeenCalled()
+  })
+
+  it('reports the clamped expiry for a live impersonation row', async () => {
+    cookieJar.set('access_token', 'view-token')
+    verifyAccessTokenMock.mockReturnValue({ userId: 'user-9', role: 'private', sessionId: 'view-session-1' })
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    dbMocks.query.mockResolvedValue({
+      results: [{ expires_at: expiresAt, impersonated_by: 'admin-1', revoked_at: null }],
+      meta: {},
+    })
+
+    const result = await impersonationStateAction()
+
+    expect(result).toEqual({ active: true, expiresAt })
+    expect(dbMocks.query).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores plain (non-impersonation) and revoked rows', async () => {
+    cookieJar.set('access_token', 'plain-token')
+    verifyAccessTokenMock.mockReturnValue({ userId: 'user-9', role: 'private', sessionId: 's-1' })
+    dbMocks.query.mockResolvedValue({
+      results: [{ expires_at: '2099-01-01T00:00:00.000Z', impersonated_by: null, revoked_at: null }],
+      meta: {},
+    })
+
+    expect(await impersonationStateAction()).toEqual({ active: false, expiresAt: null })
+
+    dbMocks.query.mockResolvedValue({
+      results: [{ expires_at: '2099-01-01T00:00:00.000Z', impersonated_by: 'admin-1', revoked_at: '2026-09-01T00:00:00.000Z' }],
+      meta: {},
+    })
+    expect(await impersonationStateAction()).toEqual({ active: false, expiresAt: null })
   })
 })
 
