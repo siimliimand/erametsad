@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { CheckboxField } from './CheckboxField'
 import { saveFaqItemAction } from '../../../_actions/content'
 import {
   FormField,
@@ -26,7 +27,14 @@ export function FaqItemForm({
       {item ? <input type="hidden" name="id" value={item.id} /> : null}
       <FormField label="Küsimus" name="question" required defaultValue={item?.question ?? ''} />
       <FormTextareaField
-        label="Vastus"
+        label="Lühivastus"
+        name="shortAnswer"
+        rows={2}
+        hint="Lühike vastus kuvatakse loendis; täisvastus avaneb „Loe edasi…“ taga."
+        defaultValue={item?.shortAnswer ?? ''}
+      />
+      <FormTextareaField
+        label="Täisvastus"
         name="answer"
         rows={6}
         hint="HTML sisu."
@@ -55,6 +63,12 @@ export function FaqItemForm({
           defaultValue={item?.slug ?? ''}
         />
       </div>
+      <CheckboxField
+        label="Aktiivne"
+        name="active"
+        hint="Kui märkimata, ei kuvata küsimust avalikul KKK lehel."
+        defaultChecked={item?.active ?? true}
+      />
       <div className="flex items-center gap-sm pt-xs">
         <button type="submit" className={primaryButtonClass}>
           Salvesta

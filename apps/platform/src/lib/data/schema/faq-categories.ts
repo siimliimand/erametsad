@@ -6,6 +6,7 @@ export const faqCategories = sqliteTable(
     id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
     title: text('title').notNull(),
     slug: text('slug').notNull(),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
     // Payload number used only for display ordering; integer is sufficient.
     order: integer('order').notNull().default(0),
     createdAt: text('created_at').notNull(),

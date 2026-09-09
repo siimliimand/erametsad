@@ -13,6 +13,7 @@ interface FaqCategoryRow {
   title: string
   slug: string
   order: number
+  active: boolean
   itemCount: number
 }
 
@@ -39,6 +40,7 @@ export default async function AdminFaqCategoriesPage({
     title: category.title,
     slug: category.slug,
     order: category.order,
+    active: category.active,
     itemCount: itemCounts.get(category.id) ?? 0,
   }))
 
@@ -72,6 +74,11 @@ export default async function AdminFaqCategoriesPage({
           },
           { key: 'slug', label: 'URL' },
           { key: 'order', label: 'Järjekord' },
+          {
+            key: 'active',
+            label: 'Aktiivne',
+            render: (row) => (row.active ? 'Jah' : 'Ei'),
+          },
           { key: 'itemCount', label: 'Küsimusi' },
           {
             key: 'actions',
