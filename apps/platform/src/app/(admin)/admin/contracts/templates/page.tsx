@@ -4,6 +4,12 @@ import {
   type TemplateLifecycle,
 } from './_components/TemplateCard'
 import type { TemplateVersionEntry } from './_components/TemplateVersionHistory'
+import {
+  activePeriodsByTemplateId,
+  countContractsByTemplate,
+  uploaderByTemplateId,
+  type ActivePeriod,
+} from './_components/template-version-meta'
 import { uploadContractTemplateAction } from '../../../_actions/contracts'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import { PageHeader } from '../../../_components/PageHeader'
@@ -20,6 +26,9 @@ const smallButtonClass =
 const inputClass =
   'rounded-input border border-border bg-bgPage px-3 py-2 text-bodySm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none'
 
+/** One bounded fetch covers the generated-contracts counts. */
+const GENERATED_CONTRACTS_FETCH_LIMIT = 2000
+
 function readTokens(placeholders: unknown): { key: string }[] {
   if (!Array.isArray(placeholders)) return []
   return placeholders.flatMap((item) => {
@@ -32,6 +41,13 @@ interface GroupedVersion extends TemplateVersionEntry {
   tokens: { key: string }[]
   sourceContent: string | null
   sourceFormat: 'html' | 'txt' | null
+}
+
+interface VersionMetaMaps {
+  uploaders: Map<string, string | null>
+  uploaderNames: Map<string, string>
+  periods: Map<string, ActivePeriod>
+  counts: Map<string, number>
 }
 
 /** Draft save bumps the head version's minor ("3.0" -> "3.1"); uploads use "N.0". */
@@ -61,6 +77,7 @@ function groupTemplateCards(
     updatedAt: string
   }[],
   rowLifecycle: Map<string, TemplateLifecycle>,
+  meta: VersionMetaMaps,
 ): TemplateCardData[] {
   const groups = new Map<
     string,
@@ -73,12 +90,20 @@ function groupTemplateCards(
       type: template.type,
       versions: [],
     }
+    const uploaderId = meta.uploaders.get(template.id) ?? null
+    const period = meta.periods.get(template.id)
     group.versions.push({
       id: template.id,
       version: template.version,
       createdAt: template.createdAt,
       updatedAt: template.updatedAt,
       active: template.active,
+      uploaderName: uploaderId ? (meta.uploaderNames.get(uploaderId) ?? uploaderId) : null,
+      // No note column on contract_templates yet; the history renders an em dash.
+      note: null,
+      activeFrom: period?.from ?? null,
+      activeTo: period?.to ?? null,
+      generatedCount: meta.counts.get(template.id) ?? 0,
       tokens: readTokens(template.placeholders),
       sourceContent: template.sourceContent,
       sourceFormat: template.sourceFormat,
@@ -137,6 +162,8 @@ export default async function ContractTemplatesPage({
   })
 
   const templateIds = templates.map((template) => template.id)
+  // One audit pass feeds the lifecycle states, the uploaders and the
+  // active-period derivation (newest first, bounded like the other lists).
   const lifecycleEntries =
     templateIds.length > 0
       ? (
@@ -144,7 +171,16 @@ export default async function ContractTemplatesPage({
             collection: 'audit-entry',
             where: {
               and: [
-                { action: { in: ['template.activate', 'template.deactivate'] } },
+                {
+                  action: {
+                    in: [
+                      'template.upload',
+                      'template.draft_save',
+                      'template.activate',
+                      'template.deactivate',
+                    ],
+                  },
+                },
                 { entityId: { in: templateIds } },
               ],
             },
@@ -173,7 +209,41 @@ export default async function ContractTemplatesPage({
     )
   }
 
-  const cards = groupTemplateCards(templates, rowLifecycle)
+  // Version metadata: uploaders from the audit trail, active periods from
+  // the activate/deactivate pairs, generated-contract counts from a single
+  // bounded contracts fetch. No note column exists on contract_templates.
+  const { docs: generatedContracts } = await repositories.find({
+    collection: 'contracts',
+    sort: '-createdAt',
+    pagination: false,
+    limit: GENERATED_CONTRACTS_FETCH_LIMIT,
+  })
+  const uploaders = uploaderByTemplateId(lifecycleEntries)
+  const activeTemplateIds = new Set(
+    templates.filter((template) => template.active).map((template) => template.id),
+  )
+  const uploaderIds = [
+    ...new Set(
+      [...uploaders.values()].filter((id): id is string => typeof id === 'string'),
+    ),
+  ]
+  const uploaderUsers =
+    uploaderIds.length > 0
+      ? await repositories.find({
+          collection: 'users',
+          where: { id: { in: uploaderIds } },
+          pagination: false,
+        })
+      : { docs: [] as { id: string; name: string | null; email: string }[] }
+
+  const cards = groupTemplateCards(templates, rowLifecycle, {
+    uploaders,
+    uploaderNames: new Map(
+      uploaderUsers.docs.map((user) => [user.id, user.name ?? user.email]),
+    ),
+    periods: activePeriodsByTemplateId(lifecycleEntries, activeTemplateIds),
+    counts: countContractsByTemplate(generatedContracts),
+  })
 
   return (
     <div>

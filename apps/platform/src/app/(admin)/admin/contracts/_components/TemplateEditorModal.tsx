@@ -3,7 +3,7 @@
 import { useId, useRef, useState, useTransition } from 'react'
 
 import { HtmlPreviewDrawer } from './HtmlPreviewDrawer'
-import { PLACEHOLDER_GROUPS } from './placeholder-catalogue'
+import { filterPlaceholderGroups, PLACEHOLDER_GROUPS } from './placeholder-catalogue'
 import { saveTemplateDraftAction, testRenderTemplateAction } from '../../../_actions/contracts'
 import { PencilIcon } from '../../../_components/icons'
 import { Modal } from '../../../_components/ui/Modal'
@@ -44,6 +44,11 @@ interface TemplateEditorModalProps {
   initialSourceFormat?: 'html' | 'txt' | null
   /** Suggested next version for the draft save ("3.0" -> "3.1"). */
   nextVersion?: string
+  /**
+   * Contracts generated from this version row; > 0 turns on the in-use
+   * warning banner (spec admin-commerce-ops).
+   */
+  generatedCount?: number
 }
 
 const editorButtonClass =
@@ -104,15 +109,23 @@ export function TemplateEditorModal({
   initialSourceContent = null,
   initialSourceFormat = null,
   nextVersion,
+  generatedCount = 0,
 }: TemplateEditorModalProps) {
   const pushToast = useOptionalToast()
   const [pending, startTransition] = useTransition()
   const [open, setOpen] = useState(false)
   const [source, setSource] = useState('')
   const [draftVersion, setDraftVersion] = useState(nextVersion ?? '')
+  const [tokenQuery, setTokenQuery] = useState('')
   const areaRef = useRef<HTMLTextAreaElement>(null)
   const areaId = useId()
   const versionId = useId()
+  const tokenSearchId = useId()
+
+  const inUseWarning =
+    generatedCount === 1
+      ? '1 leping on sellest malliversioonist loodud.'
+      : `${String(generatedCount)} lepingut on sellest malliversioonist loodud.`
 
   // DOCX-only templates carry no editor source, so the editor opens empty and
   // the draft defaults to HTML — the format the editor itself produces.
@@ -179,6 +192,8 @@ export function TemplateEditorModal({
     })
   }
 
+  const visibleGroups = filterPlaceholderGroups(PLACEHOLDER_GROUPS, tokenQuery)
+
   return (
     <>
       <button type="button" onClick={openEditor} className={editorButtonClass}>
@@ -227,6 +242,15 @@ export function TemplateEditorModal({
           </>
         }
       >
+        {generatedCount > 0 ? (
+          <p
+            role="alert"
+            className="rounded-input border border-l-4 border-[var(--st-ended)] bg-[var(--st-ended-bg)] px-md py-sm text-bodySm text-[color:var(--st-ended-text)]"
+          >
+            {`⚠ ${inUseWarning} Salvestamine loob uue passiivse versiooni — olemasolevad lepingud jäävad muutmata.`}
+          </p>
+        ) : null}
+
         <p className="text-bodySm text-ink-muted">
           Klõpsa kohatäidet, et lisada see kursori kohale lähteteksti. Redaktor sobib HTML- ja
           TXT-mallidele; „Salvesta“ salvestab lähteteksti uue passiivse versioonina, aktiveerimine
@@ -234,26 +258,45 @@ export function TemplateEditorModal({
         </p>
 
         <div className="flex flex-col gap-xs" role="group" aria-label="Kohatäited">
-          {PLACEHOLDER_GROUPS.map((group) => (
-            <div key={group.label} className="flex flex-col gap-1">
-              <span className="text-label font-semibold text-ink-muted">{group.label}</span>
-              <div className="flex flex-wrap gap-1.5">
-                {group.tokens.map((token) => (
-                  <button
-                    key={token}
-                    type="button"
-                    onClick={() => {
-                      insertToken(`{{${token}}}`)
-                    }}
-                    aria-label={`Sisesta kohatäide {{${token}}}`}
-                    className={chipClass}
-                  >
-                    {`{{${token}}}`}
-                  </button>
-                ))}
+          <div className="flex flex-col gap-1">
+            <label htmlFor={tokenSearchId} className="text-label font-semibold text-ink">
+              Otsi kohatäiteid
+            </label>
+            <input
+              id={tokenSearchId}
+              type="search"
+              value={tokenQuery}
+              onChange={(event) => {
+                setTokenQuery(event.target.value)
+              }}
+              placeholder="nt lot, fee, pakkuja"
+              className="h-8 w-full max-w-64 rounded-input border border-border bg-bgPage px-2 text-bodySm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none"
+            />
+          </div>
+          {visibleGroups.length === 0 ? (
+            <p className="text-bodySm text-ink-muted">Kohatäiteid ei leitud.</p>
+          ) : (
+            visibleGroups.map((group) => (
+              <div key={group.label} className="flex flex-col gap-1">
+                <span className="text-label font-semibold text-ink-muted">{group.label}</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {group.tokens.map((token) => (
+                    <button
+                      key={token}
+                      type="button"
+                      onClick={() => {
+                        insertToken(`{{${token}}}`)
+                      }}
+                      aria-label={`Sisesta kohatäide {{${token}}}`}
+                      className={chipClass}
+                    >
+                      {`{{${token}}}`}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         <div className="flex flex-col gap-1">

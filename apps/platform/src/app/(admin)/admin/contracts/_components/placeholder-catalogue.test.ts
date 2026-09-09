@@ -4,6 +4,7 @@ import {
   PLACEHOLDER_GROUPS,
   buildValidationMessage,
   extractTemplateTokens,
+  filterPlaceholderGroups,
   isKnownToken,
   templateFixtureData,
   validateTemplateTokens,
@@ -92,6 +93,34 @@ describe('validateTemplateTokens', () => {
     expect(message).toContain('Tundmatud kohatäited: {{lot.nonexistent}}')
     expect(message).toContain('{{bidder.isikukood}} või {{bidder.registrikood}}')
     expect(message).toContain('{{lot.finalPrice}} või {{bid.amount}}; {{fee.total}}.')
+  })
+})
+
+describe('filterPlaceholderGroups', () => {
+  it('returns every group untouched for an empty or blank query', () => {
+    expect(filterPlaceholderGroups(PLACEHOLDER_GROUPS, '')).toEqual([...PLACEHOLDER_GROUPS])
+    expect(filterPlaceholderGroups(PLACEHOLDER_GROUPS, '   ')).toHaveLength(
+      PLACEHOLDER_GROUPS.length,
+    )
+  })
+
+  it('keeps only the groups and tokens matching the needle case-insensitively', () => {
+    const filtered = filterPlaceholderGroups(PLACEHOLDER_GROUPS, 'CADASTRE')
+    expect(filtered).toHaveLength(1)
+    expect(filtered[0]?.label).toBe('Oksjon')
+    expect(filtered[0]?.tokens).toEqual(['lot.cadastres'])
+  })
+
+  it('matches the group tokens by substring and drops empty groups', () => {
+    const filtered = filterPlaceholderGroups(PLACEHOLDER_GROUPS, 'fee.')
+    expect(filtered).toHaveLength(1)
+    expect(filtered[0]?.tokens.every((token) => token.startsWith('fee.'))).toBe(true)
+    expect(filterPlaceholderGroups(PLACEHOLDER_GROUPS, 'puudub-täielikult')).toEqual([])
+  })
+
+  it('matches partial names like bidder across the catalogue', () => {
+    const filtered = filterPlaceholderGroups(PLACEHOLDER_GROUPS, 'bidder')
+    expect(filtered.map((group) => group.label)).toEqual(['Pakkuja'])
   })
 })
 

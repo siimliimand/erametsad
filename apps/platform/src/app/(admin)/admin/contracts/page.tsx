@@ -3,6 +3,17 @@ import Link from 'next/link'
 import { ContainerDownloadButton } from './_components/ContainerDownloadButton'
 import { HtmlPreviewDrawer } from './_components/HtmlPreviewDrawer'
 import {
+  classifyContractSearch,
+  CONTRACTS_FETCH_LIMIT,
+  CONTRACTS_PAGE_SIZE,
+  contractInDateRange,
+  contractNumber,
+  matchesContractSearch,
+  paginateRows,
+  parseContractListFilters,
+  transactionRefLabel,
+} from './_components/contract-search'
+import {
   getContractContainerAction,
   getContractDocumentAction,
   resendContractAction,
@@ -10,15 +21,25 @@ import {
 } from '../../_actions/contracts'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
-import { secondaryButtonClass } from '../../_components/FormField'
+import {
+  FormField,
+  FormSelectField,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
 import { StatusChip } from '../../_components/StatusChip'
 import { requireAdminRepositories } from '../../_lib/admin'
-import { formatDateTime } from '../../_lib/labels'
+import {
+  contractStatusLabels,
+  contractTemplateTypeLabels,
+  formatDateTime,
+} from '../../_lib/labels'
 import { can } from '../../_lib/permissions'
+import { chunkIds } from '../users/_components/user-search'
 
-import type { UserDoc } from '@/lib/data/repositories'
-import type { ContractStatus } from '@/lib/data/schema'
+import { contractStatuses, contractTemplateTypes } from '@/lib/data/schema'
+import type { ContractStatus, ContractTemplateType } from '@/lib/data/schema'
 
 const STUCK_SENT_MS = 7 * 24 * 60 * 60 * 1000
 const RESEND_THROTTLE_MS = 60 * 60 * 1000
@@ -27,11 +48,15 @@ interface ContractRow {
   id: string
   status: string
   createdAt: string
+  signedAt: string | null
+  type: ContractTemplateType
+  templateLabel: string
   auctionTitle: string
   sellerName: string
   sellerId: string | null
   buyerName: string
   buyerId: string | null
+  transactionRef: string | null
   hasDocument: boolean
   stuck: boolean
   resendCount: number
@@ -41,14 +66,36 @@ interface ContractRow {
 const reasonInputClass =
   'w-full rounded-input border border-border bg-bgPage px-3 py-2 text-bodySm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none'
 
+const SEARCH_HINT = 'Otsi: osapool / oksjon / lepingu nr / tehingu viide'
+
+type RawParams = Record<string, string | string[] | undefined>
+
+function firstParam(params: RawParams, key: string): string {
+  const value = params[key]
+  const first = Array.isArray(value) ? value[0] : value
+  return first ?? ''
+}
+
 export const metadata = { title: 'Lepingud' }
 
 export default async function AdminContractsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ viga?: string; teade?: string }>
+  searchParams: Promise<RawParams>
 }) {
-  const { viga, teade } = await searchParams
+  const params = await searchParams
+  const viga = firstParam(params, 'viga')
+  const teade = firstParam(params, 'teade')
+  const q = firstParam(params, 'q').trim()
+  const pageParam = firstParam(params, 'page')
+  const filters = parseContractListFilters({
+    type: firstParam(params, 'type'),
+    status: firstParam(params, 'status'),
+    from: firstParam(params, 'from'),
+    to: firstParam(params, 'to'),
+  })
+  const query = classifyContractSearch(q)
+
   const { session, repositories } = await requireAdminRepositories()
   if (!can(session.role, 'contracts:read')) {
     return (
@@ -62,22 +109,119 @@ export default async function AdminContractsPage({
   }
   const isSuperadmin = session.role === 'superadmin'
 
-  const { docs: contracts } = await repositories.find({
-    collection: 'contracts',
-    sort: '-createdAt',
-    limit: 50,
+  // Status translates into the repository where clause; the type filter
+  // needs the template join anyway, and the date range plus freetext have
+  // no repository operators yet, so all three run in JS over one bounded
+  // fetch (users/auctions list pattern).
+  const [{ docs: contracts }, { docs: templates }] = await Promise.all([
+    repositories.find({
+      collection: 'contracts',
+      ...(filters.status
+        ? { where: { status: { equals: filters.status } } }
+        : {}),
+      sort: '-createdAt',
+      pagination: false,
+      limit: CONTRACTS_FETCH_LIMIT,
+    }),
+    repositories.find({
+      collection: 'contract-templates',
+      sort: '-createdAt',
+      pagination: false,
+      limit: 500,
+    }),
+  ])
+  const templateById = new Map(templates.map((template) => [template.id, template]))
+
+  // Enrichment for filtering (titles, party names) runs on every fetched
+  // contract; D1 caps bound parameters at 100, so id lists go in chunks.
+  const lotIds = [...new Set(contracts.map((contract) => contract.lotId))]
+  const auctions = (
+    await Promise.all(
+      chunkIds(lotIds).map((chunk) =>
+        repositories.find({
+          collection: 'auctions',
+          where: { id: { in: chunk } },
+          pagination: false,
+        }),
+      ),
+    )
+  ).flatMap((result) => result.docs)
+  const auctionById = new Map(auctions.map((auction) => [auction.id, auction]))
+
+  const winningBidIds = [
+    ...new Set(auctions.map((auction) => auction.winningBid).filter((id): id is string => !!id)),
+  ]
+  const winningBids = (
+    await Promise.all(
+      chunkIds(winningBidIds).map((chunk) =>
+        repositories.find({
+          collection: 'bids',
+          where: { id: { in: chunk } },
+          pagination: false,
+        }),
+      ),
+    )
+  ).flatMap((result) => result.docs)
+  const bidById = new Map(winningBids.map((bid) => [bid.id, bid]))
+
+  const partyIds = [
+    ...new Set(
+      [
+        ...auctions.map((auction) => auction.sellerId),
+        ...winningBids.map((bid) => bid.userId),
+        ...contracts.map((contract) => contract.signedBy),
+      ].filter((id): id is string => !!id),
+    ),
+  ]
+  const parties = (
+    await Promise.all(
+      chunkIds(partyIds).map((chunk) =>
+        repositories.find({
+          collection: 'users',
+          where: { id: { in: chunk } },
+          pagination: false,
+        }),
+      ),
+    )
+  ).flatMap((result) => result.docs)
+  const userLabel = new Map(parties.map((party) => [party.id, party.name ?? party.email]))
+
+  const filteredContracts = contracts.filter((contract) => {
+    const template = templateById.get(contract.templateId)
+    if (filters.type && template?.type !== filters.type) return false
+    if (!contractInDateRange(contract.createdAt, filters)) return false
+    const auction = auctionById.get(contract.lotId)
+    const winningBid = auction?.winningBid ? bidById.get(auction.winningBid) : undefined
+    return matchesContractSearch(
+      {
+        id: contract.id,
+        contentHash: contract.contentHash,
+        auctionTitle: auction?.title ?? contract.lotId,
+        sellerName: auction?.sellerId
+          ? (userLabel.get(auction.sellerId) ?? auction.sellerId)
+          : '',
+        buyerName: winningBid ? (userLabel.get(winningBid.userId) ?? winningBid.userId) : '',
+      },
+      query,
+    )
   })
 
-  const contractIds = contracts.map((contract) => contract.id)
+  const { pageRows, safePage, pageCount, totalCount } = paginateRows(
+    filteredContracts,
+    pageParam,
+  )
+
+  // Resend state stays a page-slice concern, like the other enrichment.
+  const pageContractIds = pageRows.map((contract) => contract.id)
   const resendEntries =
-    contractIds.length > 0
+    pageContractIds.length > 0
       ? (
           await repositories.find({
             collection: 'audit-entry',
             where: {
               and: [
                 { action: { equals: 'contract.resend' } },
-                { entityId: { in: contractIds } },
+                { entityId: { in: pageContractIds } },
               ],
             },
             sort: '-createdAt',
@@ -96,56 +240,9 @@ export default async function AdminContractsPage({
     resendsByContract.set(contractId, current)
   }
 
-  const lotIds = [...new Set(contracts.map((contract) => contract.lotId))]
-  const auctions =
-    lotIds.length > 0
-      ? (
-          await repositories.find({
-            collection: 'auctions',
-            where: { id: { in: lotIds } },
-            pagination: false,
-          })
-        ).docs
-      : []
-  const auctionById = new Map(auctions.map((auction) => [auction.id, auction]))
-
-  const winningBidIds = [
-    ...new Set(auctions.map((auction) => auction.winningBid).filter((id): id is string => !!id)),
-  ]
-  const winningBids =
-    winningBidIds.length > 0
-      ? (
-          await repositories.find({
-            collection: 'bids',
-            where: { id: { in: winningBidIds } },
-            pagination: false,
-          })
-        ).docs
-      : []
-  const bidById = new Map(winningBids.map((bid) => [bid.id, bid]))
-
-  const partyIds = [
-    ...new Set(
-      [
-        ...auctions.map((auction) => auction.sellerId),
-        ...winningBids.map((bid) => bid.userId),
-      ].filter((id): id is string => !!id),
-    ),
-  ]
-  const parties: UserDoc[] =
-    partyIds.length > 0
-      ? (
-          await repositories.find({
-            collection: 'users',
-            where: { id: { in: partyIds } },
-            pagination: false,
-          })
-        ).docs
-      : []
-  const userLabel = new Map(parties.map((party) => [party.id, party.name ?? party.email]))
-
   const now = Date.now()
-  const rows: ContractRow[] = contracts.map((contract) => {
+  const rows: ContractRow[] = pageRows.map((contract) => {
+    const template = templateById.get(contract.templateId)
     const auction = auctionById.get(contract.lotId)
     const winningBid = auction?.winningBid ? bidById.get(auction.winningBid) : undefined
     const resends = resendsByContract.get(contract.id)
@@ -156,11 +253,15 @@ export default async function AdminContractsPage({
       id: contract.id,
       status: contract.status,
       createdAt: contract.createdAt,
+      signedAt: contract.signedAt,
+      type: template?.type ?? 'auction',
+      templateLabel: template ? `${template.name} (v${template.version})` : contract.templateId,
       auctionTitle: auction?.title ?? contract.lotId,
       sellerName: auction?.sellerId ? (userLabel.get(auction.sellerId) ?? auction.sellerId) : '—',
       sellerId: auction?.sellerId ?? null,
       buyerName: winningBid ? (userLabel.get(winningBid.userId) ?? winningBid.userId) : '—',
       buyerId: winningBid?.userId ?? null,
+      transactionRef: contract.contentHash,
       hasDocument: typeof contract.renderedHtml === 'string' && contract.renderedHtml !== '',
       stuck:
         contract.status === 'sent' &&
@@ -170,6 +271,33 @@ export default async function AdminContractsPage({
       lastResendAt,
     }
   })
+
+  const fromParam = firstParam(params, 'from')
+  const toParam = firstParam(params, 'to')
+  const currentValues = {
+    q: q || undefined,
+    type: filters.type ?? undefined,
+    status: filters.status ?? undefined,
+    from: fromParam,
+    to: toParam,
+    page: safePage > 1 ? String(safePage) : undefined,
+  }
+
+  function buildUrl(overrides: Record<string, string | undefined>): string {
+    const search = new URLSearchParams()
+    for (const [key, value] of Object.entries({ ...currentValues, ...overrides })) {
+      if (value) search.set(key, value)
+    }
+    const queryString = search.toString()
+    return queryString === '' ? '/admin/contracts' : `/admin/contracts?${queryString}`
+  }
+
+  const hasActiveFilters =
+    q !== '' ||
+    filters.type !== null ||
+    filters.status !== null ||
+    fromParam !== '' ||
+    toParam !== ''
 
   const voidForm = (row: ContractRow): React.ReactElement => (
     <details className="mt-xs">
@@ -223,8 +351,96 @@ export default async function AdminContractsPage({
           </Link>
         }
       />
+
+      <form
+        method="get"
+        action="/admin/contracts"
+        aria-label="Filtrid"
+        className="mb-md flex max-w-container-sm flex-wrap items-end gap-sm rounded-card border border-border bg-bgPage p-md"
+      >
+        <div className="w-full max-w-80">
+          <FormField
+            label="Otsing"
+            name="q"
+            type="search"
+            defaultValue={q}
+            hint={SEARCH_HINT}
+          />
+        </div>
+        <div className="w-40">
+          <FormSelectField
+            label="Tüüp"
+            name="type"
+            defaultValue={filters.type ?? ''}
+            options={[
+              { value: '', label: 'Kõik' },
+              ...contractTemplateTypes.map((type) => ({
+                value: type,
+                label: contractTemplateTypeLabels[type],
+              })),
+            ]}
+          />
+        </div>
+        <div className="w-36">
+          <FormSelectField
+            label="Olek"
+            name="status"
+            defaultValue={filters.status ?? ''}
+            options={[
+              { value: '', label: 'Kõik' },
+              ...contractStatuses.map((status) => ({
+                value: status,
+                label: contractStatusLabels[status],
+              })),
+            ]}
+          />
+        </div>
+        <div className="w-40">
+          <FormField
+            label="Loodud alates"
+            name="from"
+            type="date"
+            defaultValue={fromParam}
+          />
+        </div>
+        <div className="w-40">
+          <FormField
+            label="Loodud kuni"
+            name="to"
+            type="date"
+            defaultValue={toParam}
+          />
+        </div>
+        <button type="submit" className={primaryButtonClass}>
+          Otsi
+        </button>
+        {hasActiveFilters ? (
+          <Link href="/admin/contracts" className={secondaryButtonClass}>
+            Tühjenda
+          </Link>
+        ) : null}
+      </form>
+
       <DataTable
         columns={[
+          {
+            key: 'nr',
+            label: 'Nr',
+            render: (row) => (
+              <Link
+                href={`/admin/contracts/${row.id}`}
+                title={row.id}
+                className="font-mono text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
+              >
+                {contractNumber(row.id)}
+              </Link>
+            ),
+          },
+          {
+            key: 'type',
+            label: 'Tüüp',
+            render: (row) => contractTemplateTypeLabels[row.type],
+          },
           { key: 'auctionTitle', label: 'Oksjon' },
           {
             key: 'sellerName',
@@ -256,6 +472,7 @@ export default async function AdminContractsPage({
                 row.buyerName
               ),
           },
+          { key: 'templateLabel', label: 'Mall' },
           {
             key: 'status',
             label: 'Olek',
@@ -274,6 +491,26 @@ export default async function AdminContractsPage({
             key: 'createdAt',
             label: 'Loodud',
             render: (row) => formatDateTime(row.createdAt),
+          },
+          {
+            key: 'signedAt',
+            label: 'Allkirjastatud',
+            render: (row) => formatDateTime(row.signedAt),
+          },
+          {
+            key: 'transactionRef',
+            label: 'Pakkuja tehingu viide',
+            render: (row) =>
+              row.transactionRef ? (
+                <span
+                  className="font-mono"
+                  title={row.transactionRef}
+                >
+                  {transactionRefLabel(row.transactionRef)}
+                </span>
+              ) : (
+                '—'
+              ),
           },
           {
             key: 'actions',
@@ -328,8 +565,41 @@ export default async function AdminContractsPage({
           },
         ]}
         rows={rows}
-        emptyLabel="Lepinguid ei ole."
+        emptyLabel={
+          hasActiveFilters
+            ? 'Lepingut ei leitud — kontrolli otsingusõna või filtreid.'
+            : 'Lepinguid ei ole.'
+        }
       />
+
+      <div className="mt-sm flex items-center justify-between text-label text-ink-muted">
+        <span>
+          {totalCount === 0
+            ? '0 lepingut'
+            : `${String((safePage - 1) * CONTRACTS_PAGE_SIZE + 1)}–${String(Math.min(safePage * CONTRACTS_PAGE_SIZE, totalCount))} / ${String(totalCount)}`}
+        </span>
+        <span className="flex items-center gap-sm">
+          {safePage > 1 ? (
+            <Link
+              href={buildUrl({ page: String(safePage - 1) })}
+              className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
+            >
+              ‹ Eelmine
+            </Link>
+          ) : null}
+          <span>
+            Leht {String(safePage)} / {String(pageCount)}
+          </span>
+          {safePage < pageCount ? (
+            <Link
+              href={buildUrl({ page: String(safePage + 1) })}
+              className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
+            >
+              Järgmine ›
+            </Link>
+          ) : null}
+        </span>
+      </div>
     </div>
   )
 }

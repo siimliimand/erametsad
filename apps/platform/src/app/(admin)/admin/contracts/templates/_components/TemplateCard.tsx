@@ -109,6 +109,7 @@ export function TemplateCard({ card }: { card: TemplateCardData }) {
           initialSourceContent={card.sourceContent ?? null}
           initialSourceFormat={card.sourceFormat ?? null}
           nextVersion={card.nextVersion ?? ''}
+          generatedCount={headVersion.generatedCount ?? 0}
         />
         <HtmlPreviewDrawer
           label="Testrender"

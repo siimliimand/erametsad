@@ -65,6 +65,11 @@ describe('StatusChip variants', () => {
     }
   })
 
+  it('renders the sent contract chip in the blue (info) triad', () => {
+    expect(chipHtml('contract:sent')).toContain('bg-info-light text-info')
+    expect(chipHtml('contract:sent')).not.toContain('--st-ended')
+  })
+
   it('renders the lead domain pills', () => {
     const cases: [StatusChipVariant, string][] = [
       ['lead:new', 'Uus'],
