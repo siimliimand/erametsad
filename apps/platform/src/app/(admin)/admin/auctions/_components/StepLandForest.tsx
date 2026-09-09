@@ -2,7 +2,7 @@
 
 import { AuctionRepeater } from './AuctionRepeater'
 import { MultiSelectField } from './MultiSelectField'
-import { LOGGING_TYPE_OPTIONS, SPECIES_OPTIONS } from './wizard-model'
+import { APPROVAL_OPTIONS, LOGGING_TYPE_OPTIONS, SPECIES_OPTIONS } from './wizard-model'
 import type { WizardStepContext } from './wizard-model'
 import { FieldError, FieldLabel, WarningNote } from './wizard-ui'
 import { inputClass } from '../../../_components/FormField'
@@ -192,6 +192,50 @@ export function StepLandForest({ state, patch, errors }: WizardStepContext) {
           </WarningNote>
         ) : null}
         <FieldError message={errors.deadlines} />
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-xs">
+        <legend className="text-label font-semibold text-ink">Kooskõlastused ja väljaveoteed</legend>
+        <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            <FieldLabel htmlFor="wizard-storageLocationApproval">
+              Kooskõlastused (ladustamiskohad)
+            </FieldLabel>
+            <select
+              id="wizard-storageLocationApproval"
+              value={state.storageLocationApproval ?? ''}
+              onChange={(event) => {
+                patch({ storageLocationApproval: event.target.value })
+              }}
+              className={inputClass}
+            >
+              <option value="">Valimata</option>
+              {APPROVAL_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <FieldLabel htmlFor="wizard-removalRoads">Väljaveoteed</FieldLabel>
+            <select
+              id="wizard-removalRoads"
+              value={state.removalRoads ?? ''}
+              onChange={(event) => {
+                patch({ removalRoads: event.target.value })
+              }}
+              className={inputClass}
+            >
+              <option value="">Valimata</option>
+              {APPROVAL_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </fieldset>
     </div>
   )

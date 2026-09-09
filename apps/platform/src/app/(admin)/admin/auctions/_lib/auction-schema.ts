@@ -24,6 +24,17 @@ export const loggingTypeCodes = ['AR', 'HL', 'HR', 'KR', 'LR', 'RD', 'SR', 'TR',
 export const ANTI_SNIPE_MIN_MINUTES = 1
 export const ANTI_SNIPE_MAX_MINUTES = 30
 
+/**
+ * Step-3 approval options shared by kooskõlastused (ladustamiskohad) and
+ * väljaveoteed; stored as codes inside the deadlines JSON (docs 03 step 3).
+ */
+export const approvalOptionValues = ['seller', 'buyer', 'approved'] as const
+export type ApprovalOptionValue = (typeof approvalOptionValues)[number]
+
+const approvalOption = z.enum(approvalOptionValues, {
+  errorMap: () => ({ message: 'Vali müüja, ostja või kooskõlastatud.' }),
+})
+
 const eurAmount = z
   .number({ invalid_type_error: 'Sisesta summa numbrina.' })
   .finite('Sisesta summa numbrina.')
@@ -64,6 +75,8 @@ export const deadlinesSchema = z.object({
   loggingDeadline: dateOnly.optional(),
   removalDeadline: dateOnly.optional(),
   leaseDeadline: dateOnly.optional(),
+  storageLocationApproval: approvalOption.optional(),
+  removalRoads: approvalOption.optional(),
   antiSnipeEnabled: z.boolean().optional(),
   antiSnipeMinutes: z
     .number()
@@ -241,6 +254,9 @@ export interface AuctionWriteData {
   compartments: string[]
   notifications: string[]
   deadlines: unknown
+  /** Lot-level measures on the real columns (migration 0018). */
+  areaHa?: number
+  volumeM3?: number
   descriptionPublic?: string | null
   descriptionInternal?: string | null
   descriptionSecondary?: string | null
@@ -286,13 +302,15 @@ export function toAuctionWriteData(input: AuctionInput): AuctionWriteData {
     loggingTypes: [...input.loggingTypes],
     compartments: input.compartments,
     notifications: input.forestNotifications,
+    ...(input.areaHa !== undefined ? { areaHa: input.areaHa } : {}),
+    ...(input.volumeM3 !== undefined ? { volumeM3: input.volumeM3 } : {}),
     deadlines: {
       ...input.deadlines,
       antiSnipeEnabled: input.antiSnipeEnabled,
       ...(input.antiSnipeMinutes !== undefined ? { antiSnipeMinutes: input.antiSnipeMinutes } : {}),
-      // The auctions table has no propertyCount/areaHa/volumeM3 columns yet;
-      // these scalars ride in the structured JSON until a migration adds
-      // them. Row-level area/volume totals keep coming from packageRows.
+      // The area_ha/volume_m3 columns (0018) are the list/sort source, but
+      // the guest preview still reads these scalars from the deadlines JSON,
+      // so the values keep mirroring here. propertyCount has no column.
       ...(input.propertyCount !== undefined ? { propertyCount: input.propertyCount } : {}),
       ...(input.areaHa !== undefined ? { areaHa: input.areaHa } : {}),
       ...(input.volumeM3 !== undefined ? { volumeM3: input.volumeM3 } : {}),

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { check, index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 import { auctionObjectTypes, inList } from './shared'
 import { users } from './users'
@@ -45,6 +45,10 @@ export const auctions = sqliteTable(
     compartments: text('compartments'),
     notifications: text('notifications'),
     deadlines: text('deadlines'),
+    // Lot-level measures (ha / m³), backfilled from the deadlines JSON in
+    // migration 0018; the JSON copies stay for legacy readers.
+    areaHa: real('area_ha'),
+    volumeM3: real('volume_m3'),
     minBidCents: integer('min_bid_cents').notNull(),
     bidStepCents: integer('bid_step_cents'),
     reservePriceCents: integer('reserve_price_cents'),

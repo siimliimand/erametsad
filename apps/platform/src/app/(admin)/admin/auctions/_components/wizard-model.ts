@@ -10,7 +10,7 @@ import {
   loggingTypeCodes,
   speciesCodes,
 } from '../_lib/auction-schema'
-import type { AuctionGateSubject } from '../_lib/auction-schema'
+import type { ApprovalOptionValue, AuctionGateSubject } from '../_lib/auction-schema'
 
 import { auctionObjectTypes } from '@/lib/data/schema'
 import type { AuctionObjectType } from '@/lib/data/schema'
@@ -86,6 +86,13 @@ export interface AuctionWizardState {
   loggingDeadline: string
   removalDeadline: string
   leaseDeadline: string
+  /**
+   * Kooskõlastused (ladustamiskohad) and väljaveoteed codes ('seller' |
+   * 'buyer' | 'approved'); '' = unset. Optional so the pre-5.1 seed paths
+   * stay valid, mirroring the `files` precedent.
+   */
+  storageLocationApproval?: string
+  removalRoads?: string
   /** Pakett passthrough so a wizard save never wipes the stored value. */
   propertyCount: number | null
   specialistId: string
@@ -235,6 +242,8 @@ const FIELD_STEP: Record<string, number> = {
   deadlines: 3,
   areaHa: 3,
   volumeM3: 3,
+  storageLocationApproval: 3,
+  removalRoads: 3,
   minBid: 4,
   minBidEur: 4,
   bidStepEur: 4,
@@ -353,6 +362,10 @@ export function buildAuctionPayload(
   if (state.loggingDeadline !== '') deadlines.loggingDeadline = state.loggingDeadline
   if (state.removalDeadline !== '') deadlines.removalDeadline = state.removalDeadline
   if (state.leaseDeadline !== '') deadlines.leaseDeadline = state.leaseDeadline
+  const storageLocationApproval = state.storageLocationApproval ?? ''
+  if (storageLocationApproval !== '') deadlines.storageLocationApproval = storageLocationApproval
+  const removalRoads = state.removalRoads ?? ''
+  if (removalRoads !== '') deadlines.removalRoads = removalRoads
   if (state.propertyCount !== null) payload.propertyCount = state.propertyCount
   payload.deadlines = deadlines
 
@@ -680,6 +693,13 @@ export const SPECIES_OPTIONS: readonly { value: string; label: string }[] = spec
 export const LOGGING_TYPE_OPTIONS: readonly { value: string; label: string }[] =
   loggingTypeCodes.map((code) => ({ value: code, label: code }))
 
+/** Kooskõlastused/väljaveoteed options (docs 03 step 3: müüja/ostja/kooskõlastatud). */
+export const APPROVAL_OPTIONS: readonly { value: ApprovalOptionValue; label: string }[] = [
+  { value: 'seller', label: 'Müüja' },
+  { value: 'buyer', label: 'Ostja' },
+  { value: 'approved', label: 'Kooskõlastatud' },
+]
+
 // ── Step rail marks (task 5.2; demo 03 wiz-side) ────────────────────────────
 
 export type WizardStepMark = 'done' | 'current' | 'todo' | 'disabled'
@@ -954,6 +974,11 @@ function draftStateFrom(value: unknown): AuctionWizardState | null {
     if (parsed === null) return null
     files = parsed
   }
+  // Additive state keys from task 5.1: absent in older version-1 drafts, so
+  // they restore only when stored, keeping parsed drafts byte-equal to the
+  // server state the dirty compare runs against.
+  const storageLocationApproval = draftString(record.storageLocationApproval) ?? ''
+  const removalRoads = draftString(record.removalRoads) ?? ''
 
   return {
     title: strings.title,
@@ -986,6 +1011,8 @@ function draftStateFrom(value: unknown): AuctionWizardState | null {
     loggingDeadline: strings.loggingDeadline,
     removalDeadline: strings.removalDeadline,
     leaseDeadline: strings.leaseDeadline,
+    ...(storageLocationApproval !== '' ? { storageLocationApproval } : {}),
+    ...(removalRoads !== '' ? { removalRoads } : {}),
     propertyCount: typeof propertyCount === 'number' ? propertyCount : null,
     specialistId: strings.specialistId,
     descriptionPublic: strings.descriptionPublic,
