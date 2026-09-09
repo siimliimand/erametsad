@@ -300,7 +300,7 @@ export const ADMIN_MODULES: readonly AdminModuleDefinition[] = [
   { id: 'contracts', label: 'Lepingud', href: '/admin/contracts' },
   { id: 'leads', label: 'Juhtlõimed', href: '/admin/leads' },
   { id: 'inquiries', label: 'Päringud', href: '/admin/inquiries' },
-  { id: 'content', label: 'Sisu', href: '/admin/content' },
+  { id: 'content', label: 'Sisuhaldus', href: '/admin/content' },
   { id: 'statistics', label: 'Statistika', href: '/admin/statistics' },
   { id: 'settings', label: 'Seaded', href: '/admin/settings' },
   { id: 'audit-log', label: 'Auditlogi', href: '/admin/audit' },

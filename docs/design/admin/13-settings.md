@@ -29,10 +29,10 @@ Central configuration for the whole platform: identity defaults, fees, auction m
 ## Block-by-block spec
 1. **Üldine** — ettevõtte andmed (juriidiline nimi, registrikood, KMKR, aadress — feeds contract placeholders), alias e-posti domeen (`oksjonid.erametsad.ee`, validation: DNS MX check button), vaikimisi ajavöönd (locked Europe/Tallinn), toetus-e-post/telefon.
 2. **Tasud** — vaikimisi teenustasu % (decimal, 0–10), KM määr %, kiiroksjoni erinev tasu, min tasu € (optional floor), näidis-arvutus live: "100 000 € → tasu 3 000 € + KM 660 €". Per-lot overrides remain in 03.
-3. **Oksjonid** — anti-snipe vaikimisi minutid (1–30) + lubatud vahemik; automaatpakkuja sisse/välja (globaalne gate); alapakkumine: vaikimisi lubatud/lubamata uutel lottidel + müüja kinnitamise tähtaeg päevades; min oksjoni kestus; kiiroksjoni kestus (default 48h, allowed 24–72); sulenud pakkumiste paranduste arv (N revisions, default 0); kahe-osalise avamise reegel (kinnitaja roll: superadmin / teine admin).
+3. **Oksjonid** — anti-snipe vaikimisi minutid (1–30) + lubatud vahemik; automaatpakkuja sisse/välja (globaalne gate); alapakkumine: vaikimisi lubatud/lubamata uutel lottidel + **alapakkumise otsustähtaeg** päevades (müüja otsuse aken). Otsus (D-12): aegumise nimetused on eristatud — "alapakkumise otsustähtaeg" on müüja otsuse aken (see väli), "vastamise tähtaeg 7 pd" on teenusepäringu partneri vastuse aken (koodis), ja päringu aegumine on 14 pd (spec 10); "aegunud" tähendab ainult aegunud päringu olekut. Min oksjoni kestus; kiiroksjoni kestus (default 48h, allowed 24–72); sulenud pakkumiste paranduste arv (N revisions, default 0); kahe-osalise avamise reegel (kinnitaja roll: superadmin / teine admin).
 4. **Teavitused** — mallide editor: list of templates per event (new-matching-lot, outbid, won, lost, ending-24h, alapakkumine-decision, company-approved/rejected, contract-ready, kiiroksjon-result) × channel (e-post, SMS). Editor: subject + body, variable inserter ({{user.name}}, {{lot.name}}, {{amount}}, {{endTime}}, …), test-send to own address (uses dummy data), versioon + viimati muudetud. SMS counter (160-char segments).
-5. **Integratsioonid** — cards each: eID/allkirjastus (eID Easy), Äriregister, e-post (Mailgun), SMS (Messente), kaardid (LMV — keyless, status only). Per card: olek ●, viimane kontroll, **võtmed maskitud** (`sk-…••••4f2a`), rotate-väli (write-only), "Testi ühendust" button. Key values never rendered after save.
-6. **Rollid** — rollide nimistu (specialist, seller, admin, superadmin) + **vaikimisi õiguste maatriks**: read õigus (module/action), columns roles, checkbox matrix; per-role module visibility (which sidebar items render). Also: company-approval default rights set (which auction types auto-granted in 07); anomaly-heuristic thresholds (04); lead auto-assignment on/off + round-robin list order.
+5. **Integratsioonid** — env-backed key cards matching `admin/settings/_components/integration-keys.ts`: eID Easy (`EIDEASY_SECRET`), Cloudflare Email (`CLOUDFLARE_EMAIL_TOKEN`), SMTP (`SMTP_PASS` — varulülitus), Äriregister (`ARIREGISTER_API_KEY`), SMS (`SMS_API_KEY`), kaardiserver (`MAP_TILE_URL` — keyless by default, OpenStreetMap fallback). Per card: olek ●, viimane kontroll, võtme muutuja nimi + configured/unconfigured dot — the value itself is never rendered; "Testi ühendust" probe (credential-presence check or one lightweight GET). Otsus (D-8): e-posti transpordiks on Cloudflare Email (Workers `send_email` binding → Cloudflare Email Service), SMTP (nodemailer, nt Mailpit arenduses) on transpordiahela viimane lüli — Mailgun puudub. Otsus (D-9): keys live as environment variables, not DB-encrypted fields; the audited `settings.key_reveal` action is the single return path for a raw value (the audit entry names the key and its source, never the value); rotation stores a write-only override in the settings JSON with a mandatory reason.
+6. **Rollid** — rollide nimistu (specialist, seller, admin, superadmin) + **õiguste maatriks (kirjutuskaitstud)**: rows are the code-defined permission groups, columns roles, rendered from `admin/_lib/permissions.ts` (`ROLE_ALLOWED_PERMISSIONS`); per-role module visibility derives from the same registry (which sidebar items render). Otsus (D-10): the matrix is read-only and code-defined — no checkbox editing and no presets at launch (sites doc §7.2); an editable matrix stays later scope. Also: company-approval default rights set (which auction types auto-granted in 07); anomaly-heuristic thresholds are fixed in code (04, D-11); lead auto-assignment on/off + round-robin list order later scope.
 7. **Hooldus** — hooldusrežiim: planeeri aken (algus—lõpp) + koht: "Näita hooldusteateid ainult portaalis / kõigil saidil"; **konflikti hoiatus**: scheduler lists auctions ending inside the window (blocks saving until shifted or force-confirmed "Mõjutatud oksjoneid: 2 — jätkan siiski"); hoolduslehe tekst (rich). Manual "Alusta kohe" with typed reason.
 8. **Lipud (feature flags)** — toggle list with keys: `sealed_bids`, `sms_notifications`, `saved_search_digests`, `map_view`, `statistics_public`, `quick_auction`, `partner_portal`; each with description, roll (kasutajatele %-positsioneerimine ei ole vajalik — binäärne), muutmise põhjendusväli.
 
@@ -41,7 +41,7 @@ Central configuration for the whole platform: identity defaults, fees, auction m
 - Fee % change does NOT retro-affect active auctions (banner clarifies: "Kehtib uutele oksjonidele").
 - Anti-snipe change: default only; existing lots keep their per-lot value.
 - Maintenance window conflict check re-validates on save (race with newly scheduled lots).
-- Role matrix self-lockout guard: removing superadmin's own "Seaded" right is blocked.
+- Role matrix self-lockout guard (removing superadmin's own "Seaded" right) applies when the editable matrix ships (D-10).
 - Test-send never sends to real users; uses current superadmin address.
 
 ## Data & API
@@ -71,7 +71,7 @@ Most audit-sensitive module: every save logs actor, section, before/after (maske
 - Auto-end of window + manual "Lõpeta hooldus" (logged).
 
 ## Secrets handling
-Keys accepted via write-only inputs; stored encrypted at rest; rendered only as mask + last 4; rotation = new value + immediate test-button suggestion; audit logs record "key rotated" never the value. Env-var mode indicator if keys managed outside DB.
+Otsus (D-9): integration keys are environment variables (single source), not DB-encrypted fields; the card shows the variable name + configured dot and never a value. The audited `settings.key_reveal` action is the only return path for a raw value — the audit entry names the key, its env var, and the source (`env` | `settings`), never the value. Rotation = write-only override stored in the settings featureFlags JSON (`integrationKeySecrets`) with a mandatory reason; the override wins over the env var; audit logs record "rotated", never the value, and suggest an immediate "Testi ühendust" run.
 
 ## Accessibility & guardrails
 All inputs labelled; % fields with unit suffix; destructive toggles (maintenance, flags off) require typed keyword; unsaved-changes guard on section switch; admin read-only view disables inputs with explanatory banner.
@@ -88,13 +88,11 @@ Template list rows: sündmus · kanal (e-post/SMS) · versioon · viimati muudet
 ## States (full)
 - Save blocked (validation): inline errors per field; reason field empty blocks all saves.
 - Integration test pending: per-card spinner → "OK (212 ms)" / "Nurjus: {põhjus}".
-- Self-lockout guard message: "Seda õigust ei saa endalt eemaldada".
 - Admin read-only banner: "Muutmise õigus puudub — teavita superadminit".
 
 ## Rollid section detail (matrix interactions)
-- Checkbox grid; changing a checkbox marks the row dirty; save-all writes one audit entry with full before/after matrix.
-- Hovering a cell shows the permissions it grants as a tooltip ("sealed.open — näeb ja avab suletud pakkumisi (05)").
-- Preset buttons: "Vaikimisi soovitus" (plan §5.1 matrix) / "Kõik õigused superadminile" sanity restore.
+- Read-only grid rendered from `admin/_lib/permissions.ts`; cells show granted/denied per role; the superadmin column is always granted. Otsus (D-10): no checkbox editing, no presets, no per-cell saves — an editable matrix with the self-lockout guard stays later scope.
+- Hovering a cell shows the permission it grants as a tooltip ("sealed.open — näeb ja avab suletud pakkumisi (05)").
 - Sidebar rendering preview: mini mock of the shell showing which icons appear for the selected role.
 
 ## Open questions

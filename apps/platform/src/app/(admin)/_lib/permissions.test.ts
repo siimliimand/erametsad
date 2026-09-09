@@ -278,7 +278,7 @@ describe('module visibility map', () => {
       'Lepingud',
       'Juhtlõimed',
       'Päringud',
-      'Sisu',
+      'Sisuhaldus',
       'Statistika',
       'Seaded',
       'Auditlogi',

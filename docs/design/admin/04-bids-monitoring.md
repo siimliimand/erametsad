@@ -42,7 +42,7 @@ Mobile: feed single column, anomaly cards collapsible.
    - **IP klaster** — ≥2 distinct bidders sharing ip_hash prefix on this auction (list labels + bid times).
    - **Uute kontode pursked** — bidders with account age <7 days making ≥N bids (default 3).
    - **Kiire ületamise muster** — consecutive bids by two labels alternating within <10s ×5.
-   Each flag: [Märgi uurimiseks] (creates audit note + optional user flags in 06), [Avalda platvormile? — no: internal only]. Heuristics configurable in 13 (thresholds).
+   Each flag: [Märgi uurimiseks] (creates audit note + optional user flags in 06), [Avalda platvormile? — no: internal only]. Otsus (D-11): the thresholds are fixed code constants in `monitor/_lib/anomalies.ts`, matching the numbers above — IP klaster ≥2 distinct bidders on one IP hash; uute kontode pursked = account age < 7 days AND ≥ 3 bids; kiire ületamine = leading-bid flips between the same two bidders within < 10 s, 5 times. Heuristics stay advisory-only (they never block bids — admission remains server-authoritative in AuctionDO) and are not yet configurable in 13 (see Open questions).
 5. **Anti-snipe log** — append-only list: time, trigger bid id, +N min, new endTime; mirrors what bidders saw.
 6. **Lõpeta käsitsi** — modal per 02 (typed reason mandatory, outcome chooser, countdown re-check) — audit `auction.end_manual` with reason + actor.
 
@@ -67,7 +67,7 @@ No bids: "Pakkumisi veel ei ole" EmptyState. No anomalies: green "Anomaaliaid ei
 Audit-logged: identity reveals, alapakkumine approve/reject (reason), anomaly mark, manual end, export. Seller: no export, no identity (except alapakkumine), no anomaly heuristics.
 
 ## Global alapakkumised tab (`/pakkumised`)
-Cross-auction queue DataTable: columns Oksjon (id+nimi), Tüüp, Pakkuja (anon label; identity for admin/specialist), Summa €, % alghinnast (red if <50%), Esitatud, Ootel juba (SLA amber >24 h, red >72 h — seller decision deadline from settings 13), Müüja, Tegevused (Nõustu / Keeldu). Filters: auction type, county, age. Default sort oldest first. This is the seller's main screen (their own lots only).
+Cross-auction queue DataTable: columns Oksjon (id+nimi), Tüüp, Pakkuja (anon label; identity for admin/specialist), Summa €, % alghinnast (red if <50%), Esitatud, Ootel juba (SLA amber >24 h, red >72 h — the **alapakkumise otsustähtaeg** from settings 13), Müüja, Tegevused (Nõustu / Keeldu). Filters: auction type, county, age. Default sort oldest first. This is the seller's main screen (their own lots only). Otsus (D-12): expiry windows keep distinct names — "alapakkumise otsustähtaeg" (seller's underbid decision window, 13), "vastamise tähtaeg 7 pd" (service-request partner-response window, code), and the 14-pd service-request expiry (10); "aegunud" names only the expired-request state, never this SLA.
 
 ## Anomaly evidence detail
 Each expandable flag shows: affected anonymized labels (with bid-counts), ip_hash prefixes (2 chars visible), account creation dates, bid time deltas chart (mini timeline). All evidence internal-only; nothing is auto-published or auto-actioned — human decision required, per-legal-caution.
@@ -107,5 +107,5 @@ Feed rows have role="log" aria-live="polite" toggleable to "off"; anomaly cards 
 
 ## Open questions
 - Should accepted alapakkumine trigger autobidders (they'd instantly outbid)?
-- Thresholds for heuristics — tune after first real auctions; expose in 13?
+- Expose the fixed thresholds (D-11) as editable settings in 13, and tune them after the first real auctions?
 - Show sellers the anomaly heuristics on their own lots (transparency vs. gaming risk)?
