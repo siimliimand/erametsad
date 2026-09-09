@@ -19,6 +19,7 @@ import {
   parseAuctionDefaults,
   parseFlagObject,
   readFlagObject,
+  settingsBounds,
   withAuctionDefaults,
 } from '../admin/content/_components/settings-audit'
 
@@ -427,7 +428,10 @@ export async function savePageAction(formData: FormData): Promise<void> {
   const errorPath = formPath(pagesPath, id)
   const title = readText(formData, 'title')
   const slug = readText(formData, 'slug')
-  const status = readText(formData, 'status') as ContentStatus
+  // The editor's Ajasta button submits intent=schedule with no status field;
+  // publishing semantics stay with resolvePublishDecision below.
+  const scheduleIntent = readText(formData, 'intent') === 'schedule'
+  const status = (scheduleIntent ? 'published' : readText(formData, 'status')) as ContentStatus
   const layout = readJsonValue(formData, 'layout')
 
   if (!title) redirectWithError(errorPath, 'Pealkiri on kohustuslik.')
@@ -438,6 +442,9 @@ export async function savePageAction(formData: FormData): Promise<void> {
   await publishDueScheduledContent(repositories, session.userId)
 
   const publishAtIso = readPublishAt(formData, errorPath, 'Avaldamise aeg')
+  if (scheduleIntent && (publishAtIso === null || publishAtIso <= new Date().toISOString())) {
+    redirectWithError(errorPath, 'Ajastamiseks vali tulevikus olev avaldamise aeg.')
+  }
   const current = id
     ? await persist(errorPath, 'Lehe lugemine ebaõnnestus: ', () =>
         repositories.findByID({ collection: 'pages', id }),
@@ -1260,8 +1267,12 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
   } else if (section === 'tasud') {
     const feePercent = readInt(formData, 'feePercent')
     const vatPercent = readInt(formData, 'vatPercent')
-    if (!Number.isInteger(feePercent) || feePercent < 0 || feePercent > 100) {
-      redirectWithError(settingsPath, 'Vahendustasu peab olema täisarv vahemikus 0 kuni 100.')
+    const { feePercent: feeBounds } = settingsBounds
+    if (!Number.isInteger(feePercent) || feePercent < feeBounds.min || feePercent > feeBounds.max) {
+      redirectWithError(
+        settingsPath,
+        `Vahendustasu peab olema täisarv vahemikus ${String(feeBounds.min)} kuni ${String(feeBounds.max)}.`,
+      )
     }
     if (!Number.isInteger(vatPercent) || vatPercent < 0 || vatPercent > 100) {
       redirectWithError(settingsPath, 'Käibemaks peab olema täisarv vahemikus 0 kuni 100.')

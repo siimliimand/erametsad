@@ -24,6 +24,7 @@ export interface AuctionDefaults {
 
 /** Inclusive [min, max] bounds per task 6.2 and design 13. */
 export const settingsBounds = {
+  feePercent: { min: 0, max: 10, default: 3 },
   antiSnipeDurationMinutes: { min: 1, max: 30, default: 5 },
   alapakkumineDecisionDeadlineDays: { min: 1, max: 14, default: 3 },
   sealedRevisionCap: { min: 0, max: 5, default: 3 },

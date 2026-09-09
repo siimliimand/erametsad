@@ -211,10 +211,10 @@ export function SettingsForm({
                   name="feePercent"
                   type="number"
                   min="0"
-                  max="100"
+                  max="10"
                   step="1"
                   required
-                  hint="Kehtib ainult uutele oksjonidele."
+                  hint="Vahemikus 0–10%. Kehtib ainult uutele oksjonidele."
                   defaultValue={settings?.feePercent ?? 3}
                 />
                 <FormField

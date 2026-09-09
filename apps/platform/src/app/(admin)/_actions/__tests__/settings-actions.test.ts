@@ -158,6 +158,34 @@ describe('updateSettingsAction (audited saves)', () => {
     expect(url.searchParams.get('ok')).toBe('tasud')
   })
 
+  it('rejects fees outside the 0-10 percent bounds', async () => {
+    for (const feePercent of ['11', '-1', '100']) {
+      const url = await redirectOf(() =>
+        updateSettingsAction(
+          form({ section: 'tasud', reason: 'seadete muutus', feePercent, vatPercent: '22' }),
+        ),
+      )
+      expect(url.searchParams.get('viga')).toBe('Vahendustasu peab olema täisarv vahemikus 0 kuni 10.')
+    }
+    expect(repos.updates).toEqual([])
+    expect(repos.creates).toEqual([])
+  })
+
+  it('saves fees at both bounds of the 0-10 range', async () => {
+    repos.settingsRow.feePercent = 5
+    repos.settingsRow.vatPercent = 22
+
+    for (const feePercent of ['0', '10']) {
+      const url = await redirectOf(() =>
+        updateSettingsAction(
+          form({ section: 'tasud', reason: 'piirväärtuse salvestus', feePercent, vatPercent: '22' }),
+        ),
+      )
+      expect(repos.updates.at(-1)?.data).toMatchObject({ feePercent: Number(feePercent) })
+      expect(url.searchParams.get('ok')).toBe('tasud')
+    }
+  })
+
   it('saves the Oksjonid defaults into the reserved flag key and audits both snapshots', async () => {
     repos.settingsRow.featureFlags = { auctionDefaults: { old: true } }
 
