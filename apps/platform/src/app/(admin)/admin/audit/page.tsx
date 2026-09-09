@@ -1,4 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1'
+import { Download as DownloadIcon } from 'lucide-react'
 import Link from 'next/link'
 
 import {
@@ -15,6 +16,7 @@ import {
 } from './_components/action-registry'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
+import { secondaryButtonClass } from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
 import { requireAdminRepositories } from '../../_lib/admin'
 import { formatDateTime, userRoleLabels } from '../../_lib/labels'
@@ -278,6 +280,15 @@ export default async function AdminAuditPage({
     return qs === '' ? '/admin/audit' : `/admin/audit?${qs}`
   }
 
+  // Export link reuses the list's shareable filter parameters; `entry` is a
+  // drawer deep-link, not a filter, so it stays out (same pattern as the
+  // auctions list csvHref).
+  const csvParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(currentValues)) {
+    if (key !== 'entry' && value) csvParams.set(key, value)
+  }
+  const csvHref = `/api/v1/admin/audit/export/csv?${csvParams.toString()}`
+
   const filterSelectClass =
     'h-9 rounded-input border border-border bg-bgPage px-2 text-bodySm text-ink'
   const activeFilterCount = [
@@ -291,7 +302,18 @@ export default async function AdminAuditPage({
 
   return (
     <div>
-      <PageHeader title="Auditlogi" description="Personalitegevuste muutumatu jälg." />
+      <PageHeader
+        title="Auditlogi"
+        description="Personalitegevuste muutumatu jälg."
+        actions={
+          isSuper ? (
+            <a href={csvHref} className={secondaryButtonClass}>
+              <DownloadIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+              Ekspordi filtreeritud CSV
+            </a>
+          ) : null
+        }
+      />
       <p className="mb-md rounded-card border border-border bg-bgMist px-md py-sm text-bodySm text-ink-muted">
         {BANNER} {selfView ? SELF_VIEW_NOTE : null}
       </p>

@@ -38,8 +38,8 @@ const REASON_MIN_LENGTH = 5
 
 const REQUESTS_PATH = '/admin/leads/requests'
 const LEADS_PATH = '/admin/leads'
-const SERVICE_REQUESTS_PATH = '/admin/requests'
-const PARTNERS_PATH = '/admin/requests/partners'
+const SERVICE_REQUESTS_PATH = '/admin/inquiries'
+const PARTNERS_PATH = '/admin/inquiries/partners'
 
 function readText(formData: FormData, key: string): string {
   const value = formData.get(key)

@@ -10,9 +10,9 @@ import type { AuditEntryDoc, UserDoc } from '@/lib/data/repositories'
 
 /**
  * Pure helpers for the audit CSV/JSON export routes (task 15.4). Filtering
- * mirrors the audit list page exactly: same fetch bound, same filter set,
- * same self-view rule (an admin only ever exports its own entries; a
- * superadmin sees all). The CSV uses a semicolon delimiter and a UTF-8 BOM
+ * mirrors the audit list page exactly: same fetch bound, same filter set.
+ * The routes gate to superadmin, so the actor filter resolves the superadmin
+ * view (any actor). The CSV uses a semicolon delimiter and a UTF-8 BOM
  * because Estonian Excel treats the comma as the decimal separator — the
  * same convention as the leads and auctions exports.
  */
@@ -78,10 +78,9 @@ export function parseAuditExportFilters(params: URLSearchParams): AuditExportFil
 }
 
 /**
- * Self-view scoping, the same rule the list page applies: an admin sees
- * only its own entries regardless of the actor param; a superadmin may
- * filter by any actor. Specialist and seller never reach this point
- * (no audit:read).
+ * Actor scoping by role. Both export routes admit only a superadmin, so in
+ * practice this resolves the superadmin view (the chosen actor or all).
+ * Kept role-aware so a future gate change cannot silently widen the view.
  */
 export function resolveActorFilter(
   role: StaffRole,

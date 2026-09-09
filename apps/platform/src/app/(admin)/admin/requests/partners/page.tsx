@@ -1,5 +1,11 @@
 import { redirect } from 'next/navigation'
 
-export default function PartnersRedirectPage() {
-  redirect('/admin/inquiries/partners')
+import { forwardLegacyQuery } from '../_components/forward-legacy-query'
+
+export default async function PartnersRedirectPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  redirect(`/admin/inquiries/partners${forwardLegacyQuery(await searchParams)}`)
 }
