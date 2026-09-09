@@ -28,43 +28,21 @@ error.
 
 ### Requirement: AdminShell chrome
 
-The admin SHALL render inside a shell with a 56px icon sidebar listing the
-13 modules (Töölaud, Oksjonid, Pakkumised, Sul. avamine, Kasutajad,
-Ettevõtted, Lepingud, Juhtlõimed, Päringud, Sisu, Statistika, Seaded,
-Auditlogi) with tooltips and an active-state indicator, and a topbar with an
-environment badge, a notification bell with an unread count, and the user
-menu. Modules hidden for the current role SHALL not render. Labels SHALL be
-in Estonian.
+The shell SHALL keep the 13-module icon rail, and in addition:
 
-The sidebar SHALL render on a white surface with a right border, muted
-icons, tint hover and active states, and a 3px primary-color active
-indicator on the rail's left edge, matching
-`docs/design/demo/admin/index.html`. The topbar SHALL be sticky at 64px
-height and show the brand title "Erametsad haldus" beside the environment
-badge, the operator's name and role chip visible in the topbar, and a
-global search bar rendered as a non-functional stub with a ⌘K hint. The
-environment badge SHALL use semantic colors (development red, test amber)
-and stay hidden in production. The main workspace SHALL use a 1400px
-container with the admin density token scale.
+- the ⌘K command palette SHALL list jump targets for all 13 modules;
+- the environment badge SHALL distinguish PROD, STAGE, and dev/test;
+- the CMS nav label SHALL read "Sisuhaldus".
 
-#### Scenario: Specialist sidebar
+#### Scenario: Palette covers every module
 
-- **WHEN** a specialist loads the admin
-- **THEN** governance modules that the role cannot use are absent from
-  the sidebar and deep-linking to their routes is rejected
+- **WHEN** the operator opens the ⌘K palette
+- **THEN** a jump target exists for each of the 13 nav modules
 
-#### Scenario: Active rail item
+#### Scenario: Stage badge
 
-- **WHEN** the operator is on a page inside the Oksjonid module
-- **THEN** the Oksjonid rail icon renders with the primary icon color, the
-  strong tint background, and the 3px primary indicator on the rail's left
-  edge
-
-#### Scenario: Search stub is not a dead affordance
-
-- **WHEN** the operator focuses or activates the topbar search bar
-- **THEN** the input stays disabled, performs no request, and no error or
-  empty result state is shown
+- **WHEN** the app runs in a staging deployment
+- **THEN** the topbar shows a STAGE badge, and PROD shows no badge
 
 ### Requirement: Notification bell
 
@@ -127,4 +105,39 @@ module's rail badge.
 - **WHEN** a sealed auction ends
 - **THEN** it appears in the sealed-opening list and the rail badge
   count increases
+
+### Requirement: Impersonation banner shows session expiry
+
+The impersonation banner SHALL display the remaining session time as a
+countdown while an admin views the system as a user.
+
+#### Scenario: Countdown visible
+
+- **WHEN** an impersonation session is active
+- **THEN** the banner shows whose view it is and the remaining minutes
+
+### Requirement: Dashboard parity
+
+Töölaud SHALL follow the documented semantics: the "Lõpevad täna" window is
+the Europe/Tallinn calendar day, the ending-today KPI is amber when the count
+is greater than 0, bids-today shows a 7-day sparkline, pending confirmations
+are red only when greater than 0, new-lead counting is today AND (unassigned
+OR status uus), the fee KPI excludes VAT, the recent-leads block shows the 8
+newest leads with county and specialist chips linking to Juhtlõimed, and
+Süsteemi tervis is visible to admins and superadmins only.
+
+#### Scenario: Calendar-day window
+
+- **WHEN** an auction ends tomorrow at 00:30 Europe/Tallinn
+- **THEN** it is not counted in "Lõpevad täna" today
+
+#### Scenario: Amber KPI
+
+- **WHEN** at least one auction ends today
+- **THEN** the KPI card renders amber
+
+#### Scenario: Lead count filter
+
+- **WHEN** an unassigned lead from today sits in status Võetud ühendust
+- **THEN** the "Uued juhtlõimed" KPI counts it
 

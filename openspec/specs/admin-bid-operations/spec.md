@@ -5,49 +5,37 @@ TBD - created by archiving change phase-5-admin-backend. Update Purpose after ar
 ## Requirements
 ### Requirement: Live bid monitoring
 
-The per-auction monitor SHALL show a server-synced countdown, the
-leading bid with the margin to the next step, a live SSE feed
-(newest first) with source chips (käsitsi/automaat) and status chips,
-a pause control, an anti-snipe extension log, and reconnect with
-`?since=` backfill after a dropped connection. Sealed lots SHALL show
-the encrypted-bid count instead of the feed. Specialists SHALL see only
-their own lots' monitors.
+The bid monitor SHALL additionally provide:
 
-#### Scenario: Feed recovers after a connection drop
+- a bids CSV export ("Ekspordi pakkumiste logi") with the documented columns
+  and an audit entry carrying the row count;
+- an alapakkumised block with a "Vaata kõik" link on the monitor itself;
+- an accept confirmation modal naming the resulting leading amount;
+- a green "Anomaaliaid ei tuvastatud" zero state;
+- a link from the sealed-bid count to the opening ceremony;
+- the revealed identity chip linking to the user detail in Kasutajad.
 
-- **WHEN** the SSE connection drops and reconnects after 60 seconds
-- **THEN** bids missed during the gap are backfilled from the repository
-  and marked as loaded late
+#### Scenario: Export is audited
 
-#### Scenario: Anti-snipe extension is visible
+- **WHEN** an admin exports the bid log
+- **THEN** the download starts and an audit entry records the row count
 
-- **WHEN** a bid inside the anti-snipe window extends the end time
-- **THEN** the countdown updates and the extension log gains an entry
-  with the trigger bid, the extension, and the new end time
+#### Scenario: Accept confirm
+
+- **WHEN** the operator accepts an alapakkumine of 12 000 €
+- **THEN** a confirm dialog states that 12 000 € becomes the leading bid
 
 ### Requirement: Alapakkumine queues and decisions
 
-Alapakkumine decisions SHALL be available per auction and in a global
-cross-auction queue with SLA badges computed from the Settings deadline
-(amber beyond the deadline, red beyond twice the deadline). Approve
-SHALL make the bid leading and notify all parties; reject SHALL require
-a typed reason and notify the bidder with that reason. Sellers SHALL
-see the queue for their own lots only. Every decision SHALL be
-audit-logged, and a second decision attempt on the same bid SHALL
-report the earlier decision instead of failing.
+Rejecting an alapakkumine SHALL require a typed reason (minimum 5 chars) on
+every path, the reason SHALL be stored in the audit entry, and the bidder
+notification SHALL include the reason text.
 
-#### Scenario: Reject requires a reason
+#### Scenario: Per-lot reject requires a reason
 
-- **WHEN** the operator rejects an alapakkumine with an empty reason
-- **THEN** the action is blocked until a reason of at least 5 characters
-  is entered
-
-#### Scenario: Double decision race
-
-- **WHEN** two operators decide the same alapakkumine and the second
-  submit arrives after the first succeeded
-- **THEN** the second operator sees the first decision with its actor
-  and time, and no second state change occurs
+- **WHEN** the operator rejects an alapakkumine from the auction detail block
+  without a reason
+- **THEN** the submit is blocked
 
 ### Requirement: Identity reveal is audited
 
@@ -65,46 +53,32 @@ their own lots.
 
 ### Requirement: Sealed-opening ceremony
 
-The ceremony screen for an ended sealed auction SHALL enforce:
-- a precondition checklist (ending worker completed with its
-  idempotency key, no pending alapakkumised, an active contract
-  template with a warning when it changed within 24 hours of auction
-  start);
-- a two-person rule with typed keyword confirmation and signatures
-  valid for 30 minutes from distinct sessions;
-- a one-shot simultaneous reveal presenting all bids ranked by amount
-  descending with ties ordered by earliest submission and invalid bids
-  greyed with a reason;
-- winner confirmation against the reserve with sold, unsold, and
-  (superadmin-only) kiiroksjon house-backup paths;
-- a void path with a typed reason before winner confirmation;
-- step-up re-authentication by the opener at winner confirmation.
+The ceremony SHALL additionally:
 
-Every checklist confirmation, signature, reveal, confirmation, and void
-SHALL write an audit entry. After the reveal the page SHALL become a
-permanent read-only record. The reveal SHALL be disabled until 60
-seconds after the recorded end time.
+- enforce the approver role configured in Seaded for the second signature;
+- render the reveal table with Pakkuja (identity with masked code, company
+  chip, user link) and Marginaal (gap to next) columns after the reveal;
+- show a winner-confirmation modal with the winner, final price, and fee
+  estimate;
+- notify the winner and the seller with the fee estimate when the winner is
+  confirmed;
+- force an explicit choice when a company bid awaits profile approval;
+- offer "Märgi müümata" from the pre-flight checklist for lots with zero
+  valid bids under single-admin rules;
+- show a read-only "Avamine on pooleli" state to other admins while the
+  ceremony is in progress.
 
-#### Scenario: Tie broken by earliest submission
+#### Scenario: Approver role mismatch
 
-- **WHEN** two sealed bids carry the same top amount
-- **THEN** the earlier submission is ranked first and marked with the
-  tie badge
+- **WHEN** the configured approver role is superadmin and an admin attempts
+  to approve
+- **THEN** the approval is rejected with a role error
 
-#### Scenario: Reserve not met
+#### Scenario: Reveal table identity
 
-- **WHEN** the top bid is below the reserve price and the operator
-  confirms
-- **THEN** only the unsold path (or the kiiroksjon house-backup path for
-  a superadmin on a kiiroksjon) is offered, the lot moves to unsold,
-  and the seller is notified
-
-#### Scenario: Ceremony is locked to participants
-
-- **WHEN** another admin opens the ceremony page after two signatures
-  are recorded
-- **THEN** the page renders read-only showing the ceremony participants
-  and state
+- **WHEN** the reveal completes
+- **THEN** each ranked row shows the bidder identity with the code masked and
+  the margin to the next bid
 
 ### Requirement: Under-bid queue parity
 
@@ -118,4 +92,18 @@ decisions.
 - **WHEN** an operator rejects a pending under-bid
 - **THEN** the shared confirm dialog enforces a reason of at least 5
   characters and the decision is audited
+
+### Requirement: Anomaly heuristics
+
+The monitor SHALL flag: same-IP clusters (two or more bidders sharing an IP
+hash), account-age bursts (accounts younger than 7 days placing 3 or more
+bids), and rapid overtakes (alternating bids within 10 seconds, 5 times).
+Anomaly cards SHALL be expandable with the affected labels, bid counts, IP
+prefixes, and bid-time deltas, SHALL be hidden from sellers, and SHALL offer
+"Märgi uurimiseks".
+
+#### Scenario: IP cluster flagged
+
+- **WHEN** two bidders share an IP hash on the same auction
+- **THEN** an "IP klaster" anomaly card appears with both bidder labels
 

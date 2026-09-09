@@ -5,136 +5,80 @@ TBD - created by archiving change phase-5-admin-backend. Update Purpose after ar
 ## Requirements
 ### Requirement: Auctions list operations
 
-The auctions list SHALL provide type tabs with counts (including a
-cross-type Kiiroksjonid tab), URL-shareable filters (status, type,
-specialist, county, end-date range, freetext over id, name, cadastral
-number, registry number, and alias email), server-side pagination at 25
-rows, a live countdown column with pending-alapakkumine markers, and row
-actions: end-manually, archive, and re-list/clone. Specialists SHALL see
-only their own lots and SHALL NOT see the end-manual action.
+The auctions list SHALL additionally provide:
 
-The list SHALL present the demo layout
-(`docs/design/demo/admin/02-auctions-list.html`):
+- an "ha / m³" column rendered from real area/volume values;
+- a toggleable "Uuendatud" column;
+- default sort: active lots by endsAt ascending, all other filters by id
+  descending;
+- a Kiiroksjonid tab filtered by `isQuickAuction = true` across object types;
+- archive permitted from ended, unsold, and completed lots.
 
-- Type tabs render as pill buttons with count badges; the active tab
-  carries the pressed state. Tab selection remains a URL filter.
-- Filters render as a chip filter bar: chip-wrapped selects (Olek keeps
-  its multi-select), an inline date-range chip, a pill search input, and
-  a clear action showing the active-filter count. Filter URL parameters
-  are unchanged.
-- The table supports working sort on ID, Nimi, Alghind, Pakkumisi, and
-  Lõpp. Defaults are unchanged: `endsAt` ascending when exactly the
-  active status is filtered, otherwise newest first.
-- Row actions appear on row hover or keyboard focus and include the
-  portal "Vaata" link, Muuda, Dupl., and the role-gated end/archive/
-  re-list controls; quick auctions carry a zap marker; specialists
-  render as initials avatars; bid counts keep the pending alapakkumine
-  marker.
-- The countdown ticks client-side for active auctions, shows a critical
-  state under five minutes, and exposes the full end time via
-  `aria-label`.
-- Row selection drives a fixed bulk bar showing the selected count with
-  the "Ajasta avaldimine" and "Ekspordi valitud" actions; the bar is
-  hidden when nothing is selected.
-- Manual end opens a guarded modal: an irreversibility warning, an
-  auction context line, the outcome choice (declare the leading bid
-  winner, or mark unsold), and a required reason of at least five
-  characters, wrapping the existing server action and its audit entry.
+#### Scenario: Quick-auction tab is cross-type
 
-#### Scenario: Manual end with reason and outcome
+- **WHEN** a raieõigus lot has `isQuickAuction = true`
+- **THEN** it appears under the Kiiroksjonid tab
 
-- **WHEN** an admin ends an active auction manually through the modal
-  with a typed reason and chooses an outcome (declare leading bid
-  winner, or mark unsold)
-- **THEN** the auction ends through the server-authoritative path, the
-  outcome is applied, and an `auction.end_manual` audit entry records
-  the actor, reason, and outcome
+#### Scenario: Default sort
 
-#### Scenario: Manual end modal blocks short reasons
-
-- **WHEN** the operator submits the end-manual modal with a reason
-  shorter than five characters
-- **THEN** the submission is blocked with the hint to write at least
-  five characters and no state changes
-
-#### Scenario: Filters are shareable
-
-- **WHEN** an operator copies the list URL after filtering by county and
-  status and opens it in a new session
-- **THEN** the same filter set is applied from the URL parameters
-
-#### Scenario: Sort toggle preserves filters
-
-- **WHEN** the operator sorts by Alghind while county and status filters
-  are active
-- **THEN** the list re-sorts and both filters remain applied
-
-#### Scenario: Bulk bar follows selection
-
-- **WHEN** the operator selects two draft rows
-- **THEN** the bulk bar appears showing the count of two with the
-  schedule and export actions, and disappears when the selection is
-  cleared
-
-#### Scenario: Countdown critical state
-
-- **WHEN** an active auction has fewer than five minutes remaining
-- **THEN** its countdown renders in the critical style with the full end
-  time available to assistive technology via `aria-label`
+- **WHEN** the operator opens the list with no explicit sort and the status
+  filter is active
+- **THEN** the lot ending soonest is listed first
 
 ### Requirement: Seven-step auction editor
 
-Lot create and edit SHALL use a wizard with steps Tüüp & mehaanika,
-Asukoht, Maa & mets, Hind, Sisu, Pakett, and Ülevaade. The wizard SHALL
-enforce: sealed is forced (and open disabled) for property, field, and
-package object types; kiiroksjon defaults to a 48-hour window with a
-€1 minimum bid and a required secret reserve; anti-snipe is toggleable
-with minutes from Settings (range 1-30); times validate against
-Europe/Tallinn; cadastral numbers match `NNNNN:NNN:NNNN`; the county
-select cascades into the parish select; the reserve price is write-only
-and masked after first save; the fee override is visible to admin+
-only. Step 6 renders only for package lots. The Ülevaade step SHALL
-show a cross-step validation summary where each failure links to its
-step and field, and publishing SHALL be blocked while required gates
-fail.
+The editor SHALL additionally:
 
-#### Scenario: Sealed is forced for a property lot
+- gate publishing on: specialist set, start time at least 10 minutes in the
+  future, and area greater than 0;
+- offer three distinct actions: Salvesta mustandina, Ajasta, Avalda kohe;
+- show the reserve (piirhind) field only for sealed and kiiroksjon lots;
+- allow an admin to edit the end time of a locked scheduled or active lot,
+  with the change audit-logged;
+- provide a read-only field summary in step 7 and a two-column diff against
+  the published version when editing a published lot;
+- persist kooskõlastused and väljaveoteed from step 3;
+- gate the lease deadline field behind a rendi-/kasutusleping checkbox and
+  build the Metsaregister link from the first registry number.
 
-- **WHEN** the operator selects object type property
-- **THEN** the auction type locks to sealed and open is disabled with an
-  explanatory tooltip
+#### Scenario: Publish gate blocks without specialist
 
-#### Scenario: Validation gate blocks publish
+- **WHEN** the operator publishes a lot with no responsible specialist
+- **THEN** publishing is blocked and step 5 is marked defective
 
-- **WHEN** the operator attempts to publish with a missing alt text and
-  an invalid cadastral number
-- **THEN** publish is blocked and the summary lists both failures with
-  links to the exact fields
+#### Scenario: Reserved diff masks the reserve
+
+- **WHEN** the step-7 diff includes a changed reserve price
+- **THEN** the old and new values render as "muudetud (varjatud)"
 
 ### Requirement: Editor media pipeline
 
-Editor uploads SHALL generate renditions (hero 1600x1000, gallery
-1200x750, thumb 350x175), accept jpg/png/webp up to 15 MB with a
-minimum width of 1200px, restrict file attachments to PDF with a tag
-select, and require alt text on every image before publish.
+The editor SHALL upload images and PDFs through a server endpoint that stores
+them and generates the documented renditions, replacing URL pasting.
 
-#### Scenario: Publish blocked without alt text
+#### Scenario: Upload validates and stores
 
-- **WHEN** a gallery image has no alt text and the operator publishes
-- **THEN** the validation gate fails and names the image
+- **WHEN** the operator uploads a 15 MB JPEG with alt text
+- **THEN** the image is stored, renditions are queued, and the lot references
+  the stored media id
 
 ### Requirement: Bulk schedule and CSV export
 
-The list SHALL support bulk scheduling of draft lots to a shared start
-time with validation that blocks non-draft selections, and CSV export
-of the current filter or selection including cadastres, registry
-numbers, finalPrice, and fee. Both actions SHALL be audit-logged.
+Bulk scheduling SHALL present the Ajasta avaldamine modal with a per-row
+end-time preview and an "nihuta kõiki lõppe ×h" offset control that preserves
+individual end-time offsets, and "Ekspordi valitud" SHALL export exactly the
+selected ids.
 
-#### Scenario: Bulk schedule validates selection
+#### Scenario: Offset schedule
 
-- **WHEN** the selection contains an active lot and the operator
-  schedules the drafts
-- **THEN** the action is rejected with a message naming the blocking lot
+- **WHEN** the operator shifts all start times by +2 hours with the offset
+  control
+- **THEN** each end time shifts by the same 2 hours
+
+#### Scenario: Selection export
+
+- **WHEN** three rows are selected and the operator clicks Ekspordi valitud
+- **THEN** the CSV contains exactly those three lots
 
 ### Requirement: Guest preview token
 
@@ -148,18 +92,15 @@ for 24 hours that renders the unpublished lot on the portal layout.
 
 ### Requirement: Auction wizard chrome and draft autosave
 
-The auction wizard SHALL render the demo editor bar (auction id in mono,
-status pill, autosave indicator with a ping on each save, portal preview
-link) and a step rail with per-step status marks: done, current, todo,
-and disabled (hidden Pakett step), plus a defect count footer. The wizard
-SHALL autosave the in-progress draft to localStorage, offer restore on
-return, and warn on unload when dirty. Durable saving stays on submit.
+The wizard SHALL autosave drafts to the server (10 s idle, step change, or
+blur), show a server-backed "Salvatud HH:MM" indicator, and show a conflict
+banner with a lock option when another staff member has unsaved changes to
+the same lot.
 
-#### Scenario: Operator leaves and returns
+#### Scenario: Conflict banner
 
-- **WHEN** an operator with an unsaved wizard draft reopens the form
-- **THEN** a restore prompt offers the local draft and submission still
-  remains the authoritative save
+- **WHEN** another specialist saves the same draft while the wizard is open
+- **THEN** the wizard shows the conflict banner and offers to take the lock
 
 ### Requirement: Auctions list parity
 
