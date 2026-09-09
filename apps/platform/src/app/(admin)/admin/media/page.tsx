@@ -55,7 +55,8 @@ export default async function AdminMediaPage({
           <FormField
             label="Alt-tekst"
             name="alt"
-            hint="Kirjeldus pildile ekraanilugejatele."
+            required
+            hint="Kohustuslik piltide puhul; kirjeldus ekraanilugejatele."
           />
           <button type="submit" className={primaryButtonClass}>
             Laadi üles
