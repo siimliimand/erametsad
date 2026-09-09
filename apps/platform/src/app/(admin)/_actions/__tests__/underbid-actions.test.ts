@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { approveUnderbidAction, rejectUnderbidAction } from '../auctions'
+import { approveUnderbidAction, rejectAuctionBidAction, rejectUnderbidAction } from '../auctions'
 
 import type { ApproveDecision, RejectDecision } from '@/lib/bidding/alapakkumine'
 import { approveAlapakkumine, rejectAlapakkumine } from '@/lib/bidding/alapakkumine'
@@ -281,7 +281,7 @@ describe('rejectUnderbidAction', () => {
       rejectUnderbidAction(form({ auctionId: 'auction-1', bidId: 'bid-1', reason: 'pakkumus alla miinimumi' })),
     )
 
-    expect(rejectMock).toHaveBeenCalledWith('auction-1', 'bid-1')
+    expect(rejectMock).toHaveBeenCalledWith('auction-1', 'bid-1', 'pakkumus alla miinimumi')
     expect(guarded.creates[0]?.data).toMatchObject({
       actorId: 'admin-1',
       action: 'bid.reject',
@@ -290,6 +290,15 @@ describe('rejectUnderbidAction', () => {
       after: { auctionId: 'auction-1', amountEur: 80, reason: 'pakkumus alla miinimumi', bidderNotified: true },
     })
     expect(url.searchParams.get('teade')).toBe('Alapakkumus tagasi lükatud; pakkuja teavitatud põhjusega.')
+  })
+
+  it('rejects a missing reason before touching the domain', async () => {
+    useTrusted({ auction })
+    const url = await redirectOf(() =>
+      rejectUnderbidAction(form({ auctionId: 'auction-1', bidId: 'bid-1' })),
+    )
+    expect(url.searchParams.get('viga')).toBe('Kirjuta põhjus (vähemalt 5 tähemärki).')
+    expect(rejectMock).not.toHaveBeenCalled()
   })
 
   it('rejects a reason shorter than 5 characters before touching the domain', async () => {
@@ -320,5 +329,66 @@ describe('rejectUnderbidAction', () => {
     )
 
     expect(url.searchParams.get('viga')).toMatch(/^Juba otsustatud \(Kaire Kask/)
+  })
+})
+
+describe('rejectAuctionBidAction (per-lot path)', () => {
+  let guarded: Repos
+
+  beforeEach(() => {
+    state.session = { userId: 'admin-1', role: 'admin' }
+    approveMock.mockReset()
+    rejectMock.mockReset()
+    guarded = makeRepos()
+    state.repositories = guarded
+  })
+
+  it('blocks a missing reason before touching the domain', async () => {
+    const url = await redirectOf(() =>
+      rejectAuctionBidAction(form({ auctionId: 'auction-1', bidId: 'bid-1' })),
+    )
+    expect(url.pathname).toBe('/admin/auctions/auction-1')
+    expect(url.searchParams.get('viga')).toBe('Kirjuta põhjus (vähemalt 5 tähemärki).')
+    expect(rejectMock).not.toHaveBeenCalled()
+    expect(guarded.creates).toEqual([])
+  })
+
+  it('blocks a reason shorter than 5 characters before touching the domain', async () => {
+    const url = await redirectOf(() =>
+      rejectAuctionBidAction(form({ auctionId: 'auction-1', bidId: 'bid-1', reason: 'ei' })),
+    )
+    expect(url.searchParams.get('viga')).toBe('Kirjuta põhjus (vähemalt 5 tähemärki).')
+    expect(rejectMock).not.toHaveBeenCalled()
+    expect(guarded.creates).toEqual([])
+  })
+
+  it('carries a valid reason into the domain call and the bid_rejected audit entry', async () => {
+    rejectMock.mockResolvedValue(rejectedDecision)
+
+    const url = await redirectOf(() =>
+      rejectAuctionBidAction(form({ auctionId: 'auction-1', bidId: 'bid-1', reason: 'pakkumus alla miinimumi' })),
+    )
+
+    expect(rejectMock).toHaveBeenCalledWith('auction-1', 'bid-1', 'pakkumus alla miinimumi')
+    expect(guarded.creates[0]?.data).toMatchObject({
+      actorId: 'admin-1',
+      action: 'bid_rejected',
+      entityType: 'bid',
+      entityId: 'bid-1',
+      after: { auctionId: 'auction-1', amountEur: 80, reason: 'pakkumus alla miinimumi', bidderNotified: true },
+    })
+    expect(url.pathname).toBe('/admin/auctions/auction-1')
+    expect(url.searchParams.get('teade')).toBe('Alapakkumus tagasi lükatud; pakkuja teavitatud põhjusega.')
+  })
+
+  it('maps a losing race to the not-pending error without an audit entry', async () => {
+    rejectMock.mockResolvedValue({ outcome: 'not_pending', status: 'pending_approval' })
+
+    const url = await redirectOf(() =>
+      rejectAuctionBidAction(form({ auctionId: 'auction-1', bidId: 'bid-1', reason: 'pakkumus alla miinimumi' })),
+    )
+
+    expect(url.searchParams.get('viga')).toBe('Pakkumus ei ole enam kinnitamisel (hetke olek: pending_approval).')
+    expect(guarded.creates).toEqual([])
   })
 })

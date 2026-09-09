@@ -23,6 +23,7 @@ import {
   type AuctionWriteData,
 } from '../admin/auctions/_lib/auction-schema'
 import { tallinnWallTimeToUtcIso } from '../admin/content/_components/scheduled-publish'
+import { readAuctionDefaults } from '../admin/content/_components/settings-audit'
 
 import { verifyAdminAccessToken } from '@/lib/auth/jwt'
 import { verifyPassword } from '@/lib/auth/password'
@@ -1008,8 +1009,12 @@ export async function rejectAuctionBidAction(formData: FormData): Promise<void> 
     redirectWithError('/admin/auctions', 'Pakkumuse otsustamiseks puudub identifikaator.')
   }
   const detailPath = auctionDetailPath(auctionId)
+  const reason = readText(formData, 'reason')
+  if (reason.length < MIN_REASON_LENGTH) {
+    redirectWithError(detailPath, reasonHint)
+  }
 
-  const decision: RejectDecision = await rejectAlapakkumine(auctionId, bidId)
+  const decision: RejectDecision = await rejectAlapakkumine(auctionId, bidId, reason)
   if (decision.outcome !== 'rejected') {
     redirectWithError(
       detailPath,
@@ -1024,11 +1029,11 @@ export async function rejectAuctionBidAction(formData: FormData): Promise<void> 
     action: 'bid_rejected',
     entityType: 'bid',
     entityId: bidId,
-    after: { auctionId },
+    after: { auctionId, amountEur: decision.bid.amount, reason, bidderNotified: true },
   })
 
   revalidatePath(detailPath)
-  redirect(`${detailPath}?teade=${encodeURIComponent('Alapakkumus tagasi lükatud.')}`)
+  redirect(`${detailPath}?teade=${encodeURIComponent('Alapakkumus tagasi lükatud; pakkuja teavitatud põhjusega.')}`)
 }
 
 export async function generateContractAction(formData: FormData): Promise<void> {
@@ -1654,6 +1659,14 @@ export async function signSealedApproverAction(
   const keyword = readText(formData, 'keyword')
   if (keyword !== CONFIRM_KEYWORD) {
     return { ok: false, phase: 'checklist', error: `Kirjuta kinnitusväljale "${CONFIRM_KEYWORD}".` }
+  }
+
+  // The second signature must come from the role configured in Seaded
+  // (Oksjonid defaults); an unset setting falls back to the superadmin.
+  const settingsDocs = await repositories.find({ collection: 'settings', limit: 1 })
+  const approverRole = readAuctionDefaults(settingsDocs.docs[0]).sealedApproverRole
+  if (session.role !== approverRole) {
+    return { ok: false, phase: 'checklist', error: `Avamise kinnitab ainult ${approverRole}.` }
   }
 
   const record = await loadCeremonyRecord(auctionId)
@@ -2355,7 +2368,7 @@ export async function rejectUnderbidAction(formData: FormData): Promise<void> {
     redirectWithError(feedbackPath, 'Oksjon ei ole teie tööulatuses.')
   }
 
-  const decision: RejectDecision = await rejectAlapakkumine(auctionId, bidId)
+  const decision: RejectDecision = await rejectAlapakkumine(auctionId, bidId, reason)
   if (decision.outcome !== 'rejected') {
     if (decision.outcome === 'not_pending') {
       const earlier = await earlierDecisionMessage(trusted, bidId)

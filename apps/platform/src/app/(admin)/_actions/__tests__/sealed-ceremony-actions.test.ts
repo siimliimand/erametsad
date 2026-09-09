@@ -142,6 +142,8 @@ interface CeremonyFixture {
   auction?: Record<string, unknown> | null
   otherLeadingBids?: Record<string, unknown>[]
   user?: Record<string, unknown> | null
+  /** Seaded → Oksjonid → kinnitaja roll; null leaves the setting unset. */
+  approverRole?: 'superadmin' | 'admin' | null
 }
 
 function makeRepos(fixture: CeremonyFixture = {}) {
@@ -165,6 +167,18 @@ function makeRepos(fixture: CeremonyFixture = {}) {
       }
       if (args.collection === 'contract-templates') {
         return Promise.resolve({ docs: fixture.templates ?? [] })
+      }
+      if (args.collection === 'settings') {
+        const docs =
+          fixture.approverRole === undefined || fixture.approverRole === null
+            ? []
+            : [
+                {
+                  id: 'settings-1',
+                  featureFlags: { auctionDefaults: { sealedApproverRole: fixture.approverRole } },
+                },
+              ]
+        return Promise.resolve({ docs })
       }
       return Promise.resolve({ docs: [] })
     }),
@@ -241,6 +255,7 @@ const cleanFixture = (overrides: CeremonyFixture = {}): CeremonyFixture => ({
       updatedAt: minutesAgo(48 * 60),
     },
   ],
+  approverRole: 'admin',
   ...overrides,
 })
 
@@ -370,6 +385,36 @@ describe('signSealedOpenerAction (ceremony checklist)', () => {
       action: 'sealed.sign_approver',
       after: { openerUserId: 'opener-1' },
     })
+  })
+
+  it('blocks an admin when the configured approver role is superadmin', async () => {
+    useRepos(makeRepos(cleanFixture({ approverRole: 'superadmin' })))
+    await signSealedOpenerAction(actionState('checklist'), form({ auctionId, keyword: 'AVAN' }))
+    state.cookies.access_token = 'token-approver'
+    const result = await signSealedApproverAction(actionState('checklist'), form({ auctionId, keyword: 'KINNITAN' }))
+    expect(result).toEqual({ ok: false, phase: 'checklist', error: 'Avamise kinnitab ainult superadmin.' })
+  })
+
+  it('accepts the configured superadmin as the approver', async () => {
+    const repos = makeRepos(cleanFixture({ approverRole: 'superadmin' }))
+    useRepos(repos)
+    await signSealedOpenerAction(actionState('checklist'), form({ auctionId, keyword: 'AVAN' }))
+    state.session = { userId: 'approver-1', role: 'superadmin' }
+    state.cookies.access_token = 'token-approver'
+    const result = await signSealedApproverAction(actionState('checklist'), form({ auctionId, keyword: 'KINNITAN' }))
+    expect(result).toEqual({ ok: true, phase: 'awaiting-approval', error: null })
+    expect(repos.creates[1]?.data).toMatchObject({
+      action: 'sealed.sign_approver',
+      after: { openerUserId: 'opener-1' },
+    })
+  })
+
+  it('falls back to superadmin when the setting is unset', async () => {
+    useRepos(makeRepos(cleanFixture({ approverRole: null })))
+    await signSealedOpenerAction(actionState('checklist'), form({ auctionId, keyword: 'AVAN' }))
+    state.cookies.access_token = 'token-approver'
+    const result = await signSealedApproverAction(actionState('checklist'), form({ auctionId, keyword: 'KINNITAN' }))
+    expect(result).toEqual({ ok: false, phase: 'checklist', error: 'Avamise kinnitab ainult superadmin.' })
   })
 })
 
@@ -751,7 +796,7 @@ describe('confirmSealedCeremonyWinnerAction (reserve branches)', () => {
 
   it('restricts the house-backup path to a kiiroksjon', async () => {
     state.session = { userId: 'opener-1', role: 'superadmin' }
-    await signedRepos()
+    await signedRepos({ approverRole: 'superadmin' })
     const result = await confirmSealedCeremonyWinnerAction(
       actionState('revealed'),
       baseForm({ decision: 'house-backup' }),
@@ -761,7 +806,10 @@ describe('confirmSealedCeremonyWinnerAction (reserve branches)', () => {
 
   it('runs the superadmin house-backup on a kiiroksjon without a status change', async () => {
     state.session = { userId: 'opener-1', role: 'superadmin' }
-    const repos = await signedRepos({ auction: ceremonyAuction({ isQuickAuction: true }) })
+    const repos = await signedRepos({
+      auction: ceremonyAuction({ isQuickAuction: true }),
+      approverRole: 'superadmin',
+    })
     const result = await confirmSealedCeremonyWinnerAction(
       actionState('revealed'),
       baseForm({ decision: 'house-backup', reason: 'maja varupakkumine' }),

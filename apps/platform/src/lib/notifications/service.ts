@@ -93,10 +93,14 @@ function getTemplate(eventType: DomainEventType, payload: Record<string, unknown
       return `Teie pakkumus ${String(payload.amount)} EUR oksjonil "${String(
         payload.auctionTitle,
       )}" on müüja poolt kinnitatud ja juhtiv.`
-    case 'bid.rejected':
-      return `Müüja lükkas teie pakkumuse ${String(payload.amount)} EUR oksjonil "${String(
+    case 'bid.rejected': {
+      const rejected = `Müüja lükkas teie pakkumuse ${String(payload.amount)} EUR oksjonil "${String(
         payload.auctionTitle,
       )}" tagasi.`
+      return typeof payload.reason === 'string' && payload.reason.trim() !== ''
+        ? `${rejected} Põhjus: ${payload.reason}`
+        : rejected
+    }
     default:
       return null
   }
