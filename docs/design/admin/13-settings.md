@@ -56,6 +56,8 @@ Read-only mode for admin: fields disabled + banner "Muutmise õigus puudub". Int
 ## Permissions & audit
 Most audit-sensitive module: every save logs actor, section, before/after (masked secrets), reason. Superadmin only, except notification-template editing (admin) and viewing general info.
 
+Otsus (D-6): admin settings access is read-only — the spec tier wins over the old `permissions.ts` behavior where admin equaled superadmin. `settings:write` now belongs to superadmin only (`ADMIN_ALLOWED` excludes it for admin; admin keeps `settings:read` and the Seaded module stays visible), and every settings save re-checks the gate server-side (`assertCan` in `_actions/settings.ts` and `updateSettingsAction`). Admin sees the "Muutmise õigus puudub — teavita superadminit" banner on Seaded. The teavituste mallid exception from the Access row gets its own permission when that module is built — it does not restore blanket `settings:write` for admin.
+
 ## Section field inventories (summary tables)
 **Üldine**: juriidiline nimi*, registrikood* (8 numbrit), KMKR, aadress, toetus e-post*, toimus telefon*, alias domeen* (MX-check), KM-arve saatja andmed.
 **Oksjonid**: anti-snipe min [1–30, def 5] · automaatpakkuja lubatud ☐ · alapakkumine lubatud ☐ + otsustähtaeg päevades [1–14, def 3] · min kestus h [def 1] · kiiroksjon kestus h [24–72, def 48] · suletud paranduste arv [0–5, def 0] · kinnitaja roll (superadmin | teine admin).

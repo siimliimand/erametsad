@@ -16,7 +16,8 @@ const state = vi.hoisted((): {
   session: { userId: string; role: string }
   repositories: unknown
 } => ({
-  session: { userId: 'admin-1', role: 'admin' },
+  // Settings writes are superadmin-only since the D-6 tier split.
+  session: { userId: 'superadmin-1', role: 'superadmin' },
   repositories: null,
 }))
 
@@ -92,7 +93,7 @@ describe('integration connection test + rotation actions', () => {
   }
 
   beforeEach(() => {
-    state.session = { userId: 'admin-1', role: 'admin' }
+    state.session = { userId: 'superadmin-1', role: 'superadmin' }
     repos = makeRepos({ id: 'settings-1' })
     state.repositories = repos
     delete process.env.SMTP_PASS
@@ -204,11 +205,13 @@ describe('integration connection test + rotation actions', () => {
       expect(result.error).toBe('Tundmatu võti.')
     })
 
-    it('denies a role without settings:write', async () => {
-      state.session = { userId: 'specialist-1', role: 'specialist' }
-      await expect(testIntegrationConnectionAction('smtp')).rejects.toBeInstanceOf(
-        PermissionDeniedError,
-      )
+    it('denies roles without settings:write, including admin (D-6 read-only tier)', async () => {
+      for (const role of ['admin', 'specialist'] as const) {
+        state.session = { userId: `${role}-1`, role }
+        await expect(testIntegrationConnectionAction('smtp')).rejects.toBeInstanceOf(
+          PermissionDeniedError,
+        )
+      }
       expect(repos.updates).toEqual([])
     })
   })

@@ -16,7 +16,8 @@ const state = vi.hoisted((): {
   session: { userId: string; role: string }
   repositories: unknown
 } => ({
-  session: { userId: 'admin-1', role: 'admin' },
+  // Settings writes are superadmin-only since the D-6 tier split.
+  session: { userId: 'superadmin-1', role: 'superadmin' },
   repositories: null,
 }))
 
@@ -103,7 +104,7 @@ describe('updateSettingsAction (audited saves)', () => {
   let repos: Repos
 
   beforeEach(() => {
-    state.session = { userId: 'admin-1', role: 'admin' }
+    state.session = { userId: 'superadmin-1', role: 'superadmin' }
     repos = makeRepos({ id: 'settings-1' })
     useRepos(repos)
   })
@@ -124,11 +125,13 @@ describe('updateSettingsAction (audited saves)', () => {
     expect(repos.creates).toEqual([])
   })
 
-  it('denies a role without settings:write', async () => {
-    state.session = { userId: 'specialist-1', role: 'specialist' }
-    await expect(
-      updateSettingsAction(form({ section: 'tasud', reason: 'seadete muutus' })),
-    ).rejects.toBeInstanceOf(PermissionDeniedError)
+  it('denies roles without settings:write, including admin (D-6 read-only tier)', async () => {
+    for (const role of ['admin', 'specialist'] as const) {
+      state.session = { userId: `${role}-1`, role }
+      await expect(
+        updateSettingsAction(form({ section: 'tasud', reason: 'seadete muutus' })),
+      ).rejects.toBeInstanceOf(PermissionDeniedError)
+    }
     expect(repos.updates).toEqual([])
   })
 
@@ -147,7 +150,7 @@ describe('updateSettingsAction (audited saves)', () => {
     })
     const audit = repos.creates.find((entry) => entry.collection === 'audit-entry')
     expect(audit?.data).toMatchObject({
-      actorId: 'admin-1',
+      actorId: 'superadmin-1',
       action: 'settings.change',
       entityType: 'settings',
       entityId: 'settings-1',
