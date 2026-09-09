@@ -80,6 +80,7 @@ vi.mock('../../_lib/admin', () => ({
 
 import {
   confirmSealedCeremonyWinnerAction,
+  markSealedUnsoldShortcutAction,
   revealSealedBidsAction,
   sealedCeremonyStateAction,
   signSealedApproverAction,
@@ -95,6 +96,7 @@ import {
   getSealedBidsForAuction,
 } from '@/lib/bidding/sealed-bid'
 import { prepareContract } from '@/lib/contracts/service'
+import { eventBus } from '@/lib/notifications/event-bus'
 import { upsertSnapshot } from '@/lib/stats/aggregation'
 
 const verifyPasswordMock = vi.mocked(verifyPassword)
@@ -144,6 +146,10 @@ interface CeremonyFixture {
   user?: Record<string, unknown> | null
   /** Seaded → Oksjonid → kinnitaja roll; null leaves the setting unset. */
   approverRole?: 'superadmin' | 'admin' | null
+  /** Global Tasud fee percent on the settings row. */
+  settingsFeePercent?: number
+  /** Winner's profile row (type/approvalStatus) for the ootel forced choice. */
+  profile?: Record<string, unknown> | null
 }
 
 function makeRepos(fixture: CeremonyFixture = {}) {
@@ -168,16 +174,24 @@ function makeRepos(fixture: CeremonyFixture = {}) {
       if (args.collection === 'contract-templates') {
         return Promise.resolve({ docs: fixture.templates ?? [] })
       }
+      if (args.collection === 'profile') {
+        return Promise.resolve({ docs: fixture.profile ? [fixture.profile] : [] })
+      }
       if (args.collection === 'settings') {
-        const docs =
-          fixture.approverRole === undefined || fixture.approverRole === null
-            ? []
-            : [
-                {
-                  id: 'settings-1',
-                  featureFlags: { auctionDefaults: { sealedApproverRole: fixture.approverRole } },
-                },
-              ]
+        const settingsPresent =
+          (fixture.approverRole !== undefined && fixture.approverRole !== null) ||
+          fixture.settingsFeePercent !== undefined
+        if (!settingsPresent) return Promise.resolve({ docs: [] })
+        const docs = [
+          {
+            id: 'settings-1',
+            feePercent: fixture.settingsFeePercent,
+            featureFlags:
+              fixture.approverRole === undefined || fixture.approverRole === null
+                ? {}
+                : { auctionDefaults: { sealedApproverRole: fixture.approverRole } },
+          },
+        ]
         return Promise.resolve({ docs })
       }
       return Promise.resolve({ docs: [] })
@@ -545,13 +559,14 @@ describe('sealedCeremonyStateAction (ranked read model)', () => {
     decryptMock.mockImplementation((bids) => bids as unknown as DecryptedBid[])
   })
 
-  const revealedRepos = (): Repos =>
+  const revealedRepos = (overrides: CeremonyFixture = {}): Repos =>
     makeRepos(
       cleanFixture({
         auditEntries: {
           auction_ended: [{ id: 'worker-1', createdAt: minutesAgo(10) }],
           'sealed.reveal': [{ id: 'reveal-1', createdAt: minutesAgo(5) }],
         },
+        ...overrides,
       }),
     )
 
@@ -739,6 +754,127 @@ describe('sealedCeremonyStateAction (ranked read model)', () => {
     expect(context.bids[0]?.bidder).toBeNull()
     expect(context.bids[0]?.marginToNext).toBeNull()
   })
+
+  it('builds the winner fee estimate from the default 3% + VAT', async () => {
+    useRepos(revealedRepos())
+    getSealedBidsMock.mockResolvedValue([
+      sealedRow('bid-1', 'user-a', 150_000, minutesAgo(31)),
+    ] as never)
+
+    const context = await sealedCeremonyStateAction(auctionId)
+
+    expect(context.feeEstimate).toEqual({ feeCents: 549_000, feePercent: 3, vatPercent: 22 })
+  })
+
+  it('computes the fee estimate from the configured settings fee percent', async () => {
+    useRepos(revealedRepos({ settingsFeePercent: 5 }))
+    getSealedBidsMock.mockResolvedValue([
+      sealedRow('bid-1', 'user-a', 150_000, minutesAgo(31)),
+    ] as never)
+
+    const context = await sealedCeremonyStateAction(auctionId)
+
+    expect(context.feeEstimate).toEqual({ feeCents: 915_000, feePercent: 5, vatPercent: 22 })
+  })
+
+  it('honors the per-auction fee override over the settings percent', async () => {
+    useRepos(
+      revealedRepos({
+        settingsFeePercent: 5,
+        auction: ceremonyAuction({ feeOverridePercent: 0 }),
+      }),
+    )
+    getSealedBidsMock.mockResolvedValue([
+      sealedRow('bid-1', 'user-a', 150_000, minutesAgo(31)),
+    ] as never)
+
+    const context = await sealedCeremonyStateAction(auctionId)
+
+    expect(context.feeEstimate).toEqual({ feeCents: 0, feePercent: 0, vatPercent: 22 })
+  })
+
+  it('leaves the fee estimate null before any valid bid ranks', async () => {
+    useRepos(revealedRepos())
+    getSealedBidsMock.mockResolvedValue([
+      sealedRow('bid-bad', 'user-d', 999_000, minutesAgo(27), false),
+    ] as never)
+
+    const context = await sealedCeremonyStateAction(auctionId)
+
+    expect(context.feeEstimate).toBeNull()
+  })
+
+  it('surfaces the winner’s pending company profile for the forced choice', async () => {
+    useRepos(
+      revealedRepos({ profile: { id: 'p-1', type: 'company', approvalStatus: 'pending' } }),
+    )
+    getSealedBidsMock.mockResolvedValue([
+      identityRow('bid-1', 'user-a', 150_000, minutesAgo(31), privateIdentity('Kalle Tamm')),
+    ] as never)
+
+    const context = await sealedCeremonyStateAction(auctionId)
+
+    expect(context.winnerProfileHold).toBe(true)
+  })
+
+  it('does not hold an approved company or private winner', async () => {
+    useRepos(
+      revealedRepos({ profile: { id: 'p-1', type: 'company', approvalStatus: 'approved' } }),
+    )
+    getSealedBidsMock.mockResolvedValue([
+      identityRow('bid-1', 'user-a', 150_000, minutesAgo(31), privateIdentity('Kalle Tamm')),
+    ] as never)
+
+    const approvedContext = await sealedCeremonyStateAction(auctionId)
+    expect(approvedContext.winnerProfileHold).toBe(false)
+
+    useRepos(revealedRepos())
+    const privateContext = await sealedCeremonyStateAction(auctionId)
+    expect(privateContext.winnerProfileHold).toBe(false)
+  })
+
+  it('flags the read-only pooleli state for an admin outside the running ceremony', async () => {
+    const repos = makeRepos(cleanFixture({ approverRole: 'superadmin' }))
+    useRepos(repos)
+    state.cookies.access_token = 'token-opener'
+    const sign = await signSealedOpenerAction(actionState('checklist'), form({ auctionId, keyword: 'AVAN' }))
+    expect(sign.ok, sign.error ?? 'opener sign failed').toBe(true)
+
+    state.session = { userId: 'third-1', role: 'admin' }
+    state.cookies.access_token = 'token-third'
+    const context = await sealedCeremonyStateAction(auctionId)
+    expect(context.openingInProgress).toBe(true)
+    expect(context.viewerIsParticipant).toBe(false)
+
+    state.session = { userId: 'opener-1', role: 'admin' }
+    state.cookies.access_token = 'token-opener'
+    const openerContext = await sealedCeremonyStateAction(auctionId)
+    expect(openerContext.viewerIsParticipant).toBe(true)
+    expect(openerContext.openingInProgress).toBe(true)
+  })
+
+  it('keeps every admin a participant before the opener signs', async () => {
+    useRepos(makeRepos(cleanFixture({ approverRole: 'superadmin' })))
+    state.cookies.access_token = 'token-third'
+
+    const context = await sealedCeremonyStateAction(auctionId)
+
+    expect(context.openingInProgress).toBe(false)
+    expect(context.viewerIsParticipant).toBe(true)
+  })
+
+  it('lets the configured approver role through the pooleli gate', async () => {
+    const repos = makeRepos(cleanFixture({ approverRole: 'admin' }))
+    useRepos(repos)
+    await signSealedOpenerAction(actionState('checklist'), form({ auctionId, keyword: 'AVAN' }))
+
+    state.session = { userId: 'third-1', role: 'admin' }
+    state.cookies.access_token = 'token-third'
+    const context = await sealedCeremonyStateAction(auctionId)
+
+    expect(context.openingInProgress).toBe(true)
+    expect(context.viewerIsParticipant).toBe(true)
+  })
 })
 
 describe('confirmSealedCeremonyWinnerAction (reserve branches)', () => {
@@ -893,6 +1029,77 @@ describe('confirmSealedCeremonyWinnerAction (reserve branches)', () => {
     expect(unsold?.data.after).toMatchObject({ reason: 'piirhind jäi alla' })
   })
 
+  it('forces an explicit choice when the winner’s company profile is pending', async () => {
+    await signedRepos({ profile: { id: 'p-1', type: 'company', approvalStatus: 'pending' } })
+
+    const result = await confirmSealedCeremonyWinnerAction(actionState('revealed'), baseForm())
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('Ettevõtte profiil on ootel — vali: jätka lepinguga või hoia kinnitamine ootel.')
+  })
+
+  it('keeps the confirmation on hold until the company profile is approved', async () => {
+    const repos = await signedRepos({
+      profile: { id: 'p-1', type: 'company', approvalStatus: 'pending' },
+    })
+    const result = await confirmSealedCeremonyWinnerAction(
+      actionState('revealed'),
+      baseForm({ companyProfileDecision: 'hold' }),
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('Kinnitamine hoitakse ootel, kuni võitja ettevõtte profiil on kinnitatud.')
+    expect(repos.updates).toEqual([])
+  })
+
+  it('proceeds with the sale once the hold choice is explicit and audited', async () => {
+    const repos = await signedRepos({
+      profile: { id: 'p-1', type: 'company', approvalStatus: 'pending' },
+    })
+    const result = await confirmSealedCeremonyWinnerAction(
+      actionState('revealed'),
+      baseForm({ companyProfileDecision: 'proceed' }),
+    )
+
+    expect(result).toEqual({ ok: true, phase: 'confirmed', error: null })
+    const confirm = repos.creates.find((entry) => entry.data.action === 'sealed.winner_confirm')
+    expect(confirm?.data.after).toMatchObject({
+      companyProfileOotel: true,
+      companyProfileDecision: 'proceed',
+    })
+  })
+
+  it('notifies the winner and the seller with the fee estimate on confirm', async () => {
+    await signedRepos()
+    const emitSpy = vi.spyOn(eventBus, 'emit')
+
+    const result = await confirmSealedCeremonyWinnerAction(actionState('revealed'), baseForm())
+
+    expect(result).toEqual({ ok: true, phase: 'confirmed', error: null })
+    const events = emitSpy.mock.calls.map(([event]) => event)
+    expect(events).toContainEqual({
+      type: 'auction.won',
+      userId: 'user-a',
+      payload: {
+        auctionId,
+        auctionTitle: 'Suletud pakkumise oksjon',
+        winningBid: 150_000,
+        feeEstimateEur: 5490,
+      },
+    })
+    expect(events).toContainEqual({
+      type: 'auction.sold',
+      userId: 'seller-1',
+      payload: {
+        auctionId,
+        auctionTitle: 'Suletud pakkumise oksjon',
+        finalPrice: 150_000,
+        feeEstimateEur: 5490,
+      },
+    })
+    emitSpy.mockRestore()
+  })
+
   it('restricts the house-backup path to a superadmin', async () => {
     await signedRepos({ auction: ceremonyAuction({ isQuickAuction: true }) })
     const result = await confirmSealedCeremonyWinnerAction(
@@ -1029,5 +1236,111 @@ describe('voidSealedBidsAction (superadmin void)', () => {
 
     expect(context.voided).toBe(true)
     expect(context.winnerConfirmed).toBe(false)
+  })
+})
+
+describe('markSealedUnsoldShortcutAction (empty-lot shortcut)', () => {
+  beforeEach(() => {
+    auctionId = `auction-${crypto.randomUUID()}`
+    state.session = { userId: 'opener-1', role: 'admin' }
+    state.cookies = { access_token: 'token-opener' }
+    vi.clearAllMocks()
+    decryptMock.mockImplementation((bids) => bids as unknown as DecryptedBid[])
+  })
+
+  const shortcutForm = (overrides: Record<string, string> = {}): FormData =>
+    form({ auctionId, reason: 'tühi loots', ...overrides })
+
+  it('denies a role without sealed:operate', async () => {
+    state.session = { userId: 'specialist-1', role: 'specialist' }
+    const repos = makeRepos(cleanFixture())
+    useRepos(repos)
+    const result = await markSealedUnsoldShortcutAction(actionState('checklist'), shortcutForm())
+    expect(result.error).toBe('Teil puudub õigus selle toimingu sooritamiseks.')
+    expect(repos.updates).toEqual([])
+  })
+
+  it('requires a typed reason', async () => {
+    const repos = makeRepos(cleanFixture())
+    useRepos(repos)
+    const result = await markSealedUnsoldShortcutAction(actionState('checklist'), shortcutForm({ reason: 'ei' }))
+    expect(result.error).toBe('Müümata märkimine vajab põhjust (vähemalt 5 tähemärki).')
+    expect(repos.updates).toEqual([])
+  })
+
+  it('refuses a lot that still holds valid bids', async () => {
+    const repos = makeRepos(cleanFixture())
+    useRepos(repos)
+    getSealedBidsMock.mockResolvedValue([
+      sealedRow('bid-1', 'user-a', 150_000, minutesAgo(31)),
+    ] as never)
+
+    const result = await markSealedUnsoldShortcutAction(actionState('checklist'), shortcutForm())
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('Oksjonil on kehtivaid pakkumisi — tulemus otsustakse avamistseremoonial.')
+    expect(repos.updates).toEqual([])
+  })
+
+  it('marks an empty lot unsold and audits the shortcut entry', async () => {
+    const repos = makeRepos(cleanFixture())
+    useRepos(repos)
+    getSealedBidsMock.mockResolvedValue([] as never)
+
+    const result = await markSealedUnsoldShortcutAction(actionState('checklist'), shortcutForm())
+
+    expect(result).toEqual({ ok: true, phase: 'unsold', error: null })
+    expect(repos.updates).toContainEqual({
+      collection: 'auctions',
+      id: auctionId,
+      data: { status: 'unsold' },
+    })
+    const entry = repos.creates.find((create) => create.data.action === 'sealed.mark_unsold')
+    expect(entry?.data).toMatchObject({
+      actorId: 'opener-1',
+      entityType: 'auction',
+      entityId: auctionId,
+      after: { reason: 'tühi loots', shortcut: true, totalBids: 0, validCount: 0 },
+    })
+  })
+
+  it('allows the shortcut when every bid is invalid', async () => {
+    const repos = makeRepos(cleanFixture())
+    useRepos(repos)
+    getSealedBidsMock.mockResolvedValue([
+      sealedRow('bid-bad', 'user-d', 999_000, minutesAgo(27), false),
+    ] as never)
+
+    const result = await markSealedUnsoldShortcutAction(actionState('checklist'), shortcutForm())
+
+    expect(result).toEqual({ ok: true, phase: 'unsold', error: null })
+    const entry = repos.creates.find((create) => create.data.action === 'sealed.mark_unsold')
+    expect(entry?.data.after).toMatchObject({ totalBids: 1, validCount: 0 })
+  })
+
+  it('refuses a lot that is not ended', async () => {
+    const repos = makeRepos(cleanFixture({ auction: ceremonyAuction({ status: 'appraised' }) }))
+    useRepos(repos)
+
+    const result = await markSealedUnsoldShortcutAction(actionState('checklist'), shortcutForm())
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('Müümata otsetee kehtib ainult lõppenud oksjonil.')
+    expect(repos.updates).toEqual([])
+  })
+
+  it('replays success without a second audit entry', async () => {
+    state.session = { userId: 'opener-1', role: 'superadmin' }
+    const repos = makeRepos(cleanFixture())
+    useRepos(repos)
+    getSealedBidsMock.mockResolvedValue([] as never)
+
+    const first = await markSealedUnsoldShortcutAction(actionState('checklist'), shortcutForm())
+    const second = await markSealedUnsoldShortcutAction(actionState('unsold'), shortcutForm())
+
+    expect(first).toEqual({ ok: true, phase: 'unsold', error: null })
+    expect(second).toEqual({ ok: true, phase: 'unsold', error: null })
+    expect(repos.creates.filter((create) => create.data.action === 'sealed.mark_unsold')).toHaveLength(1)
+    expect(getSealedBidsMock).toHaveBeenCalledTimes(1)
   })
 })

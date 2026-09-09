@@ -11,8 +11,10 @@ import {
 } from '../../../../../_actions/auctions'
 import { FormField, primaryButtonClass } from '../../../../../_components/FormField'
 import { useToast } from '../../../../../_components/ui/Toast'
+import { formatEur, formatEurAmount } from '../../../../../_lib/labels'
 
 type Decision = 'sold' | 'unsold' | 'house-backup'
+type CompanyProfileChoice = '' | 'proceed' | 'hold'
 
 const initialState: SealedCeremonyActionState = {
   ok: false,
@@ -30,12 +32,16 @@ function decisionLabel(decision: string): string {
  * Winner decision after the reveal: sold (top valid bid), unsold with a
  * typed reason, or the superadmin-only kiiroksjon house-backup. The opener
  * confirms behind step-up re-auth (password, or session token for eID-only
- * accounts); the reserve comparison itself stays server-side.
+ * accounts); the reserve comparison itself stays server-side. The dialog
+ * shows the final price plus the fee estimate, and a company bidder with a
+ * pending profile forces an explicit proceed-or-hold choice.
  */
 export function WinnerConfirm({
   auctionId,
   bids,
   topMeetsReserve,
+  feeEstimate,
+  winnerProfileHold,
   isOpener,
   isSuperadmin,
   kiiroksjon,
@@ -43,6 +49,8 @@ export function WinnerConfirm({
   auctionId: string
   bids: SealedCeremonyContext['bids']
   topMeetsReserve: SealedCeremonyContext['topMeetsReserve']
+  feeEstimate: SealedCeremonyContext['feeEstimate']
+  winnerProfileHold: boolean
   isOpener: boolean
   isSuperadmin: boolean
   kiiroksjon: boolean
@@ -56,12 +64,14 @@ export function WinnerConfirm({
   const [dialogOpen, setDialogOpen] = useState(false)
   const [decision, setDecision] = useState<Decision>('sold')
   const [reason, setReason] = useState('')
+  const [companyChoice, setCompanyChoice] = useState<CompanyProfileChoice>('')
 
   const topBid: RevealedBidView | null = bids.find((bid) => bid.valid) ?? null
   const soldPossible = topBid !== null && topMeetsReserve !== false
   const houseBackupPossible = isSuperadmin && kiiroksjon
   const effectiveDecision: Decision =
     decision === 'sold' && !soldPossible ? 'unsold' : decision
+  const companyChoiceRequired = winnerProfileHold && effectiveDecision === 'sold'
 
   // Server-action error semantics stay intact: the state drives the toast,
   // and the success message follows the server-authoritative phase.
@@ -117,6 +127,11 @@ export function WinnerConfirm({
           Varupakkumise tee on ainult superadminile.
         </p>
       ) : null}
+      {winnerProfileHold && topBid !== null ? (
+        <p className="mb-sm rounded-input border border-statusEndingSoon bg-bgMist px-md py-sm text-bodySm text-ink">
+          Võitja ettevõtte profiil on kinnitamata — kinnitamine vajab selget otsust.
+        </p>
+      ) : null}
 
       <button
         type="button"
@@ -143,11 +158,28 @@ export function WinnerConfirm({
             <input type="hidden" name="auctionId" value={auctionId} />
             <input type="hidden" name="bidId" value={topBid?.id ?? ''} />
             <input type="hidden" name="decision" value={effectiveDecision} />
+            <input type="hidden" name="companyProfileDecision" value={companyChoice} />
             <h3 className="font-heading text-h4 font-bold text-ink">Kinnita tulemus</h3>
             <p className="mt-sm rounded-input border-l-4 border-danger bg-dangerLight px-md py-sm text-bodySm font-semibold text-danger">
               HOIATUS: otsus on lõplik. Müük avaldab lõpphinna ja koostab võitjale lepingu;
               müümata kuulutab oksjoni müüdud tagasi ei tule.
             </p>
+
+            {effectiveDecision === 'sold' && topBid !== null ? (
+              <div className="mt-sm rounded-input border border-border bg-bgMist px-md py-sm text-bodySm text-ink">
+                <p>
+                  Lõpphind:{' '}
+                  <span className="font-semibold">{formatEurAmount(topBid.amount)}</span>
+                </p>
+                {feeEstimate !== null ? (
+                  <p className="text-inkMuted">
+                    Vahendustasu hinnang: {formatEur(feeEstimate.feeCents)} (
+                    {String(feeEstimate.feePercent)}% + käibemaks {String(feeEstimate.vatPercent)}
+                    %), makstakse lepingu sõlmimisel
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
 
             <fieldset className="mt-md space-y-xs">
               <legend className="text-label font-semibold text-ink">Tulemus</legend>
@@ -191,6 +223,42 @@ export function WinnerConfirm({
                 </label>
               ) : null}
             </fieldset>
+
+            {companyChoiceRequired ? (
+              <fieldset className="mt-md space-y-xs rounded-input border border-statusEndingSoon bg-bgMist px-md py-sm">
+                <legend className="text-label font-semibold text-ink">
+                  Ettevõtte profiil on ootel
+                </legend>
+                <p className="text-bodySm text-inkMuted">
+                  Võitja ettevõtte profiil ei ole veel kinnitatud. Vali, kas kuulutad võitja ja
+                  koostad lepingu, või hoia kinnitamine ootel.
+                </p>
+                <label className="flex items-center gap-sm text-bodySm text-ink">
+                  <input
+                    type="radio"
+                    name="company-profile-choice"
+                    value="proceed"
+                    checked={companyChoice === 'proceed'}
+                    onChange={() => {
+                      setCompanyChoice('proceed')
+                    }}
+                  />
+                  Jätka — kuuluta võitja ja koosta leping
+                </label>
+                <label className="flex items-center gap-sm text-bodySm text-ink">
+                  <input
+                    type="radio"
+                    name="company-profile-choice"
+                    value="hold"
+                    checked={companyChoice === 'hold'}
+                    onChange={() => {
+                      setCompanyChoice('hold')
+                    }}
+                  />
+                  Hoia ootel — ära kinnita veel
+                </label>
+              </fieldset>
+            ) : null}
 
             {effectiveDecision === 'unsold' || effectiveDecision === 'house-backup' ? (
               <FormField
@@ -240,7 +308,8 @@ export function WinnerConfirm({
                 type="submit"
                 disabled={
                   confirmPending ||
-                  (effectiveDecision === 'unsold' && reason.trim().length < 5)
+                  (effectiveDecision === 'unsold' && reason.trim().length < 5) ||
+                  (companyChoiceRequired && companyChoice === '')
                 }
                 className="inline-flex h-10 items-center rounded-button bg-danger px-4 text-label font-semibold text-inkInverse transition-[filter] duration-hover ease-hover hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
               >

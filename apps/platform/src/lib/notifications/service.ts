@@ -24,6 +24,7 @@ const eventChannels: Record<DomainEventType, (keyof ChannelOverride | 'inApp')[]
   'auction.published': ['email', 'inApp'],
   'bid.created': ['email', 'inApp'],
   'auction.ended': ['email', 'inApp'],
+  'auction.sold': ['email', 'inApp'],
   'contract.ready': ['email', 'sms', 'inApp'],
   outbid: ['email', 'inApp'],
   'auction.won': ['email', 'sms', 'inApp'],
@@ -36,6 +37,7 @@ const eventTitles: Record<DomainEventType, string> = {
   'auction.published': 'Uus oksjon on avaldatud',
   'bid.created': 'Pakkumus registreeritud',
   'auction.ended': 'Oksjon on lõppenud',
+  'auction.sold': 'Teie oksjon leidis ostja',
   'contract.ready': 'Leping on allkirjastamiseks valmis',
   outbid: 'Teie pakkumus on üle pakutud',
   'auction.won': 'Te võitsite oksjoni',
@@ -75,11 +77,25 @@ function getTemplate(eventType: DomainEventType, payload: Record<string, unknown
         auctionTitle: payload.auctionTitle as string,
         currentBid: payload.currentBid as number,
       })
-    case 'auction.won':
-      return auctionWonTemplate({
+    case 'auction.won': {
+      const base = auctionWonTemplate({
         auctionTitle: payload.auctionTitle as string,
         winningBid: payload.winningBid as number,
       })
+      return typeof payload.feeEstimateEur === 'number'
+        ? `${base} Vahendustasu hinnang: ${payload.feeEstimateEur.toFixed(2)} EUR (3% + käibemaks), makstakse lepingu sõlmimisel.`
+        : base
+    }
+    case 'auction.sold': {
+      if (typeof payload.finalPrice !== 'number' || typeof payload.feeEstimateEur !== 'number') {
+        return null
+      }
+      return (
+        `Teie oksjon "${String(payload.auctionTitle)}" lõppes tulemusega ` +
+        `${payload.finalPrice.toFixed(2)} EUR. Vahendustasu hinnang: ` +
+        `${payload.feeEstimateEur.toFixed(2)} EUR (3% + käibemaks).`
+      )
+    }
     case 'auction.ended':
       return auctionEndedTemplate({
         auctionTitle: payload.auctionTitle as string,
@@ -272,6 +288,7 @@ export function startListening(bus: EventBus): void {
   bus.on('auction.published', (event) => { void handleSafely(event) })
   bus.on('bid.created', (event) => { void handleSafely(event) })
   bus.on('auction.ended', (event) => { void handleSafely(event) })
+  bus.on('auction.sold', (event) => { void handleSafely(event) })
   bus.on('contract.ready', (event) => { void handleSafely(event) })
   bus.on('outbid', (event) => { void handleSafely(event) })
   bus.on('auction.won', (event) => { void handleSafely(event) })

@@ -29,6 +29,11 @@ import {
 } from '../admin/auctions/_lib/auction-schema'
 import { tallinnWallTimeToUtcIso } from '../admin/content/_components/scheduled-publish'
 import { readAuctionDefaults } from '../admin/content/_components/settings-audit'
+import {
+  SUCCESS_FEE_PERCENT_DEFAULT,
+  successFeeCents,
+  VAT_PERCENT,
+} from '../admin/_lib/workspace'
 
 import { verifyAdminAccessToken } from '@/lib/auth/jwt'
 import { verifyPassword } from '@/lib/auth/password'
@@ -51,8 +56,8 @@ import {
 } from '@/lib/bidding/sealed-opening'
 import { createCache } from '@/lib/cache'
 import { prepareContract } from '@/lib/contracts/service'
-import type { AuctionDoc, CoreRepositories } from '@/lib/data/repositories'
-import { eurosToCents } from '@/lib/data/repositories/money'
+import type { AuctionDoc, CoreRepositories, SettingsDoc } from '@/lib/data/repositories'
+import { centsToEuros, eurosToCents } from '@/lib/data/repositories/money'
 import { getRepositories } from '@/lib/data/runtime'
 import { eventBus } from '@/lib/notifications/event-bus'
 import { upsertSnapshot } from '@/lib/stats/aggregation'
@@ -1619,6 +1624,49 @@ async function findCeremonyAuditEntry(
   return entries.docs[0] ?? null
 }
 
+/** Success fee percent: per-auction override, then the global Tasud setting, then the default. */
+function feePercentFor(auction: AuctionDoc, settingsDoc: SettingsDoc | undefined): number {
+  const override = auction.feeOverridePercent
+  if (typeof override === 'number') return override
+  const globalFee = settingsDoc?.feePercent
+  return typeof globalFee === 'number' ? globalFee : SUCCESS_FEE_PERCENT_DEFAULT
+}
+
+export interface SealedCeremonyFeeEstimate {
+  feeCents: number
+  feePercent: number
+  vatPercent: number
+}
+
+/** Fee estimate for the ceremony winner modal: 3% + VAT charged on completion. */
+function feeEstimateFor(
+  topBidEuros: number,
+  auction: AuctionDoc,
+  settingsDoc: SettingsDoc | undefined,
+): SealedCeremonyFeeEstimate {
+  const feePercent = feePercentFor(auction, settingsDoc)
+  return {
+    feeCents: successFeeCents(eurosToCents(topBidEuros), feePercent),
+    feePercent,
+    vatPercent: VAT_PERCENT,
+  }
+}
+
+/** "Ettevõtte profiil ootel": company profile awaiting approval for a bidder. */
+async function companyProfilePending(
+  repositories: CoreRepositories,
+  userId: string | null,
+): Promise<boolean> {
+  if (userId === null || userId === '') return false
+  const docs = await repositories.find({
+    collection: 'profile',
+    where: { user: { equals: userId } },
+    limit: 1,
+  })
+  const profile = docs.docs[0] as { type?: unknown; approvalStatus?: unknown } | undefined
+  return profile?.type === 'company' && profile?.approvalStatus === 'pending'
+}
+
 /** Ranked reveal views: valid bids amount-desc with earliest-wins ties, invalid bids greyed. */
 function rankedViews(decrypted: DecryptedBid[]): RevealedBidView[] {
   const valid = decrypted
@@ -1718,6 +1766,14 @@ export interface SealedCeremonyContext {
   bids: RevealedBidView[]
   /** Server-side reserve comparison result; the reserve value itself never leaves the server (D5). */
   topMeetsReserve: boolean | null
+  /** Winner-modal fee estimate (3% + VAT success fee on completion); null before a ranked top bid exists. */
+  feeEstimate: SealedCeremonyFeeEstimate | null
+  /** Winner's company profile is pending approval — the confirm flow forces an explicit choice. */
+  winnerProfileHold: boolean
+  /** The viewer is the opener, a signer, or holds the configured approver role. */
+  viewerIsParticipant: boolean
+  /** Opening started (opener signed) and not yet concluded — other admins get a read-only view. */
+  openingInProgress: boolean
   winnerConfirmed: boolean
   voided: boolean
   error: string | null
@@ -1794,6 +1850,10 @@ export async function sealedCeremonyStateAction(auctionId: string): Promise<Seal
     revealedAt: null,
     bids: [],
     topMeetsReserve: null,
+    feeEstimate: null,
+    winnerProfileHold: false,
+    viewerIsParticipant: true,
+    openingInProgress: false,
     winnerConfirmed: false,
     voided: false,
     error: null,
@@ -1815,9 +1875,13 @@ export async function sealedCeremonyStateAction(auctionId: string): Promise<Seal
   const revealEntry = await findCeremonyAuditEntry(repositories, 'sealed.reveal', auctionId)
   const winnerEntry = await findCeremonyAuditEntry(repositories, 'sealed.winner_confirm', auctionId)
   const voidEntry = await findCeremonyAuditEntry(repositories, 'sealed.void', auctionId)
+  const settingsDocs = await repositories.find({ collection: 'settings', limit: 1 })
+  const settingsDoc = settingsDocs.docs[0] as SettingsDoc | undefined
 
   let bids: RevealedBidView[] = []
   let topMeetsReserve: boolean | null = null
+  let feeEstimate: SealedCeremonyFeeEstimate | null = null
+  let winnerProfileHold = false
   if (revealEntry !== null) {
     const decrypted = decryptSealedBids(await getSealedBidsForAuction(auctionId))
     // Identity is ceremony-scoped and post-reveal only: this replay runs
@@ -1835,10 +1899,30 @@ export async function sealedCeremonyStateAction(auctionId: string): Promise<Seal
     } else {
       topMeetsReserve = topValid !== undefined
     }
+    if (topValid) {
+      feeEstimate = feeEstimateFor(topValid.amount, auction, settingsDoc)
+      winnerProfileHold = await companyProfilePending(
+        repositories,
+        topValid.bidder?.userId ?? null,
+      )
+    }
   }
 
+  // "Avamine on pooleli": other admins get a read-only view while a signed
+  // ceremony is under way. The configured approver role must keep signing
+  // access, or the second signature could never arrive.
   const signaturesExpired =
-    record !== null && ((record.approver !== undefined && !signatureFresh(record.approver)) || !signatureFresh(record.opener))
+    record !== null &&
+    ((record.approver !== undefined && !signatureFresh(record.approver)) ||
+      !signatureFresh(record.opener))
+  const approverRole = readAuctionDefaults(settingsDoc).sealedApproverRole
+  const winnerConfirmed = winnerEntry !== null
+  const voided = voidEntry !== null
+  const viewerIsParticipant =
+    record === null ||
+    record.opener.userId === session.userId ||
+    record.approver?.userId === session.userId ||
+    session.role === approverRole
 
   return {
     auctionId,
@@ -1858,8 +1942,12 @@ export async function sealedCeremonyStateAction(auctionId: string): Promise<Seal
     revealedAt: revealEntry?.createdAt ?? null,
     bids,
     topMeetsReserve,
-    winnerConfirmed: winnerEntry !== null,
-    voided: voidEntry !== null,
+    feeEstimate,
+    winnerProfileHold,
+    viewerIsParticipant,
+    openingInProgress: record !== null && !winnerConfirmed && !voided,
+    winnerConfirmed,
+    voided,
     error: null,
   }
 }
@@ -2066,6 +2154,7 @@ export async function confirmSealedCeremonyWinnerAction(
   const keyword = readText(formData, 'keyword')
   const password = readText(formData, 'password')
   const reason = readText(formData, 'reason')
+  const companyProfileDecision = readText(formData, 'companyProfileDecision')
 
   if (keyword !== CONFIRM_KEYWORD) {
     return { ok: false, phase: 'revealed', error: `Kirjuta kinnitusväljale "${CONFIRM_KEYWORD}".` }
@@ -2175,6 +2264,27 @@ export async function confirmSealedCeremonyWinnerAction(
     return { ok: false, phase: 'revealed', error: 'Pakkumust ei leitud.' }
   }
 
+  // "Ettevõtte profiil ootel": the winner's company profile awaits approval,
+  // so the operator must explicitly choose — proceed to the contract anyway
+  // or hold the confirmation. No silent default exists.
+  const companyProfileOotel = await companyProfilePending(repositories, target.user)
+  if (companyProfileOotel) {
+    if (companyProfileDecision !== 'proceed' && companyProfileDecision !== 'hold') {
+      return {
+        ok: false,
+        phase: 'revealed',
+        error: 'Ettevõtte profiil on ootel — vali: jätka lepinguga või hoia kinnitamine ootel.',
+      }
+    }
+    if (companyProfileDecision === 'hold') {
+      return {
+        ok: false,
+        phase: 'revealed',
+        error: 'Kinnitamine hoitakse ootel, kuni võitja ettevõtte profiil on kinnitatud.',
+      }
+    }
+  }
+
   const failure: string | null = await (async (): Promise<string | null> => {
     try {
       await repositories.update({
@@ -2232,6 +2342,34 @@ export async function confirmSealedCeremonyWinnerAction(
           },
         })
       }
+      // Winner and seller learn the outcome (with the fee estimate) at the
+      // confirm step — the moment the sale becomes certain.
+      const settingsDocs = await repositories.find({ collection: 'settings', limit: 1 })
+      const feeEstimateEur = centsToEuros(
+        successFeeCents(eurosToCents(top.amount), feePercentFor(auction, settingsDocs.docs[0] as SettingsDoc | undefined)),
+      )
+      eventBus.emit({
+        type: 'auction.won',
+        userId: target.user,
+        payload: {
+          auctionId,
+          auctionTitle: auction.title,
+          winningBid: top.amount,
+          feeEstimateEur,
+        },
+      })
+      if (typeof auction.sellerId === 'string' && auction.sellerId !== '') {
+        eventBus.emit({
+          type: 'auction.sold',
+          userId: auction.sellerId,
+          payload: {
+            auctionId,
+            auctionTitle: auction.title,
+            finalPrice: top.amount,
+            feeEstimateEur,
+          },
+        })
+      }
       await audit(repositories, {
         actorId: session.userId,
         action: 'sealed.winner_confirm',
@@ -2244,6 +2382,9 @@ export async function confirmSealedCeremonyWinnerAction(
           reauth: reauthMethod,
           openerUserId: record.opener.userId,
           approverUserId: record.approver?.userId ?? null,
+          ...(companyProfileOotel
+            ? { companyProfileOotel: true, companyProfileDecision: 'proceed' }
+            : {}),
         },
       })
       return null
@@ -2256,6 +2397,76 @@ export async function confirmSealedCeremonyWinnerAction(
   }
 
   return { ok: true, phase: 'confirmed', error: null }
+}
+
+/**
+ * Empty-lot shortcut from the pre-flight checklist: a lot with zero valid
+ * sealed bids is declared unsold without the two-signature ceremony
+ * (single-admin rules). The server re-checks the empty state by decrypting,
+ * so a lot with any qualifying bid can never bypass the ceremony.
+ */
+export async function markSealedUnsoldShortcutAction(
+  _prev: SealedCeremonyActionState,
+  formData: FormData,
+): Promise<SealedCeremonyActionState> {
+  const { session, repositories } = await requireAdminRepositories()
+  const denied = ceremonyOperateOrError(session.role)
+  if (denied) return { ok: false, phase: 'checklist', error: denied }
+
+  const auctionId = readText(formData, 'auctionId')
+  const reason = readText(formData, 'reason')
+  if (reason.length < MIN_REASON_LENGTH) {
+    return {
+      ok: false,
+      phase: 'checklist',
+      error: `Müümata märkimine vajab põhjust (vähemalt ${String(MIN_REASON_LENGTH)} tähemärki).`,
+    }
+  }
+
+  const auction = await repositories.findByID({ collection: 'auctions', id: auctionId })
+  if (!auction) return { ok: false, phase: 'checklist', error: 'Oksjonit ei leitud.' }
+
+  // Idempotency precedes the status gate, mirroring the void path.
+  const existing = await findCeremonyAuditEntry(repositories, 'sealed.mark_unsold', auctionId)
+  if (existing !== null) return { ok: true, phase: 'unsold', error: null }
+  if (auction.status !== 'ended') {
+    return { ok: false, phase: 'checklist', error: 'Müümata otsetee kehtib ainult lõppenud oksjonil.' }
+  }
+
+  const decrypted = decryptSealedBids(await getSealedBidsForAuction(auctionId))
+  const validCount = decrypted.filter((bid) => bid.valid).length
+  if (validCount > 0) {
+    return {
+      ok: false,
+      phase: 'checklist',
+      error: 'Oksjonil on kehtivaid pakkumisi — tulemus otsustakse avamistseremoonial.',
+    }
+  }
+
+  try {
+    await repositories.update({
+      collection: 'auctions',
+      id: auctionId,
+      data: { status: 'unsold' },
+    })
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'sealed.mark_unsold',
+      entityType: 'auction',
+      entityId: auctionId,
+      after: { reason, shortcut: true, totalBids: decrypted.length, validCount: 0 },
+    })
+  } catch (error) {
+    return {
+      ok: false,
+      phase: 'checklist',
+      error: `Müümata märkimine ebaõnnestus: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+
+  revalidatePath(auctionDetailPath(auctionId))
+  revalidatePath(`${auctionDetailPath(auctionId)}/ceremony`)
+  return { ok: true, phase: 'unsold', error: null }
 }
 
 /**
