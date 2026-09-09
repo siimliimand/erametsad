@@ -20,6 +20,12 @@ export const auditEntries = sqliteTable(
     hash: text('hash'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    // Era columns (migration 0020): nullable so rows written before the
+    // migration stay valid and keep verifying against the hash chain.
+    reason: text('reason'),
+    sessionId: text('session_id'),
+    ipHash: text('ip_hash'),
+    userAgent: text('user_agent'),
   },
   (t) => [
     index('audit_entries_entity_idx').on(t.entityType, t.entityId),

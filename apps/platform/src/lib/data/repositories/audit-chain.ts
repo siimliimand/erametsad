@@ -11,6 +11,14 @@ import type { CoreDatabase } from './repository'
  * TEXT-JSON strings and every absent value is JSON null. Fixed order plus
  * JSON escaping keeps the serialization stable across runs, so independent
  * verification only needs this file and the stored rows.
+ *
+ * Era tolerance: rows written before migration 0020 have no reason,
+ * sessionId, ipHash, or userAgent values. Their stored hashes cover the
+ * 10-field array above, so the serialization stays that array whenever all
+ * four era values are null. When any era value is present, the four values
+ * are appended ([..., prevHash, reason, sessionId, ipHash, userAgent]). The
+ * rule is a pure function of the stored values, so verification reproduces
+ * both the pre-migration and post-migration hashes without rewriting any.
  */
 /**
  * Hash input: either the encoded write values or a stored row read back
@@ -19,7 +27,7 @@ import type { CoreDatabase } from './repository'
 type HashableEntry = AuditChainRow | Record<string, unknown>
 
 function canonicalEntryString(values: HashableEntry): string {
-  return JSON.stringify([
+  const base = [
     values.id ?? null,
     values.actorId ?? null,
     values.action ?? null,
@@ -30,7 +38,15 @@ function canonicalEntryString(values: HashableEntry): string {
     values.createdAt ?? null,
     values.updatedAt ?? null,
     values.prevHash ?? null,
-  ])
+  ]
+  const reason = values.reason ?? null
+  const sessionId = values.sessionId ?? null
+  const ipHash = values.ipHash ?? null
+  const userAgent = values.userAgent ?? null
+  if (reason === null && sessionId === null && ipHash === null && userAgent === null) {
+    return JSON.stringify(base)
+  }
+  return JSON.stringify([...base, reason, sessionId, ipHash, userAgent])
 }
 
 async function sha256Hex(input: string): Promise<string> {
@@ -87,7 +103,8 @@ export async function chainAuditEntry(
 /**
  * One stored audit row in the shape the chain hashes. before/after are the
  * stored TEXT-JSON strings, exactly as serialized at write time — never the
- * decoded JSON values.
+ * decoded JSON values. The era fields are null on rows written before
+ * migration 0020.
  */
 export interface AuditChainRow {
   id: string
@@ -101,6 +118,10 @@ export interface AuditChainRow {
   updatedAt: string
   prevHash: string | null
   hash: string | null
+  reason?: string | null
+  sessionId?: string | null
+  ipHash?: string | null
+  userAgent?: string | null
 }
 
 export type AuditChainBreakReason =
@@ -176,6 +197,10 @@ export async function verifyAuditChain(
       updatedAt: auditEntries.updatedAt,
       prevHash: auditEntries.prevHash,
       hash: auditEntries.hash,
+      reason: auditEntries.reason,
+      sessionId: auditEntries.sessionId,
+      ipHash: auditEntries.ipHash,
+      userAgent: auditEntries.userAgent,
     })
     .from(auditEntries)
     .orderBy(sql`rowid`)
