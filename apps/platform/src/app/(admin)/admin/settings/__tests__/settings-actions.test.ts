@@ -16,7 +16,8 @@ const state = vi.hoisted((): {
   session: { userId: string; role: string }
   repositories: unknown
 } => ({
-  session: { userId: 'admin-1', role: 'admin' },
+  // Settings writes are superadmin-only since the D-6 tier split.
+  session: { userId: 'superadmin-1', role: 'superadmin' },
   repositories: null,
 }))
 
@@ -102,7 +103,7 @@ describe('setMaintenanceModeAction', () => {
   let repos: Repos
 
   beforeEach(() => {
-    state.session = { userId: 'admin-1', role: 'admin' }
+    state.session = { userId: 'superadmin-1', role: 'superadmin' }
     repos = makeRepos({ id: 'settings-1', maintenanceEnabled: false })
     state.repositories = repos
   })
@@ -111,12 +112,13 @@ describe('setMaintenanceModeAction', () => {
     return repos.creates.filter((entry) => entry.collection === 'audit-entry')
   }
 
-  it('denies a role without settings:write', async () => {
-    state.session = { userId: 'specialist-1', role: 'specialist' }
-
-    await expect(
-      setMaintenanceModeAction(form({ enabled: 'true', confirm: 'HOOLDUS', reason: 'hooldustööd käivad' })),
-    ).rejects.toBeInstanceOf(PermissionDeniedError)
+  it('denies roles without settings:write, including admin (D-6 read-only tier)', async () => {
+    for (const role of ['admin', 'specialist'] as const) {
+      state.session = { userId: `${role}-1`, role }
+      await expect(
+        setMaintenanceModeAction(form({ enabled: 'true', confirm: 'HOOLDUS', reason: 'hooldustööd käivad' })),
+      ).rejects.toBeInstanceOf(PermissionDeniedError)
+    }
 
     expect(repos.updates).toEqual([])
     expect(repos.creates).toEqual([])
@@ -167,7 +169,7 @@ describe('setMaintenanceModeAction', () => {
       data: { maintenanceEnabled: true },
     })
     expect(auditEntries()[0]?.data).toMatchObject({
-      actorId: 'admin-1',
+      actorId: 'superadmin-1',
       action: 'maintenance.start',
       entityType: 'settings',
       entityId: 'settings-1',
@@ -198,7 +200,7 @@ describe('setMaintenanceModeAction', () => {
       data: { maintenanceEnabled: false },
     })
     expect(auditEntries()[0]?.data).toMatchObject({
-      actorId: 'admin-1',
+      actorId: 'superadmin-1',
       action: 'maintenance.end',
       entityType: 'settings',
       entityId: 'settings-1',
@@ -234,7 +236,7 @@ describe('revealIntegrationKeyAction', () => {
   let repos: Repos
 
   beforeEach(() => {
-    state.session = { userId: 'admin-9', role: 'admin' }
+    state.session = { userId: 'superadmin-9', role: 'superadmin' }
     repos = makeRepos({ id: 'settings-1' })
     state.repositories = repos
     vi.stubEnv('EIDEASY_SECRET', SECRET)
@@ -254,7 +256,7 @@ describe('revealIntegrationKeyAction', () => {
 
     expect(result).toEqual({ ok: true, value: SECRET })
     expect(auditEntries()[0]?.data).toMatchObject({
-      actorId: 'admin-9',
+      actorId: 'superadmin-9',
       action: 'settings.key_reveal',
       entityType: 'settings',
       entityId: 'eideasy',

@@ -14,6 +14,8 @@ import {
 import type { IntegrationCheckState, IntegrationProbe } from '../admin/settings/_components/integration-keys'
 
 import type { CoreRepositories } from '@/lib/data/repositories'
+import { maintenanceScopes, type MaintenanceScope } from '@/lib/data/schema'
+import { db } from '@/lib/db'
 
 const settingsPath = '/admin/settings'
 const maintenanceConfirmWord = 'HOOLDUS'
@@ -34,6 +36,7 @@ async function writeAudit(
     actorId: string
     action: string
     entityId: string
+    entityType?: string
     before?: unknown
     after: unknown
   },
@@ -43,7 +46,7 @@ async function writeAudit(
     data: {
       actorId: entry.actorId,
       action: entry.action,
-      entityType: 'settings',
+      entityType: entry.entityType ?? 'settings',
       entityId: entry.entityId,
       ...(entry.before !== undefined ? { before: entry.before } : {}),
       after: entry.after,
@@ -335,5 +338,190 @@ export async function rotateIntegrationKeyAction(
     after: { key: key.id, env: key.envVar, rotated: true, reason: reason.trim() },
   })
 
+  return { ok: true }
+}
+
+/**
+ * Hooldusaknad (task 4.4): planned maintenance windows. The windows table
+ * is not in the repository registry, so rows go through the raw D1
+ * executor (same escape hatch as _actions/users.ts) while audit entries
+ * ride the audited repository. Saving a window that contains an auction
+ * end is blocked with the auction list unless the operator force-confirms.
+ */
+
+export interface MaintenanceWindowRow {
+  id: string
+  startsAt: string
+  endsAt: string
+  scope: MaintenanceScope
+  createdBy: string | null
+  note: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MaintenanceConflict {
+  id: string
+  title: string
+  status: string
+  endsAt: string
+}
+
+export type SaveWindowResult =
+  | { ok: true }
+  | { ok: false; error: string }
+  | { ok: false; conflict: true; conflicts: MaintenanceConflict[] }
+
+export async function listMaintenanceWindowsAction(): Promise<MaintenanceWindowRow[]> {
+  await requireAdminRepositories()
+
+  const { results } = await db.query(
+    `SELECT id, starts_at AS startsAt, ends_at AS endsAt, scope,
+      created_by AS createdBy, note, created_at AS createdAt, updated_at AS updatedAt
+     FROM maintenance_windows ORDER BY starts_at ASC`,
+  )
+  return results.map((row) => ({
+    id: String(row.id),
+    startsAt: String(row.startsAt),
+    endsAt: String(row.endsAt),
+    scope:
+      typeof row.scope === 'string' && row.scope === 'admin'
+        ? 'admin'
+        : row.scope === 'all'
+          ? 'all'
+          : 'portal',
+    createdBy: typeof row.createdBy === 'string' ? row.createdBy : null,
+    note: typeof row.note === 'string' ? row.note : null,
+    createdAt: String(row.createdAt),
+    updatedAt: String(row.updatedAt),
+  }))
+}
+
+/** Accepts datetime-local ("YYYY-MM-DDTHH:mm") or full ISO timestamps. */
+function parseWindowDate(value: string): string | null {
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
+}
+
+/** Auctions whose end time falls inside [startsAt, endsAt]. */
+async function findConflictingAuctions(
+  startsAt: string,
+  endsAt: string,
+): Promise<MaintenanceConflict[]> {
+  const { results } = await db.query(
+    `SELECT id, title, status, ends_at AS endsAt FROM auctions
+     WHERE ends_at IS NOT NULL AND ends_at >= ? AND ends_at <= ?
+       AND status IN ('draft', 'scheduled', 'active')
+     ORDER BY ends_at ASC LIMIT 20`,
+    [startsAt, endsAt],
+  )
+  return results.map((row) => ({
+    id: String(row.id),
+    title: String(row.title),
+    status: String(row.status),
+    endsAt: String(row.endsAt),
+  }))
+}
+
+export async function saveMaintenanceWindowAction(input: {
+  startsAt: string
+  endsAt: string
+  scope: string
+  note: string
+  reason: string
+  force: boolean
+}): Promise<SaveWindowResult> {
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'settings:write')
+
+  const reason = input.reason.trim()
+  if (!isValidReason(reason)) {
+    return { ok: false, error: 'Põhjendus peab olema vähemalt 5 tähemärki.' }
+  }
+  const startsAt = parseWindowDate(input.startsAt.trim())
+  const endsAt = parseWindowDate(input.endsAt.trim())
+  if (!startsAt || !endsAt) {
+    return { ok: false, error: 'Sisesta korrektne algus- ja lõpuaeg.' }
+  }
+  if (endsAt <= startsAt) {
+    return { ok: false, error: 'Akna lõpp peab olema pärast algust.' }
+  }
+  const scope = (maintenanceScopes as readonly string[]).includes(input.scope)
+    ? (input.scope as MaintenanceScope)
+    : 'portal'
+
+  const conflicts = await findConflictingAuctions(startsAt, endsAt)
+  if (conflicts.length > 0 && !input.force) {
+    return { ok: false, conflict: true, conflicts }
+  }
+
+  const id = crypto.randomUUID()
+  const timestamp = new Date().toISOString()
+  await db.query(
+    `INSERT INTO maintenance_windows
+      (id, starts_at, ends_at, scope, created_by, note, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, startsAt, endsAt, scope, session.userId, input.note.trim() || null, timestamp, timestamp],
+  )
+
+  await writeAudit(repositories, {
+    actorId: session.userId,
+    action: 'maintenance.window_create',
+    entityType: 'maintenance_window',
+    entityId: id,
+    after: {
+      startsAt,
+      endsAt,
+      scope,
+      note: input.note.trim() || null,
+      reason,
+      conflictCount: conflicts.length,
+      forced: conflicts.length > 0,
+    },
+  })
+
+  revalidatePath(settingsPath)
+  return { ok: true }
+}
+
+export async function deleteMaintenanceWindowAction(
+  id: string,
+  reason: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'settings:write')
+
+  const trimmed = reason.trim()
+  if (!isValidReason(trimmed)) {
+    return { ok: false, error: 'Põhjendus peab olema vähemalt 5 tähemärki.' }
+  }
+  const { results } = await db.query(
+    `SELECT id, starts_at AS startsAt, ends_at AS endsAt, scope, note
+     FROM maintenance_windows WHERE id = ? LIMIT 1`,
+    [id],
+  )
+  const window = results[0]
+  if (!window) {
+    return { ok: false, error: 'Akna ei leitud.' }
+  }
+
+  await db.query(`DELETE FROM maintenance_windows WHERE id = ?`, [id])
+
+  await writeAudit(repositories, {
+    actorId: session.userId,
+    action: 'maintenance.window_delete',
+    entityType: 'maintenance_window',
+    entityId: id,
+    before: {
+      startsAt: window.startsAt,
+      endsAt: window.endsAt,
+      scope: window.scope,
+      note: window.note ?? null,
+      reason: trimmed,
+    },
+    after: { deleted: true, reason: trimmed },
+  })
+
+  revalidatePath(settingsPath)
   return { ok: true }
 }
