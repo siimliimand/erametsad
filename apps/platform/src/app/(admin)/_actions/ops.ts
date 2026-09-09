@@ -10,13 +10,20 @@ import {
   type LeadExportRow,
 } from '../../api/v1/admin/leads/export/_lib/leads-export'
 import { requireAdminRepositories, type AdminSession } from '../_lib/admin'
-import { formatDateTime } from '../_lib/labels'
+import { formatDateTime, maskIsikukood } from '../_lib/labels'
 import { can, leadInScope, leadScope } from '../_lib/permissions'
+import {
+  buildCompanyHistoryCsv,
+  buildCompanyHistoryRow,
+  matchesCompanyHistoryFilters,
+  parseCompanyHistoryFilters,
+} from '../admin/companies/_components/history-view'
 import { evaluateLeadExitGuard } from '../admin/leads/_components/lead-flow'
 import {
   crossCheckBoardMembership,
   resolveRegistrySnapshot,
 } from '../admin/leads/_components/registry-snapshot'
+import { getMediaBucket, sanitizeFilename, validateMediaUpload } from '../admin/media/_lib/media-upload'
 import {
   buildAttachmentLinks,
   buildMinimizedForwardPayload,
@@ -28,10 +35,12 @@ import {
   auctionObjectTypes,
   leadStatuses,
   serviceRequestTypes,
+  type CompanyAccessRequest,
   type Lead,
   type LeadStatus,
   type ServiceRequestType,
 } from '@/lib/data/schema'
+import { deriveCountyCodeFromCadastre } from '@/lib/leads/cadastre-county'
 import { sendEmail, type SendResult } from '@/lib/notifications/email-sender'
 
 const REASON_MIN_LENGTH = 5
@@ -63,6 +72,21 @@ function readCheckbox(formData: FormData, key: string): boolean {
   return value === 'on' || value === 'true'
 }
 
+function readFile(formData: FormData, key: string): File | null {
+  const value = formData.get(key)
+  return value instanceof File && value.size > 0 ? value : null
+}
+
+/**
+ * Optional same-area redirect override: the company decision forms are
+ * hosted on both the leads requests page and /admin/companies, so the form
+ * names the page to land on. Anything outside /admin falls back.
+ */
+function readRedirectTo(formData: FormData, fallback: string): string {
+  const value = readText(formData, 'redirectTo')
+  return value.startsWith('/admin') ? value : fallback
+}
+
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?viga=${encodeURIComponent(message)}`)
 }
@@ -84,6 +108,20 @@ async function requirePermission(
     redirectWithError(fallbackPath, 'Teil puudub õigus selle toimingu sooritamiseks.')
   }
   return session
+}
+
+/** Counties row id for a two-letter county code, or null when unknown. */
+async function resolveCountyId(
+  repositories: CoreRepositories,
+  countyCode: string | null,
+): Promise<string | null> {
+  if (!countyCode) return null
+  const { docs } = await repositories.find({
+    collection: 'counties',
+    where: { code: { equals: countyCode } },
+    limit: 1,
+  })
+  return docs[0]?.id ?? null
 }
 
 /**
@@ -201,6 +239,58 @@ export async function approveCompanyAccessRequestAction(formData: FormData): Pro
     redirectWithError(REQUESTS_PATH, 'Kinnitage äriregistri andmed käsitsi enne nõustumist.')
   }
 
+  // Volikiri enforcement (spec delta admin-people): a failed board-member
+  // check permits only rejection, or an approval that carries a justification
+  // and a power-of-attorney document upload. The upload follows the media R2
+  // pattern (validate → bucket put → key recorded on the audit entry).
+  const boardCheckFailed = boardCheck.level === 'none'
+  let volikiriAudit: Record<string, unknown> | null = null
+  let volikiriKey: string | null = null
+  if (boardCheckFailed) {
+    const justification = readText(formData, 'justification')
+    if (!hasMinReason(justification)) {
+      redirectWithError(
+        REQUESTS_PATH,
+        'Juhatuse liikmelisuse kontroll ebaõnnestus — nõustumise põhjendus on kohustuslik (vähemalt 5 tähemärki).',
+      )
+    }
+    const file = readFile(formData, 'volikiri')
+    if (!file) {
+      redirectWithError(REQUESTS_PATH, 'Nõustumine ilma juhatuse liikmelisuseta nõuab volikirja üleslaadimist.')
+    }
+    const validationError = validateMediaUpload({
+      filename: file.name,
+      mimeType: file.type,
+      size: file.size,
+    })
+    if (validationError) {
+      redirectWithError(REQUESTS_PATH, `Volikiri: ${validationError}`)
+    }
+    const bucket = await getMediaBucket()
+    if (!bucket) {
+      redirectWithError(REQUESTS_PATH, 'R2 salvestusruum pole saadaval — volikirja ei saa üles laadida.')
+    }
+    const key = `volikiri/${id}/${new Date().toISOString().replace(/[:.]/g, '-')}-${sanitizeFilename(file.name)}`
+    try {
+      await bucket.put(key, await file.arrayBuffer(), {
+        httpMetadata: { contentType: file.type },
+      })
+    } catch (error) {
+      redirectWithError(
+        REQUESTS_PATH,
+        `Volikirja üleslaadimine ebaõnnestus: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+    volikiriKey = key
+    volikiriAudit = {
+      r2Key: key,
+      filename: file.name,
+      sizeBytes: file.size,
+      mimeType: file.type,
+      justification,
+    }
+  }
+
   let failure: string | null = null
   let profileId: string | null = null
   try {
@@ -257,18 +347,33 @@ export async function approveCompanyAccessRequestAction(formData: FormData): Pro
         registryStatus: snapshot.status,
         boardCheck: boardCheck.level,
         reason: 'Ettevõtte vaikimisi õigused',
+        ...(volikiriAudit ? { volikiri: volikiriAudit } : {}),
       },
     })
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
+    // A failed decision must not leave an unreachable R2 object behind.
+    if (volikiriKey) {
+      const bucket = await getMediaBucket()
+      try {
+        await bucket?.delete(volikiriKey)
+      } catch {
+        // The primary failure is what the admin needs to see.
+      }
+    }
     redirectWithError(REQUESTS_PATH, `Taotluse nõustumine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(REQUESTS_PATH)
   revalidatePath('/admin/leads')
-  redirectWithNotice(REQUESTS_PATH, 'Taotlus nõustutud; profiil aktiveeritud ja taotlejale teavitatud.')
+  redirectWithNotice(
+    readRedirectTo(formData, REQUESTS_PATH),
+    boardCheckFailed
+      ? 'Taotlus nõustutud põhjenduse ja volikirjaga; profiil aktiveeritud ja taotlejale teavitatud.'
+      : 'Taotlus nõustutud; profiil aktiveeritud ja taotlejale teavitatud.',
+  )
 }
 
 export async function rejectCompanyAccessRequestAction(formData: FormData): Promise<void> {
@@ -337,7 +442,10 @@ export async function rejectCompanyAccessRequestAction(formData: FormData): Prom
   }
 
   revalidatePath(REQUESTS_PATH)
-  redirectWithNotice(REQUESTS_PATH, 'Taotlus keeldutud ja taotlejale põhjusega teavitatud.')
+  redirectWithNotice(
+    readRedirectTo(formData, REQUESTS_PATH),
+    'Taotlus keeldutud ja taotlejale põhjusega teavitatud.',
+  )
 }
 
 export async function holdCompanyAccessRequestAction(formData: FormData): Promise<void> {
@@ -381,7 +489,187 @@ export async function holdCompanyAccessRequestAction(formData: FormData): Promis
   }
 
   revalidatePath(REQUESTS_PATH)
-  redirectWithNotice(REQUESTS_PATH, 'Taotlus pandud ootele sisemärkusega.')
+  redirectWithNotice(
+    readRedirectTo(formData, REQUESTS_PATH),
+    'Taotlus pandud ootele sisemärkusega.',
+  )
+}
+
+/**
+ * Audited registry re-check (the 7.6 "Kontrolli uuesti" view): re-resolves
+ * the registry snapshot for the request and writes the view to the
+ * append-only audit log before the page re-renders with fresh data.
+ */
+export async function registryRecheckAction(formData: FormData): Promise<void> {
+  const session = await requirePermission('companies:write', REQUESTS_PATH)
+  const repositories = await getRepositories()
+
+  const id = readText(formData, 'id')
+  const redirectPath = readRedirectTo(formData, REQUESTS_PATH)
+  if (!id) redirectWithError(redirectPath, 'Taotluse identifikaator puudub.')
+
+  const request = await repositories.findByID({ collection: 'company-access-request', id })
+  if (!request) redirectWithError(redirectPath, 'Taotlust ei leitud.')
+
+  const snapshot = resolveRegistrySnapshot(request.regCode, request.companyName, request.createdAt)
+
+  let failure: string | null = null
+  try {
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'company.registry_recheck',
+      entityType: 'company-access-request',
+      entityId: id,
+      after: {
+        regCode: request.regCode,
+        registryStatus: snapshot.status,
+        verified: snapshot.verified,
+        boardMembers: snapshot.boardMembers.length,
+      },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    redirectWithError(redirectPath, `Registri kontrollimise logimine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath(redirectPath)
+  redirectWithNotice(redirectPath, 'Äriregistri andmed kontrollitud; vaade logitud auditilogisse.')
+}
+
+/**
+ * Audited CSV export of the decided company requests (spec delta
+ * admin-people). The action re-reads the rows server-side, so the audit
+ * entry describes exactly what was exported, and returns the CSV as base64
+ * for a client-side download (the GDPR export pattern).
+ */
+export async function exportCompanyHistoryAction(input: {
+  decision?: string | undefined
+  date?: string | undefined
+  q?: string | undefined
+}): Promise<{ ok: true; filename: string; base64: string; rowCount: number } | { ok: false; error: string }> {
+  const { session } = await requireAdminRepositories()
+  if (!can(session.role, 'companies:read')) {
+    return { ok: false, error: 'Teil puudub õigus selle toimingu sooritamiseks.' }
+  }
+
+  const repositories = await getRepositories()
+  const { docs: requests } = await repositories.find({
+    collection: 'company-access-request',
+    where: {
+      or: [
+        { status: { equals: 'approved' } },
+        { status: { equals: 'rejected' } },
+      ],
+    },
+    sort: '-reviewedAt',
+    pagination: false,
+  })
+
+  const [usersResult, auditsResult] = await Promise.all([
+    repositories.find({ collection: 'users', pagination: false, limit: 5000 }),
+    repositories.find({
+      collection: 'audit-entry',
+      where: { entityType: { equals: 'company-access-request' } },
+      sort: '-createdAt',
+      pagination: false,
+    }),
+  ])
+  const usersById = new Map(usersResult.docs.map((user) => [user.id, user]))
+  const applicantByEmail = new Map(
+    usersResult.docs
+      .filter((user) => typeof user.email === 'string')
+      .map((user) => [user.email, user]),
+  )
+  const auditsByRequestId = new Map<string, AuditEntryDoc[]>()
+  for (const entry of auditsResult.docs) {
+    if (!entry.entityId) continue
+    const list = auditsByRequestId.get(entry.entityId) ?? []
+    list.push(entry)
+    auditsByRequestId.set(entry.entityId, list)
+  }
+
+  const rows = requests
+    .filter(
+      (request): request is CompanyAccessRequest & { status: 'approved' | 'rejected' } =>
+        request.status === 'approved' || request.status === 'rejected',
+    )
+    .map((request) => {
+      const applicant = request.requesterEmail
+        ? applicantByEmail.get(request.requesterEmail)
+        : undefined
+      const entries = auditsByRequestId.get(request.id) ?? []
+      const rejectAfter = entries.find((entry) => entry.action === 'company.reject')?.after
+      const approveAfter = entries.find((entry) => entry.action === 'company.approve')?.after
+      const rejectPayload =
+        typeof rejectAfter === 'object' && rejectAfter !== null
+          ? (rejectAfter as Record<string, unknown>)
+          : {}
+      const approvePayload =
+        typeof approveAfter === 'object' && approveAfter !== null
+          ? (approveAfter as Record<string, unknown>)
+          : {}
+      const rights = Array.isArray(approvePayload.rights) ? approvePayload.rights : []
+      return buildCompanyHistoryRow({
+        request: {
+          id: request.id,
+          regCode: request.regCode,
+          companyName: request.companyName,
+          requesterName: request.requesterName,
+          requesterEmail: request.requesterEmail,
+          status: request.status,
+          reviewedAt: request.reviewedAt,
+        },
+        applicant: {
+          name: applicant?.name ?? null,
+          isikukoodMasked: maskIsikukood(applicant?.isikukood),
+        },
+        reviewerName: request.reviewedBy
+          ? (usersById.get(request.reviewedBy)?.name ?? request.reviewedBy)
+          : null,
+        rejectReason: typeof rejectPayload.reason === 'string' ? rejectPayload.reason : null,
+        rights: rights.filter((right): right is string => typeof right === 'string'),
+      })
+    })
+    .filter((row) =>
+      matchesCompanyHistoryFilters(
+        row,
+        parseCompanyHistoryFilters({ decision: input.decision, date: input.date, q: input.q }),
+      ),
+    )
+
+  const csv = buildCompanyHistoryCsv(rows)
+  const filename = `ettevotte-taotluste-ajalugu-${new Date().toISOString().slice(0, 10)}.csv`
+
+  let failure: string | null = null
+  try {
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'company.history_export',
+      entityType: 'company-access-request',
+      entityId: '*',
+      after: {
+        format: 'csv',
+        rowCount: rows.length,
+        filters: {
+          ...(input.decision ? { decision: input.decision } : {}),
+          ...(input.date ? { date: input.date } : {}),
+          ...(input.q ? { q: input.q } : {}),
+        },
+      },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    return { ok: false, error: `Eksportimise logimine ebaõnnestus: ${failure}` }
+  }
+
+  const bytes = new TextEncoder().encode(csv)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return { ok: true, filename, base64: btoa(binary), rowCount: rows.length }
 }
 
 // ---------------------------------------------------------------------------
@@ -589,6 +877,51 @@ export async function assignLeadSpecialistAction(formData: FormData): Promise<vo
   redirectWithNotice(detailPath, 'Spetsialist määratud.')
 }
 
+/** Manual county set/override on the lead detail (task 8.1). */
+export async function setLeadCountyAction(formData: FormData): Promise<void> {
+  const session = await requirePermission('leads:write', LEADS_PATH)
+  const repositories = await getRepositories()
+
+  const id = readText(formData, 'id')
+  if (!id) redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
+  const detailPath = `/admin/leads/${id}`
+
+  const loaded = await loadLeadInScope(repositories, session, id)
+  if (!loaded.ok) redirectWithError(LEADS_PATH, loaded.error)
+
+  const countyId = readOptionalText(formData, 'countyId')
+  if (countyId) {
+    const county = await repositories.findByID({ collection: 'counties', id: countyId })
+    if (!county) redirectWithError(detailPath, 'Maakonda ei leitud.')
+  }
+
+  let failure: string | null = null
+  try {
+    await repositories.update({
+      collection: 'leads',
+      id,
+      data: { countyId: countyId ?? null },
+    })
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'lead.county',
+      entityType: 'lead',
+      entityId: id,
+      before: { countyId: loaded.lead.countyId ?? null },
+      after: { countyId: countyId ?? null },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    redirectWithError(detailPath, `Maakonna määramine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath(LEADS_PATH)
+  revalidatePath(detailPath)
+  redirectWithNotice(detailPath, 'Maakond määratud.')
+}
+
 export async function addLeadNoteAction(formData: FormData): Promise<void> {
   const session = await requirePermission('leads:write', LEADS_PATH)
   const repositories = await getRepositories()
@@ -678,6 +1011,11 @@ export async function createLeadAction(formData: FormData): Promise<void> {
   let leadId = ''
   try {
     const nowIso = new Date().toISOString()
+    const cadastr = readOptionalText(formData, 'cadastr')
+    const countyId = await resolveCountyId(
+      repositories,
+      deriveCountyCodeFromCadastre(cadastr),
+    )
     const created = await repositories.create({
       collection: 'leads',
       data: {
@@ -686,7 +1024,8 @@ export async function createLeadAction(formData: FormData): Promise<void> {
         contactName,
         phone,
         email,
-        cadastr: readOptionalText(formData, 'cadastr'),
+        cadastr,
+        countyId,
         consentAt: nowIso,
         source: readOptionalText(formData, 'source') ?? 'käsitsi',
         status: 'new',
@@ -1075,6 +1414,162 @@ export async function markRequestRespondedAction(formData: FormData): Promise<vo
 
   revalidatePath(SERVICE_REQUESTS_PATH)
   redirectWithNotice(detailPath, 'Partner märgitud vastanuks.')
+}
+
+/** Marks a routed/answered request teostatud (task 8.4). */
+export async function markRequestDoneAction(formData: FormData): Promise<void> {
+  const session = await requirePermission('inquiries:write', SERVICE_REQUESTS_PATH)
+  const repositories = await getRepositories()
+
+  const id = readText(formData, 'id')
+  if (!id) redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu identifikaator puudub.')
+  const detailPath = `${SERVICE_REQUESTS_PATH}?detail=${id}`
+
+  const request = await repositories.findByID({ collection: 'service-requests', id })
+  if (!request) redirectWithError(SERVICE_REQUESTS_PATH, 'Päringut ei leitud.')
+  if (request.status === 'teostatud') {
+    redirectWithNotice(detailPath, 'Päring on juba teostatud.')
+  }
+  if (request.status === 'suletud') {
+    redirectWithError(detailPath, 'Päring on suletud — olekut ei saa enam muuta.')
+  }
+
+  let failure: string | null = null
+  try {
+    await repositories.update({
+      collection: 'service-requests',
+      id,
+      data: { status: 'teostatud' },
+    })
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'request.mark_done',
+      entityType: 'service-request',
+      entityId: id,
+      before: { status: request.status },
+      after: { status: 'teostatud' },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    redirectWithError(detailPath, `Teostatuks märkimine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath(SERVICE_REQUESTS_PATH)
+  redirectWithNotice(detailPath, 'Päring märgitud teostatuks.')
+}
+
+/** Closes a request for good; closed rows leave the active workflow (task 8.4). */
+export async function closeRequestAction(formData: FormData): Promise<void> {
+  const session = await requirePermission('inquiries:write', SERVICE_REQUESTS_PATH)
+  const repositories = await getRepositories()
+
+  const id = readText(formData, 'id')
+  if (!id) redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu identifikaator puudub.')
+  const detailPath = `${SERVICE_REQUESTS_PATH}?detail=${id}`
+
+  const request = await repositories.findByID({ collection: 'service-requests', id })
+  if (!request) redirectWithError(SERVICE_REQUESTS_PATH, 'Päringut ei leitud.')
+  if (request.status === 'suletud') {
+    redirectWithNotice(detailPath, 'Päring on juba suletud.')
+  }
+
+  let failure: string | null = null
+  try {
+    await repositories.update({
+      collection: 'service-requests',
+      id,
+      data: { status: 'suletud' },
+    })
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'request.close',
+      entityType: 'service-request',
+      entityId: id,
+      before: { status: request.status },
+      after: { status: 'suletud' },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    redirectWithError(detailPath, `Sulgemine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath(SERVICE_REQUESTS_PATH)
+  redirectWithNotice(detailPath, 'Päring suletud.')
+}
+
+function attachmentKeys(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string' && item !== '')
+    : []
+}
+
+function attachmentZipName(key: string): string {
+  const base = key.split('/').pop() ?? key
+  return base === '' ? 'manus' : base
+}
+
+export interface RequestZipEntry {
+  name: string
+  bytes: Uint8Array
+}
+
+export type RequestAttachmentsZipResult =
+  | { ok: true; requestLabel: string; entries: RequestZipEntry[] }
+  | { ok: false; error: string }
+
+/**
+ * Assembles the attachment ZIP for one service request (task 8.5). The
+ * route turns the result into the download; the audit entry lands before
+ * any byte leaves the server.
+ */
+export async function loadRequestAttachmentsZipData(
+  requestId: string,
+): Promise<RequestAttachmentsZipResult> {
+  const { session } = await requireAdminRepositories()
+  if (!can(session.role, 'inquiries:read')) {
+    return { ok: false, error: 'Teil puudub õigus päringu manustele.' }
+  }
+  const repositories = await getRepositories()
+
+  const request = await repositories.findByID({ collection: 'service-requests', id: requestId })
+  if (!request) return { ok: false, error: 'Päringut ei leitud.' }
+
+  const keys = attachmentKeys(request.attachments)
+  if (keys.length === 0) return { ok: false, error: 'Päringul ei ole manuseid.' }
+
+  const bucket = await getMediaBucket()
+  if (!bucket) return { ok: false, error: 'Salvestusruum ei ole saadaval.' }
+
+  const entries: RequestZipEntry[] = []
+  for (const key of keys) {
+    const object = await bucket.get(key)
+    if (!object?.body) continue
+    entries.push({
+      name: attachmentZipName(key),
+      bytes: new Uint8Array(await new Response(object.body).arrayBuffer()),
+    })
+  }
+  if (entries.length === 0) {
+    return { ok: false, error: 'Manuseid ei õnnestunud salvestusruumist laadida.' }
+  }
+
+  try {
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'request.attachments_zip',
+      entityType: 'service-request',
+      entityId: requestId,
+      after: { count: entries.length },
+    })
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+
+  return { ok: true, requestLabel: `${request.type}-${requestId.slice(0, 8)}`, entries }
 }
 
 function readPartnerForm(formData: FormData): {

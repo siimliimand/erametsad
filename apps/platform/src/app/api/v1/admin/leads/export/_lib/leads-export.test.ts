@@ -20,6 +20,7 @@ function makeLead(overrides: Partial<Lead>): Lead {
     phone: '+372 500 100',
     email: 'jaan@tamm.ee',
     cadastr: '34801:001:0217',
+    countyId: null,
     consentAt: '2026-08-26T09:12:00.000Z',
     source: 'veebivorm',
     status: 'new',

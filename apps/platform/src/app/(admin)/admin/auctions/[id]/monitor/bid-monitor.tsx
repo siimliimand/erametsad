@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Eye,
+  Flag,
   Network,
   SearchCheck,
   Swords,
@@ -382,24 +383,51 @@ function formatDelta(deltaMs: number): string {
 }
 
 /**
+ * True when any bidder involved in the anomaly carries a shill flag: the
+ * kind-specific ids plus every bidder in the evidence timeline.
+ */
+function anomalyInvolvesFlaggedBidder(
+  anomaly: DetectedAnomaly,
+  flaggedBidderIds: ReadonlySet<string>,
+): boolean {
+  if (flaggedBidderIds.size === 0) return false
+  const kindIds =
+    anomaly.kind === 'new-account-burst'
+      ? [anomaly.bidderId]
+      : anomaly.kind === 'rapid-overtake'
+        ? [anomaly.bidderIdA, anomaly.bidderIdB]
+        : []
+  return (
+    kindIds.some((bidderId) => flaggedBidderIds.has(bidderId)) ||
+    anomaly.timeline.some(
+      (entry) => entry.bidderId !== null && flaggedBidderIds.has(entry.bidderId),
+    )
+  )
+}
+
+/**
  * One expandable anomaly card: the collapsed row names the finding, the
  * expanded evidence block shows the affected labels with their bid counts,
  * the masked IP prefixes, and the bid-time deltas of the involved bids.
  * "Märgi uurimiseks" flags this one finding through the audited
- * `anomaly.flag` audit entry.
+ * `anomaly.flag` audit entry. A card with a shill-flagged bidder shows the
+ * flag mark on the collapsed summary.
  */
 function AnomalyCard({
   auctionId,
   anomaly,
+  flaggedBidderIds,
 }: {
   auctionId: string
   anomaly: DetectedAnomaly
+  flaggedBidderIds: ReadonlySet<string>
 }) {
   const [flagged, setFlagged] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const view = anomalyCardView(anomaly)
   const Icon = view.icon
+  const involvesFlagged = anomalyInvolvesFlaggedBidder(anomaly, flaggedBidderIds)
 
   return (
     <li className="rounded-input border border-l-4 border-border border-l-danger bg-danger-light px-sm py-xs">
@@ -407,7 +435,10 @@ function AnomalyCard({
         <summary className="flex cursor-pointer list-none items-start gap-2.5 [&::-webkit-details-marker]:hidden">
           <Icon className="mt-0.5 h-4 w-4 flex-none text-danger" aria-hidden="true" />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-bodySm font-semibold text-ink">{view.title}</span>
+            <span className="flex items-center gap-1.5 text-bodySm font-semibold text-ink">
+              {involvesFlagged ? <FlagMark /> : null}
+              {view.title}
+            </span>
             <span className="text-label text-ink-muted">{view.description}</span>
           </span>
           <ChevronDown
@@ -491,9 +522,11 @@ function AnomalyCard({
 function AnomaliesPanel({
   auctionId,
   anomalies,
+  flaggedBidderIds,
 }: {
   auctionId: string
   anomalies: readonly DetectedAnomaly[]
+  flaggedBidderIds: ReadonlySet<string>
 }) {
   return (
     <section
@@ -520,7 +553,12 @@ function AnomaliesPanel({
       ) : (
         <ul className="mt-sm flex flex-col gap-xs">
           {anomalies.map((anomaly) => (
-            <AnomalyCard key={anomaly.id} auctionId={auctionId} anomaly={anomaly} />
+            <AnomalyCard
+              key={anomaly.id}
+              auctionId={auctionId}
+              anomaly={anomaly}
+              flaggedBidderIds={flaggedBidderIds}
+            />
           ))}
         </ul>
       )}
@@ -694,6 +732,19 @@ function UnderbidsPanel({
 }
 
 /**
+ * Shill-flag marker (spec delta admin-people): flagged bidders carry this
+ * icon on their reveal chip and on the anomaly cards that involve them.
+ */
+function FlagMark({ className = '' }: { className?: string }) {
+  return (
+    <span className={`inline-flex items-center ${className}`} title="Märgitud shill-uurimiseks">
+      <Flag className="h-3 w-3 text-danger" aria-hidden="true" />
+      <span className="sr-only">Märgitud shill-uurimiseks</span>
+    </span>
+  )
+}
+
+/**
  * Audited bidder reveal chip (demo 04-bids-monitoring "Pakkuja #N"). The
  * masked chip is the only client path to an identity: clicking calls the
  * shared `revealBidderIdentityAction`, which writes the `user.identity_view`
@@ -707,11 +758,13 @@ function BidderRevealChip({
   bidderId,
   alias,
   canViewUsers,
+  flagged,
 }: {
   bidId: string | null
   bidderId: string | null
   alias: number
   canViewUsers: boolean
+  flagged: boolean
 }) {
   const [identity, setIdentity] = useState<BidderIdentityView | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -728,6 +781,7 @@ function BidderRevealChip({
     )
     return (
       <span className="inline-flex flex-wrap items-center gap-x-1">
+        {flagged ? <FlagMark /> : null}
         {canViewUsers && bidderId !== null ? (
           <Link
             href={`/admin/users/${encodeURIComponent(bidderId)}`}
@@ -750,29 +804,37 @@ function BidderRevealChip({
   }
 
   if (bidId === null) {
-    return <span className="text-label font-medium text-ink-muted">Pakkuja #{String(alias)}</span>
+    return (
+      <span className="inline-flex items-center gap-1">
+        {flagged ? <FlagMark /> : null}
+        <span className="text-label font-medium text-ink-muted">Pakkuja #{String(alias)}</span>
+      </span>
+    )
   }
 
   return (
-    <button
-      type="button"
-      disabled={pending}
-      title="Paljasta pakkuja nimi (logitakse auditisse)"
-      onClick={() => {
-        startTransition(async () => {
-          const reveal = await revealBidderIdentityAction(bidId)
-          if (reveal.ok) {
-            setIdentity(reveal.identity)
-          } else {
-            setError(reveal.error)
-          }
-        })
-      }}
-      className="inline-flex h-6 items-center gap-1 rounded-pill border border-border px-2 text-label font-semibold text-ink-muted transition-colors duration-hover ease-hover hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      <Eye className="h-3 w-3" aria-hidden="true" />
-      {pending ? 'Avan…' : `Pakkuja #${String(alias)}`}
-    </button>
+    <span className="inline-flex items-center gap-1">
+      {flagged ? <FlagMark /> : null}
+      <button
+        type="button"
+        disabled={pending}
+        title="Paljasta pakkuja nimi (logitakse auditisse)"
+        onClick={() => {
+          startTransition(async () => {
+            const reveal = await revealBidderIdentityAction(bidId)
+            if (reveal.ok) {
+              setIdentity(reveal.identity)
+            } else {
+              setError(reveal.error)
+            }
+          })
+        }}
+        className="inline-flex h-6 items-center gap-1 rounded-pill border border-border px-2 text-label font-semibold text-ink-muted transition-colors duration-hover ease-hover hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Eye className="h-3 w-3" aria-hidden="true" />
+        {pending ? 'Avan…' : `Pakkuja #${String(alias)}`}
+      </button>
+    </span>
   )
 }
 
@@ -785,11 +847,13 @@ function FeedBidRow({
   row,
   nowMs,
   canViewUsers,
+  flagged = false,
   indented = false,
 }: {
   row: MonitorBidRow
   nowMs: number
   canViewUsers: boolean
+  flagged?: boolean
   indented?: boolean
 }) {
   return (
@@ -815,6 +879,7 @@ function FeedBidRow({
             bidderId={row.bidderId}
             alias={row.bidderAlias}
             canViewUsers={canViewUsers}
+            flagged={flagged}
           />
         )}
       </td>
@@ -845,12 +910,14 @@ function FeedBurstRow({
   entry,
   nowMs,
   canViewUsers,
+  flaggedBidderIds,
   open,
   onToggle,
 }: {
   entry: Extract<FeedEntry, { kind: 'burst' }>
   nowMs: number
   canViewUsers: boolean
+  flaggedBidderIds: ReadonlySet<string>
   open: boolean
   onToggle: () => void
 }) {
@@ -878,7 +945,14 @@ function FeedBurstRow({
       </tr>
       {open
         ? entry.rows.map((row) => (
-            <FeedBidRow key={row.key} row={row} nowMs={nowMs} canViewUsers={canViewUsers} indented />
+            <FeedBidRow
+              key={row.key}
+              row={row}
+              nowMs={nowMs}
+              canViewUsers={canViewUsers}
+              flagged={row.bidderId !== null && flaggedBidderIds.has(row.bidderId)}
+              indented
+            />
           ))
         : null}
     </>
@@ -916,6 +990,7 @@ export function BidMonitor({
   canViewCeremony,
   canDecideUnderbids,
   underbids,
+  flaggedBidderIds,
 }: {
   auctionId: string
   title: string
@@ -943,6 +1018,12 @@ export function BidMonitor({
   canViewCeremony: boolean
   canDecideUnderbids: boolean
   underbids: MonitorUnderbidRow[]
+  /**
+   * Shill-flagged bidder ids of this lot (spec delta admin-people), built
+   * server-side from the `user.shill_flag` audit entries. Flagged bidders
+   * show the flag icon on their reveal chip and on anomaly cards.
+   */
+  flaggedBidderIds: readonly string[]
 }) {
   const router = useRouter()
   const [rows, setRows] = useState<MonitorBidRow[]>(initialRows)
@@ -963,6 +1044,7 @@ export function BidMonitor({
   const [expandedBursts, setExpandedBursts] = useState<ReadonlySet<string>>(new Set())
   const [endModalOpen, setEndModalOpen] = useState(false)
   const [endReason, setEndReason] = useState('')
+  const flaggedSet = useMemo(() => new Set(flaggedBidderIds), [flaggedBidderIds])
 
   // Server-synced clock: the skew is fixed once against the server render
   // time, then the countdown ticks locally against it.
@@ -1466,6 +1548,7 @@ export function BidMonitor({
                         row={entry.row}
                         nowMs={Date.now() - skewRef.current}
                         canViewUsers={canViewUsers}
+                        flagged={entry.row.bidderId !== null && flaggedSet.has(entry.row.bidderId)}
                       />
                     ) : (
                       <FeedBurstRow
@@ -1473,6 +1556,7 @@ export function BidMonitor({
                         entry={entry}
                         nowMs={Date.now() - skewRef.current}
                         canViewUsers={canViewUsers}
+                        flaggedBidderIds={flaggedSet}
                         open={expandedBursts.has(entry.key)}
                         onToggle={() => {
                           setExpandedBursts((current) => {
@@ -1512,7 +1596,11 @@ export function BidMonitor({
       />
 
       {canViewAnomalies ? (
-        <AnomaliesPanel auctionId={auctionId} anomalies={anomalies} />
+        <AnomaliesPanel
+          auctionId={auctionId}
+          anomalies={anomalies}
+          flaggedBidderIds={flaggedSet}
+        />
       ) : null}
 
       {extensions.length > 0 ? (

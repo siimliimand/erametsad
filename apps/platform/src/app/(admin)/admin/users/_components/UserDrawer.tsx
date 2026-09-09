@@ -13,7 +13,9 @@ import { DEFAULT_USER_TAB, USER_TABS } from './tabs/userTabs'
 import type { DataTabId, UserTabId } from './tabs/userTabs'
 import {
   banUserAction,
+  flagUserForShillAction,
   startImpersonationAction,
+  unflagUserForShillAction,
 } from '../../../_actions/users'
 import { ConfirmDialog } from '../../../_components/ui/ConfirmDialog'
 import { Drawer } from '../../../_components/ui/Drawer'
@@ -69,6 +71,8 @@ export function UserDrawerProvider({ children }: { children: ReactNode }) {
   const [impersonateBusy, setImpersonateBusy] = useState(false)
   const [banOpen, setBanOpen] = useState(false)
   const [banBusy, setBanBusy] = useState(false)
+  const [flagOpen, setFlagOpen] = useState(false)
+  const [flagBusy, setFlagBusy] = useState(false)
 
   const pushToast = useToast()
 
@@ -120,6 +124,7 @@ export function UserDrawerProvider({ children }: { children: ReactNode }) {
   const impersonatable =
     canWrite && actionState !== null && !actionState.staffTarget && actionState.status === 'active'
   const bannable = canWrite && actionState !== null && !actionState.staffTarget && !actionState.banned
+  const flagAvailable = canWrite && actionState !== null && !actionState.staffTarget
 
   const startImpersonation = (reason: string) => {
     if (!user) return
@@ -159,6 +164,34 @@ export function UserDrawerProvider({ children }: { children: ReactNode }) {
       })
   }
 
+  const flagged = actionState?.flagged ?? false
+
+  const toggleShillFlag = (reason: string) => {
+    if (!user) return
+    setFlagBusy(true)
+    const request = flagged
+      ? unflagUserForShillAction(user.id, reason)
+      : flagUserForShillAction(user.id, reason)
+    request
+      .then((result) => {
+        setFlagBusy(false)
+        if (result.ok) {
+          setFlagOpen(false)
+          pushToast({ title: result.message, tone: 'success' })
+          setReloadKey((key) => key + 1)
+        } else {
+          pushToast({ title: result.error, tone: 'error' })
+        }
+      })
+      .catch(() => {
+        setFlagBusy(false)
+        pushToast({
+          title: flagged ? 'Märke eemaldamine ebaõnnestus.' : 'Märkimine ebaõnnestus.',
+          tone: 'error',
+        })
+      })
+  }
+
   return (
     <OpenUserDrawerContext.Provider value={setUser}>
       {children}
@@ -176,9 +209,9 @@ export function UserDrawerProvider({ children }: { children: ReactNode }) {
           user && canWrite ? (
             <div className="flex w-full flex-wrap items-center gap-2">
               <span className="mr-auto text-label text-inkMuted">
-                {impersonatable || bannable
+                {impersonatable || bannable || flagAvailable
                   ? 'Tegevused logitakse auditilogisse.'
-                  : 'Vaatlus ja keelamine ei ole selle konto jaoks saadaval.'}
+                  : 'Vaatlus, keelamine ja märkimine ei ole selle konto jaoks saadaval.'}
               </span>
               <button
                 type="button"
@@ -190,6 +223,17 @@ export function UserDrawerProvider({ children }: { children: ReactNode }) {
               >
                 Vaata kasutajana (Impersonate)
               </button>
+              {flagAvailable ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFlagOpen(true)
+                  }}
+                  className={footerGhostButtonClass}
+                >
+                  {flagged ? 'Eemalda märge' : 'Märgi shill-uurimiseks'}
+                </button>
+              ) : null}
               {bannable ? (
                 <button
                   type="button"
@@ -277,6 +321,20 @@ export function UserDrawerProvider({ children }: { children: ReactNode }) {
             confirmLabel="Kinnita keelamine"
             busy={banBusy}
             onConfirm={banUser}
+          />
+          <ConfirmDialog
+            open={flagOpen}
+            onClose={() => {
+              setFlagOpen(false)
+            }}
+            title={flagged ? 'Eemalda shill-märge' : 'Märgi shill-uurimiseks'}
+            description="Märge on sisemine uurimise märkus: kasutajat ei teavitata ja konto ligipääsu ei muudeta. Põhjus ja märkija logitakse auditilogisse."
+            variant="reason"
+            reasonLabel="Põhjus (kohustuslik)"
+            reasonPlaceholder="nt kahtlane pakkumiste vahetus samade kontode vahel"
+            confirmLabel={flagged ? 'Kinnita eemaldamine' : 'Kinnita märkimine'}
+            busy={flagBusy}
+            onConfirm={toggleShillFlag}
           />
         </>
       ) : null}

@@ -10,10 +10,18 @@ import {
   type ResponseDeadlineState,
   type RoutingPartnerInput,
 } from './_components/routing'
-import { forwardServiceRequestAction, markRequestRespondedAction, retryRequestForwardAction } from '../../_actions/ops'
+import { maskClientName, sisuPreview } from './_components/display'
+import { ForwardConfirm } from './_components/ForwardConfirm'
+import {
+  closeRequestAction,
+  forwardServiceRequestAction,
+  markRequestDoneAction,
+  markRequestRespondedAction,
+  retryRequestForwardAction,
+} from '../../_actions/ops'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
-import { primaryButtonClass, secondaryButtonClass } from '../../_components/FormField'
+import { secondaryButtonClass } from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
 import { requireAdminRepositories } from '../../_lib/admin'
 import { formatDateTime } from '../../_lib/labels'
@@ -24,6 +32,13 @@ import { getRepositories } from '@/lib/data/runtime'
 import { serviceRequestTypes, type ServiceRequestType } from '@/lib/data/schema'
 
 export const metadata = { title: 'Päringud' }
+
+const statusLabels: Record<string, string> = {
+  uus: 'uus',
+  routed: 'saadetud',
+  teostatud: 'teostatud',
+  suletud: 'suletud',
+}
 
 const typeLabels: Record<ServiceRequestType, string> = {
   kava: 'Metsamajanduskava',
@@ -131,9 +146,12 @@ export default async function ServiceRequestsPage({
     detail?: string
     tuup?: string
     olek?: string
+    maakond?: string
+    kuupaev?: string
+    otsing?: string
   }>
 }) {
-  const { viga, teade, detail, tuup, olek } = await searchParams
+  const { viga, teade, detail, tuup, olek, maakond, kuupaev, otsing } = await searchParams
   const { session } = await requireAdminRepositories()
   if (!can(session.role, 'inquiries:read')) {
     return (
@@ -205,6 +223,23 @@ export default async function ServiceRequestsPage({
   const filteredRequests = requests.filter((request) => {
     if (olek === 'uus' && request.status !== 'new') return false
     if (olek === 'routed' && request.status !== 'routed') return false
+    if (olek === 'teostatud' && request.status !== 'teostatud') return false
+    if (olek === 'suletud' && request.status !== 'suletud') return false
+    const payloadCounty = asRecord(request.payload).county
+    if (maakond && payloadCounty !== maakond) return false
+    if (kuupaev && !request.createdAt.startsWith(kuupaev)) return false
+    if (otsing && otsing.trim() !== '') {
+      const needle = otsing.trim().toLowerCase()
+      const payload = asRecord(request.payload)
+      const contactName =
+        typeof asRecord(payload.contact).name === 'string'
+          ? (asRecord(payload.contact).name as string).toLowerCase()
+          : ''
+      const cadastres = asStringArray(payload.cadastres).join(' ').toLowerCase()
+      if (!contactName.includes(needle) && !cadastres.includes(needle) && !request.id.includes(needle)) {
+        return false
+      }
+    }
     return true
   })
 
@@ -227,9 +262,11 @@ export default async function ServiceRequestsPage({
     return {
       id: request.id,
       type: request.type,
-      client: typeof contact.name === 'string' ? contact.name : '—',
+      client: maskClientName(contact.name),
       county: payload.county ? countyName(payload.county) : '—',
       cadastres: asStringArray(payload.cadastres).length,
+      sisu: sisuPreview(payload),
+      attachments: asStringArray(request.attachments).length,
       createdAt: request.createdAt,
       routedAt,
       sentCount,
@@ -391,6 +428,70 @@ export default async function ServiceRequestsPage({
         ))}
       </div>
 
+      <form method="get" action="/admin/inquiries" className="mb-sm flex flex-wrap items-end gap-xs">
+        {typeFilter ? <input type="hidden" name="tuup" value={typeFilter} /> : null}
+        <label className="flex flex-col gap-1 text-label font-semibold text-ink">
+          Olek
+          <select
+            name="olek"
+            defaultValue={olek ?? ''}
+            className="h-10 rounded-input border border-border bg-bgPage px-3 text-bodySm text-ink"
+          >
+            <option value="">Kõik olekud</option>
+            {Object.entries(statusLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-label font-semibold text-ink">
+          Maakond
+          <select
+            name="maakond"
+            defaultValue={maakond ?? ''}
+            className="h-10 rounded-input border border-border bg-bgPage px-3 text-bodySm text-ink"
+          >
+            <option value="">Kõik maakonnad</option>
+            {EE_COUNTIES.map((county) => (
+              <option key={county.code} value={county.code}>
+                {county.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-label font-semibold text-ink">
+          Kuupäev
+          <input
+            type="date"
+            name="kuupaev"
+            defaultValue={kuupaev ?? ''}
+            className="h-10 rounded-input border border-border bg-bgPage px-3 text-bodySm text-ink"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-label font-semibold text-ink">
+          Otsing
+          <input
+            type="search"
+            name="otsing"
+            defaultValue={otsing ?? ''}
+            placeholder="nimi, kataster või ID"
+            className="h-10 rounded-input border border-border bg-bgPage px-3 text-bodySm text-ink"
+          />
+        </label>
+        <button
+          type="submit"
+          className="inline-flex h-10 items-center rounded-button border border-border bg-bgPage px-4 text-label font-semibold text-ink hover:border-primary hover:text-primary"
+        >
+          Filtreeri
+        </button>
+        {olek || maakond || kuupaev || otsing ? (
+          <Link href="/admin/inquiries" className={secondaryButtonClass}>
+            Tühjenda
+          </Link>
+        ) : null}
+      </form>
+
       <DataTable
         columns={[
           {
@@ -405,6 +506,26 @@ export default async function ServiceRequestsPage({
           { key: 'type', label: 'Tüüp', render: (row) => typeLabels[row.type] },
           { key: 'county', label: 'Maakond' },
           { key: 'cadastres', label: 'Katastrid', render: (row) => (row.cadastres > 0 ? String(row.cadastres) : '—') },
+          {
+            key: 'sisu',
+            label: 'Sisu',
+            render: (row) => <span title={row.sisu}>{row.sisu}</span>,
+          },
+          {
+            key: 'attachments',
+            label: 'Manused',
+            render: (row) =>
+              row.attachments > 0 ? (
+                <a
+                  href={`/admin/inquiries/attachments-zip?paaring=${encodeURIComponent(row.id)}`}
+                  className="text-label font-semibold text-primary hover:text-primaryHover"
+                >
+                  {String(row.attachments)} · ZIP
+                </a>
+              ) : (
+                '—'
+              ),
+          },
           { key: 'createdAt', label: 'Loodud', render: (row) => formatDateTime(row.createdAt) },
           {
             key: 'routedAt',
@@ -415,7 +536,15 @@ export default async function ServiceRequestsPage({
             key: 'status',
             label: 'Olek',
             render: (row) =>
-              row.deadline === 'expired' ? (
+              row.status === 'suletud' ? (
+                <span className="rounded-pill bg-[var(--st-archived-bg)] px-2 py-0.5 text-label font-semibold text-[color:var(--st-archived-text)]">
+                  suletud
+                </span>
+              ) : row.status === 'teostatud' ? (
+                <span className="rounded-pill bg-[var(--st-contract-bg)] px-2 py-0.5 text-label font-semibold text-[color:var(--st-contract-text)]">
+                  teostatud
+                </span>
+              ) : row.deadline === 'expired' ? (
                 <span className="rounded-pill bg-dangerLight px-2 py-0.5 text-label font-semibold text-danger">
                   aegunud
                 </span>
@@ -437,9 +566,36 @@ export default async function ServiceRequestsPage({
             key: 'actions',
             label: 'Tegevused',
             render: (row) => (
-              <Link href={detailPath(row.id)} className="text-label font-semibold text-primary hover:text-primaryHover">
-                Ava
-              </Link>
+              <div className="flex flex-wrap items-center gap-sm">
+                <Link
+                  href={detailPath(row.id)}
+                  className="text-label font-semibold text-primary hover:text-primaryHover"
+                >
+                  Ava
+                </Link>
+                {row.status !== 'teostatud' && row.status !== 'suletud' ? (
+                  <form action={markRequestDoneAction}>
+                    <input type="hidden" name="id" value={row.id} />
+                    <button
+                      type="submit"
+                      className="text-label font-semibold text-info hover:text-primaryHover"
+                    >
+                      Märgi teostatuks
+                    </button>
+                  </form>
+                ) : null}
+                {row.status !== 'suletud' ? (
+                  <form action={closeRequestAction}>
+                    <input type="hidden" name="id" value={row.id} />
+                    <button
+                      type="submit"
+                      className="text-label font-semibold text-ink-muted hover:text-danger"
+                    >
+                      Sulge
+                    </button>
+                  </form>
+                ) : null}
+              </div>
             ),
           },
         ]}
@@ -543,9 +699,14 @@ export default async function ServiceRequestsPage({
                     )
                   })}
                 </ul>
-                <button type="submit" className={primaryButtonClass}>
-                  Saada valitud partneritele
-                </button>
+                <ForwardConfirm
+                  recipients={routingCandidates.map((candidate) => ({
+                    id: candidate.partner.id,
+                    name: candidate.partner.name,
+                    email: candidate.partner.contactEmail,
+                    atCapacity: candidate.atCapacity,
+                  }))}
+                />
               </form>
 
               <div className="rounded-input border border-border bg-bg-mist p-sm">

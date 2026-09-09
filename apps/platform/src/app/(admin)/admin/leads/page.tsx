@@ -36,9 +36,10 @@ export default async function AdminLeadsPage({
     allikas?: string
     spetsialist?: string
     sla?: string
+    maakond?: string
   }>
 }) {
-  const { viga, teade, vaade, allikas, spetsialist, sla } = await searchParams
+  const { viga, teade, vaade, allikas, spetsialist, sla, maakond } = await searchParams
   const { session } = await requireAdminRepositories()
   if (!can(session.role, 'leads:read')) {
     return (
@@ -82,6 +83,13 @@ export default async function AdminLeadsPage({
     specialists.map((specialist) => [specialist.id, specialist.name]),
   )
 
+  const { docs: counties } = await repositories.find({
+    collection: 'counties',
+    sort: 'name',
+    pagination: false,
+  })
+  const countyNameById = new Map(counties.map((county) => [county.id, county.name]))
+
   const { docs: leadAudits } = await repositories.find({
     collection: 'audit-entry',
     where: { entityType: { equals: 'lead' } },
@@ -113,6 +121,7 @@ export default async function AdminLeadsPage({
       return false
     }
     if (sla === '1' && !leadSlaBadge(lead.createdAt, lead.status)) return false
+    if (maakond && lead.countyId !== maakond) return false
     return true
   })
 
@@ -126,6 +135,7 @@ export default async function AdminLeadsPage({
       contactName: lead.contactName,
       formName: lead.formName,
       cadastr: lead.cadastr ?? null,
+      countyName: lead.countyId ? (countyNameById.get(lead.countyId) ?? null) : null,
       status: lead.status,
       assignedSpecialistId: lead.assignedSpecialistId,
       assignedSpecialistName: lead.assignedSpecialistId
@@ -168,12 +178,14 @@ export default async function AdminLeadsPage({
     const duplicate = findDuplicateLead(scopedLeads, lead, lead.id, nowMs)
     return {
       id: lead.id,
+      shortId: `#${lead.id.slice(0, 8)}`,
       createdAt: lead.createdAt,
       contactName: lead.contactName,
       phone: lead.phone,
       email: lead.email,
       source: `${lead.formName}${lead.pageSlug ? ` · ${lead.pageSlug}` : ''}`,
       cadastr: lead.cadastr,
+      countyName: lead.countyId ? (countyNameById.get(lead.countyId) ?? '—') : '—',
       status: lead.status,
       specialistName: lead.assignedSpecialistId
         ? (specialistNames.get(lead.assignedSpecialistId) ?? '—')
@@ -191,6 +203,7 @@ export default async function AdminLeadsPage({
     allikas,
     spetsialist,
     ...(sla === '1' ? { sla: '1' } : {}),
+    ...(maakond ? { maakond } : {}),
     ...(view === 'tabel' ? { vaade: 'tabel' } : {}),
   }
 
@@ -227,6 +240,39 @@ export default async function AdminLeadsPage({
         })}
       </div>
 
+      <form method="get" action="/admin/leads" className="mb-sm flex flex-wrap items-end gap-xs">
+        {([
+          ['vaade', view === 'tabel' ? 'tabel' : undefined],
+          ['allikas', allikas],
+          ['spetsialist', spetsialist],
+          ['sla', sla === '1' ? '1' : undefined],
+        ] as const).map(([name, value]) =>
+          value ? <input key={name} type="hidden" name={name} value={value} /> : null,
+        )}
+        <label className="flex flex-col gap-1 text-label font-semibold text-ink">
+          Maakond
+          <select
+            name="maakond"
+            defaultValue={maakond ?? ''}
+            className="h-10 rounded-input border border-border bg-bgPage px-3 text-bodySm text-ink"
+          >
+            <option value="">Kõik maakonnad</option>
+            {counties.map((county) => (
+              <option key={county.id} value={county.id}>
+                {county.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="submit"
+          className="inline-flex h-10 items-center rounded-button border border-border bg-bgPage px-4 text-label font-semibold text-ink hover:border-primary hover:text-primary"
+        >
+          Filtreeri
+        </button>
+        {maakond ? filterLink('• Eemalda maakond', { ...activeFilters, maakond: undefined }) : null}
+      </form>
+
       <details className="mb-sm rounded-card border border-border bg-bgPage p-md">
         <summary className={`${secondaryButtonClass} cursor-pointer list-none`}>
           + Uus juhtlõige (käsitsi)
@@ -255,6 +301,7 @@ export default async function AdminLeadsPage({
       ) : (
         <DataTable
           columns={[
+            { key: 'shortId', label: 'ID' },
             { key: 'createdAt', label: 'Kuupäev', render: (row) => formatDateTime(row.createdAt) },
             {
               key: 'contactName',
@@ -272,6 +319,7 @@ export default async function AdminLeadsPage({
             { key: 'email', label: 'E-post', render: (row) => row.email ?? '—' },
             { key: 'source', label: 'Allikas' },
             { key: 'cadastr', label: 'Katastrid', render: (row) => row.cadastr ?? '—' },
+            { key: 'countyName', label: 'Maakond', render: (row) => row.countyName },
             {
               key: 'status',
               label: 'Olek',

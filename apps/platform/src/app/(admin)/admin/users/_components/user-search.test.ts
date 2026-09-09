@@ -4,6 +4,7 @@ import {
   chunkIds,
   classifyUserSearch,
   DEFAULT_USER_SORT,
+  flaggedUserIdsFromEntries,
   freetextMatchesUser,
   normalizeSearchInput,
   parseUserListFilters,
@@ -89,7 +90,18 @@ describe('parseUserListFilters', () => {
   it('keeps known profile, status and right values', () => {
     expect(
       parseUserListFilters({ profile: 'specialist', status: 'suspended', right: 'raieoigus' }),
-    ).toEqual({ role: 'specialist', status: 'suspended', right: 'raieoigus' })
+    ).toEqual({ role: 'specialist', status: 'suspended', right: 'raieoigus', marked: false })
+  })
+
+  it('keeps the märgitud (marked) shill-flag filter', () => {
+    expect(parseUserListFilters({ marked: '1' })).toEqual({
+      role: null,
+      status: null,
+      right: null,
+      marked: true,
+    })
+    expect(parseUserListFilters({ marked: '' }).marked).toBe(false)
+    expect(parseUserListFilters({ marked: 'yes' }).marked).toBe(false)
   })
 
   it('drops unknown values instead of throwing', () => {
@@ -97,16 +109,42 @@ describe('parseUserListFilters', () => {
       role: null,
       status: null,
       right: null,
+      marked: false,
     })
   })
 
   it('returns all-null filters for an unfiltered list', () => {
-    expect(parseUserListFilters({})).toEqual({ role: null, status: null, right: null })
+    expect(parseUserListFilters({})).toEqual({ role: null, status: null, right: null, marked: false })
     expect(parseUserListFilters({ profile: undefined, status: '', right: '' })).toEqual({
       role: null,
       status: null,
       right: null,
+      marked: false,
     })
+  })
+})
+
+describe('flaggedUserIdsFromEntries (shill flag fold)', () => {
+  it('marks flagged users and removes them again on a later clear', () => {
+    const entries = [
+      { entityId: 'a', after: { phase: 'flagged' }, createdAt: '2026-01-01T00:00:00.000Z' },
+      { entityId: 'a', after: { phase: 'cleared' }, createdAt: '2026-01-02T00:00:00.000Z' },
+      { entityId: 'b', after: { phase: 'flagged' }, createdAt: '2026-01-03T00:00:00.000Z' },
+    ]
+    expect(flaggedUserIdsFromEntries(entries)).toEqual(new Set(['b']))
+  })
+
+  it('treats phase-less legacy entries as flagged', () => {
+    const entries = [{ entityId: 'a', after: { reason: 'x' }, createdAt: '2026-01-01T00:00:00.000Z' }]
+    expect(flaggedUserIdsFromEntries(entries)).toEqual(new Set(['a']))
+  })
+
+  it('parses JSON-string payloads and orders entries by createdAt itself', () => {
+    const entries = [
+      { entityId: 'a', after: JSON.stringify({ phase: 'cleared' }), createdAt: '2026-01-03T00:00:00.000Z' },
+      { entityId: 'a', after: JSON.stringify({ phase: 'flagged' }), createdAt: '2026-01-01T00:00:00.000Z' },
+    ]
+    expect(flaggedUserIdsFromEntries(entries)).toEqual(new Set())
   })
 })
 

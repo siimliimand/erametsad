@@ -45,20 +45,24 @@ export function freetextMatchesUser(user: SearchableUser, query: UserSearchQuery
 }
 
 // ---------------------------------------------------------------------------
-// Users list filters and sort (spec admin-people): profiil / olek / õigus.
-// County has no data source on users or profiles, so it is not filterable.
+// Users list filters and sort (spec admin-people): profiil / olek / õigus /
+// märge. County has no data source on users or profiles, so it is not
+// filterable.
 // ---------------------------------------------------------------------------
 
 export interface UserListFilters {
   role: (typeof userRoles)[number] | null
   status: (typeof userStatuses)[number] | null
   right: (typeof auctionObjectTypes)[number] | null
+  /** "Märgitud" shill-flag filter: true keeps only flagged users. */
+  marked: boolean
 }
 
 export function parseUserListFilters(raw: {
   profile?: string | undefined
   status?: string | undefined
   right?: string | undefined
+  marked?: string | undefined
 }): UserListFilters {
   const isRole = (value: string | undefined): value is (typeof userRoles)[number] =>
     typeof value === 'string' && (userRoles as readonly string[]).includes(value)
@@ -70,7 +74,61 @@ export function parseUserListFilters(raw: {
     role: isRole(raw.profile) ? raw.profile : null,
     status: isStatus(raw.status) ? raw.status : null,
     right: isRight(raw.right) ? raw.right : null,
+    marked: raw.marked === '1',
   }
+}
+
+// ---------------------------------------------------------------------------
+// Shill flags (spec delta admin-people). The users table has no flag column,
+// so the durable marker is the append-only `user.shill_flag` audit entry —
+// the same marker pattern as `user.ban`. The latest entry's `after.phase`
+// decides: 'flagged' marks, 'cleared' unmarks.
+// ---------------------------------------------------------------------------
+
+export const SHILL_FLAG_AUDIT_ACTION = 'user.shill_flag'
+
+export type ShillFlagPhase = 'flagged' | 'cleared'
+
+export interface ShillFlagAuditLike {
+  entityId: string | null
+  after?: unknown
+  createdAt: string
+}
+
+function shillFlagPayload(after: unknown): Record<string, unknown> {
+  if (typeof after === 'string' && after !== '') {
+    try {
+      const parsed: unknown = JSON.parse(after)
+      return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
+    } catch {
+      return {}
+    }
+  }
+  return typeof after === 'object' && after !== null ? (after as Record<string, unknown>) : {}
+}
+
+/**
+ * Folds flag entries (newest first) into a per-user flag state. Only the
+ * latest entry per user decides — entries older than it are ignored.
+ * Entries from before the phase field existed count as flagged, so legacy
+ * markers stay visible.
+ */
+export function flaggedUserIdsFromEntries(
+  entries: readonly ShillFlagAuditLike[],
+): Set<string> {
+  const flagged = new Set<string>()
+  const decided = new Set<string>()
+  // createdAt-descending input is the repository sort order; a defensive
+  // re-sort keeps the fold correct regardless of the caller's ordering.
+  const ordered = [...entries].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+  for (const entry of ordered) {
+    if (entry.entityId === null || decided.has(entry.entityId)) continue
+    decided.add(entry.entityId)
+    const phase = shillFlagPayload(entry.after).phase
+    if (phase === 'cleared') continue
+    flagged.add(entry.entityId)
+  }
+  return flagged
 }
 
 export type UserSortKey = 'lastLogin' | 'createdAt'

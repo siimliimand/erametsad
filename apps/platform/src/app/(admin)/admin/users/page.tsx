@@ -5,8 +5,10 @@ import {
   chunkIds,
   classifyUserSearch,
   DEFAULT_USER_SORT,
+  flaggedUserIdsFromEntries,
   freetextMatchesUser,
   parseUserListFilters,
+  SHILL_FLAG_AUDIT_ACTION,
   sortUserRows,
 } from './_components/user-search'
 import { DataTable } from '../../_components/DataTable'
@@ -19,6 +21,7 @@ import {
   secondaryButtonClass,
 } from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
+import { FlagIcon } from '../../_components/icons'
 import { requireAdminRepositories } from '../../_lib/admin'
 import {
   auctionObjectTypeLabels,
@@ -98,6 +101,7 @@ interface UserRow {
   profiles: ProfileChip[]
   rights: string[]
   bidCount: number
+  flagged: boolean
 }
 
 export const metadata = { title: 'Kasutajad' }
@@ -115,6 +119,7 @@ export default async function AdminUsersPage({
     profile: firstParam(params, 'profile'),
     status: firstParam(params, 'status'),
     right: firstParam(params, 'right'),
+    marked: firstParam(params, 'marked'),
   })
   const sort = firstParam(params, 'sort') || DEFAULT_USER_SORT
 
@@ -176,6 +181,21 @@ export default async function AdminUsersPage({
     docs = all.docs.filter(
       (user) => !query || freetextMatchesUser(user, query) || regCodeUserIds.has(user.id),
     )
+  }
+
+  // Shill flags (spec delta admin-people): the durable marker is the
+  // append-only `user.shill_flag` audit entry, so the flagged set comes from
+  // one bounded audit fetch; the latest entry per user wins.
+  const { docs: flagEntries } = await repositories.find({
+    collection: 'audit-entry',
+    where: { action: { equals: SHILL_FLAG_AUDIT_ACTION } },
+    sort: '-createdAt',
+    pagination: false,
+    limit: FREETEXT_FETCH_LIMIT,
+  })
+  const flaggedUserIds = flaggedUserIdsFromEntries(flagEntries)
+  if (filters.marked) {
+    docs = docs.filter((user) => flaggedUserIds.has(user.id))
   }
 
   // Right filter keeps only users holding an active (non-revoked) right of
@@ -291,6 +311,7 @@ export default async function AdminUsersPage({
       (objectType) => auctionObjectTypeLabels[objectType],
     ),
     bidCount: bidCounts.get(user.id) ?? 0,
+    flagged: flaggedUserIds.has(user.id),
   }))
 
   const currentValues = {
@@ -298,6 +319,7 @@ export default async function AdminUsersPage({
     profile: filters.role ?? undefined,
     status: filters.status ?? undefined,
     right: filters.right ?? undefined,
+    marked: filters.marked ? '1' : undefined,
     sort: firstParam(params, 'sort'),
   }
 
@@ -374,10 +396,21 @@ export default async function AdminUsersPage({
             ]}
           />
         </div>
+        <div className="w-36">
+          <FormSelectField
+            label="Märge"
+            name="marked"
+            defaultValue={filters.marked ? '1' : ''}
+            options={[
+              { value: '', label: 'Kõik' },
+              { value: '1', label: 'Märgitud' },
+            ]}
+          />
+        </div>
         <button type="submit" className={primaryButtonClass}>
           Otsi
         </button>
-        {q || filters.role || filters.status || filters.right ? (
+        {q || filters.role || filters.status || filters.right || filters.marked ? (
           <Link href="/admin/users" className={secondaryButtonClass}>
             Tühjenda
           </Link>
@@ -387,7 +420,21 @@ export default async function AdminUsersPage({
       <UserDrawerProvider>
         <DataTable
           columns={[
-            { key: 'name', label: 'Nimi', render: (row) => row.name ?? '—' },
+            {
+              key: 'name',
+              label: 'Nimi',
+              render: (row) => (
+                <span className="inline-flex items-center gap-1.5">
+                  {row.flagged ? (
+                    <span title="Märgitud shill-uurimiseks">
+                      <FlagIcon className="h-3.5 w-3.5 text-danger" aria-hidden="true" />
+                      <span className="sr-only">Märgitud shill-uurimiseks</span>
+                    </span>
+                  ) : null}
+                  {row.name ?? '—'}
+                </span>
+              ),
+            },
             { key: 'email', label: 'E-post' },
             {
               key: 'isikukoodMasked',
@@ -453,7 +500,7 @@ export default async function AdminUsersPage({
           ]}
           rows={rows}
           emptyLabel={
-            q || filters.role || filters.status || filters.right
+            q || filters.role || filters.status || filters.right || filters.marked
               ? 'Kasutajat ei leitud — kontrolli otsingusõna või filtreid.'
               : 'Kasutajaid ei ole.'
           }

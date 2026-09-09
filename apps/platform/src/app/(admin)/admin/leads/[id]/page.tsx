@@ -5,6 +5,7 @@ import {
   addLeadNoteAction,
   assignLeadSpecialistAction,
   moveLeadStatusFormAction,
+  setLeadCountyAction,
   setLeadNextActionAction,
 } from '../../../_actions/ops'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
@@ -19,6 +20,7 @@ import { requireAdminRepositories } from '../../../_lib/admin'
 import { formatDateTime, leadStatusLabels, LeadStatusPill } from '../../../_lib/labels'
 import { can, leadInScope, leadScope } from '../../../_lib/permissions'
 import { roundRobinSuggestion } from '../_components/lead-flow'
+import { leadAttachmentUrl, resolveLeadSubmission } from '../_components/lead-submission'
 
 import { getRepositories } from '@/lib/data/runtime'
 import type { Specialist } from '@/lib/data/schema'
@@ -78,6 +80,15 @@ export default async function LeadDetailPage({
     sort: 'name',
     pagination: false,
   })
+
+  const { docs: counties } = await repositories.find({
+    collection: 'counties',
+    sort: 'name',
+    pagination: false,
+  })
+  const countyName = lead.countyId
+    ? (counties.find((county) => county.id === lead.countyId)?.name ?? null)
+    : null
 
   // Consent record: the latest cookie-consent decision tied to the lead's
   // stored IP hash; a marketing rejection marks contact as forbidden.
@@ -154,6 +165,10 @@ export default async function LeadDetailPage({
       break
     }
   }
+
+  // Task 8.3: original submitted message + attachments live only in the
+  // creation audit entry; the section renders when either exists.
+  const submission = resolveLeadSubmission(leadAudits)
 
   // Round-robin suggestion: active specialists, fewest open-pipeline leads first.
   const openCounts = new Map<string, number>()
@@ -241,6 +256,7 @@ export default async function LeadDetailPage({
             (lead.cadastr ?? '—')
           )}
         </Field>
+        <Field label="Maakond">{countyName ?? '—'}</Field>
         <Field label="Allikas">{lead.source ?? '—'}</Field>
         <Field label="Nõusolek turunduseks">
           {consentWithdrawn
@@ -311,6 +327,31 @@ export default async function LeadDetailPage({
           </form>
 
           <form
+            action={setLeadCountyAction}
+            className="space-y-sm rounded-card border border-border bg-bgPage p-md"
+          >
+            <input type="hidden" name="id" value={lead.id} />
+            <p className="text-bodySm text-ink-muted">
+              Maakond tuletatakse esimesest katastrist; siin saab selle käsitsi üle kirjutada.
+            </p>
+            <FormSelectField
+              label="Maakond"
+              name="countyId"
+              options={[
+                { value: '', label: 'Määramata' },
+                ...counties.map((county) => ({
+                  value: county.id,
+                  label: county.name,
+                })),
+              ]}
+              defaultValue={lead.countyId ?? ''}
+            />
+            <button type="submit" className={primaryButtonClass}>
+              Määra maakond
+            </button>
+          </form>
+
+          <form
             action={setLeadNextActionAction}
             className="space-y-sm rounded-card border border-border bg-bgPage p-md"
           >
@@ -333,6 +374,33 @@ export default async function LeadDetailPage({
             </button>
           </form>
         </div>
+      ) : null}
+
+      {submission.message || submission.attachments.length > 0 ? (
+        <section className="mb-sm max-w-container-sm rounded-card border border-border bg-bgPage p-md">
+          <h2 className="mb-sm font-heading text-h4 font-bold text-ink">Esialgne teade ja manused</h2>
+          {submission.message ? (
+            <p className="mb-sm whitespace-pre-line rounded-input border border-border bg-bg-mist px-3 py-2 text-bodySm text-ink">
+              {submission.message}
+            </p>
+          ) : null}
+          {submission.attachments.length > 0 ? (
+            <ul className="space-y-1 text-bodySm">
+              {submission.attachments.map((key) => (
+                <li key={key}>
+                  <a
+                    className="text-primary underline"
+                    href={leadAttachmentUrl(key)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {key}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
       ) : null}
 
       <section className="max-w-container-sm rounded-card border border-border bg-bgPage p-md">

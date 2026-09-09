@@ -51,6 +51,11 @@ const AUDIT_BID_VOID = 'bid.void'
 // existing `user.ban` entry on the isikukood-matched user as the ban marker.
 const AUDIT_BAN = 'user.ban'
 
+// Registry key for the shill flag; the users table has no flag column, so
+// the durable marker is the append-only entry with `after.phase` splitting
+// flagged from cleared (same marker pattern as the ban above).
+const AUDIT_SHILL_FLAG = 'user.shill_flag'
+
 // Registry keys for the GDPR tools; the delete key covers anonymize with
 // retention (no row is removed, so `after.retentionUntil` carries the
 // 7-year accounting retention deadline).
@@ -1008,6 +1013,122 @@ export async function banUserAction(userId: string, reason: string): Promise<Use
   revalidatePath('/admin/users')
   revalidatePath(`/admin/users/${userId}`)
   return { ok: true, message: 'Konto keelatud; sama isikukoodiga registreerimine on blokeeritud.' }
+}
+
+/** Latest `user.shill_flag` phase for a user, or null when never flagged. */
+async function latestShillFlagPhase(
+  repositories: CoreRepositories,
+  userId: string,
+): Promise<'flagged' | 'cleared' | null> {
+  const { docs } = await repositories.find({
+    collection: 'audit-entry',
+    where: {
+      and: [
+        { entityType: { equals: 'user' } },
+        { entityId: { equals: userId } },
+        { action: { equals: AUDIT_SHILL_FLAG } },
+      ],
+    },
+    sort: '-createdAt',
+    limit: 1,
+  })
+  const latest = docs[0]
+  if (!latest) return null
+  return auditPayload(latest.after).phase === 'cleared' ? 'cleared' : 'flagged'
+}
+
+/**
+ * Flag a portal user for shill investigation (spec delta admin-people).
+ * The mandatory reason lands on the append-only `user.shill_flag` audit
+ * entry; there is deliberately no user notification — the flag is an
+ * internal investigation marker.
+ */
+export async function flagUserForShillAction(
+  userId: string,
+  reason: string,
+): Promise<UserActionResult> {
+  const { session } = await requireAdminRepositories()
+  if (!can(session.role, 'users:write')) {
+    return actionError('Teil puudub õigus selle toimingu sooritamiseks.')
+  }
+  if (!userId) return actionError('Kasutaja identifikaator puudub.')
+  if (!hasMinReason(reason)) {
+    return actionError('Märkimise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+  }
+
+  const repositories = await getRepositories()
+
+  const user = await repositories.findByID({ collection: 'users', id: userId })
+  if (!user) return actionError('Kasutajat ei leitud.')
+  if (isStaffRole(user.role)) {
+    return actionError('Töötaja konto märkimine ei ole lubatud.')
+  }
+  if ((await latestShillFlagPhase(repositories, userId)) === 'flagged') {
+    return actionError('Kasutaja on juba märgitud shill-uurimiseks.')
+  }
+
+  let failure: string | null = null
+  try {
+    await audit(repositories, {
+      actorId: session.userId,
+      action: AUDIT_SHILL_FLAG,
+      entityType: 'user',
+      entityId: userId,
+      after: { phase: 'flagged', reason },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    return actionError(`Märkimine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath('/admin/users')
+  revalidatePath(`/admin/users/${userId}`)
+  return { ok: true, message: 'Kasutaja märgitud shill-uurimiseks.' }
+}
+
+/** Remove an active shill flag; the clear is a phase entry on the same key. */
+export async function unflagUserForShillAction(
+  userId: string,
+  reason: string,
+): Promise<UserActionResult> {
+  const { session } = await requireAdminRepositories()
+  if (!can(session.role, 'users:write')) {
+    return actionError('Teil puudub õigus selle toimingu sooritamiseks.')
+  }
+  if (!userId) return actionError('Kasutaja identifikaator puudub.')
+  if (!hasMinReason(reason)) {
+    return actionError('Märkimise eemaldamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+  }
+
+  const repositories = await getRepositories()
+
+  const user = await repositories.findByID({ collection: 'users', id: userId })
+  if (!user) return actionError('Kasutajat ei leitud.')
+  if ((await latestShillFlagPhase(repositories, userId)) !== 'flagged') {
+    return actionError('Aktiivset märget ei leitud.')
+  }
+
+  let failure: string | null = null
+  try {
+    await audit(repositories, {
+      actorId: session.userId,
+      action: AUDIT_SHILL_FLAG,
+      entityType: 'user',
+      entityId: userId,
+      after: { phase: 'cleared', reason },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    return actionError(`Märke eemaldamine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath('/admin/users')
+  revalidatePath(`/admin/users/${userId}`)
+  return { ok: true, message: 'Märge eemaldatud.' }
 }
 
 /**

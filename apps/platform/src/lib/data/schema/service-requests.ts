@@ -6,7 +6,7 @@ import { inList } from './shared'
 export const serviceRequestTypes = ['kava', 'hooldusraie', 'istutamine'] as const
 export type ServiceRequestType = (typeof serviceRequestTypes)[number]
 
-export const serviceRequestStatuses = ['new', 'routed'] as const
+export const serviceRequestStatuses = ['new', 'routed', 'teostatud', 'suletud'] as const
 export type ServiceRequestStatus = (typeof serviceRequestStatuses)[number]
 
 export const serviceRequests = sqliteTable(

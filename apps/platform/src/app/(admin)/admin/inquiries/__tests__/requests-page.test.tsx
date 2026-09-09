@@ -25,6 +25,8 @@ vi.mock('../../../_actions/ops', () => ({
   forwardServiceRequestAction: vi.fn(),
   markRequestRespondedAction: vi.fn(),
   retryRequestForwardAction: vi.fn(),
+  markRequestDoneAction: vi.fn(),
+  closeRequestAction: vi.fn(),
 }))
 
 vi.mock('../../../_lib/admin', () => ({
@@ -45,7 +47,7 @@ const getRepositoriesMock = vi.mocked(getRepositories)
 interface RequestDoc {
   id: string
   type: 'kava' | 'hooldusraie' | 'istutamine'
-  status: 'new' | 'routed'
+  status: 'new' | 'routed' | 'teostatud' | 'suletud'
   createdAt: string
   updatedAt: string
   payload: Record<string, unknown>
@@ -256,6 +258,164 @@ function rowByClient(name: string): HTMLTableRowElement {
   return row
 }
 
+describe('masked client names and preview columns (task 8.5)', () => {
+  it('masks client names in the table but keeps the full name in the detail panel', async () => {
+    await mountPage({ detail: 'req-new' })
+
+    expect(rowByClient('Eve L.').textContent).toContain('Eve L.')
+    expect(mainTableRows().map((row) => row.textContent)).not.toContain('Eve Lind')
+    expect(container.textContent).toContain('Eve Lind')
+  })
+
+  it('previews the payload content and counts attachments with a ZIP link', async () => {
+    useDocs({
+      'service-requests': [
+        makeRequest({
+          id: 'req-att',
+          contactName: 'Eve Lind',
+          payload: {
+            contact: { name: 'Eve Lind' },
+            county: 'HH',
+            comment: 'Palun pakkumine võimalikult peaegu.',
+            cadastres: ['78402:003:0210'],
+          },
+          attachments: ['service-requests/1-plaan.pdf', 'service-requests/2-kaart.png'],
+        }),
+      ],
+      partners,
+      'audit-entry': [],
+    })
+    await mountPage()
+
+    const row = rowByClient('Eve L.')
+    expect(row.textContent).toContain('Palun pakkumine võimalikult peaegu.')
+    expect(row.textContent).toContain('2 · ZIP')
+    const zipLink = row.querySelector('a[href^="/admin/inquiries/attachments-zip"]')
+    expect(zipLink?.getAttribute('href')).toBe(
+      '/admin/inquiries/attachments-zip?paaring=req-att',
+    )
+  })
+
+  it('shows a dash when the payload carries no previewable content', async () => {
+    useDocs({
+      'service-requests': [
+        makeRequest({
+          id: 'req-empty',
+          contactName: 'Eve Lind',
+          payload: { contact: { name: 'Eve Lind' } },
+        }),
+      ],
+      partners,
+      'audit-entry': [],
+    })
+    await mountPage()
+
+    expect(rowByClient('Eve L.').textContent).toContain('—')
+  })
+})
+
+describe('list filters (task 8.5)', () => {
+  const docs = (): Record<string, unknown[]> => ({
+    'service-requests': [
+      makeRequest({
+        id: 'req-harju',
+        contactName: 'Eve Lind',
+        createdAt: '2026-03-01T10:00:00.000Z',
+        payload: {
+          contact: { name: 'Eve Lind' },
+          county: 'HH',
+          cadastres: ['78402:003:0210'],
+        },
+      }),
+      makeRequest({
+        id: 'req-tartu',
+        contactName: 'Mati Tamm',
+        createdAt: '2026-04-11T10:00:00.000Z',
+        payload: {
+          contact: { name: 'Mati Tamm' },
+          county: 'TA',
+          cadastres: ['78904:101:0123'],
+        },
+      }),
+    ],
+    partners,
+    'audit-entry': [],
+  })
+
+  it('filters by county from the payload', async () => {
+    useDocs(docs())
+    await mountPage({ maakond: 'TA' })
+
+    expect(mainTableRows()).toHaveLength(1)
+    expect(rowByClient('Mati T.').textContent).toContain('Tartu')
+  })
+
+  it('filters by the created date', async () => {
+    useDocs(docs())
+    await mountPage({ kuupaev: '2026-03-01' })
+
+    expect(mainTableRows()).toHaveLength(1)
+    expect(rowByClient('Eve L.').textContent).toContain('Harju')
+  })
+
+  it('searches free text over name and cadastres', async () => {
+    useDocs(docs())
+    await mountPage({ otsing: '78904' })
+
+    expect(mainTableRows()).toHaveLength(1)
+    expect(rowByClient('Mati T.').textContent).toContain('Tartu')
+  })
+})
+
+describe('done and close row actions (task 8.4)', () => {
+  const docs = (): Record<string, unknown[]> => ({
+    'service-requests': [
+      makeRequest({ id: 'req-active', contactName: 'Eve Lind' }),
+      makeRequest({
+        id: 'req-done',
+        contactName: 'Mati Tamm',
+        status: 'teostatud',
+      }),
+      makeRequest({
+        id: 'req-closed',
+        contactName: 'Anu Kask',
+        status: 'suletud',
+      }),
+    ],
+    partners,
+    'audit-entry': [],
+  })
+
+  it('offers Märgi teostatuks and Sulge only while a request is open', async () => {
+    useDocs(docs())
+    await mountPage()
+
+    expect(rowByClient('Eve L.').textContent).toContain('Märgi teostatuks')
+    expect(rowByClient('Eve L.').textContent).toContain('Sulge')
+  })
+
+  it('renders the teostatud and suletud chips with no remaining actions', async () => {
+    useDocs(docs())
+    await mountPage()
+
+    expect(rowByClient('Mati T.').textContent).toContain('teostatud')
+    expect(rowByClient('Mati T.').textContent).not.toContain('Märgi teostatuks')
+    expect(rowByClient('Mati T.').textContent).toContain('Sulge')
+
+    expect(rowByClient('Anu K.').textContent).toContain('suletud')
+    expect(rowByClient('Anu K.').textContent).not.toContain('Märgi teostatuks')
+    expect(rowByClient('Anu K.').textContent).not.toContain('Sulge')
+  })
+
+  it('filters by the new statuses', async () => {
+    useDocs(docs())
+    await mountPage({ olek: 'teostatud' })
+
+    expect(mainTableRows()).toHaveLength(1)
+    expect(rowByClient('Mati T.').textContent).toContain('teostatud')
+  })
+})
+
 function trackingSection(): HTMLElement {
   const heading = [...container.querySelectorAll('h3')].find(
     (candidate) => candidate.textContent === 'Vastuste jälgimine',
@@ -320,16 +480,16 @@ describe('requests list states and expired tint', () => {
   it('tints expired rows and labels new, sent, answered and expired states', async () => {
     await mountPage()
 
-    const expired = rowByClient('Priit Põhjamets')
+    const expired = rowByClient('Priit P.')
     expect(expired.className).toContain('bg-dangerLight')
     expect(expired.textContent).toContain('aegunud')
 
-    const approaching = rowByClient('Anu Kask')
+    const approaching = rowByClient('Anu K.')
     expect(approaching.className).not.toContain('bg-dangerLight')
     expect(approaching.textContent).toContain('saadetud')
 
-    expect(rowByClient('Mati Tamm').textContent).toContain('vastatud (1)')
-    expect(rowByClient('Eve Lind').textContent).toContain('uus')
+    expect(rowByClient('Mati T.').textContent).toContain('vastatud (1)')
+    expect(rowByClient('Eve L.').textContent).toContain('uus')
   })
 })
 

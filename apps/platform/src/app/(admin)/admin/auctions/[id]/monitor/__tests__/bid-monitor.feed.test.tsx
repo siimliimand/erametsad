@@ -92,6 +92,7 @@ function baseProps(rows: MonitorBidRow[]): MonitorProps {
     canViewCeremony: false,
     canDecideUnderbids: false,
     underbids: [],
+    flaggedBidderIds: [],
   }
 }
 

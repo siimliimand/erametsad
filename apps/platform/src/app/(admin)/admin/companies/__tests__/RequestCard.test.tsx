@@ -3,19 +3,21 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { makeRequestCardData, makeSnapshot } from './fixtures'
+import { makeRequest, makeRequestCardData, makeSnapshot } from './fixtures'
 import { RequestCard, type RequestCardData } from '../_components/RequestCard'
 
 const actions = vi.hoisted(() => ({
   approve: vi.fn((_formData: FormData): Promise<void> => Promise.resolve()),
   reject: vi.fn((_formData: FormData): Promise<void> => Promise.resolve()),
   hold: vi.fn((_formData: FormData): Promise<void> => Promise.resolve()),
+  recheck: vi.fn((_formData: FormData): Promise<void> => Promise.resolve()),
 }))
 
 vi.mock('@/app/(admin)/_actions/ops', () => ({
   approveCompanyAccessRequestAction: actions.approve,
   rejectCompanyAccessRequestAction: actions.reject,
   holdCompanyAccessRequestAction: actions.hold,
+  registryRecheckAction: actions.recheck,
 }))
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -45,6 +47,7 @@ afterEach(() => {
   actions.approve.mockClear()
   actions.reject.mockClear()
   actions.hold.mockClear()
+  actions.recheck.mockClear()
 })
 
 function dialog(): HTMLElement {
@@ -180,21 +183,46 @@ describe('RequestCard decision flow', () => {
   })
 })
 
-describe('RequestCard wait badge', () => {
-  it('labels a one-day wait in the singular', async () => {
+/** jsdom runs constraint validation on programmatic submits; the volikiri
+ * file input's internal FileList cannot be seeded, so tests bypass it with a
+ * manual submit dispatch (React still receives the event and the FormData). */
+async function submitDialogForm(): Promise<void> {
+  const form = dialog().querySelector('form')
+  if (!form) throw new Error('dialog form not found')
+  await act(async () => {
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+}
+
+describe('RequestCard SLA chip', () => {
+  it('labels the wait with the spec format and stays neutral within 2 days', async () => {
+    await mountCard(makeRequestCardData({ waitingDays: 2 }))
+    expect(container.textContent).toContain('oodatud 2 p')
+    const chip = container.querySelector('[title^="Taotluse ooteaeg"]')
+    expect(chip?.className).toContain('bg-bg-mist')
+    expect(chip?.className).not.toContain('bg-danger-light')
+  })
+
+  it('goes amber after 2 days', async () => {
+    await mountCard(makeRequestCardData({ waitingDays: 3 }))
+    expect(container.textContent).toContain('oodatud 3 p')
+    const amber = container.querySelector('[title^="Taotluse ooteaeg"]')
+    expect(amber?.className).toContain('bg-[var(--st-ended-bg)]')
+  })
+
+  it('goes red after 5 days', async () => {
+    await mountCard(makeRequestCardData({ waitingDays: 6 }))
+    const red = container.querySelector('[title^="Taotluse ooteaeg"]')
+    expect(red?.className).toContain('bg-danger-light')
+  })
+
+  it('labels a one-day wait and a long wait with the day count', async () => {
     await mountCard(makeRequestCardData({ waitingDays: 1 }))
-    expect(container.textContent).toContain('Oodanud 1 päev')
-    expect(container.textContent).not.toContain('Oodanud 1 päeva')
-  })
+    expect(container.textContent).toContain('oodatud 1 p')
 
-  it('labels a same-day wait with the plural form', async () => {
-    await mountCard(makeRequestCardData({ waitingDays: 0 }))
-    expect(container.textContent).toContain('Oodanud 0 päeva')
-  })
-
-  it('labels a long wait with the day count', async () => {
     await mountCard(makeRequestCardData({ waitingDays: 45 }))
-    expect(container.textContent).toContain('Oodanud 45 päeva')
+    expect(container.textContent).toContain('oodatud 45 p')
   })
 })
 
@@ -302,10 +330,193 @@ describe('RequestCard rights modal capture', () => {
       }),
     )
     await click(buttonByLabel('Nõustu — Aktiveeri profiil'))
+    const justification = dialog().querySelector<HTMLTextAreaElement>('textarea[name="justification"]')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(
+        justification,
+        'Taotleja on volitatud juhatuse poolt',
+      )
+      justification?.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+    const fileInput = dialog().querySelector<HTMLInputElement>('input[name="volikiri"]')
+    await act(async () => {
+      Object.defineProperty(fileInput, 'files', { value: [new File(['x'], 'volikiri.pdf')] })
+      fileInput?.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
     const checkbox = dialog().querySelector<HTMLInputElement>('input[name="checkedRegistry"]')
     expect(checkbox?.checked).toBe(false)
-    await click(buttonByLabel('Kinnita ja aktiveeri', dialog()))
-    await flushActions()
+    await submitDialogForm()
     expect(postedFormData(actions.approve).get('checkedRegistry')).toBeNull()
+  })
+
+  it('uses the rights defaults passed from Seaded via the page', async () => {
+    await mountCard(makeRequestCardData({ defaultRights: ['kiire', 'pakett'] }))
+    await click(buttonByLabel('Nõustu — Aktiveeri profiil'))
+    expect(rightsInputValues()).toEqual(['kiire', 'pakett'])
+  })
+})
+
+describe('RequestCard volikiri enforcement', () => {
+  const failedBoard = { level: 'none' as const, matchedName: null }
+
+  function makeVolikiriFile(): File {
+    return new File(['volikiri'], 'volikiri.pdf', { type: 'application/pdf' })
+  }
+
+  it('shows the volikiri warning and requires justification plus upload on a failed board check', async () => {
+    await mountCard(makeRequestCardData({ boardCheck: failedBoard }))
+    expect(container.textContent).toContain('Ainult keeldumine või nõustumine põhjenduse ja volikirjaga.')
+    await click(buttonByLabel('Nõustu — Aktiveeri profiil'))
+    const form = dialog().querySelector('form')
+    expect(dialog().textContent).toContain('Taotleja ei ole juhatuse liige')
+    expect(form?.querySelector<HTMLTextAreaElement>('textarea[name="justification"]')).not.toBeNull()
+    expect(form?.querySelector<HTMLInputElement>('input[name="volikiri"]')).not.toBeNull()
+  })
+
+  it('keeps the confirm disabled until the justification and the file are provided', async () => {
+    await mountCard(makeRequestCardData({ boardCheck: failedBoard }))
+    await click(buttonByLabel('Nõustu — Aktiveeri profiil'))
+    const confirm = buttonByLabel('Kinnita ja aktiveeri', dialog())
+    expect(confirm.disabled).toBe(true)
+
+    const justification = dialog().querySelector<HTMLTextAreaElement>('textarea[name="justification"]')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(
+        justification,
+        'Taotleja on volitatud juhatuse poolt',
+      )
+      justification?.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+    expect(confirm.disabled).toBe(true)
+
+    const fileInput = dialog().querySelector<HTMLInputElement>('input[name="volikiri"]')
+    const file = makeVolikiriFile()
+    await act(async () => {
+      Object.defineProperty(fileInput, 'files', { value: [file] })
+      fileInput?.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+    expect(confirm.disabled).toBe(false)
+  })
+
+  it('sends the justification and the volikiri file with the approve action', async () => {
+    await mountCard(makeRequestCardData({ boardCheck: failedBoard }))
+    await click(buttonByLabel('Nõustu — Aktiveeri profiil'))
+    const justification = dialog().querySelector<HTMLTextAreaElement>('textarea[name="justification"]')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(
+        justification,
+        'Taotleja on volitatud juhatuse poolt',
+      )
+      justification?.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+    const fileInput = dialog().querySelector<HTMLInputElement>('input[name="volikiri"]')
+    await act(async () => {
+      Object.defineProperty(fileInput, 'files', { value: [makeVolikiriFile()] })
+      fileInput?.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+    await submitDialogForm()
+    expect(actions.approve).toHaveBeenCalledTimes(1)
+    const formData = postedFormData(actions.approve)
+    expect(formData.get('justification')).toBe('Taotleja on volitatud juhatuse poolt')
+    expect(formData.get('volikiri') instanceof File).toBe(true)
+  })
+
+  it('requires no volikiri fields when the board check passes', async () => {
+    await mountCard(makeRequestCardData({ boardCheck: { level: 'weak', matchedName: 'Mari Maasikas' } }))
+    await click(buttonByLabel('Nõustu — Aktiveeri profiil'))
+    expect(dialog().querySelector('textarea[name="justification"]')).toBeNull()
+    expect(dialog().querySelector('input[name="volikiri"]')).toBeNull()
+    const confirm = buttonByLabel('Kinnita ja aktiveeri', dialog())
+    expect(confirm.disabled).toBe(false)
+  })
+})
+
+describe('RequestCard applicant context panel', () => {
+  it('lists existing profiles on the same registry code with their status', async () => {
+    await mountCard(
+      makeRequestCardData({
+        existingProfiles: [
+          { profileId: 'p1', ownerName: 'Jaan Mets', approvalStatus: 'approved' },
+          { profileId: 'p2', ownerName: 'Eve Tamm', approvalStatus: 'pending' },
+        ],
+      }),
+    )
+    expect(container.textContent).toContain('Olemasolevad profiilid')
+    expect(container.textContent).toContain('Jaan Mets')
+    expect(container.textContent).toContain('kinnitatud')
+    expect(container.textContent).toContain('Eve Tamm')
+    expect(container.textContent).toContain('ootel')
+  })
+
+  it('summarizes the bidding history with bids, auctions and the last bid date', async () => {
+    await mountCard(
+      makeRequestCardData({
+        biddingHistory: { bidCount: 4, auctionCount: 2, lastBidAt: '2026-07-20T10:00:00.000Z' },
+      }),
+    )
+    expect(container.textContent).toContain('Pakkumiste ajalugu')
+    expect(container.textContent).toContain('4 pakkumist')
+    expect(container.textContent).toContain('2 oksjonit')
+    expect(container.textContent).toContain('viimane')
+  })
+
+  it('renders dashes when the applicant has no portal account', async () => {
+    await mountCard(
+      makeRequestCardData({
+        applicant: null,
+        biddingHistory: null,
+        frameworkContract: { state: 'unknown', signedAt: null },
+      }),
+    )
+    const dls = [...container.querySelectorAll('dl')]
+    const contextDl = dls.find((candidate) => candidate.textContent.includes('Pakkumiste ajalugu'))
+    expect(contextDl).toBeDefined()
+    const rows = [...(contextDl?.querySelectorAll('div') ?? [])]
+    const historyRow = rows.find((row) => row.textContent.startsWith('Pakkumiste ajalugu'))
+    expect(historyRow?.textContent).toContain('—')
+  })
+
+  it('shows the framework contract as signed with the date', async () => {
+    await mountCard(
+      makeRequestCardData({
+        frameworkContract: { state: 'signed', signedAt: '2026-05-01T12:00:00.000Z' },
+      }),
+    )
+    expect(container.textContent).toContain('Allkirjastatud')
+  })
+
+  it('shows the framework contract as unsigned', async () => {
+    await mountCard(
+      makeRequestCardData({ frameworkContract: { state: 'unsigned', signedAt: null } }),
+    )
+    expect(container.textContent).toContain('Allkirjastamata')
+  })
+})
+
+describe('RequestCard registry re-check', () => {
+  it('offers the audited re-check for operators with the write role', async () => {
+    await mountCard(makeRequestCardData())
+    const button = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+      (candidate) => candidate.textContent.trim() === 'Kontrolli uuesti',
+    )
+    expect(button).toBeDefined()
+    const form = button?.closest('form')
+    expect(form?.querySelector<HTMLInputElement>('input[name="id"]')?.value).toBe(
+      makeRequest().id,
+    )
+    expect(form?.querySelector<HTMLInputElement>('input[name="redirectTo"]')?.value).toBe(
+      '/admin/companies',
+    )
+  })
+
+  it('hides the re-check without the write role', async () => {
+    await mountCard(makeRequestCardData(), false)
+    expect(container.textContent).not.toContain('Kontrolli uuesti')
   })
 })

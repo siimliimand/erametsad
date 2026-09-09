@@ -15,6 +15,7 @@ export interface KanbanCardView {
   contactName: string
   formName: string
   cadastr: string | null
+  countyName: string | null
   status: string
   assignedSpecialistId: string | null
   assignedSpecialistName: string | null
@@ -292,6 +293,11 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
                         {card.cadastr ? (
                           <span className={chipClass} title="Katastritunnus">
                             {card.cadastr}
+                          </span>
+                        ) : null}
+                        {card.countyName ? (
+                          <span className={chipClass} title="Maakond">
+                            {card.countyName}
                           </span>
                         ) : null}
                         <span className={chipClass}>{card.formName}</span>

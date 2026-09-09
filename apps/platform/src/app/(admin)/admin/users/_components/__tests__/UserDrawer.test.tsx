@@ -20,6 +20,8 @@ vi.mock('../tabs/userTabData', () => tabDataMocks)
 
 const userActionMocks = vi.hoisted(() => ({
   banUserAction: vi.fn(),
+  flagUserForShillAction: vi.fn(),
+  unflagUserForShillAction: vi.fn(),
   startImpersonationAction: vi.fn(),
   updateUserAction: vi.fn(),
   suspendUserAction: vi.fn(),
@@ -50,6 +52,7 @@ const writableActive: UserActionState = {
   canWrite: true,
   staffTarget: false,
   banned: false,
+  flagged: false,
   status: 'active',
 }
 
@@ -315,7 +318,7 @@ describe('UserDrawer footer actions', () => {
   })
 
   it('hides the ban control for an already banned account', async () => {
-    await mountDrawer({ canWrite: true, staffTarget: false, banned: true, status: 'suspended' })
+    await mountDrawer({ canWrite: true, staffTarget: false, banned: true, flagged: false, status: 'suspended' })
     await openDrawer()
 
     expect(hasButton(drawerDialog(), 'Keela kasutaja (Ban)')).toBe(false)
@@ -323,22 +326,79 @@ describe('UserDrawer footer actions', () => {
   })
 
   it('offers neither action for a staff target', async () => {
-    await mountDrawer({ canWrite: true, staffTarget: true, banned: false, status: 'active' })
+    await mountDrawer({ canWrite: true, staffTarget: true, banned: false, flagged: false, status: 'active' })
     await openDrawer()
 
     expect(hasButton(drawerDialog(), 'Keela kasutaja (Ban)')).toBe(false)
     expect(buttonByText(drawerDialog(), 'Vaata kasutajana (Impersonate)').disabled).toBe(true)
     expect(drawerDialog().textContent).toContain(
-      'Vaatlus ja keelamine ei ole selle konto jaoks saadaval.',
+      'Vaatlus, keelamine ja märkimine ei ole selle konto jaoks saadaval.',
     )
   })
 
   it('renders no footer without users:write', async () => {
-    await mountDrawer({ canWrite: false, staffTarget: false, banned: false, status: 'active' })
+    await mountDrawer({ canWrite: false, staffTarget: false, banned: false, flagged: false, status: 'active' })
     await openDrawer()
 
     expect(hasButton(drawerDialog(), 'Vaata kasutajana (Impersonate)')).toBe(false)
     expect(hasButton(drawerDialog(), 'Keela kasutaja (Ban)')).toBe(false)
+  })
+})
+
+
+describe('UserDrawer shill flag actions', () => {
+  it('offers the flag action with the mandatory reason for a portal user', async () => {
+    userActionMocks.flagUserForShillAction.mockResolvedValue({
+      ok: true,
+      message: 'Kasutaja märgitud shill-uurimiseks.',
+    })
+    await mountDrawer(writableActive)
+    await openDrawer()
+
+    await click(buttonByText(drawerDialog(), 'Märgi shill-uurimiseks'))
+    const flagDialog = dialogByTitle('Märgi shill-uurimiseks')
+    const textarea = flagDialog.querySelector('textarea')
+    if (textarea === null) throw new Error('reason textarea not found')
+    await type(textarea, 'kahtlane pakkumiste vahetus')
+    await click(buttonByText(flagDialog, 'Kinnita märkimine'))
+    await flush()
+
+    expect(userActionMocks.flagUserForShillAction).toHaveBeenCalledWith(
+      'user-9',
+      'kahtlane pakkumiste vahetus',
+    )
+    expect(document.body.textContent).toContain('Kasutaja märgitud shill-uurimiseks.')
+  })
+
+  it('offers the clear action for an already flagged user', async () => {
+    userActionMocks.unflagUserForShillAction.mockResolvedValue({
+      ok: true,
+      message: 'Märge eemaldatud.',
+    })
+    await mountDrawer({ canWrite: true, staffTarget: false, banned: false, flagged: true, status: 'active' })
+    await openDrawer()
+
+    await click(buttonByText(drawerDialog(), 'Eemalda märge'))
+    const flagDialog = dialogByTitle('Eemalda shill-märge')
+    const textarea = flagDialog.querySelector('textarea')
+    if (textarea === null) throw new Error('reason textarea not found')
+    await type(textarea, 'märge ei kinnitunud')
+    await click(buttonByText(flagDialog, 'Kinnita eemaldamine'))
+    await flush()
+
+    expect(userActionMocks.unflagUserForShillAction).toHaveBeenCalledWith(
+      'user-9',
+      'märge ei kinnitunud',
+    )
+    expect(document.body.textContent).toContain('Märge eemaldatud.')
+  })
+
+  it('hides the flag action for a staff target', async () => {
+    await mountDrawer({ canWrite: true, staffTarget: true, banned: false, flagged: false, status: 'active' })
+    await openDrawer()
+
+    expect(hasButton(drawerDialog(), 'Märgi shill-uurimiseks')).toBe(false)
+    expect(hasButton(drawerDialog(), 'Eemalda märge')).toBe(false)
   })
 })
 

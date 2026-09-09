@@ -6,6 +6,7 @@ import { PageHeader } from '../../../../_components/PageHeader'
 import { requireAdminRepositories } from '../../../../_lib/admin'
 import { StatusPill, formatEur } from '../../../../_lib/labels'
 import { auctionInScope, auctionScope, can } from '../../../../_lib/permissions'
+import { flaggedUserIdsFromEntries } from '../../../users/_components/user-search'
 
 import { clampAntiSnipeMinutes } from '@/lib/bidding/anti-snipe'
 import { centsToEuros } from '@/lib/data/repositories/money'
@@ -84,6 +85,33 @@ export default async function AuctionMonitorPage({
       // Account ages feed the advisory new-account heuristic only; the
       // monitor feed works without them.
     }
+  }
+
+  // Anomaly heuristics and their evidence (ip_hash, account ages) stay with
+  // admin/superadmin: the gate is server-side, so sellers and specialists
+  // neither receive the ip_hash data nor the anomaly panel at all (spec:
+  // anomaly cards hidden from sellers). Declared before the row build below
+  // needs it.
+  const canViewAnomalies = can(session.role, 'audit:read')
+
+  // Shill flags (spec delta admin-people): flagged bidder ids come from the
+  // append-only `user.shill_flag` audit entries; only bidders of this lot
+  // are passed down, so the client never receives the whole flag list.
+  const flaggedBidderIds: string[] = []
+  try {
+    const flagResult = await trusted.find({
+      collection: 'audit-entry',
+      where: { action: { equals: 'user.shill_flag' } },
+      sort: '-createdAt',
+      pagination: false,
+      limit: 2000,
+    })
+    const flagged = flaggedUserIdsFromEntries(flagResult.docs)
+    for (const bidderId of bidderIds) {
+      if (flagged.has(bidderId)) flaggedBidderIds.push(bidderId)
+    }
+  } catch {
+    // Roles without audit read keep the feed; the flag icons degrade away.
   }
 
   const initialRows: MonitorBidRow[] = isSealed
@@ -170,12 +198,6 @@ export default async function AuctionMonitorPage({
   )
   const ended = !['draft', 'scheduled', 'active'].includes(auction.status)
 
-  // Anomaly heuristics and their evidence (ip_hash, account ages) stay with
-  // admin/superadmin: the gate is server-side, so sellers and specialists
-  // neither receive the ip_hash data nor the anomaly panel at all (spec:
-  // anomaly cards hidden from sellers).
-  const canViewAnomalies = can(session.role, 'audit:read')
-
   // Pending alapakkumised for this lot (oldest first). Accepting promotes
   // the alapakkumine itself to leading (approveAlapakkumine), so the
   // resulting leading amount is the bid's own amount — offered only when
@@ -245,6 +267,7 @@ export default async function AuctionMonitorPage({
         canViewCeremony={can(session.role, 'sealed:read')}
         canDecideUnderbids={auction.status === 'active'}
         underbids={underbids}
+        flaggedBidderIds={flaggedBidderIds}
       />
       {isSealed ? (
         <p className="mt-md rounded-input border border-info bg-info-light px-md py-sm text-bodySm text-info">

@@ -34,6 +34,7 @@ function makeCard(overrides: Partial<KanbanCardView> = {}): KanbanCardView {
     contactName: 'Mari Maasikas',
     formName: 'Metsamajanduskava',
     cadastr: '78402:003:0210',
+    countyName: 'Harju',
     status: 'new',
     assignedSpecialistId: 'spec-1',
     assignedSpecialistName: 'Mari Maasikas',
@@ -176,8 +177,14 @@ describe('kanban card metadata', () => {
     expect(card.querySelector('[title="Katastritunnus"]')?.textContent).toBe(
       '78402:003:0210',
     )
+    expect(card.querySelector('[title="Maakond"]')?.textContent).toBe('Harju')
     expect(card.textContent).toContain('Metsamajanduskava')
     expect(card.querySelector('[title="Mari Maasikas"]')?.textContent).toBe('MM')
+  })
+
+  it('omits the county chip when the lead has no county yet', async () => {
+    await mountKanban([makeCard({ countyName: null })])
+    expect(queryCard().querySelector('[title="Maakond"]')).toBeNull()
   })
 
   it('renders SLA level badges, the next action and the unassigned pill', async () => {

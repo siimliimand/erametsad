@@ -119,6 +119,7 @@ function baseProps(rows: MonitorBidRow[], overrides: Partial<MonitorProps> = {})
     canViewCeremony: false,
     canDecideUnderbids: false,
     underbids: [],
+    flaggedBidderIds: [],
     ...overrides,
   }
 }
@@ -196,6 +197,7 @@ describe('BidMonitor alapakkumised block', () => {
     await mountMonitor(
       baseProps([], {
         underbids: [underbidRow()],
+        flaggedBidderIds: [],
         canDecideUnderbids: true,
       }),
     )
@@ -221,6 +223,7 @@ describe('BidMonitor alapakkumised block', () => {
     await mountMonitor(
       baseProps([], {
         underbids: [underbidRow()],
+        flaggedBidderIds: [],
         canDecideUnderbids: true,
       }),
     )
@@ -255,6 +258,7 @@ describe('BidMonitor alapakkumised block', () => {
     await mountMonitor(
       baseProps([], {
         underbids: [underbidRow()],
+        flaggedBidderIds: [],
         canDecideUnderbids: true,
       }),
     )
@@ -273,6 +277,7 @@ describe('BidMonitor alapakkumised block', () => {
     await mountMonitor(
       baseProps([], {
         underbids: [underbidRow({ canBecomeLeading: false, resultingLeadingEur: null })],
+        flaggedBidderIds: [],
         canDecideUnderbids: true,
       }),
     )
