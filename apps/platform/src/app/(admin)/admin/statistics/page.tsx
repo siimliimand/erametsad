@@ -4,15 +4,18 @@ import type { ReactNode } from 'react'
 
 import {
   ChartSeriesLegend,
-  MonthlyBarsChart,
+  MonthlyStackedChart,
   TypeDonutChart,
   TrendChart,
 } from './_components/Charts'
 import {
   getStatisticsData,
   OBJECT_TYPE_LABELS,
+  parseStatisticsFilters,
   periodSubline,
+  QUICK_AUCTION_FILTER,
   soldSubline,
+  statisticsFiltersActive,
   statisticsKpiLabels,
   STATISTICS_PERIODS,
   type CountyStatRow,
@@ -21,12 +24,18 @@ import {
 } from './_lib/statistics'
 import { DataTable, type DataTableColumn } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
-import { secondaryButtonClass } from '../../_components/FormField'
+import {
+  FormSelectField,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
 import { KpiCard } from '../../_components/ui/KpiCard'
 import { requireAdminRepositories } from '../../_lib/admin'
 import { formatEur, formatEurAmount } from '../../_lib/labels'
 import { can } from '../../_lib/permissions'
+
+import { auctionObjectTypes } from '@/lib/data/schema'
 
 // DB-backed admin page: the build has no D1, so the window must be per-request.
 export const dynamic = 'force-dynamic'
@@ -50,10 +59,20 @@ function parsePeriod(value: string | string[] | undefined): StatisticsPeriod {
     : STATISTICS_PERIODS[0]
 }
 
-function periodHref(period: StatisticsPeriod): string {
-  return period === STATISTICS_PERIODS[0]
-    ? '/admin/statistics'
-    : `/admin/statistics?period=${String(period)}`
+function firstParam(params: RawParams, key: string): string {
+  const value = params[key]
+  const first = Array.isArray(value) ? value[0] : value
+  return first ?? ''
+}
+
+/** Period pill / reset links keep the active Tüüp and Maakond filters. */
+function statisticsHref(period: StatisticsPeriod, type: string, county: string): string {
+  const search = new URLSearchParams()
+  if (period !== STATISTICS_PERIODS[0]) search.set('period', String(period))
+  if (type !== '') search.set('type', type)
+  if (county !== '') search.set('county', county)
+  const queryString = search.toString()
+  return queryString === '' ? '/admin/statistics' : `/admin/statistics?${queryString}`
 }
 
 function percentValue(percent: number | null): string {
@@ -152,7 +171,11 @@ export default async function AdminStatisticsPage({
     )
   }
 
-  const data = await getStatisticsData(parsePeriod(params.period))
+  const typeParam = firstParam(params, 'type')
+  const countyParam = firstParam(params, 'county')
+  const filters = parseStatisticsFilters({ type: typeParam, county: countyParam })
+  const filtersOn = statisticsFiltersActive(filters)
+  const data = await getStatisticsData(parsePeriod(params.period), filters)
 
   return (
     <div>
@@ -179,7 +202,7 @@ export default async function AdminStatisticsPage({
                 return (
                   <Link
                     key={option}
-                    href={periodHref(option)}
+                    href={statisticsHref(option, typeParam, countyParam)}
                     aria-current={active ? 'page' : undefined}
                     className={`rounded-pill border px-3.5 py-1.5 text-label whitespace-nowrap transition-colors duration-hover ease-hover ${
                       active
@@ -202,6 +225,56 @@ export default async function AdminStatisticsPage({
           </>
         }
       />
+
+      {/* Tüüp + Maakond view filters, searchParams-driven like other admin lists */}
+      <form
+        method="get"
+        action="/admin/statistics"
+        aria-label="Statistika filtrid"
+        className="mb-lg flex max-w-container-sm flex-wrap items-end gap-sm rounded-card border border-border bg-bgPage p-md"
+      >
+        <input type="hidden" name="period" value={String(data.period)} />
+        <div className="w-44">
+          <FormSelectField
+            label="Tüüp"
+            name="type"
+            defaultValue={typeParam}
+            options={[
+              { value: '', label: 'Kõik' },
+              ...auctionObjectTypes.map((objectType) => ({
+                value: objectType,
+                label: OBJECT_TYPE_LABELS[objectType] ?? objectType,
+              })),
+              { value: QUICK_AUCTION_FILTER, label: 'Kiiroksjon' },
+            ]}
+          />
+        </div>
+        <div className="w-44">
+          <FormSelectField
+            label="Maakond"
+            name="county"
+            defaultValue={countyParam}
+            options={[
+              { value: '', label: 'Kõik' },
+              ...data.countyOptions.map((county) => ({
+                value: county.id,
+                label: county.name,
+              })),
+            ]}
+          />
+        </div>
+        <button type="submit" className={primaryButtonClass}>
+          Otsi
+        </button>
+        {filtersOn ? (
+          <Link
+            href={statisticsHref(data.period, '', '')}
+            className={secondaryButtonClass}
+          >
+            Tühjenda
+          </Link>
+        ) : null}
+      </form>
 
       {/* KPI strip (demo .kpi-6) */}
       <section
@@ -254,10 +327,10 @@ export default async function AdminStatisticsPage({
               <ChartSeriesLegend series={data.monthly.series} />
             </div>
             <div className={chartBodyClass}>
-              <MonthlyBarsChart data={data.monthly} />
+              <MonthlyStackedChart data={data.monthly} />
             </div>
             <p className={chartNoteClass}>
-              Kuude lõikes · summad tuhandetes eurotes (t€)
+              Kuude lõikes · tulemuste arv (müüdud, müümata, tühistatud)
             </p>
           </section>
 

@@ -3,21 +3,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { startOfDayMs } from '../../../_lib/workspace'
 import {
   MONTH_LABELS,
+  NO_STATISTICS_FILTERS,
   STATISTICS_PERIODS,
   TREND_DAYS,
   buildStatisticsKpis,
   countyOverview,
   dailyBidTrend,
+  filterStatisticsAuctions,
   getStatisticsData,
   isSold,
   localDayKey,
   monthBuckets,
-  monthlyResultBuckets,
+  monthlyOutcomeBuckets,
   objectTypeDonut,
+  parseStatisticsFilters,
   periodSubline,
   round1,
   salesByDay,
   soldSubline,
+  statisticsFiltersActive,
   statisticsToCsv,
   topAuctions,
   windowStartMs,
@@ -67,12 +71,15 @@ function auction(overrides: Partial<StatisticsAuctionSlice> = {}): StatisticsAuc
     status: 'active',
     objectType: 'raieoigus',
     type: 'open',
+    isQuickAuction: false,
     countyId: 'harju',
     minBidCents: 10_000,
     finalPriceCents: null,
     feeOverridePercent: null,
     createdAt: iso(NOW - DAY_MS),
     completedAt: null,
+    endedAt: null,
+    updatedAt: iso(NOW - DAY_MS),
     ...overrides,
   }
 }
@@ -332,31 +339,125 @@ describe('monthly chart data', () => {
     expect(monthBuckets(NOW, 90).at(-1)?.label).toBe(lastLabel)
     expect(monthBuckets(NOW, 365).at(-1)?.label).toBe(lastLabel)
   })
+})
 
-  it('shapes grouped bars with starting prices and snapshot-first final sums', () => {
+describe('monthly outcome chart data', () => {
+  it('counts müüdud, müümata, and tühistatud in their outcome month', () => {
     const auctions = [
-      sold({
-        id: 'aug',
-        minBidCents: 12_345,
-        finalPriceCents: 23_456,
-        createdAt: iso(NOW - 20 * DAY_MS),
-        completedAt: iso(NOW - 19 * DAY_MS),
-      }),
-      auction({ id: 'active', minBidCents: 50_000, createdAt: iso(NOW - 5 * DAY_MS) }),
+      sold({ id: 's-aug', completedAt: iso(NOW - 19 * DAY_MS) }),
+      sold({ id: 's-sept', completedAt: iso(NOW - DAY_MS) }),
+      auction({ id: 'u-sept', status: 'unsold', endedAt: iso(NOW - 3 * DAY_MS) }),
+      auction({ id: 'still-active' }),
     ]
-    const monthly = monthlyResultBuckets(auctions, [snapshot({ count: 1, eur: 100.5 })], NOW, 30)
+    const voided = [
+      { lotId: 'x-aug', status: 'voided', updatedAt: iso(NOW - 20 * DAY_MS) },
+      { lotId: 'x-sept', status: 'voided', updatedAt: iso(NOW - 2 * DAY_MS) },
+    ]
+    const monthly = monthlyOutcomeBuckets(auctions, voided, NOW, 30)
     expect(monthly.months).toHaveLength(2)
-    expect(monthly.series).toEqual([
-      { name: 'Alghind', color: 'primary', values: [123, 0] },
-      { name: 'Lõpphind', color: 'accent', values: [235, 101] },
+    expect(monthly.series.map((series) => series.name)).toEqual([
+      'Müüdud',
+      'Müümata',
+      'Tühistatud',
+    ])
+    expect(monthly.series.map((series) => [...series.values])).toEqual([
+      [1, 1],
+      [0, 1],
+      [1, 1],
     ])
   })
 
-  it('keeps bars at zero when the window has no sales', () => {
-    const monthly = monthlyResultBuckets([auction({ id: 'live' })], [], NOW, 90)
+  it('ignores outcomes outside the window and lots without an outcome', () => {
+    const from = windowStartMs(NOW, 30)
+    const monthly = monthlyOutcomeBuckets(
+      [
+        sold({ id: 'stale', completedAt: iso(from - DAY_MS), createdAt: iso(from - 2 * DAY_MS) }),
+        auction({ id: 'active' }),
+      ],
+      [{ lotId: 'old', status: 'voided', updatedAt: iso(from - DAY_MS) }],
+      NOW,
+      30,
+    )
     expect(monthly.series.every((series) => series.values.every((value) => value === 0))).toBe(
       true,
     )
+  })
+
+  it('falls back from completedAt to endedAt to updatedAt for the bucket date', () => {
+    const monthly = monthlyOutcomeBuckets(
+      [
+        auction({
+          id: 'unsold-no-end',
+          status: 'unsold',
+          endedAt: null,
+          updatedAt: iso(NOW - 4 * DAY_MS),
+        }),
+      ],
+      [],
+      NOW,
+      30,
+    )
+    const unsold = monthly.series.find((series) => series.name === 'Müümata')
+    expect(unsold?.values).toEqual([0, 1])
+  })
+
+  it('counts every voided contract as tühistatud even across old lots', () => {
+    const monthly = monthlyOutcomeBuckets(
+      [sold({ id: 'sold-lot', completedAt: iso(NOW - DAY_MS) })],
+      [
+        { lotId: 'sold-lot', status: 'voided', updatedAt: iso(NOW - HOUR_MS) },
+        { lotId: 'sold-lot', status: 'voided', updatedAt: iso(NOW - 2 * HOUR_MS) },
+      ],
+      NOW,
+      30,
+    )
+    const cancelled = monthly.series.find((series) => series.name === 'Tühistatud')
+    expect(cancelled?.values).toEqual([0, 2])
+  })
+})
+
+describe('view filters', () => {
+  it('parses the Tüüp param into objectType or kiiroksjon mode, plus county', () => {
+    expect(parseStatisticsFilters({ type: '', county: '' })).toEqual(NO_STATISTICS_FILTERS)
+    expect(parseStatisticsFilters({ type: 'kinnistu', county: 'harju' })).toEqual({
+      objectType: 'kinnistu',
+      quickAuctionOnly: false,
+      countyId: 'harju',
+    })
+    expect(parseStatisticsFilters({ type: 'kiiroksjon', county: '' })).toEqual({
+      objectType: null,
+      quickAuctionOnly: true,
+      countyId: null,
+    })
+    expect(parseStatisticsFilters({ type: 'puudub', county: '' })).toEqual(NO_STATISTICS_FILTERS)
+  })
+
+  it('reports whether any filter narrows the view', () => {
+    expect(statisticsFiltersActive(NO_STATISTICS_FILTERS)).toBe(false)
+    expect(statisticsFiltersActive({ objectType: 'pakett', quickAuctionOnly: false, countyId: null })).toBe(true)
+    expect(statisticsFiltersActive({ objectType: null, quickAuctionOnly: true, countyId: null })).toBe(true)
+    expect(statisticsFiltersActive({ objectType: null, quickAuctionOnly: false, countyId: 'hiiumaa' })).toBe(true)
+  })
+
+  it('narrows the auction slice by type, kiiroksjon flag, and county', () => {
+    const rows = [
+      auction({ id: 'quick-raie', objectType: 'raieoigus', isQuickAuction: true, countyId: 'harju' }),
+      auction({ id: 'kinnistu', objectType: 'kinnistu', countyId: 'harju' }),
+      auction({ id: 'raie-tartu', objectType: 'raieoigus', countyId: 'tartu' }),
+    ]
+    const ids = (filters: Parameters<typeof filterStatisticsAuctions>[1]) =>
+      filterStatisticsAuctions(rows, filters).map((row) => row.id)
+    expect(ids({ objectType: 'raieoigus', quickAuctionOnly: false, countyId: null })).toEqual([
+      'quick-raie',
+      'raie-tartu',
+    ])
+    expect(ids({ objectType: null, quickAuctionOnly: true, countyId: null })).toEqual([
+      'quick-raie',
+    ])
+    expect(ids({ objectType: null, quickAuctionOnly: false, countyId: 'harju' })).toEqual([
+      'quick-raie',
+      'kinnistu',
+    ])
   })
 })
 
@@ -528,6 +629,7 @@ describe('csv export', () => {
   function csvData(counties: CountyStatRow[]): StatisticsData {
     return {
       period: 30,
+      filters: NO_STATISTICS_FILTERS,
       kpis: {
         totalAuctions: 3,
         sold: { percent: 66.7, count: 2 },
@@ -539,14 +641,16 @@ describe('csv export', () => {
       monthly: {
         months: ['Aug', 'Sept'],
         series: [
-          { name: 'Alghind', color: 'primary', values: [100, 200] },
-          { name: 'Lõpphind', color: 'accent', values: [150, 250] },
+          { name: 'Müüdud', color: 'primary', values: [2, 5] },
+          { name: 'Müümata', color: 'accent', values: [1, 0] },
+          { name: 'Tühistatud', color: 'danger', values: [0, 1] },
         ],
       },
       donut: [{ label: 'Raieõigus', value: 3, color: 'primary' }],
       trend: { labels: ['10.08'], values: [0] },
       topAuctions: [],
       counties,
+      countyOptions: [],
     }
   }
 
@@ -570,7 +674,9 @@ describe('csv export', () => {
     expect(lines).toContain('NPK;2 müüdud oksjonit;2')
     expect(lines).toContain('NPK;Teenustasu perioodil (€);7')
     expect(lines).toContain('NPK;Keskmine müügihind (€);')
-    expect(lines).toContain('KUU;Aug;100;150')
+    expect(lines).toContain('"Kuud;Kuu;Müüdud;Müümata;Tühistatud"')
+    expect(lines).toContain('KUU;Aug;2;1;0')
+    expect(lines).toContain('KUU;Sept;5;0;1')
     expect(lines).toContain('TYYP;Raieõigus;3')
     expect(lines).toContain('MK;Harju;3;2;200')
     expect(csv.endsWith('\r\n')).toBe(true)
@@ -608,6 +714,7 @@ interface RepositoryFixtures {
   bids: unknown[]
   snapshots: unknown[]
   counties: unknown[]
+  contracts: unknown[]
 }
 
 const state = vi.hoisted(() => ({
@@ -641,6 +748,8 @@ function docsFor(fixtures: RepositoryFixtures, args: StatisticsFindArgs): unknow
       return fixtures.snapshots
     case 'counties':
       return fixtures.counties
+    case 'contracts':
+      return fixtures.contracts
     default:
       return []
   }
@@ -652,6 +761,7 @@ function seedRepositories(overrides: Partial<RepositoryFixtures> = {}): Statisti
     bids: [],
     snapshots: [],
     counties: [],
+    contracts: [],
     ...overrides,
   }
   const calls: StatisticsFindArgs[] = []
@@ -694,6 +804,7 @@ describe('getStatisticsData', () => {
     seedRepositories()
     const data = await getStatisticsData(30)
     expect(data.period).toBe(30)
+    expect(data.filters).toEqual(NO_STATISTICS_FILTERS)
     expect(data.kpis).toStrictEqual({
       totalAuctions: 0,
       sold: { percent: null, count: 0 },
@@ -705,7 +816,13 @@ describe('getStatisticsData', () => {
     expect(data.donut).toEqual([])
     expect(data.topAuctions).toEqual([])
     expect(data.counties).toEqual([])
+    expect(data.countyOptions).toEqual([])
     expect(data.monthly.months).toHaveLength(2)
+    expect(data.monthly.series.map((series) => series.name)).toEqual([
+      'Müüdud',
+      'Müümata',
+      'Tühistatud',
+    ])
     expect(data.trend.labels).toHaveLength(TREND_DAYS)
     expect(data.trend.values.every((value) => value === 0)).toBe(true)
     assertFiniteNumbers(data)
@@ -738,6 +855,74 @@ describe('getStatisticsData', () => {
     const bidCall = calls.find((args) => args.collection === 'bids')
     expect(bidCall?.sort).toBe('-createdAt')
     expect(bidCall?.limit ?? 0).toBeGreaterThanOrEqual(1_000)
+    const contractCall = calls.find((args) => args.collection === 'contracts')
+    expect(contractCall?.where).toEqual({ status: { equals: 'voided' } })
+  })
+
+  it('counts voided contracts as tühistatud in the monthly chart', async () => {
+    seedRepositories({
+      auctions: [
+        sold({
+          id: 'sold-lot',
+          completedAt: iso(NOW - DAY_MS),
+          minBidCents: 10_000,
+          finalPriceCents: 20_000,
+        }),
+      ],
+      contracts: [
+        { lotId: 'sold-lot', status: 'voided', updatedAt: iso(NOW - 2 * HOUR_MS) },
+        { lotId: 'sold-lot', status: 'signed', updatedAt: iso(NOW - HOUR_MS) },
+      ],
+      counties: [county('harju', 'Harju')],
+    })
+    const data = await getStatisticsData(30)
+    const cancelled = data.monthly.series.find((series) => series.name === 'Tühistatud')
+    const soldSeries = data.monthly.series.find((series) => series.name === 'Müüdud')
+    expect(cancelled?.values).toEqual([0, 1])
+    expect(soldSeries?.values.at(-1)).toBe(1)
+  })
+
+  it('narrows every aggregation through the Tüüp and Maakond filters', async () => {
+    seedRepositories({
+      auctions: [
+        sold({
+          id: 'raie-sold',
+          objectType: 'raieoigus',
+          minBidCents: 10_000,
+          finalPriceCents: 20_000,
+          completedAt: iso(NOW - DAY_MS),
+        }),
+        sold({
+          id: 'kinnistu-sold',
+          objectType: 'kinnistu',
+          countyId: 'tartu',
+          minBidCents: 10_000,
+          finalPriceCents: 30_000,
+          completedAt: iso(NOW - DAY_MS),
+        }),
+      ],
+      snapshots: [
+        snapshot({ objectType: 'raieoigus', count: 7, eur: 700, date: iso(NOW - DAY_MS) }),
+      ],
+      counties: [county('harju', 'Harju'), county('tartu', 'Tartu')],
+    })
+
+    const filtered = await getStatisticsData(30, {
+      objectType: 'kinnistu',
+      quickAuctionOnly: false,
+      countyId: null,
+    })
+    expect(filtered.kpis.totalAuctions).toBe(1)
+    expect(filtered.kpis.avgFinalPrice).toEqual({ cents: 30_000, eur: 300 })
+    expect(filtered.topAuctions.map((row) => row.id)).toEqual(['kinnistu-sold'])
+    const soldSeries = filtered.monthly.series.find((series) => series.name === 'Müüdud')
+    expect(soldSeries?.values).toEqual([0, 1])
+
+    // Snapshot day totals are type-blind, so a filtered view must skip them.
+    const unfiltered = await getStatisticsData(30)
+    expect(unfiltered.kpis.sold.count).toBe(7)
+    expect(unfiltered.kpis.avgFinalPrice).toEqual({ cents: 10_000, eur: 100 })
+    expect(filtered.kpis.sold.count).toBe(1)
   })
 
   it('switches the aggregation window with the period while the trend stays fixed', async () => {

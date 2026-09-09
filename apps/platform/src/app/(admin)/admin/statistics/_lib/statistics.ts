@@ -1,7 +1,7 @@
 import { startOfDayMs, successFeeCents } from '../../_lib/workspace'
 import type {
   ChartColor,
-  MonthlyBarsData,
+  MonthlyStackedData,
   TypeDonutSegment,
   TrendData,
 } from '../_components/Charts'
@@ -10,6 +10,7 @@ import type {
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { centsToEuros } from '@/lib/data/repositories/money'
 import { getRepositories } from '@/lib/data/runtime'
+import { auctionObjectTypes } from '@/lib/data/schema'
 
 /**
  * Data layer for the Statistika page (12 demo). Pure aggregation functions
@@ -93,12 +94,15 @@ export interface StatisticsAuctionSlice {
   status: string
   objectType: string
   type: string
+  isQuickAuction: boolean
   countyId: string | null
   minBidCents: number
   finalPriceCents: number | null
   feeOverridePercent: number | null
   createdAt: string
   completedAt: string | null
+  endedAt: string | null
+  updatedAt: string
 }
 
 export interface StatisticsBidSlice {
@@ -114,6 +118,13 @@ export interface StatisticsSnapshotSlice {
   count: number
   /** EUR at the repository boundary (snapshot eur_cents are decoded). */
   eur: number
+}
+
+export interface StatisticsContractSlice {
+  lotId: string
+  status: string
+  /** Void time for the tühistatud month bucket. */
+  updatedAt: string
 }
 
 export interface StatisticsCountySlice {
@@ -155,12 +166,68 @@ export interface CountyStatRow {
 
 export interface StatisticsData {
   period: StatisticsPeriod
+  filters: StatisticsFilters
   kpis: StatisticsKpis
-  monthly: MonthlyBarsData
+  monthly: MonthlyStackedData
   donut: TypeDonutSegment[]
   trend: TrendData
   topAuctions: TopAuctionRow[]
   counties: CountyStatRow[]
+  /** Every county, for the page's Maakond filter options. */
+  countyOptions: StatisticsCountySlice[]
+}
+
+/**
+ * searchParams-driven view filters (Tüüp incl. the kiiroksjon flag,
+ * Maakond). They narrow the auction slice before every aggregation; only
+ * the fixed 30-day bid trend stays unfiltered.
+ */
+export interface StatisticsFilters {
+  /** One of `auctionObjectTypes`, or null for all. */
+  objectType: string | null
+  /** The Tüüp option "Kiiroksjon" (isQuickAuction flag). */
+  quickAuctionOnly: boolean
+  countyId: string | null
+}
+
+export const NO_STATISTICS_FILTERS: StatisticsFilters = {
+  objectType: null,
+  quickAuctionOnly: false,
+  countyId: null,
+}
+
+/** Tüüp option value that filters on the kiiroksjon flag, not objectType. */
+export const QUICK_AUCTION_FILTER = 'kiiroksjon'
+
+export function parseStatisticsFilters(input: {
+  type: string
+  county: string
+}): StatisticsFilters {
+  const type = input.type.trim()
+  const isType = (auctionObjectTypes as readonly string[]).includes(type)
+  return {
+    objectType: isType && type !== QUICK_AUCTION_FILTER ? type : null,
+    quickAuctionOnly: type === QUICK_AUCTION_FILTER,
+    countyId: input.county.trim() === '' ? null : input.county.trim(),
+  }
+}
+
+export function statisticsFiltersActive(filters: StatisticsFilters): boolean {
+  return (
+    filters.objectType !== null || filters.quickAuctionOnly || filters.countyId !== null
+  )
+}
+
+export function filterStatisticsAuctions(
+  auctions: readonly StatisticsAuctionSlice[],
+  filters: StatisticsFilters,
+): StatisticsAuctionSlice[] {
+  return auctions.filter(
+    (auction) =>
+      (!filters.quickAuctionOnly || auction.isQuickAuction) &&
+      (!filters.objectType || auction.objectType === filters.objectType) &&
+      (!filters.countyId || auction.countyId === filters.countyId),
+  )
 }
 
 function parseTime(iso: string): number | null {
@@ -335,38 +402,71 @@ export function monthBuckets(now: number, period: StatisticsPeriod): MonthBucket
   return buckets
 }
 
-/** Demo "Oksjonite tulemused kuupõhiselt": starting vs final price per month. */
-export function monthlyResultBuckets(
+/**
+ * Outcome timestamps bucket the monthly chart: completion for sold lots,
+ * otherwise the end stamp, else the last update.
+ */
+export function outcomeAt(auction: StatisticsAuctionSlice): string {
+  return auction.completedAt ?? auction.endedAt ?? auction.updatedAt
+}
+
+/** Fixed stacked series order: müüdud, müümata, tühistatud. */
+export const OUTCOME_SERIES: readonly {
+  name: string
+  color: ChartColor
+}[] = [
+  { name: 'Müüdud', color: 'primary' },
+  { name: 'Müümata', color: 'accent' },
+  { name: 'Tühistatud', color: 'danger' },
+]
+
+/**
+ * Demo card "Oksjonite tulemused kuupõhiselt", now counting outcomes per
+ * month instead of euros: müüdud (sold per `isSold`), müümata (`unsold`
+ * branch), tühistatud (voided contracts — the machine has no cancelled
+ * auction status, the contract status list does). Buckets use the outcome
+ * date, so lots created before the window still land in their outcome
+ * month.
+ */
+export function monthlyOutcomeBuckets(
   auctions: readonly StatisticsAuctionSlice[],
-  snapshots: readonly StatisticsSnapshotSlice[],
+  voidedContracts: readonly StatisticsContractSlice[],
   now: number,
   period: StatisticsPeriod,
-): MonthlyBarsData {
+): MonthlyStackedData {
   const buckets = monthBuckets(now, period)
   const from = windowStartMs(now, period)
   const index = new Map(buckets.map((bucket, i) => [bucket.key, i]))
-  const startCents = Array.from({ length: buckets.length }, () => 0)
-  const finalCents = Array.from({ length: buckets.length }, () => 0)
+  const sold = Array.from({ length: buckets.length }, () => 0)
+  const unsold = Array.from({ length: buckets.length }, () => 0)
+  const cancelled = Array.from({ length: buckets.length }, () => 0)
 
-  for (const auction of windowAuctions(auctions, now, period)) {
-    if (!isSold(auction) || !inWindow(auction.completedAt ?? '', from, now)) continue
-    const i = index.get(monthKey(parseTime(auction.completedAt ?? '') ?? now))
-    if (i === undefined) continue
-    startCents[i] = (startCents[i] ?? 0) + auction.minBidCents
-  }
-  for (const [day, totals] of salesByDay(snapshots, auctions, now, period)) {
-    const i = index.get(day.slice(0, 7))
-    if (i === undefined) continue
-    finalCents[i] = (finalCents[i] ?? 0) + totals.finalCents
+  const bucketOf = (iso: string): number | undefined => {
+    const time = parseTime(iso)
+    if (time === null || time < from || time > now) return undefined
+    return index.get(monthKey(time))
   }
 
-  const toEuros = (cents: readonly number[]) => cents.map((value) => Math.round(centsToEuros(value)))
+  for (const auction of auctions) {
+    if (isSold(auction)) {
+      const i = bucketOf(outcomeAt(auction))
+      if (i !== undefined) sold[i] = (sold[i] ?? 0) + 1
+    } else if (auction.status === 'unsold') {
+      const i = bucketOf(outcomeAt(auction))
+      if (i !== undefined) unsold[i] = (unsold[i] ?? 0) + 1
+    }
+  }
+  for (const contract of voidedContracts) {
+    const i = bucketOf(contract.updatedAt)
+    if (i !== undefined) cancelled[i] = (cancelled[i] ?? 0) + 1
+  }
+
   return {
     months: buckets.map((bucket) => bucket.label),
-    series: [
-      { name: 'Alghind', color: 'primary', values: toEuros(startCents) },
-      { name: 'Lõpphind', color: 'accent', values: toEuros(finalCents) },
-    ],
+    series: OUTCOME_SERIES.map((meta, seriesIndex) => ({
+      ...meta,
+      values: [sold, unsold, cancelled][seriesIndex] ?? [],
+    })),
   }
 }
 
@@ -504,13 +604,14 @@ export function statisticsToCsv(data: StatisticsData): string {
       kpis.avgFinalPrice.eur === null ? '' : Math.round(kpis.avgFinalPrice.eur),
     ]),
     '',
-    csvRow(['Kuud;Kuu;Alghind (EUR);Lõpphind (EUR)']),
+    csvRow(['Kuud;Kuu;Müüdud;Müümata;Tühistatud']),
     ...data.monthly.months.map((month, i) =>
       csvRow([
         'KUU',
         month,
         data.monthly.series[0]?.values[i] ?? 0,
         data.monthly.series[1]?.values[i] ?? 0,
+        data.monthly.series[2]?.values[i] ?? 0,
       ]),
     ),
     '',
@@ -535,15 +636,18 @@ export function statisticsToCsv(data: StatisticsData): string {
  * One fetcher for the Statistika page. The caller must have authenticated
  * through requireAdminRepositories and hold `statistics:read`; reads run as
  * system context because aggregated views need the full table, not a
- * request-scoped slice.
+ * request-scoped slice. The optional filters narrow the auction slice (and,
+ * with any filter active, skip the type-blind snapshot merge so a filtered
+ * KPI never mixes in other types' snapshot totals).
  */
 export async function getStatisticsData(
   period: StatisticsPeriod,
+  filters: StatisticsFilters = NO_STATISTICS_FILTERS,
 ): Promise<StatisticsData> {
   const repositories: CoreRepositories = await getRepositories()
   const now = Date.now()
 
-  const [auctionDocs, bidDocs, snapshotDocs, countyDocs] = await Promise.all([
+  const [auctionDocs, bidDocs, snapshotDocs, countyDocs, contractDocs] = await Promise.all([
     repositories.find({
       collection: 'auctions',
       where: { status: { not_equals: 'draft' } },
@@ -556,21 +660,36 @@ export async function getStatisticsData(
     }),
     repositories.find({ collection: 'statistics-snapshots', pagination: false }),
     repositories.find({ collection: 'counties', pagination: false }),
+    repositories.find({
+      collection: 'contracts',
+      where: { status: { equals: 'voided' } },
+      pagination: false,
+    }),
   ])
 
-  const auctions: StatisticsAuctionSlice[] = auctionDocs.docs
+  const auctions = filterStatisticsAuctions(auctionDocs.docs, filters)
   const bids: StatisticsBidSlice[] = bidDocs.docs
   const snapshots: StatisticsSnapshotSlice[] = snapshotDocs.docs
   const counties: StatisticsCountySlice[] = countyDocs.docs
-  const sales = salesByDay(snapshots, auctions, now, period)
+  const voidedContracts: StatisticsContractSlice[] = contractDocs.docs.filter(
+    (contract) => contract.status === 'voided',
+  )
+  const sales = salesByDay(
+    statisticsFiltersActive(filters) ? [] : snapshots,
+    auctions,
+    now,
+    period,
+  )
 
   return {
     period,
+    filters,
     kpis: buildStatisticsKpis({ now, period, auctions, bids, sales }),
-    monthly: monthlyResultBuckets(auctions, snapshots, now, period),
+    monthly: monthlyOutcomeBuckets(auctions, voidedContracts, now, period),
     donut: objectTypeDonut(auctions, now, period),
     trend: dailyBidTrend(bids, now),
     topAuctions: topAuctions(auctions, now, period),
     counties: countyOverview(auctions, counties, now, period),
+    countyOptions: counties,
   }
 }

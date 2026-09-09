@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { ContainerDownloadButton } from './_components/ContainerDownloadButton'
 import { HtmlPreviewDrawer } from './_components/HtmlPreviewDrawer'
+import { VoidContractDialog } from './_components/VoidContractDialog'
 import {
   classifyContractSearch,
   CONTRACTS_FETCH_LIMIT,
@@ -17,7 +18,6 @@ import {
   getContractContainerAction,
   getContractDocumentAction,
   resendContractAction,
-  voidContractAction,
 } from '../../_actions/contracts'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
@@ -52,19 +52,18 @@ interface ContractRow {
   type: ContractTemplateType
   templateLabel: string
   auctionTitle: string
+  auctionStatus: string
   sellerName: string
   sellerId: string | null
   buyerName: string
   buyerId: string | null
+  signerUserId: string | null
   transactionRef: string | null
   hasDocument: boolean
   stuck: boolean
   resendCount: number
   lastResendAt: string | null
 }
-
-const reasonInputClass =
-  'w-full rounded-input border border-border bg-bgPage px-3 py-2 text-bodySm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none'
 
 const SEARCH_HINT = 'Otsi: osapool / oksjon / lepingu nr / tehingu viide'
 
@@ -257,10 +256,12 @@ export default async function AdminContractsPage({
       type: template?.type ?? 'auction',
       templateLabel: template ? `${template.name} (v${template.version})` : contract.templateId,
       auctionTitle: auction?.title ?? contract.lotId,
+      auctionStatus: auction?.status ?? '',
       sellerName: auction?.sellerId ? (userLabel.get(auction.sellerId) ?? auction.sellerId) : '—',
       sellerId: auction?.sellerId ?? null,
       buyerName: winningBid ? (userLabel.get(winningBid.userId) ?? winningBid.userId) : '—',
       buyerId: winningBid?.userId ?? null,
+      signerUserId: contract.signedBy ?? null,
       transactionRef: contract.contentHash,
       hasDocument: typeof contract.renderedHtml === 'string' && contract.renderedHtml !== '',
       stuck:
@@ -299,39 +300,16 @@ export default async function AdminContractsPage({
     fromParam !== '' ||
     toParam !== ''
 
-  const voidForm = (row: ContractRow): React.ReactElement => (
-    <details className="mt-xs">
-      <summary className="cursor-pointer text-label font-semibold text-danger">
-        Tühista ⚠
-      </summary>
-      <form action={voidContractAction} className="mt-xs flex w-64 flex-col gap-xs">
-        <input type="hidden" name="id" value={row.id} />
-        <textarea
-          name="reason"
-          required
-          minLength={5}
-          rows={2}
-          placeholder="Tühistamise põhjus (kohustuslik)"
-          className={reasonInputClass}
-        />
-        <select
-          name="outcome"
-          defaultValue="contract"
-          className="rounded-input border border-border bg-bgPage px-3 py-2 text-bodySm text-ink"
-        >
-          <option value="contract">Tühista ainult leping</option>
-          {isSuperadmin ? (
-            <option value="contract-and-result">Tühista leping ja oksjoni tulemus</option>
-          ) : null}
-        </select>
-        <button
-          type="submit"
-          className="inline-flex h-8 items-center justify-center rounded-button border border-danger bg-bgPage px-3 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light"
-        >
-          Kinnita tühistamine
-        </button>
-      </form>
-    </details>
+  const voidDialog = (row: ContractRow): React.ReactElement => (
+    <VoidContractDialog
+      contractId={row.id}
+      contractLabel={`Nr ${contractNumber(row.id)}`}
+      auctionTitle={row.auctionTitle}
+      isFramework={row.type === 'framework'}
+      auctionRevertEligible={row.auctionStatus === 'contract'}
+      isSuperadmin={isSuperadmin}
+      signerUserId={row.signerUserId}
+    />
   )
 
   return (
@@ -559,7 +537,7 @@ export default async function AdminContractsPage({
                     </form>
                   )
                 ) : null}
-                {row.status === 'prepared' || row.status === 'sent' ? voidForm(row) : null}
+                {row.status === 'prepared' || row.status === 'sent' ? voidDialog(row) : null}
               </div>
             ),
           },

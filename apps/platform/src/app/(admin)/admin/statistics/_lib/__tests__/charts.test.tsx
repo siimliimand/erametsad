@@ -4,21 +4,21 @@ import { describe, expect, it } from 'vitest'
 
 import {
   ChartSeriesLegend,
-  MonthlyBarsChart,
+  MonthlyStackedChart,
   TrendChart,
   TypeDonutChart,
-  type MonthlyBarsData,
+  type MonthlyStackedData,
   type TrendData,
   type TypeDonutData,
 } from '../../_components/Charts'
 
 const TREND_POINTS = 30
 
-const monthlyData: MonthlyBarsData = {
+const monthlyData: MonthlyStackedData = {
   months: ['Aug', 'Sept'],
   series: [
-    { name: 'Alghind', color: 'primary', values: [123, 0] },
-    { name: 'Lõpphind', color: 'accent', values: [235, 101] },
+    { name: 'Müüdud', color: 'primary', values: [3, 0] },
+    { name: 'Müümata', color: 'accent', values: [1, 2] },
   ],
 }
 
@@ -37,21 +37,53 @@ const trendData: TrendData = {
   values: Array.from({ length: TREND_POINTS }, (_, i) => i),
 }
 
-describe('MonthlyBarsChart', () => {
-  it('renders one bar per series per month with the series names', () => {
-    const html = renderToString(createElement(MonthlyBarsChart, { data: monthlyData }))
-    expect(html.match(/<rect/g)).toHaveLength(4)
-    expect(html).toContain('Alghind')
-    expect(html).toContain('Lõpphind')
+function rectGeometry(html: string): { y: number; height: number }[] {
+  return [...html.matchAll(/y="([\d.]+)" width="[\d.]+" height="([\d.]+)"/g)].map((match) => ({
+    y: Number(match[1]),
+    height: Number(match[2]),
+  }))
+}
+
+describe('MonthlyStackedChart', () => {
+  it('stacks one segment per non-zero series value per month', () => {
+    const html = renderToString(createElement(MonthlyStackedChart, { data: monthlyData }))
+    const rects = html.match(/<rect/g)
+    expect(rects).toHaveLength(3)
+    expect(html).toContain('Müüdud')
+    expect(html).toContain('Müümata')
     expect(html).toContain('Sept')
+    expect(html).toContain('>oksjonit</text>')
   })
 
-  it('renders the empty state when there are no months', () => {
-    const html = renderToString(
-      createElement(MonthlyBarsChart, { data: { months: [], series: [] } }),
+  it('stacks the second series directly on top of the first', () => {
+    const html = renderToString(createElement(MonthlyStackedChart, { data: monthlyData }))
+    const geometry = rectGeometry(html)
+    expect(geometry).toHaveLength(3)
+    const augSold = geometry[0]
+    const augUnsold = geometry[1]
+    if (!augSold || !augUnsold) throw new Error('expected two stacked Aug segments')
+    // The upper segment's bottom edge meets the lower segment's top edge.
+    expect(augUnsold.y + augUnsold.height).toBeCloseTo(augSold.y, 6)
+    expect(augSold.height).toBeGreaterThan(augUnsold.height)
+  })
+
+  it('renders the empty state when there are no months or no outcomes', () => {
+    const emptyMonths = renderToString(
+      createElement(MonthlyStackedChart, { data: { months: [], series: [] } }),
     )
-    expect(html).toContain('Andmed puuduvad')
-    expect(html).not.toContain('<rect')
+    expect(emptyMonths).toContain('Andmed puuduvad')
+    expect(emptyMonths).not.toContain('<rect')
+
+    const allZero = renderToString(
+      createElement(MonthlyStackedChart, {
+        data: {
+          months: ['Aug'],
+          series: [{ name: 'Müüdud', color: 'primary', values: [0] }],
+        },
+      }),
+    )
+    expect(allZero).toContain('Andmed puuduvad')
+    expect(allZero).not.toContain('<rect')
   })
 })
 
@@ -72,7 +104,9 @@ describe('TypeDonutChart', () => {
   })
 
   it('renders the empty state when the donut has no segments', () => {
-    const html = renderToString(createElement(TypeDonutChart, { data: { segments: [] } }))
+    const html = renderToString(
+      createElement(TypeDonutChart, { data: { segments: [] } }),
+    )
     expect(html).toContain('Andmed puuduvad')
   })
 })
@@ -96,8 +130,8 @@ describe('TrendChart', () => {
 describe('ChartSeriesLegend', () => {
   it('renders a legend item per series and nothing for an empty series', () => {
     const html = renderToString(createElement(ChartSeriesLegend, { series: monthlyData.series }))
-    expect(html).toContain('Alghind')
-    expect(html).toContain('Lõpphind')
+    expect(html).toContain('Müüdud')
+    expect(html).toContain('Müümata')
     expect(renderToString(createElement(ChartSeriesLegend, { series: [] }))).toBe('')
   })
 })
