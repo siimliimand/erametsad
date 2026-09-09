@@ -176,6 +176,20 @@
       "when": 1788942006247,
       "tag": "0024_serious_human_fly",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1788945327306,
+      "tag": "0025_redirect_hits",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1788945354169,
+      "tag": "0026_media_focal_point",
+      "breakpoints": true
     }
   ]
 }

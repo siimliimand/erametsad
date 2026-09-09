@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { requireAdminRepositories } from '../_lib/admin'
@@ -37,6 +37,7 @@ import {
 
 import { verifyAdminAccessToken } from '@/lib/auth/jwt'
 import { verifyPassword } from '@/lib/auth/password'
+import { computeIpHash } from '@/lib/bidding/place-bid'
 import {
   approveAlapakkumine,
   rejectAlapakkumine,
@@ -311,8 +312,21 @@ function restrictToPresentKeys(
 
 function audit(
   repositories: CoreRepositories,
-  entry: { actorId: string; action: string; entityType: string; entityId: string; after: unknown },
+  entry: {
+    actorId: string
+    action: string
+    entityType: string
+    entityId: string
+    after: unknown
+    reason?: string
+    context?: {
+      sessionId: string | null
+      ipHash: string | null
+      userAgent: string | null
+    }
+  },
 ): Promise<unknown> {
+  const context = entry.context
   return repositories.create({
     collection: 'audit-entry',
     data: {
@@ -321,8 +335,38 @@ function audit(
       entityType: entry.entityType,
       entityId: entry.entityId,
       after: entry.after,
+      ...(entry.reason ? { reason: entry.reason } : {}),
+      ...(context?.sessionId ? { sessionId: context.sessionId } : {}),
+      ...(context?.ipHash ? { ipHash: context.ipHash } : {}),
+      ...(context?.userAgent ? { userAgent: context.userAgent } : {}),
     },
   })
+}
+
+/**
+ * Request context for the audit era columns (task 4.7): session id from the
+ * access token, salted IP hash and user agent from the request headers.
+ * Best-effort only — outside a request scope the fields fall back to null.
+ */
+async function auditRequestContext(): Promise<{
+  sessionId: string | null
+  ipHash: string | null
+  userAgent: string | null
+}> {
+  try {
+    const headerList = await headers()
+    const token = (await cookies()).get('access_token')?.value
+    const payload = token ? verifyAdminAccessToken(token) : null
+    const ip = headerList.get('x-forwarded-for')?.split(',')[0]?.trim()
+    const userAgent = headerList.get('user-agent')?.trim()
+    return {
+      sessionId: payload?.sessionId ?? null,
+      ipHash: ip && ip.length > 0 ? computeIpHash(ip) : null,
+      userAgent: userAgent && userAgent.length > 0 ? userAgent.slice(0, 512) : null,
+    }
+  } catch {
+    return { sessionId: null, ipHash: null, userAgent: null }
+  }
 }
 
 export async function createAuctionAction(formData: FormData): Promise<void> {
@@ -1663,6 +1707,8 @@ export async function voidSealedCeremonyAction(formData: FormData): Promise<void
       entityType: 'auction',
       entityId: auctionId,
       after: { reason, status: 'unsold', voidedBidCount: sealedBids.length },
+      reason,
+      context: await auditRequestContext(),
     })
 
     await ceremonyCache.delete(ceremonyRecordKey(auctionId))
@@ -2140,6 +2186,7 @@ export async function signSealedOpenerAction(
     entityType: 'auction',
     entityId: auctionId,
     after: { note: note ?? null },
+    context: await auditRequestContext(),
   })
   return { ok: true, phase: 'awaiting-approval', error: null }
 }
@@ -2192,6 +2239,7 @@ export async function signSealedApproverAction(
     entityType: 'auction',
     entityId: auctionId,
     after: { openerUserId: record.opener.userId },
+    context: await auditRequestContext(),
   })
   return { ok: true, phase: 'awaiting-approval', error: null }
 }
@@ -2274,6 +2322,7 @@ export async function revealSealedBidsAction(
       openerUserId: record.opener.userId,
       approverUserId: record.approver.userId,
     },
+    context: await auditRequestContext(),
   })
 
   return { ok: true, phase: 'revealed', error: null }
@@ -2368,6 +2417,8 @@ export async function confirmSealedCeremonyWinnerAction(
       entityType: 'auction',
       entityId: auctionId,
       after: { reason: reason || null, topAmount: top?.amount ?? null },
+      ...(reason ? { reason } : {}),
+      context: await auditRequestContext(),
     })
     return { ok: true, phase: 'house-backup', error: null }
   }
@@ -2384,6 +2435,8 @@ export async function confirmSealedCeremonyWinnerAction(
       entityType: 'auction',
       entityId: auctionId,
       after: { reason, topAmount: top?.amount ?? null },
+      reason,
+      context: await auditRequestContext(),
     })
     return { ok: true, phase: 'unsold', error: null }
   }
@@ -2530,6 +2583,7 @@ export async function confirmSealedCeremonyWinnerAction(
             ? { companyProfileOotel: true, companyProfileDecision: 'proceed' }
             : {}),
         },
+        context: await auditRequestContext(),
       })
       return null
     } catch (error) {
@@ -2599,6 +2653,8 @@ export async function markSealedUnsoldShortcutAction(
       entityType: 'auction',
       entityId: auctionId,
       after: { reason, shortcut: true, totalBids: decrypted.length, validCount: 0 },
+      reason,
+      context: await auditRequestContext(),
     })
   } catch (error) {
     return {
@@ -2710,6 +2766,8 @@ export async function voidSealedBidsAction(
         entityType: 'auction',
         entityId: auctionId,
         after: { reason, status: 'unsold', voidedBidCount: sealedBids.length },
+        reason,
+        context: await auditRequestContext(),
       })
 
       await ceremonyCache.delete(ceremonyRecordKey(auctionId))

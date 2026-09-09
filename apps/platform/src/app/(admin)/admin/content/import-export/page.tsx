@@ -1,4 +1,5 @@
 import { ImportForm } from './_components/ImportForm'
+import { RedirectsImportForm } from './_components/RedirectsImportForm'
 import { MAX_IMPORT_BYTES, MAX_IMPORT_ITEMS } from './_lib/import-export'
 import { secondaryButtonClass } from '../../../_components/FormField'
 import { PageHeader } from '../../../_components/PageHeader'
@@ -9,9 +10,10 @@ export const metadata = { title: 'Import ja eksport' }
 export default async function AdminContentImportExportPage() {
   const { repositories } = await requireAdminRepositories()
 
-  const [articles, pages] = await Promise.all([
+  const [articles, pages, redirects] = await Promise.all([
     repositories.find({ collection: 'articles', pagination: false }),
     repositories.find({ collection: 'pages', pagination: false }),
+    repositories.find({ collection: 'redirects', pagination: false }),
   ])
   const maxMiB = Math.round(MAX_IMPORT_BYTES / (1024 * 1024))
 
@@ -19,7 +21,7 @@ export default async function AdminContentImportExportPage() {
     <div>
       <PageHeader
         title="Import ja eksport"
-        description="Laadi artiklid ja lehed JSON-failina alla või üles. Import uuendab olemasolevaid kirjeid URL-nime alusel."
+        description="Laadi artiklid, lehed ja suunamised failina alla või üles. Import uuendab olemasolevaid kirjeid võtme alusel."
       />
       <div className="mt-md grid grid-cols-1 items-start gap-sm lg:grid-cols-2">
         <section className="rounded-card border border-border bg-bgPage p-md">
@@ -53,6 +55,17 @@ export default async function AdminContentImportExportPage() {
           <ImportForm />
         </section>
       </div>
+      <section className="mt-sm rounded-card border border-border bg-bgPage p-md">
+        <h2 className="mb-xs font-heading text-h4 font-bold text-ink">
+          Suunamiste CSV import
+        </h2>
+        <p className="text-bodySm text-ink-muted">
+          Hetkel suunamisi: <span className="font-semibold text-ink">{String(redirects.docs.length)}</span>.
+          Iga rida läbib samad reeglid nagu üksik salvestus (kaldkriips, iseendale suunamine,
+          ketti pikkus).
+        </p>
+        <RedirectsImportForm />
+      </section>
     </div>
   )
 }

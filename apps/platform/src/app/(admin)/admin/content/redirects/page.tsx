@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
-import { deleteRedirectAction } from '../../../_actions/content'
+import { RedirectDeleteButton } from './_components/RedirectDeleteButton'
+import { validateRedirect } from './_lib/redirect-validation'
 import { DataTable } from '../../../_components/DataTable'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import { primaryButtonClass } from '../../../_components/FormField'
@@ -17,6 +18,9 @@ interface RedirectRow {
   to: string
   type: RedirectType
   active: boolean
+  hits: number
+  valid: boolean
+  validationError: string | null
 }
 
 export const metadata = { title: 'Suunamised' }
@@ -34,13 +38,24 @@ export default async function AdminRedirectsPage({
     sort: 'from',
     pagination: false,
   })
-  const rows: RedirectRow[] = docs.map((redirect) => ({
-    id: redirect.id,
-    from: redirect.from,
-    to: redirect.to,
-    type: redirect.type,
-    active: redirect.active,
-  }))
+  // Validation status is derived per row against the stored set (no extra
+  // column): the same rules the save action enforces.
+  const byFrom = new Map(docs.map((doc) => [doc.from, doc.to]))
+  const rows: RedirectRow[] = docs.map((redirect) => {
+    const workingMap = new Map(byFrom)
+    workingMap.delete(redirect.from)
+    const validationError = validateRedirect(redirect.from, redirect.to, workingMap)
+    return {
+      id: redirect.id,
+      from: redirect.from,
+      to: redirect.to,
+      type: redirect.type,
+      active: redirect.active,
+      hits: redirect.hits,
+      valid: validationError === null,
+      validationError,
+    }
+  })
 
   return (
     <div>
@@ -82,19 +97,26 @@ export default async function AdminRedirectsPage({
             render: (row) => (row.active ? 'Jah' : 'Ei'),
           },
           {
+            key: 'hits',
+            label: 'Tabamusi',
+            render: (row) => String(row.hits),
+          },
+          {
+            key: 'valid',
+            label: 'Valideerimine',
+            render: (row) =>
+              row.valid ? (
+                <span className="text-ink-muted">OK</span>
+              ) : (
+                <span className="font-semibold text-danger" title={row.validationError ?? undefined}>
+                  Viga
+                </span>
+              ),
+          },
+          {
             key: 'actions',
             label: 'Tegevused',
-            render: (row) => (
-              <form action={deleteRedirectAction}>
-                <input type="hidden" name="id" value={row.id} />
-                <button
-                  type="submit"
-                  className="text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:text-danger/80"
-                >
-                  Kustuta
-                </button>
-              </form>
-            ),
+            render: (row) => <RedirectDeleteButton id={row.id} from={row.from} />,
           },
         ]}
         rows={rows}

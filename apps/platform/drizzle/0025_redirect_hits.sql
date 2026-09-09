@@ -1,0 +1,1 @@
+ALTER TABLE `redirects` ADD `hits` integer DEFAULT 0 NOT NULL;

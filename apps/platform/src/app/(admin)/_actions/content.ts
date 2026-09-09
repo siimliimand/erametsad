@@ -23,6 +23,15 @@ import {
   withNamedFlags,
   type FeatureFlagKey,
 } from '../admin/content/_components/settings-audit'
+import { MAX_IMPORT_BYTES } from '../admin/content/import-export/_lib/import-export'
+import {
+  parseRedirectCsv,
+  planRedirectCsvUpserts,
+  summarizeRedirectItems,
+  type RedirectImportItemResult,
+  type RedirectImportReport,
+} from '../admin/content/import-export/_lib/redirects-csv'
+import { validateRedirect } from '../admin/content/redirects/_lib/redirect-validation'
 
 import type { BlockConfig } from '@/lib/content/blocks'
 import { safeParseBlockConfig, serializeBlockConfig } from '@/lib/content/blocks'
@@ -1068,6 +1077,17 @@ export async function deleteLegalDocumentAction(formData: FormData): Promise<voi
   redirect(legalDocumentsPath)
 }
 
+/** from→to map over the stored redirects, the input of the chain validator. */
+async function redirectChainMap(repositories: CoreRepositories): Promise<Map<string, string>> {
+  const { docs } = await repositories.find({ collection: 'redirects', pagination: false })
+  return new Map(docs.map((doc) => [doc.from, doc.to]))
+}
+
+/**
+ * Save with the task-3.5 rules: both paths start with "/", no
+ * self-redirect, and the target chain stays within the hop cap. The save
+ * is audited with the previous values so chain edits stay traceable.
+ */
 export async function saveRedirectAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
   assertCan(session.role, 'content:write')
@@ -1082,31 +1102,181 @@ export async function saveRedirectAction(formData: FormData): Promise<void> {
   if (!to) redirectWithError(errorPath, 'Kuhu on kohustuslik.')
   if (!redirectTypes.includes(type)) redirectWithError(errorPath, 'Vali suunamise tüüp.')
 
+  const current = id
+    ? await persist(errorPath, 'Suunamise lugemine ebaõnnestus: ', () =>
+        repositories.findByID({ collection: 'redirects', id }),
+      )
+    : null
+  if (id && !current) redirectWithError(errorPath, 'Suunamist ei leitud.')
+
+  const byFrom = await redirectChainMap(repositories)
+  // The row being edited keeps its old mapping in the loaded map; drop it so
+  // the chain walk sees the post-save state and cannot count it as a hop.
+  if (current) byFrom.delete(current.from)
+  const validationError = validateRedirect(from, to, byFrom)
+  if (validationError) redirectWithError(errorPath, validationError)
+
   const data = { from, to, type, active: readBool(formData, 'active') }
 
-  await persist(errorPath, 'Suunamise salvestamine ebaõnnestus: ', () =>
-    id
-      ? repositories.update({ collection: 'redirects', id, data })
-      : repositories.create({ collection: 'redirects', data }),
-  )
+  await persist(errorPath, 'Suunamise salvestamine ebaõnnestus: ', async () => {
+    const saved = current
+      ? await repositories.update({ collection: 'redirects', id, data })
+      : await repositories.create({ collection: 'redirects', data })
+    await writeAudit(repositories, {
+      actorId: session.userId,
+      action: current ? 'redirect.update' : 'redirect.create',
+      entityType: 'redirect',
+      entityId: saved.id,
+      before: current
+        ? { from: current.from, to: current.to, type: current.type, active: current.active }
+        : undefined,
+      after: { from, to, type, active: data.active },
+    })
+  })
 
   revalidate(redirectsPath, id)
+  if (current && current.from !== from) {
+    revalidatePath(current.from)
+  }
+  revalidatePath(from)
+  revalidatePath(to)
   redirect(redirectsPath)
 }
 
+/** Delete requires a typed reason and lands on the append-only audit log. */
 export async function deleteRedirectAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
   assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
+  const reason = readText(formData, 'reason')
   if (!id) redirectWithError(redirectsPath, 'Suunamise identifikaator puudub.')
+  if (!isValidReason(reason)) {
+    redirectWithError(redirectsPath, 'Kustutamise põhjus peab olema vähemalt 5 tähemärki.')
+  }
 
-  await persist(redirectsPath, 'Suunamise kustutamine ebaõnnestus: ', () =>
-    repositories.delete({ collection: 'redirects', id }),
+  const current = await persist(redirectsPath, 'Suunamise lugemine ebaõnnestus: ', () =>
+    repositories.findByID({ collection: 'redirects', id }),
   )
+  if (!current) redirectWithError(redirectsPath, 'Suunamist ei leitud.')
+
+  await persist(redirectsPath, 'Suunamise kustutamine ebaõnnestus: ', async () => {
+    await repositories.delete({ collection: 'redirects', id })
+    await writeAudit(repositories, {
+      actorId: session.userId,
+      action: 'redirect.delete',
+      entityType: 'redirect',
+      entityId: id,
+      before: { from: current.from, to: current.to, type: current.type, hits: current.hits },
+      after: { deleted: true, reason },
+    })
+  })
 
   revalidate(redirectsPath, id)
+  revalidatePath(current.from)
   redirect(redirectsPath)
+}
+
+// ── Redirects CSV bulk import (task 3.5) ────────────────────────────────────
+
+function csvErrorReport(message: string, dryRun: boolean): RedirectImportReport {
+  return {
+    status: 'error',
+    message,
+    dryRun,
+    items: [],
+    summary: { created: 0, updated: 0, failed: 0 },
+  }
+}
+
+/**
+ * Bulk import for redirects from a CSV file (columns: from,to,type,active;
+ * a header row is required). Upserts by `from` like the JSON importer
+ * upserts by slug; the same validation rules and hop cap apply per row.
+ */
+export async function importRedirectsCsvAction(
+  _previous: RedirectImportReport | null,
+  formData: FormData,
+): Promise<RedirectImportReport> {
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
+
+  const dryRun = formData.get('dryRun') === 'true'
+  const file = formData.get('file')
+  if (!(file instanceof File)) return csvErrorReport('Vali CSV-fail.', dryRun)
+  if (file.size === 0) return csvErrorReport('Fail on tühi.', dryRun)
+  if (file.size > MAX_IMPORT_BYTES) {
+    const sizeMiB = (file.size / (1024 * 1024)).toFixed(1)
+    return csvErrorReport(`Fail on liiga suur (${sizeMiB} MiB); lubatud on kuni 2 MiB.`, dryRun)
+  }
+
+  const parsed = parseRedirectCsv(await file.text())
+  if (!parsed.ok) return csvErrorReport(parsed.error, dryRun)
+
+  const { docs } = await repositories.find({ collection: 'redirects', pagination: false })
+  const byFrom = new Map(docs.map((doc) => [doc.from, doc.id]))
+  const chainMap = new Map(docs.map((doc) => [doc.from, doc.to]))
+
+  const plan = planRedirectCsvUpserts(parsed.rows, byFrom, chainMap)
+
+  const items: RedirectImportItemResult[] = [...plan.invalid]
+  if (dryRun) {
+    items.push(
+      ...plan.plans.map(
+        (plan): RedirectImportItemResult => ({
+          index: plan.index,
+          from: plan.from,
+          to: plan.to,
+          outcome: plan.action === 'create' ? 'would-create' : 'would-update',
+        }),
+      ),
+    )
+    return {
+      status: 'dry-run',
+      message: 'Kontroll valmis; midagi ei salvestatud.',
+      dryRun: true,
+      items,
+      summary: summarizeRedirectItems(items),
+    }
+  }
+
+  for (const rowPlan of plan.plans) {
+    const result: RedirectImportItemResult = {
+      index: rowPlan.index,
+      from: rowPlan.from,
+      to: rowPlan.to,
+      outcome: rowPlan.action === 'create' ? 'created' : 'updated',
+    }
+    items.push(result)
+    try {
+      const data = { from: rowPlan.from, to: rowPlan.to, type: rowPlan.type, active: rowPlan.active }
+      if (rowPlan.existingId) {
+        await repositories.update({ collection: 'redirects', id: rowPlan.existingId, data })
+      } else {
+        const created = await repositories.create({ collection: 'redirects', data })
+        await writeAudit(repositories, {
+          actorId: session.userId,
+          action: 'redirect.create',
+          entityType: 'redirect',
+          entityId: created.id,
+          after: data,
+        })
+      }
+    } catch (error) {
+      result.outcome = 'failed'
+      result.reason = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  revalidatePath(redirectsPath)
+  const summary = summarizeRedirectItems(items)
+  return {
+    status: summary.failed > 0 ? 'partial' : 'success',
+    message: `Import valmis: ${String(summary.created)} loodud, ${String(summary.updated)} uuendatud, ${String(summary.failed)} ebaõnnestus.`,
+    dryRun: false,
+    items,
+    summary,
+  }
 }
 
 export async function saveSpecialistAction(formData: FormData): Promise<void> {

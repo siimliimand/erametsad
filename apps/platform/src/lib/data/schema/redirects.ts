@@ -14,6 +14,9 @@ export const redirects = sqliteTable(
     to: text('to').notNull(),
     type: text('type', { enum: redirectTypes }).notNull().default('301'),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    // Lifetime hit counter, incremented by the middleware resolver on each
+    // served redirect (single UPDATE per hit).
+    hits: integer('hits').notNull().default(0),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
