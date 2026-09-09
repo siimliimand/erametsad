@@ -6,9 +6,11 @@ import {
   packageRowSums,
   packageRowsStateFrom,
   parsePackageRowsCsv,
+  parseWizardDraft,
   quickAuctionPatch,
   reviewIssues,
   sanitizeRichText,
+  serializeWizardDraft,
   stepForField,
   validateAuctionDraft,
   validateWizardForSubmit,
@@ -349,5 +351,76 @@ describe('stepForField', () => {
     expect(stepForField('media.0.alt')).toBe(5)
     expect(stepForField('propertyCount')).toBe(6)
     expect(stepForField('packageRows.0.cadastre')).toBe(6)
+  })
+})
+
+describe('rendi-/kasutusleping gating (task 5.7)', () => {
+  it('requires the lease deadline when the checkbox is on', () => {
+    const errors = validateAuctionDraft(
+      createInitial,
+      { ...baseState, hasLeaseAgreement: true },
+      options,
+    )
+    expect(errors['deadlines.leaseDeadline']).toContain('Rendi/kasutuslepingu tähtaeg')
+  })
+
+  it('passes when the checkbox is on and the deadline is set', () => {
+    const errors = validateAuctionDraft(
+      createInitial,
+      { ...baseState, hasLeaseAgreement: true, leaseDeadline: '2027-06-30' },
+      options,
+    )
+    expect(errors['deadlines.leaseDeadline']).toBeUndefined()
+  })
+
+  it('passes without a deadline while the checkbox is off', () => {
+    const errors = validateAuctionDraft(createInitial, baseState, options)
+    expect(errors['deadlines.leaseDeadline']).toBeUndefined()
+  })
+
+  it('lands the lease gate on step 3', () => {
+    const issues = reviewIssues(
+      createInitial,
+      { ...baseState, hasLeaseAgreement: true },
+      options,
+    )
+    const leaseIssue = issues.find((issue) => issue.field === 'deadlines.leaseDeadline')
+    expect(leaseIssue).toMatchObject({ step: 3, severity: 'error' })
+  })
+
+  it('carries hasLeaseAgreement on the deadlines payload only when checked', () => {
+    const checked = buildAuctionPayload(
+      createInitial,
+      { ...baseState, hasLeaseAgreement: true, leaseDeadline: '2027-06-30' },
+      options,
+    )
+    expect(checked.deadlines).toMatchObject({
+      hasLeaseAgreement: true,
+      leaseDeadline: '2027-06-30',
+    })
+    const unchecked = buildAuctionPayload(
+      createInitial,
+      { ...baseState, leaseDeadline: '2027-06-30' },
+      options,
+    )
+    const deadlines = unchecked.deadlines as Record<string, unknown>
+    expect(deadlines.hasLeaseAgreement).toBeUndefined()
+    // A stored deadline must survive a save made with the box unchecked.
+    expect(deadlines.leaseDeadline).toBe('2027-06-30')
+  })
+
+  it('seeds hasLeaseAgreement from a stored lease deadline on draft restore', () => {
+    const stored = serializeWizardDraft(
+      { ...baseState, leaseDeadline: '2027-06-30' },
+      new Date('2026-09-09T10:00:00.000Z'),
+    )
+    const restored = parseWizardDraft(stored)
+    expect(restored?.state.hasLeaseAgreement).toBe(true)
+
+    const storedWithoutLease = serializeWizardDraft(baseState, new Date('2026-09-09T10:00:00.000Z'))
+    const restoredWithoutLease = parseWizardDraft(storedWithoutLease)
+    // Unchecked stays absent so the restore stays byte-equal to the server
+    // state (the dirty compare must not fire a spurious restore prompt).
+    expect(restoredWithoutLease?.state.hasLeaseAgreement).toBeUndefined()
   })
 })

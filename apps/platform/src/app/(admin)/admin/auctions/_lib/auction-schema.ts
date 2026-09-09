@@ -71,20 +71,33 @@ export const packageRowSchema = z.object({
   minBidEur: eurAmount.optional(),
 })
 
-export const deadlinesSchema = z.object({
-  loggingDeadline: dateOnly.optional(),
-  removalDeadline: dateOnly.optional(),
-  leaseDeadline: dateOnly.optional(),
-  storageLocationApproval: approvalOption.optional(),
-  removalRoads: approvalOption.optional(),
-  antiSnipeEnabled: z.boolean().optional(),
-  antiSnipeMinutes: z
-    .number()
-    .int('Anti-snipe minutid peavad olema täisarv.')
-    .min(ANTI_SNIPE_MIN_MINUTES, `Anti-snipe vähemalt ${String(ANTI_SNIPE_MIN_MINUTES)} minutit.`)
-    .max(ANTI_SNIPE_MAX_MINUTES, `Anti-snipe kuni ${String(ANTI_SNIPE_MAX_MINUTES)} minutit.`)
-    .optional(),
-})
+export const deadlinesSchema = z
+  .object({
+    loggingDeadline: dateOnly.optional(),
+    removalDeadline: dateOnly.optional(),
+    leaseDeadline: dateOnly.optional(),
+    // Rendi-/kasutusleping checkbox (docs 03 step 3): when the lot carries a
+    // lease agreement, the lease deadline becomes required.
+    hasLeaseAgreement: z.boolean().optional(),
+    storageLocationApproval: approvalOption.optional(),
+    removalRoads: approvalOption.optional(),
+    antiSnipeEnabled: z.boolean().optional(),
+    antiSnipeMinutes: z
+      .number()
+      .int('Anti-snipe minutid peavad olema täisarv.')
+      .min(ANTI_SNIPE_MIN_MINUTES, `Anti-snipe vähemalt ${String(ANTI_SNIPE_MIN_MINUTES)} minutit.`)
+      .max(ANTI_SNIPE_MAX_MINUTES, `Anti-snipe kuni ${String(ANTI_SNIPE_MAX_MINUTES)} minutit.`)
+      .optional(),
+  })
+  .superRefine((deadlines, ctx) => {
+    if (deadlines.hasLeaseAgreement === true && deadlines.leaseDeadline === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['leaseDeadline'],
+        message: 'Rendi/kasutuslepingu tähtaeg on kohustuslik, kui leping on olemas.',
+      })
+    }
+  })
 
 export const auctionInputSchema = z
   .object({

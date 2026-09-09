@@ -87,6 +87,13 @@ export interface AuctionWizardState {
   removalDeadline: string
   leaseDeadline: string
   /**
+   * Rendi-/kasutusleping checkbox gating the lease deadline field (docs 03
+   * step 3): checked shows and requires the deadline input. Optional so the
+   * pre-5.7 seed paths stay valid, mirroring the `storageLocationApproval`
+   * precedent; a stored lease deadline without the flag reads as checked.
+   */
+  hasLeaseAgreement?: boolean
+  /**
    * Kooskõlastused (ladustamiskohad) and väljaveoteed codes ('seller' |
    * 'buyer' | 'approved'); '' = unset. Optional so the pre-5.1 seed paths
    * stay valid, mirroring the `files` precedent.
@@ -361,6 +368,7 @@ export function buildAuctionPayload(
   }
   if (state.loggingDeadline !== '') deadlines.loggingDeadline = state.loggingDeadline
   if (state.removalDeadline !== '') deadlines.removalDeadline = state.removalDeadline
+  if (state.hasLeaseAgreement === true) deadlines.hasLeaseAgreement = true
   if (state.leaseDeadline !== '') deadlines.leaseDeadline = state.leaseDeadline
   const storageLocationApproval = state.storageLocationApproval ?? ''
   if (storageLocationApproval !== '') deadlines.storageLocationApproval = storageLocationApproval
@@ -979,6 +987,15 @@ function draftStateFrom(value: unknown): AuctionWizardState | null {
   // server state the dirty compare runs against.
   const storageLocationApproval = draftString(record.storageLocationApproval) ?? ''
   const removalRoads = draftString(record.removalRoads) ?? ''
+  // Task 5.7, same additive rule: present only when true, so an unchecked
+  // restore stays byte-equal to a server state without the key; a stored
+  // lease deadline reads as checked.
+  const hasLeaseAgreement =
+    typeof record.hasLeaseAgreement === 'boolean' && record.hasLeaseAgreement
+      ? true
+      : strings.leaseDeadline !== ''
+        ? true
+        : undefined
 
   return {
     title: strings.title,
@@ -1011,6 +1028,7 @@ function draftStateFrom(value: unknown): AuctionWizardState | null {
     loggingDeadline: strings.loggingDeadline,
     removalDeadline: strings.removalDeadline,
     leaseDeadline: strings.leaseDeadline,
+    ...(hasLeaseAgreement !== undefined ? { hasLeaseAgreement } : {}),
     ...(storageLocationApproval !== '' ? { storageLocationApproval } : {}),
     ...(removalRoads !== '' ? { removalRoads } : {}),
     propertyCount: typeof propertyCount === 'number' ? propertyCount : null,

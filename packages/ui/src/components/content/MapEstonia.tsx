@@ -1,5 +1,6 @@
 'use client';
 
+import type * as LeafletTypes from 'leaflet';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import './MapEstonia.css';
 
@@ -10,11 +11,20 @@ export interface MapPin {
   onClick?: () => void;
 }
 
+export interface MapCoordinates {
+  lat: number;
+  lng: number;
+}
+
 export interface MapEstoniaProps {
   pins?: MapPin[];
   center?: [number, number];
   zoom?: number;
   className?: string;
+  /** Click-to-pin (admin lot editor): reports where the operator clicked. */
+  onMapClick?: (coordinates: MapCoordinates) => void;
+  /** When given, pins become draggable and moves are reported on drag end. */
+  onPinMove?: (coordinates: MapCoordinates) => void;
 }
 
 const defaultCenter: [number, number] = [58.6, 25.0];
@@ -64,11 +74,31 @@ function fixLeafletIcon(L: typeof import('leaflet')) {
   });
 }
 
-export function MapEstonia({ pins = [], center = defaultCenter, zoom = defaultZoom, className = '' }: MapEstoniaProps): ReactElement {
+export function MapEstonia({ pins = [], center = defaultCenter, zoom = defaultZoom, className = '', onMapClick, onPinMove }: MapEstoniaProps): ReactElement {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const markersLayer = useRef<L.LayerGroup | null>(null);
   const [loadError, setLoadError] = useState(false);
+
+  // The map initializes once, so the interaction callbacks ride through
+  // refs and the closures always call the latest render's handlers.
+  const onMapClickRef = useRef(onMapClick);
+  const onPinMoveRef = useRef(onPinMove);
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+    onPinMoveRef.current = onPinMove;
+  });
+
+  function createMarker(L: typeof LeafletTypes, pin: MapPin): LeafletTypes.Marker {
+    const marker = L.marker([pin.lat, pin.lng], onPinMoveRef.current ? { draggable: true } : undefined);
+    if (pin.label) marker.bindPopup(pin.label);
+    if (pin.onClick) marker.on('click', pin.onClick);
+    marker.on('dragend', () => {
+      const { lat, lng } = marker.getLatLng();
+      onPinMoveRef.current?.({ lat, lng });
+    });
+    return marker;
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -114,10 +144,11 @@ export function MapEstonia({ pins = [], center = defaultCenter, zoom = defaultZo
         markersLayer.current = L.layerGroup().addTo(map);
 
         pins.forEach((pin) => {
-          const marker = L.marker([pin.lat, pin.lng]);
-          if (pin.label) marker.bindPopup(pin.label);
-          if (pin.onClick) marker.on('click', pin.onClick);
-          markersLayer.current?.addLayer(marker);
+          markersLayer.current?.addLayer(createMarker(L, pin));
+        });
+
+        map.on('click', (event: LeafletTypes.LeafletMouseEvent) => {
+          onMapClickRef.current?.({ lat: event.latlng.lat, lng: event.latlng.lng });
         });
       } catch {
         if (mounted) setLoadError(true);
@@ -140,10 +171,7 @@ export function MapEstonia({ pins = [], center = defaultCenter, zoom = defaultZo
     import('leaflet').then((mod) => {
       const L = mod.default;
       pins.forEach((pin) => {
-        const marker = L.marker([pin.lat, pin.lng]);
-        if (pin.label) marker.bindPopup(pin.label);
-        if (pin.onClick) marker.on('click', pin.onClick);
-        markersLayer.current?.addLayer(marker);
+        markersLayer.current?.addLayer(createMarker(L, pin));
       });
     });
   }, [pins]);

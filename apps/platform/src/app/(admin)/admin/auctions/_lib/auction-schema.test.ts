@@ -226,6 +226,38 @@ describe('anti-snipe bounds', () => {
   })
 })
 
+describe('rendi-/kasutusleping deadline gate', () => {
+  it('requires the lease deadline when the lot has a lease agreement', () => {
+    const parsed = auctionInputSchema.safeParse({
+      ...validBase,
+      deadlines: { hasLeaseAgreement: true },
+    })
+    expect(parsed.success).toBe(false)
+    if (!parsed.success) {
+      const issue = parsed.error.issues.find(
+        (entry) => entry.path.join('.') === 'deadlines.leaseDeadline',
+      )
+      expect(issue?.message).toContain('Rendi/kasutuslepingu tähtaeg')
+    }
+  })
+
+  it('accepts the deadline together with the lease flag', () => {
+    const parsed = auctionInputSchema.safeParse({
+      ...validBase,
+      deadlines: { hasLeaseAgreement: true, leaseDeadline: '2027-06-30' },
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  it('accepts an absent lease deadline without the flag', () => {
+    const parsed = auctionInputSchema.safeParse({
+      ...validBase,
+      deadlines: { loggingDeadline: '2027-03-31' },
+    })
+    expect(parsed.success).toBe(true)
+  })
+})
+
 describe('mechanics per auction type', () => {
   it('requires a bid step of at least 1 EUR on open lots', () => {
     const parsed = auctionInputSchema.safeParse({ ...validBase, bidStepEur: 0.5 })

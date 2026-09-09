@@ -9,7 +9,6 @@ import { inputClass, secondaryButtonClass } from '../../../_components/FormField
 import {
   MAX_EDITOR_IMAGE_BYTES,
   MAX_EDITOR_PDF_BYTES,
-  RENDITION_SPECS,
   attachmentTagLabels,
   attachmentTags,
   formatFileSize,
@@ -22,12 +21,50 @@ import type { AttachmentTag } from '../../media/_lib/media-upload'
  * D6 validation, the per-image alt text and focal-point picker, and the
  * PDF attachment list with its Takseer/Metsateatised/Muu tag select.
  *
- * Renditions (hero 1600x1000, gallery 1200x750, thumb 350x175) are declared
- * in media-upload.ts, but no worker-runtime mechanism can generate them yet
- * and the wizard form has no non-redirecting upload endpoint, so a picked
- * file is validated here and the operator is pointed at the media library
- * until a media upload endpoint lands (reported gap, task 2.6).
+ * Picked files upload through POST /api/v1/media, which stores the original
+ * in R2, records the media row and queues the rendition job (hero 1600x1000,
+ * gallery 1200x750, thumb 350x175) — the lot references the returned URL, so
+ * URL pasting is gone. The min-width rule runs here, the only side that can
+ * decode the image.
  */
+
+interface UploadedMedia {
+  url: string
+  filename: string
+}
+
+/** POSTs the file to the wizard upload endpoint and returns its media URL. */
+async function uploadToMediaLibrary(
+  file: File,
+  extra: Record<string, string> = {},
+): Promise<UploadedMedia> {
+  const body = new FormData()
+  body.append('file', file)
+  for (const [key, value] of Object.entries(extra)) {
+    body.append(key, value)
+  }
+  const response = await fetch('/api/v1/media', { method: 'POST', body })
+  const data: unknown = await response.json().catch(() => null)
+  if (!response.ok) {
+    const message =
+      typeof data === 'object' && data !== null && typeof (data as { error?: unknown }).error === 'string'
+        ? (data as { error: string }).error
+        : 'Üleslaadimine ebaõnnestus.'
+    throw new Error(message)
+  }
+  const url =
+    typeof data === 'object' && data !== null && typeof (data as { url?: unknown }).url === 'string'
+      ? (data as { url: string }).url
+      : null
+  if (url === null || url === '') {
+    throw new Error('Üleslaadimine ebaõnnestus.')
+  }
+  const filename =
+    typeof data === 'object' && data !== null && typeof (data as { filename?: unknown }).filename === 'string'
+      ? (data as { filename: string }).filename
+      : file.name
+  return { url, filename }
+}
 
 const mediaAltErrorKey = (index: number): [string, string] => [
   `media.${String(index)}.alt`,
@@ -40,7 +77,6 @@ const fileTagErrorKey = (index: number): [string, string] => [
 ]
 
 interface MeasuredImage {
-  filename: string
   width: number
   height: number
 }
@@ -49,7 +85,7 @@ interface MeasuredImage {
 async function measureImage(file: File): Promise<MeasuredImage | null> {
   try {
     const bitmap = await createImageBitmap(file)
-    const measured = { filename: file.name, width: bitmap.width, height: bitmap.height }
+    const measured = { width: bitmap.width, height: bitmap.height }
     bitmap.close()
     return measured
   } catch {
@@ -78,12 +114,10 @@ export function MediaStep({
   initial,
 }: Omit<WizardStepContext, 'goToStep'>) {
   const id = useId()
-  const [newImageUrl, setNewImageUrl] = useState('')
   const [imageUploadError, setImageUploadError] = useState<string | null>(null)
-  const [validatedImage, setValidatedImage] = useState<MeasuredImage | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null)
-  const [validatedAttachment, setValidatedAttachment] = useState<string | null>(null)
-  const [newFileUrl, setNewFileUrl] = useState('')
+  const [uploadingAttachment, setUploadingAttachment] = useState(false)
   const [newFileTag, setNewFileTag] = useState<AttachmentTag>('muu')
 
   // Stored attachments are not seeded into the client state (the server
@@ -140,13 +174,6 @@ export function MediaStep({
     patch({ media: state.media.filter((_, i) => i !== index) })
   }
 
-  function addMediaByUrl(): void {
-    const url = newImageUrl.trim()
-    if (url === '') return
-    patch({ media: [...state.media, { url, alt: '' }] })
-    setNewImageUrl('')
-  }
-
   async function onImagePicked(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = event.target.files?.[0]
     resetFileInput(event)
@@ -160,19 +187,30 @@ export function MediaStep({
     })
     if (error !== null) {
       setImageUploadError(error)
-      setValidatedImage(null)
       return
     }
     if (measured === null) {
       setImageUploadError('Pildi mõõtmeid ei õnnestunud lugeda.')
-      setValidatedImage(null)
       return
     }
     setImageUploadError(null)
-    setValidatedImage(measured)
+    setUploadingImage(true)
+    try {
+      const uploaded = await uploadToMediaLibrary(file, {
+        width: String(measured.width),
+        height: String(measured.height),
+      })
+      patch({ media: [...state.media, { url: uploaded.url, alt: '' }] })
+    } catch (uploadError) {
+      setImageUploadError(
+        uploadError instanceof Error ? uploadError.message : 'Üleslaadimine ebaõnnestus.',
+      )
+    } finally {
+      setUploadingImage(false)
+    }
   }
 
-  function onAttachmentPicked(event: ChangeEvent<HTMLInputElement>): void {
+  async function onAttachmentPicked(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = event.target.files?.[0]
     resetFileInput(event)
     if (!file) return
@@ -183,11 +221,21 @@ export function MediaStep({
     })
     if (error !== null) {
       setAttachmentUploadError(error)
-      setValidatedAttachment(null)
       return
     }
     setAttachmentUploadError(null)
-    setValidatedAttachment(`${file.name} (${formatFileSize(file.size)})`)
+    setUploadingAttachment(true)
+    try {
+      const uploaded = await uploadToMediaLibrary(file)
+      patch({ files: [...files, { url: uploaded.url, tag: newFileTag }] })
+      setNewFileTag('muu')
+    } catch (uploadError) {
+      setAttachmentUploadError(
+        uploadError instanceof Error ? uploadError.message : 'Üleslaadimine ebaõnnestus.',
+      )
+    } finally {
+      setUploadingAttachment(false)
+    }
   }
 
   function patchFileTag(index: number, tag: AttachmentTag): void {
@@ -200,13 +248,6 @@ export function MediaStep({
     patch({ files: files.filter((_, i) => i !== index) })
   }
 
-  function addFileByUrl(): void {
-    const url = newFileUrl.trim()
-    if (url === '') return
-    patch({ files: [...files, { url, tag: newFileTag }] })
-    setNewFileUrl('')
-  }
-
   return (
     <>
       <fieldset className="flex flex-col gap-xs rounded-card border border-border p-sm">
@@ -216,16 +257,18 @@ export function MediaStep({
         <FieldHint>
           Aktsepteeritakse JPEG-, PNG- ja WebP-faile kuni {formatFileSize(MAX_EDITOR_IMAGE_BYTES)},
           laius vähemalt 1200 px. Igal pildil peab olema alternatiivtekst — ilma selleta
-          avaldamine ei läbi. Loendi esimene pilt on hero-pilt.
+          avaldamine ei läbi. Loendi esimene pilt on hero-pilt. Pärast üleslaadimist tehakse
+          taustal renditsioonid (hero, galerii, pisipilt).
         </FieldHint>
         <div className="flex flex-wrap items-center gap-xs">
           <label htmlFor={`${id}-image-upload`} className={`${secondaryButtonClass} cursor-pointer`}>
-            Vali pilt
+            {uploadingImage ? 'Laadin üles…' : 'Vali ja laadi pilt üles'}
           </label>
           <input
             id={`${id}-image-upload`}
             type="file"
             accept="image/jpeg,image/png,image/webp"
+            disabled={uploadingImage}
             onChange={(event) => {
               void onImagePicked(event)
             }}
@@ -233,18 +276,6 @@ export function MediaStep({
           />
         </div>
         {imageUploadError !== null ? <FieldError message={imageUploadError} /> : null}
-        {validatedImage !== null ? (
-          <p className="text-bodySm text-inkMuted">
-            {validatedImage.filename} — {String(validatedImage.width)}×
-            {String(validatedImage.height)} px. Fail läbis valideerimise. Võlurist üleslaadimine
-            pole veel avatud: laadi pilt üles meediakogus ja kleebi selle URL allpool.
-            Sihtrenditsioonid:{' '}
-            {RENDITION_SPECS.map(
-              (spec) => `${spec.name} ${String(spec.width)}×${String(spec.height)}`,
-            ).join(', ')}
-            .
-          </p>
-        ) : null}
         {state.media.length === 0 ? (
           <p className="text-bodySm text-inkMuted">Pilte ei ole lisatud.</p>
         ) : (
@@ -421,25 +452,6 @@ export function MediaStep({
             })}
           </ol>
         )}
-        <div className="flex items-center gap-xs">
-          <input
-            value={newImageUrl}
-            placeholder="https://… pildi URL"
-            onChange={(event) => {
-              setNewImageUrl(event.target.value)
-            }}
-            className={`${inputClass} max-w-md`}
-            aria-label="Uue pildi URL"
-          />
-          <button
-            type="button"
-            onClick={addMediaByUrl}
-            className={secondaryButtonClass}
-            disabled={newImageUrl.trim() === ''}
-          >
-            Lisa pilt
-          </button>
-        </div>
       </fieldset>
 
       <fieldset className="flex flex-col gap-xs rounded-card border border-border p-sm">
@@ -455,24 +467,35 @@ export function MediaStep({
                 htmlFor={`${id}-file-upload`}
                 className={`${secondaryButtonClass} cursor-pointer`}
               >
-                Vali PDF
+                {uploadingAttachment ? 'Laadin üles…' : 'Vali ja laadi PDF üles'}
               </label>
               <input
                 id={`${id}-file-upload`}
                 type="file"
                 accept="application/pdf"
-                onChange={onAttachmentPicked}
+                disabled={uploadingAttachment}
+                onChange={(event) => {
+                  void onAttachmentPicked(event)
+                }}
                 className="sr-only"
               />
+              <select
+                aria-label="Uue manuse silt"
+                value={newFileTag}
+                onChange={(event) => {
+                  setNewFileTag(event.target.value as AttachmentTag)
+                }}
+                className={`${inputClass} max-w-40`}
+              >
+                {attachmentTags.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {attachmentTagLabels[tag]}
+                  </option>
+                ))}
+              </select>
             </div>
             {attachmentUploadError !== null ? (
               <FieldError message={attachmentUploadError} />
-            ) : null}
-            {validatedAttachment !== null ? (
-              <p className="text-bodySm text-inkMuted">
-                {validatedAttachment} läbis valideerimise. Võlurist üleslaadimine pole veel
-                avatud: laadi manus üles meediakogus ja kleebi selle URL allpool.
-              </p>
             ) : null}
             {files.length === 0 ? (
               <p className="text-bodySm text-inkMuted">Manuseid ei ole lisatud.</p>
@@ -520,44 +543,11 @@ export function MediaStep({
                 })}
               </ol>
             )}
-            <div className="flex flex-wrap items-center gap-xs">
-              <input
-                value={newFileUrl}
-                placeholder="https://… faili URL"
-                onChange={(event) => {
-                  setNewFileUrl(event.target.value)
-                }}
-                className={`${inputClass} max-w-md`}
-                aria-label="Uue manuse URL"
-              />
-              <select
-                aria-label="Uue manuse silt"
-                value={newFileTag}
-                onChange={(event) => {
-                  setNewFileTag(event.target.value as AttachmentTag)
-                }}
-                className={`${inputClass} max-w-40`}
-              >
-                {attachmentTags.map((tag) => (
-                  <option key={tag} value={tag}>
-                    {attachmentTagLabels[tag]}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={addFileByUrl}
-                className={secondaryButtonClass}
-                disabled={newFileUrl.trim() === ''}
-              >
-                Lisa fail
-              </button>
-            </div>
           </>
         ) : (
           <FieldHint>
-            Manusete haldamine avaneb pärast üleslaadimise teenuse lisamist. Olemasolevad failid
-            jäävad muutmata.
+            Olemasoleva loti manuseid siin veel ei muudeta: salvestatud read tuleb kaitsta
+            asendamise eest, kuni serveri sisestus need eelnevalt sisse loeb.
           </FieldHint>
         )}
       </fieldset>
