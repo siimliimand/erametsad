@@ -108,10 +108,10 @@ export const contractTemplateTypeLabels: Record<ContractTemplateType, string> =
 
 export const leadStatusLabels: Record<LeadStatus, string> = {
   new: 'Uus',
-  contacted: 'Ühenduses',
+  contacted: 'Võetud ühendust',
   qualified: 'Kvalifitseeritud',
   contract: 'Leping',
-  disqualified: 'Diskvalifitseeritud',
+  disqualified: 'Mittekvalifitseeritud',
 }
 
 export const companyAccessRequestStatusLabels: Record<

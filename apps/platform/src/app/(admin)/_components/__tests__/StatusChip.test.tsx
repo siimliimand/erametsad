@@ -68,10 +68,10 @@ describe('StatusChip variants', () => {
   it('renders the lead domain pills', () => {
     const cases: [StatusChipVariant, string][] = [
       ['lead:new', 'Uus'],
-      ['lead:contacted', 'Ühenduses'],
+      ['lead:contacted', 'Võetud ühendust'],
       ['lead:qualified', 'Kvalifitseeritud'],
       ['lead:contract', 'Leping'],
-      ['lead:disqualified', 'Diskvalifitseeritud'],
+      ['lead:disqualified', 'Mittekvalifitseeritud'],
     ]
     for (const [status, label] of cases) {
       const html = chipHtml(status)

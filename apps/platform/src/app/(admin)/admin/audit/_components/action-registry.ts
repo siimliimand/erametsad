@@ -126,9 +126,10 @@ export const auditActionGroups: readonly AuditActionGroup[] = [
     actions: [
       'settings.change',
       'maintenance.start',
-      'maintenance.cancel',
+      'maintenance.end',
       'flag.toggle',
       'public_stats.change',
+      'settings.key_reveal',
     ],
   },
   {
@@ -155,6 +156,25 @@ export function groupForAction(action: string): string | null {
 export function groupLabel(groupId: string): string {
   if (groupId === UNGROUPED_GROUP_ID) return 'Muud tegevused'
   return auditActionGroups.find((group) => group.id === groupId)?.label ?? groupId
+}
+
+/**
+ * Per-action Estonian human labels (spec admin-governance). Covers the
+ * settings group; other actions keep their raw dotted key until the
+ * audit-viewer parity task extends the map. Unmapped keys fall back to
+ * the raw key so the UI never shows an empty action.
+ */
+const auditActionLabels: Record<string, string> = {
+  'settings.change': 'Seadete muutmine',
+  'maintenance.start': 'Hooldusrežiimi sisselülitamine',
+  'maintenance.end': 'Hooldusrežiimi väljalülitamine',
+  'flag.toggle': 'Lüliti lülitamine',
+  'public_stats.change': 'Avalike statistikate muutmine',
+  'settings.key_reveal': 'Integratsioonivõtme paljastamine',
+}
+
+export function actionLabel(action: string): string {
+  return auditActionLabels[action] ?? action
 }
 
 /**
