@@ -76,11 +76,12 @@ interface CreateArgs {
 
 function makeRepos() {
   const creates: CreateArgs[] = []
+  const findByID = vi.fn((args: { collection: string }) => {
+    if (args.collection === 'auctions') return Promise.resolve(auction)
+    return Promise.resolve(null)
+  })
   const repositories = {
-    findByID: vi.fn((args: { collection: string }) => {
-      if (args.collection === 'auctions') return Promise.resolve(auction)
-      return Promise.resolve(null)
-    }),
+    findByID,
     find: vi.fn((args: { collection: string }) => {
       if (args.collection === 'bids') return Promise.resolve({ docs: BID_DOCS })
       if (args.collection === 'users') return Promise.resolve({ docs: USER_DOCS })
@@ -91,7 +92,7 @@ function makeRepos() {
       return Promise.resolve({ id: 'audit-new', ...args.data })
     }),
   }
-  return { repositories: repositories as unknown as CoreRepositories, creates }
+  return { repositories: repositories as unknown as CoreRepositories, findByID, creates }
 }
 
 function useSession(
@@ -157,7 +158,7 @@ describe('GET /api/v1/admin/bids/export', () => {
 
   it('answers 404 for an unknown auction', async () => {
     const exported = useSession({ userId: 'admin-1', role: 'admin' })
-    vi.mocked(exported.repositories.findByID).mockResolvedValue(null as never)
+    vi.mocked(exported.findByID).mockResolvedValue(null)
 
     const response = await bidsExportRoute(exportRequest(`auction=missing`))
 

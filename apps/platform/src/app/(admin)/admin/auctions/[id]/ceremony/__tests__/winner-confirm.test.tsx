@@ -3,6 +3,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { SealedCeremonyContext } from '../../../../../_actions/auctions'
 import { ToastProvider } from '../../../../../_components/ui/Toast'
 import { WinnerConfirm } from '../_components/winner-confirm'
 
@@ -25,8 +26,6 @@ vi.mock('../../../../../_actions/auctions', () => ({
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true
-
-import type { SealedCeremonyContext } from '../../../../../_actions/auctions'
 
 type WinnerProps = Parameters<typeof WinnerConfirm>[0]
 
@@ -62,7 +61,7 @@ const baseProps: WinnerProps = {
 
 /** et-EE currency strings may carry narrow no-break spaces; normalize for asserts. */
 function normalizedText(): string {
-  return container.textContent?.replace(/[\u00A0\u202F]/g, ' ') ?? ''
+  return container.textContent.replace(/[\u00A0\u202F]/g, ' ')
 }
 
 let container: HTMLDivElement

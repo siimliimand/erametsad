@@ -31,7 +31,9 @@ function insertRequest(status: string): void {
 
 describe('service request status CHECK (migration 0022)', () => {
   it.each(['new', 'routed', 'teostatud', 'suletud'])('accepts the %s status', (status) => {
-    expect(() => insertRequest(status)).not.toThrow()
+    expect(() => {
+      insertRequest(status)
+    }).not.toThrow()
     const row = testDb.raw
       .prepare(`SELECT status FROM service_requests WHERE id = 'r1'`)
       .get() as { status: string }
@@ -52,7 +54,9 @@ describe('service request status CHECK (migration 0022)', () => {
   })
 
   it('rejects an unknown status', () => {
-    expect(() => insertRequest('kustutatud')).toThrow()
+    expect(() => {
+      insertRequest('kustutatud')
+    }).toThrow()
   })
 
   it('preserves rows through the status transition', () => {

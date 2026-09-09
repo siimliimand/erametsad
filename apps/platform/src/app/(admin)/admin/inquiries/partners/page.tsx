@@ -229,9 +229,7 @@ export default async function PartnersPage({
     sort: '-createdAt',
     pagination: false,
   })
-  const extrasByPartner = resolvePartnerExtras(
-    partnerAudits as (AuditEntryDoc & { entityId?: string | null })[],
-  )
+  const extrasByPartner = resolvePartnerExtras(partnerAudits)
   const { docs: forwardAudits } = await repositories.find({
     collection: 'audit-entry',
     where: {

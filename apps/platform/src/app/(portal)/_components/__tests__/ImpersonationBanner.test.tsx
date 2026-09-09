@@ -13,8 +13,8 @@ vi.mock('@/app/(admin)/_actions/users', () => ({
   stopImpersonationAction: users.stopImpersonationAction,
 }))
 
-import { ImpersonationBanner } from '../ImpersonationBanner'
 import type { PortalAuthState } from '../../_lib/session'
+import { ImpersonationBanner } from '../ImpersonationBanner'
 
 function auth(overrides: Partial<PortalAuthState> = {}): PortalAuthState {
   return {

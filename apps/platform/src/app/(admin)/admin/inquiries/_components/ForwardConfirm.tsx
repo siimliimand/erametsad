@@ -1,7 +1,7 @@
 'use client'
 
 import { useId, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { MouseEvent } from 'react'
 
 import { useEscapeKey } from '../../../_components/ui/useOverlay'
 
@@ -29,7 +29,7 @@ export function ForwardConfirm({
     setPending(null)
   })
 
-  function openConfirm(event: FormEvent<HTMLButtonElement>): void {
+  function openConfirm(event: MouseEvent<HTMLButtonElement>): void {
     const form = event.currentTarget.form
     if (!form) return
     const selected = new Set(

@@ -3,6 +3,9 @@ import { Clock as ClockIcon } from 'lucide-react'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 
+import { CopyEmailFallback } from './_components/CopyEmailFallback'
+import { ForwardConfirm } from './_components/ForwardConfirm'
+import { maskClientName, sisuPreview } from './_components/display'
 import {
   RESPONSE_WINDOW_DAYS,
   buildManualForwardEmail,
@@ -12,9 +15,6 @@ import {
   type ResponseDeadlineState,
   type RoutingPartnerInput,
 } from './_components/routing'
-import { maskClientName, sisuPreview } from './_components/display'
-import { CopyEmailFallback } from './_components/CopyEmailFallback'
-import { ForwardConfirm } from './_components/ForwardConfirm'
 import {
   closeRequestAction,
   forwardServiceRequestAction,

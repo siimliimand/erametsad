@@ -1,5 +1,5 @@
-import { getRepositories } from '../data/runtime'
 import { deriveCountyCodeFromCadastre } from './cadastre-county'
+import { getRepositories } from '../data/runtime'
 
 export interface LeadInput {
   formName: string

@@ -15,6 +15,11 @@ import {
   type StaffRole,
 } from '../_lib/permissions'
 import {
+  SUCCESS_FEE_PERCENT_DEFAULT,
+  successFeeCents,
+  VAT_PERCENT,
+} from '../admin/_lib/workspace'
+import {
   applyQuickAuctionDefaults,
   auctionInputSchema,
   collectPublishGateFailures,
@@ -29,11 +34,6 @@ import {
 } from '../admin/auctions/_lib/auction-schema'
 import { tallinnWallTimeToUtcIso } from '../admin/content/_components/scheduled-publish'
 import { readAuctionDefaults } from '../admin/content/_components/settings-audit'
-import {
-  SUCCESS_FEE_PERCENT_DEFAULT,
-  successFeeCents,
-  VAT_PERCENT,
-} from '../admin/_lib/workspace'
 
 import { verifyAdminAccessToken } from '@/lib/auth/jwt'
 import { verifyPassword } from '@/lib/auth/password'
@@ -1854,7 +1854,7 @@ async function companyProfilePending(
     limit: 1,
   })
   const profile = docs.docs[0] as { type?: unknown; approvalStatus?: unknown } | undefined
-  return profile?.type === 'company' && profile?.approvalStatus === 'pending'
+  return profile?.type === 'company' && profile.approvalStatus === 'pending'
 }
 
 /** Ranked reveal views: valid bids amount-desc with earliest-wins ties, invalid bids greyed. */
@@ -2066,7 +2066,7 @@ export async function sealedCeremonyStateAction(auctionId: string): Promise<Seal
   const winnerEntry = await findCeremonyAuditEntry(repositories, 'sealed.winner_confirm', auctionId)
   const voidEntry = await findCeremonyAuditEntry(repositories, 'sealed.void', auctionId)
   const settingsDocs = await repositories.find({ collection: 'settings', limit: 1 })
-  const settingsDoc = settingsDocs.docs[0] as SettingsDoc | undefined
+  const settingsDoc = settingsDocs.docs[0]
 
   let bids: RevealedBidView[] = []
   let topMeetsReserve: boolean | null = null
@@ -2543,7 +2543,7 @@ export async function confirmSealedCeremonyWinnerAction(
       // confirm step — the moment the sale becomes certain.
       const settingsDocs = await repositories.find({ collection: 'settings', limit: 1 })
       const feeEstimateEur = centsToEuros(
-        successFeeCents(eurosToCents(top.amount), feePercentFor(auction, settingsDocs.docs[0] as SettingsDoc | undefined)),
+        successFeeCents(eurosToCents(top.amount), feePercentFor(auction, settingsDocs.docs[0])),
       )
       eventBus.emit({
         type: 'auction.won',

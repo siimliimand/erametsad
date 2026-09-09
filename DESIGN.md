@@ -176,7 +176,7 @@ All animations respect `prefers-reduced-motion`. No motion occurs without a func
 
 Photography is the emotional anchor. Every image shows real Estonian forest: birch and spruce stands, morning mist, snow, bark texture, field work. No generic stock photography, no tropical or urban imagery.
 
-Hero images use a 16-to-10 aspect ratio with a left-to-right gradient overlay. Cards use the same ratio for thumbnails and a 4-to-3 ratio for portrait photos. All images carry descriptive alt text in Estonian.
+Hero images use a 16-to-10 aspect ratio with a left-to-right gradient overlay. Cards use the same ratio for thumbnails and a 4-to-3 ratio for portrait photos. All images carry descriptive alt text in Estonian; the media library enforces this at upload and edit, so an image cannot save without alt text. Image assets can store a focal point (normalized 0-1 coordinates) so crops keep the intended subject in view.
 
 The hero overlay is a linear gradient from dark green transparency on the left to transparent on the right. Section images use no filter and keep natural colour, slightly desaturated by about five percent.
 
@@ -198,4 +198,4 @@ The listing redesign follows the approved mockup with five deliberate deviations
 
 The voice in Estonian follows four traits: clear (short sentences, no jargon), honest (fees upfront, no hidden conditions), matter-of-fact (friendly but not chatty), and human (real names, real phone numbers, the tone of a trusted forester).
 
-<!-- Last updated: 2026-09-08 -->
+<!-- Last updated: 2026-09-09 -->

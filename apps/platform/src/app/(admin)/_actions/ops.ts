@@ -92,7 +92,7 @@ function readRedirectTo(formData: FormData, fallback: string): string {
  * param into it instead of stacking a second '?' that swallows the value.
  */
 function appendQueryParam(path: string, key: string, value: string): string {
-  const [basePath, existingQuery = ''] = path.split('?')
+  const [basePath = '', existingQuery = ''] = path.split('?')
   const encoded = `${key}=${encodeURIComponent(value)}`
   return existingQuery ? `${basePath}?${existingQuery}&${encoded}` : `${basePath}?${encoded}`
 }
@@ -729,7 +729,7 @@ async function leadAuditsFor(
     sort: '-createdAt',
     pagination: false,
   })
-  return docs as (AuditEntryDoc & { entityId?: string | null })[]
+  return docs
 }
 
 /**

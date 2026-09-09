@@ -134,7 +134,7 @@ describe('markRequestDoneAction (task 8.4)', () => {
       id: 'req-1',
       data: { status: 'teostatud' },
     })
-    const audit = await repos.create.mock.calls.find(
+    const audit = repos.create.mock.calls.find(
       (call) => call[0].collection === 'audit-entry',
     )
     expect(audit?.[0].data).toMatchObject({
@@ -185,7 +185,7 @@ describe('closeRequestAction (task 8.4)', () => {
       id: 'req-1',
       data: { status: 'suletud' },
     })
-    const audit = await repos.create.mock.calls.find(
+    const audit = repos.create.mock.calls.find(
       (call) => call[0].collection === 'audit-entry',
     )
     expect(audit?.[0].data).toMatchObject({
