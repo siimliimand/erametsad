@@ -127,6 +127,11 @@ const bulkCancelBtnClass =
 // render.
 const COLUMNS_STORAGE_KEY = 'erametsad.admin.auctions.columns'
 
+// The export route keeps the `auctions:export` gate and scope enforcement
+// server-side; it accepts `?ids=` for a selection export plus the list's
+// shareable filter params for a filtered export.
+const AUCTIONS_EXPORT_HREF = '/api/v1/admin/auctions/export'
+
 const OPTIONAL_COLUMN_KEYS = [
   'objectType',
   'countyName',
@@ -314,6 +319,12 @@ export function AuctionsTable({
       return next
     })
   }
+
+  // The bulk-bar selection export must carry exactly the picked rows, so the
+  // href is rebuilt from the selection instead of reusing the filter href.
+  const selectionExportHref = `${AUCTIONS_EXPORT_HREF}?${new URLSearchParams({
+    ids: [...selected].join(','),
+  }).toString()}`
 
   const handleBulkSchedule = async (formData: FormData): Promise<void> => {
     await bulkScheduleAction(formData)
@@ -696,14 +707,30 @@ export function AuctionsTable({
             Ajasta avaldimine
           </button>
           {roleCanExport ? (
-            <a
-              href={csvHref}
-              title="Ekspordib praeguse filtri"
-              className={bulkBarBtnClass}
-            >
-              <DownloadIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
-              Ekspordi valitud
-            </a>
+            <>
+              <a
+                href={selectionExportHref}
+                title="Ekspordib valitud oksjonid"
+                className={bulkBarBtnClass}
+              >
+                <DownloadIcon
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0"
+                />
+                Ekspordi valitud
+              </a>
+              <a
+                href={csvHref}
+                title="Ekspordib praeguse filtri"
+                className={bulkBarBtnClass}
+              >
+                <DownloadIcon
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0"
+                />
+                Ekspordi filtreeritud
+              </a>
+            </>
           ) : null}
           <button
             type="button"

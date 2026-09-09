@@ -76,6 +76,18 @@ function chooserCheckbox(index: number): HTMLInputElement {
   return box
 }
 
+function bulkBarLinks(): HTMLAnchorElement[] {
+  return [...container.querySelectorAll<HTMLAnchorElement>('[role="status"] a')]
+}
+
+function bulkBarLink(label: string): HTMLAnchorElement {
+  const link = bulkBarLinks().find(
+    (entry) => entry.textContent === label,
+  )
+  if (link === undefined) throw new Error(`bulk bar link "${label}" not found`)
+  return link
+}
+
 async function click(element: HTMLElement): Promise<void> {
   await act(async () => {
     element.click()
@@ -191,6 +203,61 @@ describe('AuctionsTable row selection tint', () => {
     expect(container.querySelector('tbody tr')?.className).not.toContain(
       '[&>td]:bg-primaryLight',
     )
+  })
+})
+
+describe('AuctionsTable bulk export links', () => {
+  it('Ekspordi valitud exports exactly the selected ids', async () => {
+    await mountTable({
+      roleCanExport: true,
+      rows: [
+        makeTableRow(),
+        makeTableRow({
+          id: 'a1b2c3d4-0000-0000-0000-000000000002',
+          title: 'Saaremaa metskinnistu',
+        }),
+      ],
+    })
+    const checkboxes = [
+      ...container.querySelectorAll<HTMLInputElement>(
+        'tbody input[type="checkbox"]',
+      ),
+    ]
+    if (checkboxes.length !== 2) throw new Error('row checkboxes not found')
+    await click(checkboxes[0] as HTMLInputElement)
+    await click(checkboxes[1] as HTMLInputElement)
+
+    expect(bulkBarLink('Ekspordi valitud').getAttribute('href')).toBe(
+      '/api/v1/admin/auctions/export?ids=a1b2c3d4-0000-0000-0000-000000000001%2Ca1b2c3d4-0000-0000-0000-000000000002',
+    )
+  })
+
+  it('Ekspordi filtreeritud keeps the filter query', async () => {
+    const csvHref = '/api/v1/admin/auctions/export?status=active&q=mets'
+    await mountTable({ roleCanExport: true, csvHref })
+    const checkbox = container.querySelector<HTMLInputElement>(
+      'tbody input[type="checkbox"]',
+    )
+    if (checkbox === null) throw new Error('row checkbox not found')
+    await click(checkbox)
+
+    expect(bulkBarLink('Ekspordi filtreeritud').getAttribute('href')).toBe(
+      csvHref,
+    )
+  })
+
+  it('renders no bulk export links without the export role', async () => {
+    await mountTable({ roleCanExport: false })
+    const checkbox = container.querySelector<HTMLInputElement>(
+      'tbody input[type="checkbox"]',
+    )
+    if (checkbox === null) throw new Error('row checkbox not found')
+    await click(checkbox)
+
+    // The bulk bar itself is visible (Ajasta avaldimine), but the export
+    // links stay hidden behind `auctions:export`.
+    expect(container.querySelector('[role="status"]')).not.toBeNull()
+    expect(bulkBarLinks()).toHaveLength(0)
   })
 })
 

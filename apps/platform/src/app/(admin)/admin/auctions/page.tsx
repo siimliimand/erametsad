@@ -491,7 +491,7 @@ export default async function AdminAuctionsPage({
             {roleCanExport ? (
               <a href={csvHref} className={secondaryButtonClass}>
                 <DownloadIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                Ekspordi CSV
+                Ekspordi filtreeritud CSV
               </a>
             ) : null}
           </>
