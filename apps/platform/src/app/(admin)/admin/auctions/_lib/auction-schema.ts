@@ -203,6 +203,12 @@ export const auctionInputSchema = z
       addIssue('reservePriceEur', 'Kiiroksjonil on piirhind kohustuslik.')
     }
 
+    // Piirhind is a sealed/kiiroksjon mechanic: an open ascending lot has no
+    // reserve, so a submitted value is rejected instead of silently stored.
+    if (data.reservePriceEur !== undefined && data.auctionType !== 'sealed' && !data.isQuickAuction) {
+      addIssue('reservePriceEur', 'Piirhind on lubatud ainult pimepakkumise ja kiiroksjoni puhul.')
+    }
+
     if (data.objectType === 'raieoigus' && data.volumeM3 === undefined) {
       addIssue('volumeM3', 'Raiemahu on raieõiguse oksjonil kohustuslik.')
     }
@@ -487,4 +493,62 @@ export function collectPublishGateFailures(subject: AuctionGateSubject): {
   }
 
   return { blocking, warnings }
+}
+
+/** Publish lead time: the start must sit at least this far in the future. */
+export const PUBLISH_START_LEAD_MINUTES = 10
+
+function deadlinesAreaHa(deadlines: unknown): number | null {
+  if (typeof deadlines !== 'object' || deadlines === null) return null
+  const value = (deadlines as Record<string, unknown>).areaHa
+  const numeric = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+export interface PublishReadinessSubject {
+  specialistId?: string | null
+  startsAt: string | null
+  areaHa?: number | null
+  deadlines?: unknown
+  packageRows?: unknown
+}
+
+/**
+ * Publish-only readiness gates evaluated against the stored lot (spec
+ * admin-auction-management): specialist assigned, start at least 10 minutes
+ * in the future, area greater than zero. Drafts save without them; the
+ * Ajasta intent applies the start gate, Avalda kohe and the publish action
+ * apply all three.
+ */
+export function collectPublishReadinessFailures(subject: PublishReadinessSubject): PublishGateFailure[] {
+  const blocking: PublishGateFailure[] = []
+
+  const specialistId = typeof subject.specialistId === 'string' ? subject.specialistId.trim() : ''
+  if (specialistId === '') {
+    blocking.push({
+      step: 'Sisu',
+      field: 'specialistId',
+      message: 'Määra vastutav spetsialist enne avaldamist.',
+    })
+  }
+
+  if (subject.startsAt === null || Number.isNaN(Date.parse(subject.startsAt))) {
+    blocking.push({ step: 'Tüüp ja mehaanika', field: 'startsAt', message: 'Määra oksjonile algusaeg.' })
+  } else if (Date.parse(subject.startsAt) < Date.now() + PUBLISH_START_LEAD_MINUTES * 60_000) {
+    blocking.push({
+      step: 'Tüüp ja mehaanika',
+      field: 'startsAt',
+      message: 'Algusaeg peab olema vähemalt 10 minutit tulevikus.',
+    })
+  }
+
+  const area =
+    subject.areaHa ??
+    deadlinesAreaHa(subject.deadlines) ??
+    extractNumberTotal(subject.packageRows, AREA_KEYS)
+  if (area === null || area <= 0) {
+    blocking.push({ step: 'Maa ja mets', field: 'areaHa', message: 'Pindala (ha) peab olema suurem kui 0.' })
+  }
+
+  return blocking
 }

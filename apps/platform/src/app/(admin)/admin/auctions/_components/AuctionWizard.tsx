@@ -6,6 +6,7 @@ import type { SyntheticEvent } from 'react'
 import { visibleWizardSteps, wizardSteps } from './steps'
 import {
   buildAuctionPayload,
+  parseDecimal,
   parseWizardDraft,
   serializeWizardDraft,
   serializeWizardState,
@@ -29,7 +30,14 @@ import {
 import { StatusChip } from '../../../_components/StatusChip'
 import { FileTextIcon } from '../../../_components/icons'
 import { Modal } from '../../../_components/ui/Modal'
-import { utcIsoToTallinnInputValue } from '../../content/_components/scheduled-publish'
+import {
+  tallinnWallTimeToUtcIso,
+  utcIsoToTallinnInputValue,
+} from '../../content/_components/scheduled-publish'
+import {
+  collectPublishReadinessFailures,
+  type PublishGateFailure,
+} from '../_lib/auction-schema'
 
 import type { AuctionStatus } from '@/lib/data/schema'
 
@@ -41,6 +49,9 @@ import type { AuctionStatus } from '@/lib/data/schema'
 export type AutosaveState = 'idle' | 'saving' | 'saved'
 
 const AUTOSAVE_DEBOUNCE_MS = 800
+
+/** Submit intent carried by the three footer buttons (task 5.5). */
+type WizardSubmitIntent = 'draft' | 'schedule' | 'publish'
 
 /** Display-ready HH:mm (Tallinn wall time) for autosave and restore labels. */
 function tallinnClock(iso: string): string {
@@ -82,21 +93,23 @@ function RailRow({
  * Client shell for the lot editor wizard (docs/design/admin/03). One schema,
  * one state: every step edits the same AuctionWizardState and the form posts
  * the whole payload on save, so partial saves never lose data. Buttons with
- * `data-skip-validation` (alias regenerate) bypass the gate; the publish
- * button and the plain submit both run it. The editable state autosaves to
- * localStorage as a draft (restore prompt on return, unload guard while
- * dirty); the form submit stays the only durable save.
+ * `data-skip-validation` (alias regenerate) bypass the gate; the three intent
+ * buttons (Salvesta mustandina / Ajasta / Avalda kohe) and the step-7 publish
+ * button run it — Ajasta adds the start-lead gate, Avalda kohe the full
+ * publish-readiness gates. The editable state autosaves to localStorage as a
+ * draft (restore prompt on return, unload guard while dirty); the form
+ * submit stays the only durable save.
  */
 export function AuctionWizard({
   action,
-  submitLabel,
   cancelHref,
   options,
   initial,
   status,
 }: {
   action: (formData: FormData) => void | Promise<void>
-  submitLabel: string
+  /** Legacy label from the page shells; the footer carries the intent split. */
+  submitLabel?: string
   cancelHref: string
   options: AuctionWizardOptions
   initial: AuctionWizardInitial
@@ -262,6 +275,42 @@ export function AuctionWizard({
     return submitter instanceof HTMLButtonElement && submitter.dataset.skipValidation === 'true'
   }
 
+  function submitterIntent(event: SyntheticEvent<HTMLFormElement>): WizardSubmitIntent {
+    const nativeEvent = event.nativeEvent
+    if (!(nativeEvent instanceof SubmitEvent)) return 'draft'
+    const submitter = nativeEvent.submitter
+    if (!(submitter instanceof HTMLButtonElement)) return 'draft'
+    const intent = submitter.dataset.intent
+    return intent === 'schedule' || intent === 'publish' ? intent : 'draft'
+  }
+
+  /**
+   * Publish-readiness gates mirrored from the server actions: Ajasta checks
+   * the start lead time, Avalda kohe also specialist and area. Drafts save
+   * without these so unfinished lots stay savable. Package rows mirror the
+   * model's row payload: only non-empty cadastres and numeric areas travel.
+   */
+  function readinessFailuresFor(
+    wizardState: AuctionWizardState,
+    intent: WizardSubmitIntent,
+  ): PublishGateFailure[] {
+    const packageRows =
+      wizardState.objectType === 'pakett'
+        ? wizardState.packageRows
+            .filter((row) => row.cadastre.trim() !== '' || parseDecimal(row.areaHa) !== undefined)
+            .map((row) => ({
+              ...(row.cadastre.trim() !== '' ? { cadastre: row.cadastre.trim() } : {}),
+              ...(parseDecimal(row.areaHa) !== undefined ? { areaHa: parseDecimal(row.areaHa) } : {}),
+            }))
+        : []
+    return collectPublishReadinessFailures({
+      specialistId: wizardState.specialistId,
+      startsAt: tallinnWallTimeToUtcIso(wizardState.startsAt),
+      areaHa: parseDecimal(wizardState.areaHa) ?? null,
+      packageRows,
+    }).filter((gate) => intent === 'publish' || gate.field === 'startsAt')
+  }
+
   // A submit that passes the gate posts the whole payload, so the local draft
   // has served its purpose: drop it and disarm the unload guard. A failed
   // validation never gets here — the draft stays for the retry.
@@ -318,12 +367,18 @@ export function AuctionWizard({
     <form
       action={action}
       onSubmit={(event) => {
+        const intent = submitterIntent(event)
         if (shouldSkipValidation(event)) {
           submittedRef.current = true
           clearDraft()
           return
         }
         const found = validateWizardForSubmit(initial, state, options)
+        if (intent !== 'draft') {
+          for (const gate of readinessFailuresFor(state, intent)) {
+            found[gate.field] ??= gate.message
+          }
+        }
         if (Object.keys(found).length > 0) {
           event.preventDefault()
           setErrors(found)
@@ -465,8 +520,32 @@ export function AuctionWizard({
       </div>
 
       <div className="flex flex-wrap items-center gap-sm">
-        <button type="submit" className={primaryButtonClass}>
-          {submitLabel}
+        <button
+          type="submit"
+          name="intent"
+          value="draft"
+          data-intent="draft"
+          className={primaryButtonClass}
+        >
+          {'Salvesta mustandina'}
+        </button>
+        <button
+          type="submit"
+          name="intent"
+          value="schedule"
+          data-intent="schedule"
+          className={secondaryButtonClass}
+        >
+          {'Ajasta'}
+        </button>
+        <button
+          type="submit"
+          name="intent"
+          value="publish"
+          data-intent="publish"
+          className={primaryButtonClass}
+        >
+          {'Avalda kohe'}
         </button>
         <a href={cancelHref} className={secondaryButtonClass}>
           Tühista

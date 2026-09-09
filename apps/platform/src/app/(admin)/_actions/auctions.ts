@@ -18,10 +18,14 @@ import {
   applyQuickAuctionDefaults,
   auctionInputSchema,
   collectPublishGateFailures,
+  collectPublishReadinessFailures,
   slugifyTitle,
   toAuctionWriteData,
+  type AuctionGateSubject,
   type AuctionInput,
   type AuctionWriteData,
+  type PublishGateFailure,
+  type PublishReadinessSubject,
 } from '../admin/auctions/_lib/auction-schema'
 import { tallinnWallTimeToUtcIso } from '../admin/content/_components/scheduled-publish'
 import { readAuctionDefaults } from '../admin/content/_components/settings-audit'
@@ -90,6 +94,49 @@ function feedbackPathFrom(formData: FormData, fallback: string): string {
 
 function auctionDetailPath(auctionId: string): string {
   return `/admin/auctions/${auctionId}`
+}
+
+/** Wizard submit intent behind the three footer buttons (task 5.5). */
+type WizardIntent = 'draft' | 'schedule' | 'publish'
+
+function wizardIntent(formData: FormData): WizardIntent {
+  const value = readText(formData, 'intent')
+  return value === 'schedule' || value === 'publish' ? value : 'draft'
+}
+
+/** Gate inputs from the stored (or just-written) lot row. */
+function gateSubjectOfAuction(auction: AuctionDoc): AuctionGateSubject {
+  return {
+    objectType: auction.objectType,
+    type: auction.type,
+    isQuickAuction: auction.isQuickAuction,
+    startsAt: auction.startsAt,
+    endsAt: auction.endsAt,
+    minBidCents: auction.minBidCents,
+    reservePriceCents: auction.reservePriceCents,
+    cadastres: auction.cadastres,
+    countyId: auction.countyId,
+    parishId: auction.parishId,
+    packageRows: auction.packageRows,
+    media: auction.media,
+  }
+}
+
+function readinessSubjectOfAuction(auction: AuctionDoc): PublishReadinessSubject {
+  return {
+    specialistId: typeof auction.specialistId === 'string' ? auction.specialistId : null,
+    startsAt: typeof auction.startsAt === 'string' ? auction.startsAt : null,
+    areaHa: typeof auction.areaHa === 'number' ? auction.areaHa : null,
+    deadlines: auction.deadlines,
+    packageRows: auction.packageRows,
+  }
+}
+
+function blockingGateSummary(blocking: PublishGateFailure[]): string {
+  return blocking
+    .slice(0, 5)
+    .map((gate) => `${gate.step} → ${gate.message}`)
+    .join(' | ')
 }
 
 /**
@@ -227,8 +274,10 @@ const writeKeyByInputKey: Record<string, string> = {
   antiSnipeEnabled: 'deadlines',
   antiSnipeMinutes: 'deadlines',
   propertyCount: 'deadlines',
-  areaHa: 'deadlines',
-  volumeM3: 'deadlines',
+  // Real columns (migration 0018); the deadlines JSON mirror still travels
+  // through toAuctionWriteData for guest preview reads.
+  areaHa: 'areaHa',
+  volumeM3: 'volumeM3',
   descriptionPublic: 'descriptionPublic',
   descriptionInternal: 'descriptionInternal',
   descriptionSecondary: 'descriptionSecondary',
@@ -274,6 +323,7 @@ function audit(
 export async function createAuctionAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
 
+  const intent = wizardIntent(formData)
   const raw = formToAuctionInput(formData)
   const input = parseAuctionInputOrRedirect(raw, newAuctionPath)
   const writeData = toAuctionWriteData(input)
@@ -333,6 +383,18 @@ export async function createAuctionAction(formData: FormData): Promise<void> {
     redirectWithError(newAuctionPath, `Oksjoni loomine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
   }
 
+  // The draft exists at this point, so a failed gate lands back on the new
+  // lot's editor with the draft preserved; success notices go to the detail.
+  if (intent !== 'draft') {
+    await applyWizardIntent(
+      repositories,
+      session.userId,
+      intent,
+      { error: `${auctionDetailPath(created.id)}/edit`, notice: auctionDetailPath(created.id) },
+      created,
+    )
+  }
+
   revalidatePath('/admin/auctions')
   redirect(auctionDetailPath(created.id))
 }
@@ -343,6 +405,7 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
   const id = readText(formData, 'id')
   const detailPath = auctionDetailPath(id)
   const editPath = `${detailPath}/edit`
+  const intent = wizardIntent(formData)
   if (!id) redirectWithError('/admin/auctions', 'Muudatuseks puudub oksjoni identifikaator.')
 
   const auction = await repositories.findByID({ collection: 'auctions', id })
@@ -356,7 +419,12 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
 
   // An active (or scheduled) lot locks its mechanics: only content fields
   // may change; force requires manual end + re-list (docs 03 interactions).
+  // Admin/superadmin may push mechanic changes through the lock by posting
+  // mechanicsOverride=true; the override is recorded in the audit entry.
   const mechanicsLocked = auction.status === 'active' || auction.status === 'scheduled'
+  const overrideRequested = readText(formData, 'mechanicsOverride') === 'true'
+  const canOverrideMechanics = session.role === 'admin' || session.role === 'superadmin'
+  let mechanicsOverridden = false
   if (mechanicsLocked) {
     // zod defaults must not count as submitted values: the quick-auction
     // flag conflicts only when the payload actually carries it.
@@ -370,7 +438,11 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
       (input.objectType !== auction.objectType) ||
       (submittedQuick !== null && submittedQuick !== auction.isQuickAuction)
     if (mechanicsConflict) {
-      redirectWithError(editPath, 'Aktiivse oksjoni mehaanikat muuta ei saa.')
+      if (overrideRequested && canOverrideMechanics) {
+        mechanicsOverridden = true
+      } else {
+        redirectWithError(editPath, 'Aktiivse oksjoni mehaanikat muuta ei saa.')
+      }
     }
   }
 
@@ -419,6 +491,7 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
           ? { specialistId: requestedSpecialist }
           : {}),
         ...(mechanicsLocked ? { mechanicsLocked: true } : {}),
+        ...(mechanicsOverridden ? { mechanicsOverride: true } : {}),
       },
     })
   } catch (error) {
@@ -426,6 +499,16 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
   }
   if (failure) {
     redirectWithError(editPath, `Oksjoni salvestamine ebaõnnestus: ${failure}`)
+  }
+
+  // Ajasta/Avalda kohe run their gates against the just-persisted state;
+  // locked lots (active/ended/…) fall back to a plain content save.
+  if (intent !== 'draft' && (auction.status === 'draft' || auction.status === 'scheduled')) {
+    await applyWizardIntent(repositories, session.userId, intent, { error: detailPath, notice: detailPath }, {
+      ...auction,
+      ...updateData,
+      specialistId: writeData.specialistId ?? auction.specialistId,
+    })
   }
 
   revalidatePath('/admin/auctions')
@@ -513,6 +596,8 @@ async function cloneAuctionDraft(
       loggingTypes: auction.loggingTypes,
       compartments: auction.compartments,
       notifications: auction.notifications,
+      areaHa: auction.areaHa,
+      volumeM3: auction.volumeM3,
       deadlines: auction.deadlines,
       minBidCents: auction.minBidCents,
       bidStepCents: auction.bidStepCents,
@@ -821,6 +906,106 @@ async function broadcastAuctionPublished(auctionId: string): Promise<void> {
   }
 }
 
+/**
+ * Status transition behind "Avalda kohe" / publish (docs 02, task 5.5):
+ * draft -> active must pass through scheduled, the guard chain is
+ * draft -> scheduled -> active and each update is one step. Emits the
+ * `auction.publish` audit entry and the DO broadcast.
+ */
+async function publishAuctionRow(
+  repositories: CoreRepositories,
+  auction: AuctionDoc,
+  options: { actorId: string; auditNote?: string | null; warnings?: PublishGateFailure[] },
+): Promise<'scheduled' | 'active'> {
+  const nowIso = new Date().toISOString()
+  const startsAtMs = typeof auction.startsAt === 'string' ? Date.parse(auction.startsAt) : Number.NaN
+  const target: 'scheduled' | 'active' = startsAtMs > Date.now() ? 'scheduled' : 'active'
+  // draft -> active must pass through scheduled; the guard chain is
+  // draft -> scheduled -> active and each update is one step.
+  if (auction.status === 'draft' && target === 'active') {
+    await repositories.update({
+      collection: 'auctions',
+      id: auction.id,
+      data: { status: 'scheduled', scheduledAt: auction.startsAt },
+    })
+  }
+  await repositories.update({
+    collection: 'auctions',
+    id: auction.id,
+    data:
+      target === 'scheduled'
+        ? { status: 'scheduled', scheduledAt: auction.startsAt }
+        : { status: 'active', activatedAt: nowIso },
+  })
+  await audit(repositories, {
+    actorId: options.actorId,
+    action: 'auction.publish',
+    entityType: 'auction',
+    entityId: auction.id,
+    after: {
+      status: target,
+      ...(options.auditNote ? { auditNote: options.auditNote } : {}),
+      ...(options.warnings && options.warnings.length > 0 ? { warnings: options.warnings } : {}),
+    },
+  })
+  await broadcastAuctionPublished(auction.id)
+  return target
+}
+
+/**
+ * Ajasta / Avalda kohe after a wizard save (task 5.5). Runs the readiness
+ * gates against the just-persisted lot, then walks the immutable status
+ * chain one step at a time. Always redirects; never returns.
+ */
+async function applyWizardIntent(
+  repositories: CoreRepositories,
+  actorId: string,
+  intent: 'schedule' | 'publish',
+  paths: { error: string; notice: string },
+  auction: AuctionDoc,
+): Promise<never> {
+  if (intent === 'schedule') {
+    const timingGate = collectPublishReadinessFailures(readinessSubjectOfAuction(auction)).find(
+      (gate) => gate.field === 'startsAt',
+    )
+    if (timingGate) {
+      redirectWithError(paths.error, `Ajastamine ei ole lubatud: ${timingGate.message}`)
+    }
+    if (!auction.endsAt || Date.parse(auction.endsAt) <= Date.parse(auction.startsAt ?? '')) {
+      redirectWithError(paths.error, 'Ajastamiseks määra lõppaeg pärast algusaega.')
+    }
+    await repositories.update({
+      collection: 'auctions',
+      id: auction.id,
+      data: { status: 'scheduled', scheduledAt: auction.startsAt },
+    })
+    await audit(repositories, {
+      actorId,
+      action: 'auction.schedule',
+      entityType: 'auction',
+      entityId: auction.id,
+      after: { status: 'scheduled', startsAt: auction.startsAt, endsAt: auction.endsAt },
+    })
+    revalidatePath('/admin/auctions')
+    revalidatePath(paths.notice)
+    redirectNotice(paths.notice, 'teade', 'Oksjon ajastatud.')
+  }
+
+  const blocking = [
+    ...collectPublishGateFailures(gateSubjectOfAuction(auction)).blocking,
+    ...collectPublishReadinessFailures(readinessSubjectOfAuction(auction)),
+  ]
+  if (blocking.length > 0) {
+    redirectWithError(paths.error, `Avaldamine on blokeeritud: ${blockingGateSummary(blocking)}`)
+  }
+
+  await publishAuctionRow(repositories, auction, { actorId })
+
+  revalidatePath('/admin/auctions')
+  revalidatePath(paths.notice)
+  redirectNotice(paths.notice, 'teade', 'Oksjon on avaldatud.')
+}
+
 export async function publishAuctionAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
 
@@ -847,62 +1032,26 @@ export async function publishAuctionAction(formData: FormData): Promise<void> {
   }
 
   // Publish gates (docs 03 validation summary): blocking failures stop the
-  // publish, warnings travel in the audit entry without blocking.
-  const gates = collectPublishGateFailures({
-    objectType: auction.objectType,
-    type: auction.type,
-    isQuickAuction: auction.isQuickAuction,
-    startsAt: auction.startsAt,
-    endsAt: auction.endsAt,
-    minBidCents: auction.minBidCents,
-    reservePriceCents: auction.reservePriceCents,
-    cadastres: auction.cadastres,
-    countyId: auction.countyId,
-    parishId: auction.parishId,
-    packageRows: auction.packageRows,
-    media: auction.media,
-  })
-  if (gates.blocking.length > 0) {
-    const summary = gates.blocking
-      .slice(0, 5)
-      .map((gate) => `${gate.step} → ${gate.message}`)
-      .join(' | ')
-    redirectWithError(detailPath, `Avaldamine on blokeeritud: ${summary}`)
+  // publish, warnings travel in the audit entry without blocking. The
+  // readiness gates (specialist, 10-minute lead, area) apply on top.
+  const gates = collectPublishGateFailures(gateSubjectOfAuction(auction))
+  const blocking = [
+    ...gates.blocking,
+    ...collectPublishReadinessFailures(readinessSubjectOfAuction(auction)),
+  ]
+  if (blocking.length > 0) {
+    redirectWithError(detailPath, `Avaldamine on blokeeritud: ${blockingGateSummary(blocking)}`)
   }
 
-  const nowIso = new Date().toISOString()
-  const target = Date.parse(auction.startsAt) > Date.now() ? 'scheduled' : 'active'
   const auditNote = readOptionalText(formData, 'auditNote')
 
   let failure: string | null = null
+  let target: 'scheduled' | 'active' = 'scheduled'
   try {
-    // draft -> active must pass through scheduled; the guard chain is
-    // draft -> scheduled -> active and each update is one step.
-    if (auction.status === 'draft' && target === 'active') {
-      await repositories.update({
-        collection: 'auctions',
-        id,
-        data: { status: 'scheduled', scheduledAt: auction.startsAt },
-      })
-    }
-    await repositories.update({
-      collection: 'auctions',
-      id,
-      data:
-        target === 'scheduled'
-          ? { status: 'scheduled', scheduledAt: auction.startsAt }
-          : { status: 'active', activatedAt: nowIso },
-    })
-    await audit(repositories, {
+    target = await publishAuctionRow(repositories, auction, {
       actorId: session.userId,
-      action: 'auction.publish',
-      entityType: 'auction',
-      entityId: id,
-      after: {
-        status: target,
-        ...(auditNote ? { auditNote } : {}),
-        ...(gates.warnings.length > 0 ? { warnings: gates.warnings } : {}),
-      },
+      auditNote,
+      warnings: gates.warnings,
     })
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
@@ -910,8 +1059,6 @@ export async function publishAuctionAction(formData: FormData): Promise<void> {
   if (failure) {
     redirectWithError(detailPath, `Avalikustamine ebaõnnestus: ${failure}`)
   }
-
-  await broadcastAuctionPublished(id)
 
   revalidatePath('/admin/auctions')
   revalidatePath(detailPath)
