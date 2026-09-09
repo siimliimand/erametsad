@@ -135,18 +135,42 @@ describe('admin module routes', () => {
 })
 
 describe('legacy admin path redirects', () => {
+  const noParams = Promise.resolve<Record<string, string | string[] | undefined>>({})
+
   it('sends /admin/leads/requests to /admin/companies', async () => {
     await expect(redirectTarget(() => { LeadsRequestsRedirectPage(); })).resolves.toBe('/admin/companies')
   })
 
   it('sends /admin/requests to /admin/inquiries', async () => {
-    await expect(redirectTarget(() => { RequestsRedirectPage(); })).resolves.toBe('/admin/inquiries')
+    await expect(
+      redirectTarget(() => RequestsRedirectPage({ searchParams: noParams })),
+    ).resolves.toBe('/admin/inquiries')
+  })
+
+  it('keeps the error and detail queries when redirecting /admin/requests', async () => {
+    await expect(
+      redirectTarget(() =>
+        RequestsRedirectPage({
+          searchParams: Promise.resolve({ viga: 'Päringut ei leitud.', detail: 'req-1' }),
+        }),
+      ),
+    ).resolves.toBe('/admin/inquiries?viga=P%C3%A4ringut+ei+leitud.&detail=req-1')
   })
 
   it('sends /admin/requests/partners to /admin/inquiries/partners', async () => {
-    await expect(redirectTarget(() => { PartnersRedirectPage(); })).resolves.toBe(
-      '/admin/inquiries/partners',
-    )
+    await expect(
+      redirectTarget(() => PartnersRedirectPage({ searchParams: noParams })),
+    ).resolves.toBe('/admin/inquiries/partners')
+  })
+
+  it('keeps the notice and edit queries when redirecting /admin/requests/partners', async () => {
+    await expect(
+      redirectTarget(() =>
+        PartnersRedirectPage({
+          searchParams: Promise.resolve({ teade: 'Partner loodud.', muuda: 'p-1' }),
+        }),
+      ),
+    ).resolves.toBe('/admin/inquiries/partners?teade=Partner+loodud.&muuda=p-1')
   })
 
   it('sends /admin/content/settings to /admin/settings', async () => {

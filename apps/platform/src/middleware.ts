@@ -4,6 +4,12 @@ import { NextResponse } from 'next/server'
 import { verifyAdminAccessToken } from '@/lib/auth/jwt'
 import { apiRateLimiter, authRateLimiter } from '@/lib/rate-limit'
 import {
+  incrementCmsRedirectHitStatement,
+  redirectLookupByFrom,
+  resolveCmsRedirect,
+  type CmsRedirect,
+} from '@/lib/routing/cms-redirects'
+import {
   normalizeHostname,
   resolveDefaultHostRewrite,
   resolveHostRedirect,
@@ -63,24 +69,61 @@ const maintenanceCache: { enabled: boolean; expiresAt: number } = {
   expiresAt: 0,
 }
 
-async function readMaintenanceEnabled(): Promise<boolean> {
-  const { db } = await import('@/lib/db')
-  const result = await db.query<{ maintenance_enabled: number }>(
-    'SELECT maintenance_enabled FROM settings LIMIT 1',
-  )
-  return result.results[0]?.maintenance_enabled === 1
+// CMS redirects (task 3.5): same cache pattern as the maintenance flag.
+// middleware() stays synchronous, so the active redirects live in a module
+// cache refreshed in the background with a short TTL; a read failure fails
+// open (no redirect, no count). A freshly created redirect starts serving
+// within one TTL.
+const REDIRECTS_TTL_MS = MAINTENANCE_TTL_MS
+
+const redirectsCache: { lookup: ReadonlyMap<string, CmsRedirect>; expiresAt: number } = {
+  lookup: new Map(),
+  expiresAt: 0,
 }
 
-function scheduleMaintenanceRefresh(): void {
+/**
+ * One background read feeds both module caches: the maintenance flag and
+ * the active CMS redirects share a single scheduled refresh (single dynamic
+ * import, one Promise.all), so a TTL never doubles the round trips.
+ */
+async function readRuntimeState(): Promise<void> {
+  const { db } = await import('@/lib/db')
+  const [maintenanceResult, redirectsResult] = await Promise.all([
+    db.query<{ maintenance_enabled: number }>(
+      'SELECT maintenance_enabled FROM settings LIMIT 1',
+    ),
+    db.query<{ from: string; to: string; type: string }>(
+      'SELECT "from", "to", "type" FROM redirects WHERE active = 1',
+    ),
+  ])
+  maintenanceCache.enabled = maintenanceResult.results[0]?.maintenance_enabled === 1
+  redirectsCache.lookup = redirectLookupByFrom(redirectsResult.results)
+}
+
+function scheduleRuntimeRefresh(): void {
   const now = Date.now()
-  if (now < maintenanceCache.expiresAt) return
+  if (now < maintenanceCache.expiresAt && now < redirectsCache.expiresAt) return
   maintenanceCache.expiresAt = now + MAINTENANCE_TTL_MS
-  readMaintenanceEnabled()
-    .then((enabled) => {
-      maintenanceCache.enabled = enabled
-    })
-    .catch(() => {
-      maintenanceCache.enabled = false
+  redirectsCache.expiresAt = now + REDIRECTS_TTL_MS
+  readRuntimeState().catch(() => {
+    maintenanceCache.enabled = false
+    redirectsCache.lookup = new Map()
+  })
+}
+
+/**
+ * Counts one served redirect with a single fire-and-forget UPDATE. The
+ * redirect response never waits on the count; a failed increment only
+ * loses one hit.
+ */
+function incrementRedirectHit(from: string): void {
+  void import('@/lib/db')
+    .then(({ db }) => db.batch([incrementCmsRedirectHitStatement(from)]))
+    .catch((error: unknown) => {
+      // The count is best-effort; a failed increment only loses one hit.
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[middleware] redirect hit increment failed', error)
+      }
     })
 }
 
@@ -157,6 +200,23 @@ export function middleware(request: NextRequest) {
     return redirect
   }
 
+  // CMS redirects (admin-managed, task 3.5) run on mapped hosts after the
+  // static legacy map: they send the visitor to the stored target with the
+  // row's status code and count one hit. Query strings ride along.
+  if (resolveHostArea(hostname) !== null) {
+    scheduleRuntimeRefresh()
+    const cmsRedirect = resolveCmsRedirect(redirectsCache.lookup, pathname)
+    if (cmsRedirect) {
+      incrementRedirectHit(cmsRedirect.from)
+      const redirect = NextResponse.redirect(
+        new URL(`${cmsRedirect.to}${search}`, request.url),
+        cmsRedirect.type === '302' ? 302 : 301,
+      )
+      applySecurityHeaders(redirect.headers)
+      return redirect
+    }
+  }
+
   // 308 keeps method, path, and query across the host switch. Unmapped
   // hostnames fall through here untouched (D7: every branch except the
   // two mapped hosts is a no-op).
@@ -174,7 +234,7 @@ export function middleware(request: NextRequest) {
   // while settings.maintenance_enabled is on. Admin sessions pass, the
   // admin UI, login flow, shared statics, and every /api route stay up.
   if (resolveHostArea(hostname) !== null) {
-    scheduleMaintenanceRefresh()
+    scheduleRuntimeRefresh()
     if (
       maintenanceCache.enabled &&
       !isMaintenanceExempt(pathname) &&

@@ -11,6 +11,8 @@ export interface AuctionTickerProps {
   error?: string | null
   onRetry?: () => void
   onRefresh?: () => void
+  /** Auto-refresh interval; defaults to the demo's 60 s when refreshing. */
+  refreshMs?: number
 }
 
 export function AuctionTicker({
@@ -19,12 +21,13 @@ export function AuctionTicker({
   error = null,
   onRetry,
   onRefresh,
+  refreshMs = 60_000,
 }: AuctionTickerProps) {
   useEffect(() => {
     if (!onRefresh) return
-    const id = setInterval(onRefresh, 60_000)
+    const id = setInterval(onRefresh, refreshMs)
     return () => clearInterval(id)
-  }, [onRefresh])
+  }, [onRefresh, refreshMs])
 
   if (error) {
     return (

@@ -13,14 +13,25 @@ import {
   type PublishedSlugCollection,
 } from '../admin/content/_components/scheduled-publish'
 import {
+  featureFlagDefinitions,
   isValidReason,
   maskSecretValues,
-  mergeFlagPayload,
   parseAuctionDefaults,
-  parseFlagObject,
   readFlagObject,
+  settingsBounds,
   withAuctionDefaults,
+  withNamedFlags,
+  type FeatureFlagKey,
 } from '../admin/content/_components/settings-audit'
+import { MAX_IMPORT_BYTES } from '../admin/content/import-export/_lib/import-export'
+import {
+  parseRedirectCsv,
+  planRedirectCsvUpserts,
+  summarizeRedirectItems,
+  type RedirectImportItemResult,
+  type RedirectImportReport,
+} from '../admin/content/import-export/_lib/redirects-csv'
+import { validateRedirect } from '../admin/content/redirects/_lib/redirect-validation'
 
 import type { BlockConfig } from '@/lib/content/blocks'
 import { safeParseBlockConfig, serializeBlockConfig } from '@/lib/content/blocks'
@@ -51,7 +62,7 @@ const legalDocumentsPath = '/admin/content/legal-documents'
 const redirectsPath = '/admin/content/redirects'
 const specialistsPath = '/admin/content/specialists'
 const statisticsPath = '/admin/content/statistics'
-const settingsPath = '/admin/content/settings'
+const settingsPath = '/admin/settings'
 
 function readText(formData: FormData, key: string): string {
   const value = formData.get(key)
@@ -78,6 +89,13 @@ function readOptionalNumber(formData: FormData, key: string): number | null {
 
 function readBool(formData: FormData, key: string): boolean {
   return formData.getAll(key).some((value) => value === 'true')
+}
+
+function readOptionalInt(formData: FormData, key: string): number | null {
+  const raw = readText(formData, key)
+  if (raw.length === 0) return null
+  const value = Number.parseInt(raw, 10)
+  return Number.isNaN(value) ? null : value
 }
 
 function readTags(formData: FormData): string[] {
@@ -427,7 +445,10 @@ export async function savePageAction(formData: FormData): Promise<void> {
   const errorPath = formPath(pagesPath, id)
   const title = readText(formData, 'title')
   const slug = readText(formData, 'slug')
-  const status = readText(formData, 'status') as ContentStatus
+  // The editor's Ajasta button submits intent=schedule with no status field;
+  // publishing semantics stay with resolvePublishDecision below.
+  const scheduleIntent = readText(formData, 'intent') === 'schedule'
+  const status = (scheduleIntent ? 'published' : readText(formData, 'status')) as ContentStatus
   const layout = readJsonValue(formData, 'layout')
 
   if (!title) redirectWithError(errorPath, 'Pealkiri on kohustuslik.')
@@ -438,6 +459,9 @@ export async function savePageAction(formData: FormData): Promise<void> {
   await publishDueScheduledContent(repositories, session.userId)
 
   const publishAtIso = readPublishAt(formData, errorPath, 'Avaldamise aeg')
+  if (scheduleIntent && (publishAtIso === null || publishAtIso <= new Date().toISOString())) {
+    redirectWithError(errorPath, 'Ajastamiseks vali tulevikus olev avaldamise aeg.')
+  }
   const current = id
     ? await persist(errorPath, 'Lehe lugemine ebaõnnestus: ', () =>
         repositories.findByID({ collection: 'pages', id }),
@@ -757,7 +781,7 @@ export async function saveFaqCategoryAction(formData: FormData): Promise<void> {
     redirectWithError(errorPath, 'Järjekord peab olema mitte negatiivne täisarv.')
   }
 
-  const data = { title, slug, order }
+  const data = { title, slug, order, active: readBool(formData, 'active') }
 
   await persist(errorPath, 'Kategooria salvestamine ebaõnnestus: ', () =>
     id
@@ -813,6 +837,8 @@ export async function saveFaqItemAction(formData: FormData): Promise<void> {
     categoryId,
     order,
     slug: readOptionalText(formData, 'slug'),
+    shortAnswer: readOptionalText(formData, 'shortAnswer'),
+    active: readBool(formData, 'active'),
   }
 
   await persist(errorPath, 'Küsimuse salvestamine ebaõnnestus: ', () =>
@@ -848,9 +874,15 @@ export async function saveTestimonialAction(formData: FormData): Promise<void> {
   const errorPath = formPath(testimonialsPath, id)
   const name = readText(formData, 'name')
   const content = readText(formData, 'content')
+  const status = readText(formData, 'status') as ContentStatus
+  const rating = readOptionalNumber(formData, 'rating')
 
   if (!name) redirectWithError(errorPath, 'Nimi on kohustuslik.')
   if (!content) redirectWithError(errorPath, 'Tsitaat on kohustuslik.')
+  if (!contentStatuses.includes(status)) redirectWithError(errorPath, 'Vali sobiv olek.')
+  if (rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
+    redirectWithError(errorPath, 'Hinne peab olema täisarv vahemikus 1 kuni 5.')
+  }
 
   const data = {
     name,
@@ -858,6 +890,8 @@ export async function saveTestimonialAction(formData: FormData): Promise<void> {
     role: readOptionalText(formData, 'role'),
     avatarId: readOptionalText(formData, 'avatarId'),
     featured: readBool(formData, 'featured'),
+    status,
+    rating,
   }
 
   await persist(errorPath, 'Tagasiside salvestamine ebaõnnestus: ', () =>
@@ -1043,6 +1077,17 @@ export async function deleteLegalDocumentAction(formData: FormData): Promise<voi
   redirect(legalDocumentsPath)
 }
 
+/** from→to map over the stored redirects, the input of the chain validator. */
+async function redirectChainMap(repositories: CoreRepositories): Promise<Map<string, string>> {
+  const { docs } = await repositories.find({ collection: 'redirects', pagination: false })
+  return new Map(docs.map((doc) => [doc.from, doc.to]))
+}
+
+/**
+ * Save with the task-3.5 rules: both paths start with "/", no
+ * self-redirect, and the target chain stays within the hop cap. The save
+ * is audited with the previous values so chain edits stay traceable.
+ */
 export async function saveRedirectAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
   assertCan(session.role, 'content:write')
@@ -1057,31 +1102,181 @@ export async function saveRedirectAction(formData: FormData): Promise<void> {
   if (!to) redirectWithError(errorPath, 'Kuhu on kohustuslik.')
   if (!redirectTypes.includes(type)) redirectWithError(errorPath, 'Vali suunamise tüüp.')
 
+  const current = id
+    ? await persist(errorPath, 'Suunamise lugemine ebaõnnestus: ', () =>
+        repositories.findByID({ collection: 'redirects', id }),
+      )
+    : null
+  if (id && !current) redirectWithError(errorPath, 'Suunamist ei leitud.')
+
+  const byFrom = await redirectChainMap(repositories)
+  // The row being edited keeps its old mapping in the loaded map; drop it so
+  // the chain walk sees the post-save state and cannot count it as a hop.
+  if (current) byFrom.delete(current.from)
+  const validationError = validateRedirect(from, to, byFrom)
+  if (validationError) redirectWithError(errorPath, validationError)
+
   const data = { from, to, type, active: readBool(formData, 'active') }
 
-  await persist(errorPath, 'Suunamise salvestamine ebaõnnestus: ', () =>
-    id
-      ? repositories.update({ collection: 'redirects', id, data })
-      : repositories.create({ collection: 'redirects', data }),
-  )
+  await persist(errorPath, 'Suunamise salvestamine ebaõnnestus: ', async () => {
+    const saved = current
+      ? await repositories.update({ collection: 'redirects', id, data })
+      : await repositories.create({ collection: 'redirects', data })
+    await writeAudit(repositories, {
+      actorId: session.userId,
+      action: current ? 'redirect.update' : 'redirect.create',
+      entityType: 'redirect',
+      entityId: saved.id,
+      before: current
+        ? { from: current.from, to: current.to, type: current.type, active: current.active }
+        : undefined,
+      after: { from, to, type, active: data.active },
+    })
+  })
 
   revalidate(redirectsPath, id)
+  if (current && current.from !== from) {
+    revalidatePath(current.from)
+  }
+  revalidatePath(from)
+  revalidatePath(to)
   redirect(redirectsPath)
 }
 
+/** Delete requires a typed reason and lands on the append-only audit log. */
 export async function deleteRedirectAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
   assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
+  const reason = readText(formData, 'reason')
   if (!id) redirectWithError(redirectsPath, 'Suunamise identifikaator puudub.')
+  if (!isValidReason(reason)) {
+    redirectWithError(redirectsPath, 'Kustutamise põhjus peab olema vähemalt 5 tähemärki.')
+  }
 
-  await persist(redirectsPath, 'Suunamise kustutamine ebaõnnestus: ', () =>
-    repositories.delete({ collection: 'redirects', id }),
+  const current = await persist(redirectsPath, 'Suunamise lugemine ebaõnnestus: ', () =>
+    repositories.findByID({ collection: 'redirects', id }),
   )
+  if (!current) redirectWithError(redirectsPath, 'Suunamist ei leitud.')
+
+  await persist(redirectsPath, 'Suunamise kustutamine ebaõnnestus: ', async () => {
+    await repositories.delete({ collection: 'redirects', id })
+    await writeAudit(repositories, {
+      actorId: session.userId,
+      action: 'redirect.delete',
+      entityType: 'redirect',
+      entityId: id,
+      before: { from: current.from, to: current.to, type: current.type, hits: current.hits },
+      after: { deleted: true, reason },
+    })
+  })
 
   revalidate(redirectsPath, id)
+  revalidatePath(current.from)
   redirect(redirectsPath)
+}
+
+// ── Redirects CSV bulk import (task 3.5) ────────────────────────────────────
+
+function csvErrorReport(message: string, dryRun: boolean): RedirectImportReport {
+  return {
+    status: 'error',
+    message,
+    dryRun,
+    items: [],
+    summary: { created: 0, updated: 0, failed: 0 },
+  }
+}
+
+/**
+ * Bulk import for redirects from a CSV file (columns: from,to,type,active;
+ * a header row is required). Upserts by `from` like the JSON importer
+ * upserts by slug; the same validation rules and hop cap apply per row.
+ */
+export async function importRedirectsCsvAction(
+  _previous: RedirectImportReport | null,
+  formData: FormData,
+): Promise<RedirectImportReport> {
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'content:write')
+
+  const dryRun = formData.get('dryRun') === 'true'
+  const file = formData.get('file')
+  if (!(file instanceof File)) return csvErrorReport('Vali CSV-fail.', dryRun)
+  if (file.size === 0) return csvErrorReport('Fail on tühi.', dryRun)
+  if (file.size > MAX_IMPORT_BYTES) {
+    const sizeMiB = (file.size / (1024 * 1024)).toFixed(1)
+    return csvErrorReport(`Fail on liiga suur (${sizeMiB} MiB); lubatud on kuni 2 MiB.`, dryRun)
+  }
+
+  const parsed = parseRedirectCsv(await file.text())
+  if (!parsed.ok) return csvErrorReport(parsed.error, dryRun)
+
+  const { docs } = await repositories.find({ collection: 'redirects', pagination: false })
+  const byFrom = new Map(docs.map((doc) => [doc.from, doc.id]))
+  const chainMap = new Map(docs.map((doc) => [doc.from, doc.to]))
+
+  const plan = planRedirectCsvUpserts(parsed.rows, byFrom, chainMap)
+
+  const items: RedirectImportItemResult[] = [...plan.invalid]
+  if (dryRun) {
+    items.push(
+      ...plan.plans.map(
+        (plan): RedirectImportItemResult => ({
+          index: plan.index,
+          from: plan.from,
+          to: plan.to,
+          outcome: plan.action === 'create' ? 'would-create' : 'would-update',
+        }),
+      ),
+    )
+    return {
+      status: 'dry-run',
+      message: 'Kontroll valmis; midagi ei salvestatud.',
+      dryRun: true,
+      items,
+      summary: summarizeRedirectItems(items),
+    }
+  }
+
+  for (const rowPlan of plan.plans) {
+    const result: RedirectImportItemResult = {
+      index: rowPlan.index,
+      from: rowPlan.from,
+      to: rowPlan.to,
+      outcome: rowPlan.action === 'create' ? 'created' : 'updated',
+    }
+    items.push(result)
+    try {
+      const data = { from: rowPlan.from, to: rowPlan.to, type: rowPlan.type, active: rowPlan.active }
+      if (rowPlan.existingId) {
+        await repositories.update({ collection: 'redirects', id: rowPlan.existingId, data })
+      } else {
+        const created = await repositories.create({ collection: 'redirects', data })
+        await writeAudit(repositories, {
+          actorId: session.userId,
+          action: 'redirect.create',
+          entityType: 'redirect',
+          entityId: created.id,
+          after: data,
+        })
+      }
+    } catch (error) {
+      result.outcome = 'failed'
+      result.reason = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  revalidatePath(redirectsPath)
+  const summary = summarizeRedirectItems(items)
+  return {
+    status: summary.failed > 0 ? 'partial' : 'success',
+    message: `Import valmis: ${String(summary.created)} loodud, ${String(summary.updated)} uuendatud, ${String(summary.failed)} ebaõnnestus.`,
+    dryRun: false,
+    items,
+    summary,
+  }
 }
 
 export async function saveSpecialistAction(formData: FormData): Promise<void> {
@@ -1242,40 +1437,112 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
   let feeChanged = false
 
   if (section === 'uldine') {
+    const supportEmail = readOptionalText(formData, 'supportEmail')
+    const supportPhone = readOptionalText(formData, 'supportPhone')
+    const aliasDomain = readOptionalText(formData, 'aliasDomain')
+    if (supportEmail !== null && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(supportEmail)) {
+      redirectWithError(settingsPath, 'Klienditoe e-post peab olema korrektne e-posti aadress.')
+    }
+    if (supportPhone !== null && !/^\+?[\d ()-]{5,20}$/.test(supportPhone)) {
+      redirectWithError(settingsPath, 'Klienditoe telefon peab koosnema numbritest (lubatud +, tühik ja sidekriips).')
+    }
+    if (
+      aliasDomain !== null &&
+      !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(
+        aliasDomain.toLowerCase(),
+      )
+    ) {
+      redirectWithError(
+        settingsPath,
+        'Alias-domeen peab olema korrektne domeeninimi (näiteks oksjonid.erametsad.ee).',
+      )
+    }
     data = {
       orgName: readOptionalText(formData, 'orgName'),
       orgRegCode: readOptionalText(formData, 'orgRegCode'),
+      orgVatCode: readOptionalText(formData, 'orgVatCode'),
       orgAddress: readOptionalText(formData, 'orgAddress'),
+      supportEmail,
+      supportPhone,
+      aliasDomain,
     }
     beforeValues = {
       orgName: current?.orgName ?? null,
       orgRegCode: current?.orgRegCode ?? null,
+      orgVatCode: current?.orgVatCode ?? null,
       orgAddress: current?.orgAddress ?? null,
+      supportEmail: current?.supportEmail ?? null,
+      supportPhone: current?.supportPhone ?? null,
+      aliasDomain: current?.aliasDomain ?? null,
     }
     afterValues = {
       orgName: data.orgName,
       orgRegCode: data.orgRegCode,
+      orgVatCode: data.orgVatCode,
       orgAddress: data.orgAddress,
+      supportEmail,
+      supportPhone,
+      aliasDomain,
     }
   } else if (section === 'tasud') {
     const feePercent = readInt(formData, 'feePercent')
     const vatPercent = readInt(formData, 'vatPercent')
-    if (!Number.isInteger(feePercent) || feePercent < 0 || feePercent > 100) {
-      redirectWithError(settingsPath, 'Vahendustasu peab olema täisarv vahemikus 0 kuni 100.')
+    const quickAuctionFeePercent = readOptionalInt(formData, 'quickAuctionFeePercent')
+    // The form collects the minimum fee in euros; storage is integer cents.
+    const minimumFeeEur = readOptionalNumber(formData, 'minimumFeeEur')
+    const minimumFeeCents = minimumFeeEur === null ? 0 : Math.round(minimumFeeEur * 100)
+    const { feePercent: feeBounds, quickAuctionFeePercent: quickFeeBounds, minimumFeeCents: minFeeBounds } =
+      settingsBounds
+    if (!Number.isInteger(feePercent) || feePercent < feeBounds.min || feePercent > feeBounds.max) {
+      redirectWithError(
+        settingsPath,
+        `Vahendustasu peab olema täisarv vahemikus ${String(feeBounds.min)} kuni ${String(feeBounds.max)}.`,
+      )
     }
     if (!Number.isInteger(vatPercent) || vatPercent < 0 || vatPercent > 100) {
       redirectWithError(settingsPath, 'Käibemaks peab olema täisarv vahemikus 0 kuni 100.')
     }
-    feeChanged = current ? current.feePercent !== feePercent || current.vatPercent !== vatPercent : true
-    data = { feePercent, vatPercent }
+    if (
+      quickAuctionFeePercent !== null &&
+      (!Number.isInteger(quickAuctionFeePercent) ||
+        quickAuctionFeePercent < quickFeeBounds.min ||
+        quickAuctionFeePercent > quickFeeBounds.max)
+    ) {
+      redirectWithError(
+        settingsPath,
+        `Kiiroksjoni teenustasu peab olema täisarv vahemikus ${String(quickFeeBounds.min)} kuni ${String(quickFeeBounds.max)} või tühi (kasutatakse vaikemäära).`,
+      )
+    }
+    if (
+      !Number.isFinite(minimumFeeCents) ||
+      minimumFeeCents < minFeeBounds.min ||
+      minimumFeeCents > minFeeBounds.max
+    ) {
+      redirectWithError(
+        settingsPath,
+        `Minimaalne tasu peab olema vahemikus 0 kuni ${String(minFeeBounds.max / 100)} eurot.`,
+      )
+    }
+    feeChanged =
+      current
+        ? current.feePercent !== feePercent ||
+          current.vatPercent !== vatPercent ||
+          current.quickAuctionFeePercent !== quickAuctionFeePercent ||
+          current.minimumFeeCents !== minimumFeeCents
+        : true
+    data = { feePercent, vatPercent, quickAuctionFeePercent, minimumFeeCents }
     beforeValues = {
       feePercent: current?.feePercent ?? null,
+      quickAuctionFeePercent: current?.quickAuctionFeePercent ?? null,
+      minimumFeeCents: current?.minimumFeeCents ?? null,
       vatPercent: current?.vatPercent ?? null,
     }
-    afterValues = { feePercent, vatPercent }
+    afterValues = { feePercent, quickAuctionFeePercent, minimumFeeCents, vatPercent }
   } else if (section === 'oksjonid') {
     const antiSnipeDurationMinutes = readInt(formData, 'antiSnipeDurationMinutes')
     const sealedRevisionCap = readInt(formData, 'sealedRevisionCap')
+    const minAuctionDurationHours = readInt(formData, 'minAuctionDurationHours')
+    const { minAuctionDurationHours: minDurationBounds } = settingsBounds
     if (
       !Number.isInteger(antiSnipeDurationMinutes) ||
       antiSnipeDurationMinutes < 1 ||
@@ -1285,6 +1552,16 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
     }
     if (!Number.isInteger(sealedRevisionCap) || sealedRevisionCap < 0 || sealedRevisionCap > 5) {
       redirectWithError(settingsPath, 'Paranduste limiit peab olema täisarv vahemikus 0 kuni 5.')
+    }
+    if (
+      !Number.isInteger(minAuctionDurationHours) ||
+      minAuctionDurationHours < minDurationBounds.min ||
+      minAuctionDurationHours > minDurationBounds.max
+    ) {
+      redirectWithError(
+        settingsPath,
+        `Minimaalne oksjoni kestus peab olema täisarv vahemikus ${String(minDurationBounds.min)} kuni ${String(minDurationBounds.max)} tundi.`,
+      )
     }
     const parsedDefaults = parseAuctionDefaults({
       alapakkumineDecisionDeadlineDays: readInt(formData, 'alapakkumineDecisionDeadlineDays'),
@@ -1299,26 +1576,35 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
       antiSnipeDurationMinutes,
       sealedRevisionCap,
       alapakkumineEnabled: readBool(formData, 'alapakkumineEnabled'),
+      autobidderEnabled: readBool(formData, 'autobidderEnabled'),
+      minAuctionDurationHours,
       featureFlags: withAuctionDefaults(currentFlags, parsedDefaults.value),
     }
     beforeValues = {
       antiSnipeDurationMinutes: current?.antiSnipeDurationMinutes ?? null,
       alapakkumineEnabled: current?.alapakkumineEnabled ?? null,
+      autobidderEnabled: current?.autobidderEnabled ?? null,
+      minAuctionDurationHours: current?.minAuctionDurationHours ?? null,
       sealedRevisionCap: current?.sealedRevisionCap ?? null,
       auctionDefaults: previousDefaults,
     }
     afterValues = {
       antiSnipeDurationMinutes,
       alapakkumineEnabled: data.alapakkumineEnabled,
+      autobidderEnabled: data.autobidderEnabled,
+      minAuctionDurationHours,
       sealedRevisionCap,
       auctionDefaults: parsedDefaults.value,
     }
   } else {
-    const parsedFlags = parseFlagObject(readText(formData, 'featureFlags'))
-    if (!parsedFlags.ok) {
-      redirectWithError(settingsPath, parsedFlags.error)
+    // Lipud save: named toggles only. Toggles absent from the form data save
+    // as false; unknown legacy keys and the reserved auctionDefaults key
+    // survive via withNamedFlags.
+    const toggles = {} as Record<FeatureFlagKey, boolean>
+    for (const definition of featureFlagDefinitions) {
+      toggles[definition.key] = readBool(formData, definition.key)
     }
-    const mergedFlags = mergeFlagPayload(currentFlags, parsedFlags.value)
+    const mergedFlags = withNamedFlags(currentFlags, toggles)
     data = { featureFlags: mergedFlags }
     beforeValues = { featureFlags: currentFlags }
     afterValues = { featureFlags: mergedFlags }

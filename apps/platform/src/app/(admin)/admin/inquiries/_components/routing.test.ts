@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  DEFAULT_PRESELECT_COUNT,
+  ROUTING_SETTINGS_FLAGS_KEY,
   buildAttachmentLinks,
+  buildManualForwardEmail,
   buildMinimizedForwardPayload,
   partnerServesRequest,
+  preselectCountFromFlags,
   rankRoutingCandidates,
   responseDeadlineState,
   type RoutingPartnerInput,
@@ -173,6 +177,66 @@ describe('responseDeadlineState', () => {
     expect(
       responseDeadlineState({ routedAt: 'not-a-date', respondedAt: null, nowMs: now }),
     ).toBeNull()
+  })
+})
+
+describe('preselectCountFromFlags (task 8.6)', () => {
+  it('defaults to 3 without a settings row or a reserved key', () => {
+    expect(DEFAULT_PRESELECT_COUNT).toBe(3)
+    expect(preselectCountFromFlags(undefined)).toBe(3)
+    expect(preselectCountFromFlags({ muu: true })).toBe(3)
+    expect(preselectCountFromFlags({ [ROUTING_SETTINGS_FLAGS_KEY]: 'kolm' })).toBe(3)
+  })
+
+  it('reads a clamped integer preselect count from Seaded', () => {
+    expect(preselectCountFromFlags({ [ROUTING_SETTINGS_FLAGS_KEY]: { preselectCount: 1 } })).toBe(1)
+    expect(preselectCountFromFlags({ [ROUTING_SETTINGS_FLAGS_KEY]: { preselectCount: 0 } })).toBe(0)
+    expect(preselectCountFromFlags({ [ROUTING_SETTINGS_FLAGS_KEY]: { preselectCount: 10 } })).toBe(10)
+    expect(preselectCountFromFlags({ [ROUTING_SETTINGS_FLAGS_KEY]: { preselectCount: 11 } })).toBe(3)
+    expect(preselectCountFromFlags({ [ROUTING_SETTINGS_FLAGS_KEY]: { preselectCount: 2.5 } })).toBe(3)
+  })
+})
+
+describe('buildManualForwardEmail (task 8.6)', () => {
+  it('renders the minimized payload into a copyable plain-text e-mail', () => {
+    const email = buildManualForwardEmail({
+      type: 'hooldusraie',
+      payload: {
+        type: 'hooldusraie',
+        contact: { name: 'Piret Põld', phone: '+37251110003', email: 'piret@meil.ee' },
+        county: 'HH',
+        cadastres: ['78402:003:0210'],
+        comment: 'Talvel sobib',
+      },
+      attachments: ['hooldusraie/1-plaan.pdf'],
+    })
+    expect(email.subject).toBe('Erametsa päring: hooldusraie')
+    expect(email.body).toContain('Kontakt: name: Piret Põld, phone: +37251110003, email: piret@meil.ee')
+    expect(email.body).toContain('Maakond: HH')
+    expect(email.body).toContain('Katastritunnused: 78402:003:0210')
+    expect(email.body).toContain('Kommentaar: Talvel sobib')
+    expect(email.body).toContain('Manused: hooldusraie/1-plaan.pdf')
+    expect(email.body.endsWith(
+      'Andmed on edastatud Erametsad OÜ vahendusel. Küsimuste korral vastake otse kliendile.',
+    )).toBe(true)
+  })
+
+  it('never leaks internal metadata into the fallback text', () => {
+    const email = buildManualForwardEmail({
+      type: 'kava',
+      payload: {
+        contact: { name: 'A' },
+        isikukood: '38001010000',
+        ipHash: 'abc',
+        consentAt: '2026-09-01T10:00:00.000Z',
+        source: 'google',
+      },
+      attachments: [],
+    })
+    expect(email.body).not.toContain('isikukood')
+    expect(email.body).not.toContain('abc')
+    expect(email.body).not.toContain('google')
+    expect(email.body).not.toContain('Manused')
   })
 })
 

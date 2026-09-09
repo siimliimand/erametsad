@@ -15,6 +15,7 @@ export interface KanbanCardView {
   contactName: string
   formName: string
   cadastr: string | null
+  countyName: string | null
   status: string
   assignedSpecialistId: string | null
   assignedSpecialistName: string | null
@@ -28,7 +29,34 @@ interface PendingInput {
   leadId: string
   to: string
   from: string
-  kind: 'qualified' | 'disqualified'
+  kind: 'contacted' | 'qualified' | 'disqualified' | 'contract'
+}
+
+/** Columns whose exit guard needs collected input before the move. */
+const NOTE_PROMPT_STATUSES: ReadonlySet<string> = new Set([
+  'contacted',
+  'qualified',
+  'disqualified',
+  'contract',
+])
+
+const PROMPT_COPY: Record<PendingInput['kind'], { title: string; body: string }> = {
+  contacted: {
+    title: 'Esimene märkus',
+    body: 'Kirje liikumiseks „Võetud ühendust“ on esimene märkus kohustuslik.',
+  },
+  qualified: {
+    title: 'Kvalifitseerimise märkus',
+    body: 'Kirje liikumiseks „Kvalifitseeritud“ on tekst kohustuslik.',
+  },
+  disqualified: {
+    title: 'Tagasilükkamise põhjus',
+    body: 'Kirje liikumiseks „Mittekvalifitseeritud“ on tekst kohustuslik.',
+  },
+  contract: {
+    title: 'Lepingu viide või märkus',
+    body: 'Kirje liikumiseks „Leping“ on nõutav oksjoni või lepingu viide või märkus.',
+  },
 }
 
 interface CardMenuState {
@@ -71,6 +99,7 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [pendingInput, setPendingInput] = useState<PendingInput | null>(null)
   const [noteText, setNoteText] = useState('')
+  const [referenceText, setReferenceText] = useState('')
   const [pending, startTransition] = useTransition()
   const [menu, setMenu] = useState<CardMenuState | null>(null)
   const menuListRef = useRef<HTMLDivElement | null>(null)
@@ -150,14 +179,15 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
     }
   }
 
-  function attemptMove(leadId: string, to: string, note?: string) {
+  function attemptMove(leadId: string, to: string, note?: string, reference?: string) {
     const current = board.find((card) => card.id === leadId)
     if (!current || current.status === to) return
 
     setError(null)
-    if ((to === 'qualified' || to === 'disqualified') && note === undefined) {
-      setPendingInput({ leadId, to, from: current.status, kind: to })
+    if (NOTE_PROMPT_STATUSES.has(to) && note === undefined && reference === undefined) {
+      setPendingInput({ leadId, to, from: current.status, kind: to as PendingInput['kind'] })
       setNoteText('')
+      setReferenceText('')
       return
     }
     // Optimistic move; the action layer enforces the same guards and the
@@ -170,6 +200,7 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
         leadId,
         status: to,
         ...(note !== undefined ? { note } : {}),
+        ...(reference !== undefined ? { reference } : {}),
       })
       if (!result.ok) {
         setBoard((prev) =>
@@ -185,10 +216,22 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
   function submitNote() {
     if (!pendingInput) return
     const { leadId, to, kind } = pendingInput
+    const reference = referenceText.trim()
+    if (kind === 'contract' && reference !== '') {
+      setPendingInput(null)
+      attemptMove(leadId, to, noteText.trim() || undefined, reference)
+      return
+    }
     if (noteText.trim().length < 5) {
-      setError(kind === 'qualified'
-        ? 'Kvalifitseerimise märkus on kohustuslik (vähemalt 5 tähemärki).'
-        : 'Tagasilükkamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+      setError(
+        kind === 'contacted'
+          ? 'Esimene märkus on kohustuslik (vähemalt 5 tähemärki).'
+          : kind === 'qualified'
+            ? 'Kvalifitseerimise märkus on kohustuslik (vähemalt 5 tähemärki).'
+            : kind === 'disqualified'
+              ? 'Tagasilükkamise põhjus on kohustuslik (vähemalt 5 tähemärki).'
+              : 'Sisestage oksjoni või lepingu viide või märkus (vähemalt 5 tähemärki).',
+      )
       return
     }
     setPendingInput(null)
@@ -294,6 +337,11 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
                             {card.cadastr}
                           </span>
                         ) : null}
+                        {card.countyName ? (
+                          <span className={chipClass} title="Maakond">
+                            {card.countyName}
+                          </span>
+                        ) : null}
                         <span className={chipClass}>{card.formName}</span>
                       </div>
                       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -386,20 +434,33 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
           className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-container-sm rounded-card border border-border bg-bgPage p-md shadow-lg"
         >
           <h4 id={noteHeadingId} className="mb-xs font-heading text-h4 font-bold text-ink">
-            {pendingInput.kind === 'qualified' ? 'Kvalifitseerimise märkus' : 'Tagasilükkamise põhjus'}
+            {PROMPT_COPY[pendingInput.kind].title}
           </h4>
           <p className="mb-xs text-bodySm text-ink-muted">
-            Kirje liikumiseks „{pendingInput.kind === 'qualified' ? 'Kvalifitseeritud' : 'Mittekvalifitseeritud'}“
-            on tekst kohustuslik.
+            {PROMPT_COPY[pendingInput.kind].body}
           </p>
+          {pendingInput.kind === 'contract' ? (
+            <input
+              type="text"
+              aria-label="Oksjoni või lepingu viide"
+              placeholder="Oksjoni või lepingu viide"
+              className="mb-xs h-10 w-full rounded-input border border-border bg-bgPage px-3 text-bodySm text-ink outline-none focus:border-primary"
+              value={referenceText}
+              onChange={(event) => {
+                setReferenceText(event.target.value)
+              }}
+              autoFocus
+            />
+          ) : null}
           <textarea
             aria-labelledby={noteHeadingId}
             className="h-20 w-full rounded-input border border-border bg-bgPage px-3 py-2 text-bodySm text-ink outline-none focus:border-primary"
+            placeholder={pendingInput.kind === 'contract' ? 'või märkus (vähemalt 5 tähemärki)' : undefined}
             value={noteText}
             onChange={(event) => {
               setNoteText(event.target.value)
             }}
-            autoFocus
+            autoFocus={pendingInput.kind !== 'contract'}
           />
           <div className="mt-xs flex items-center gap-sm">
             <button

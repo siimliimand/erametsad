@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 
-import { deleteMediaAction, updateMediaAction } from '../../../_actions/media'
+import { deleteMediaAction, replaceMediaFileAction, updateMediaAction } from '../../../_actions/media'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import {
   FormField,
@@ -11,7 +11,8 @@ import {
 import { PageHeader } from '../../../_components/PageHeader'
 import { requireAdminRepositories } from '../../../_lib/admin'
 import { formatDateTime } from '../../../_lib/labels'
-import { formatFileSize } from '../_lib/media-upload'
+import { FocalPointPicker } from '../_components/FocalPointPicker'
+import { formatFileSize, isImageMimeType } from '../_lib/media-upload'
 
 export const metadata = { title: 'Muuda meediafaili' }
 
@@ -29,14 +30,14 @@ export default async function EditMediaPage({
   const asset = await repositories.findByID({ collection: 'media', id })
   if (!asset) notFound()
 
-  const isImage = (asset.mimeType ?? '').startsWith('image/')
+  const isImage = isImageMimeType(asset.mimeType ?? '')
 
   return (
     <div>
       {viga ? <ErrorNotice message={viga} /> : null}
       <PageHeader
         title={asset.filename}
-        description="Muuda failinime ja alt-teksti või kustuta fail koos R2 objektiga."
+        description="Muuda failinime, alt-teksti ja fookuspunkti, asenda fail või kustuta see koos R2 objektiga."
         backHref="/admin/media"
       />
       <div className="grid grid-cols-1 gap-sm lg:grid-cols-2">
@@ -50,9 +51,18 @@ export default async function EditMediaPage({
             label="Alt-tekst"
             name="alt"
             rows={3}
-            hint="Kirjeldus ekraanilugejatele."
+            required={isImage}
+            hint={isImage ? 'Kohustuslik kirjeldus ekraanilugejatele.' : 'Kirjeldus ekraanilugejatele.'}
             defaultValue={asset.alt ?? ''}
           />
+          {isImage && asset.url ? (
+            <FocalPointPicker
+              url={asset.url}
+              filename={asset.filename}
+              focalX={asset.focalX ?? null}
+              focalY={asset.focalY ?? null}
+            />
+          ) : null}
           <button type="submit" className={primaryButtonClass}>
             Salvesta
           </button>
@@ -89,6 +99,23 @@ export default async function EditMediaPage({
               Ava fail
             </a>
           ) : null}
+          <form
+            action={replaceMediaFileAction}
+            className="space-y-xs rounded-card border border-border p-sm"
+          >
+            <input type="hidden" name="id" value={asset.id} />
+            <p className="text-label font-semibold text-ink">Asenda fail</p>
+            <FormField
+              label="Uus fail"
+              name="file"
+              type="file"
+              required
+              hint="Sisu vahetub, faili ID ja URL jäävad. Alt ja fookuspunkt säilivad."
+            />
+            <button type="submit" className={secondaryButtonClass}>
+              Asenda
+            </button>
+          </form>
           <form action={deleteMediaAction}>
             <input type="hidden" name="id" value={asset.id} />
             <button

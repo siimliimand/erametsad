@@ -80,6 +80,23 @@ function recordNumberString(record: Record<string, unknown>, key: string): strin
   return value === null ? '' : String(value)
 }
 
+/** Stored area_ha/volume_m3 column value -> wizard input string. */
+function columnNumberString(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : ''
+}
+
+/**
+ * Kooskõlastused/väljaveoteed codes with the legacy spellings the portal
+ * tolerates (Estonian words, the old boolean buyer-fact) mapped onto the
+ * schema's seller/buyer/approved codes.
+ */
+function approvalValue(value: unknown): string {
+  if (value === true || value === 'buyer' || value === 'ostja') return 'buyer'
+  if (value === 'seller' || value === 'müüja') return 'seller'
+  if (value === 'approved' || value === 'kooskõlastatud') return 'approved'
+  return ''
+}
+
 /** Stored string arrays keep every string; unknown entries stay untouched. */
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
@@ -184,11 +201,19 @@ function wizardStateFromAuction(
     forestNotifications: stringArray(auction.notifications),
     species: knownCodes(auction.species, speciesCodeList),
     loggingTypes: knownCodes(auction.loggingTypes, loggingTypeCodeList),
-    areaHa: recordNumberString(deadlines, 'areaHa'),
-    volumeM3: recordNumberString(deadlines, 'volumeM3'),
+    areaHa:
+      columnNumberString(auction.areaHa) !== ''
+        ? columnNumberString(auction.areaHa)
+        : recordNumberString(deadlines, 'areaHa'),
+    volumeM3:
+      columnNumberString(auction.volumeM3) !== ''
+        ? columnNumberString(auction.volumeM3)
+        : recordNumberString(deadlines, 'volumeM3'),
     loggingDeadline: recordString(deadlines, 'loggingDeadline'),
     removalDeadline: recordString(deadlines, 'removalDeadline'),
     leaseDeadline: recordString(deadlines, 'leaseDeadline'),
+    storageLocationApproval: approvalValue(deadlines.storageLocationApproval),
+    removalRoads: approvalValue(deadlines.removalRoads),
     propertyCount: recordNumber(deadlines, 'propertyCount'),
     specialistId: auction.specialistId ?? '',
     descriptionPublic: auction.descriptionPublic ?? '',

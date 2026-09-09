@@ -7,6 +7,7 @@ import { sanitizeRichText } from './wizard-model'
 import type { WizardStepContext } from './wizard-model'
 import { FieldError, FieldHint, FieldLabel } from './wizard-ui'
 import { inputClass, secondaryButtonClass } from '../../../_components/FormField'
+import { RichTextEditor } from '../../../_components/rich-text/RichTextEditor'
 
 /**
  * Step 5 Sisu (docs/design/admin/03 step 5): name and slug, specialist
@@ -121,16 +122,16 @@ export function StepSisu({ state, patch, errors, initial, options }: WizardStepC
 
       <div className="grid grid-cols-1 gap-sm lg:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <FieldLabel htmlFor={`${id}-descriptionPublic`}>Avalik info</FieldLabel>
-          <textarea
-            id={`${id}-descriptionPublic`}
-            rows={8}
-            value={state.descriptionPublic}
-            onChange={(event) => {
-              patch({ descriptionPublic: event.target.value })
-            }}
-            className={`${inputClass} h-auto py-2 ${errors.descriptionPublic !== undefined ? 'border-danger' : ''}`}
-          />
+          <span className="text-label font-semibold text-ink">Avalik info</span>
+          <div className={errors.descriptionPublic !== undefined ? 'rounded-card ring-1 ring-danger' : undefined}>
+            <RichTextEditor
+              value={state.descriptionPublic}
+              onChange={(html) => {
+                patch({ descriptionPublic: html })
+              }}
+              ariaLabel="Avalik info"
+            />
+          </div>
           <FieldHint>
             Kuvatakse portaalis lõiguna “Oksjoni info ja erisused”.{' '}
             {String(sanitizeRichText(state.descriptionPublic).length)} / 20 000 tähemärki.
@@ -138,16 +139,16 @@ export function StepSisu({ state, patch, errors, initial, options }: WizardStepC
           <FieldError message={errors.descriptionPublic} />
         </div>
         <div className="flex flex-col gap-1">
-          <FieldLabel htmlFor={`${id}-descriptionSecondary`}>Täiendav info</FieldLabel>
-          <textarea
-            id={`${id}-descriptionSecondary`}
-            rows={8}
-            value={state.descriptionSecondary}
-            onChange={(event) => {
-              patch({ descriptionSecondary: event.target.value })
-            }}
-            className={`${inputClass} h-auto py-2 ${errors.descriptionSecondary !== undefined ? 'border-danger' : ''}`}
-          />
+          <span className="text-label font-semibold text-ink">Täiendav info</span>
+          <div className={errors.descriptionSecondary !== undefined ? 'rounded-card ring-1 ring-danger' : undefined}>
+            <RichTextEditor
+              value={state.descriptionSecondary}
+              onChange={(html) => {
+                patch({ descriptionSecondary: html })
+              }}
+              ariaLabel="Täiendav info"
+            />
+          </div>
           <FieldHint>
             Kuvatakse portaalis lõiguna “Lisainfo”.{' '}
             {String(sanitizeRichText(state.descriptionSecondary).length)} / 20 000 tähemärki.

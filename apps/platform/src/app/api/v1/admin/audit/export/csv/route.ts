@@ -10,25 +10,25 @@ import {
 } from '../_lib/audit-export'
 
 import { requireAdminRepositories } from '@/app/(admin)/_lib/admin'
-import { can, staffRoles, type StaffRole } from '@/app/(admin)/_lib/permissions'
+import { staffRoles, type StaffRole } from '@/app/(admin)/_lib/permissions'
 import type { UserDoc, WhereClause } from '@/lib/data/repositories'
 
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Audit log CSV export (task 15.4, downloads stay on routes). Scoped
- * exactly like the audit list page: audit:read required, an admin always
- * exports only its own entries, a superadmin sees all. The export event is
- * itself audited (`audit.export`, anticipated in the action registry) and
- * the entry is written before the CSV is returned.
+ * Audit log CSV export (task 15.4, downloads stay on routes). Gated to
+ * superadmin (spec delta: admin-governance) — the list page keeps its admin
+ * self-view, but bulk downloads stay with the superadmin. The export event
+ * is itself audited (`audit.export`) and the entry is written before the
+ * CSV is returned.
  */
 export async function GET(request: Request): Promise<Response> {
   // Redirects to the login page when the admin cookie is missing or invalid.
   const { session, repositories } = await requireAdminRepositories()
   const role: StaffRole = session.role
-  if (!can(role, 'audit:read')) {
-    return Response.json({ error: 'Ainult superadmin ja administraator.' }, { status: 403 })
+  if (role !== 'superadmin') {
+    return Response.json({ error: 'Ainult superadmin saab auditlogi andmeid eksportida.' }, { status: 403 })
   }
 
   const params = parseAuditExportFilters(new URL(request.url).searchParams)

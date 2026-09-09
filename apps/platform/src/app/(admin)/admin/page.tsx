@@ -10,9 +10,11 @@ import { QuickActions } from './_components/QuickActions'
 import { RecentLeads } from './_components/RecentLeads'
 import { SystemHealth } from './_components/SystemHealth'
 import {
+  BIDS_SPARKLINE_DAYS,
   approvalSplitSubline,
   bidTrendSubline,
   getWorkspaceData,
+  isAdminRole,
   scheduledAuctionsSubline,
   workspaceKpiHrefs,
   workspaceKpiLabels,
@@ -21,18 +23,27 @@ import {
 
 export const metadata = { title: 'Töölaud' }
 
-/** Demo critical threshold: countdown blinks inside the last 5 minutes. */
-const CRITICAL_LOOKAHEAD_MS = 5 * 60 * 1000
+/** Sparkline viewport, shared with the statistics Charts.tsx conventions. */
+const SPARKLINE_WIDTH = 112
+const SPARKLINE_HEIGHT = 28
 
 /**
- * Demo sparkline: the aggregation exposes two real points (yesterday, today),
- * so the trend renders as one line between them instead of a fabricated
- * hourly series.
+ * Seven-day bid sparkline (spec: bids-today shows a 7-day trend): one point
+ * per Tallinn calendar day, oldest first, with the today point last.
  */
-function sparklinePoints(yesterday: number, today: number): string {
-  const max = Math.max(yesterday, today, 1)
-  const y = (value: number): number => 24 - (value / max) * 20
-  return `0,${y(yesterday).toFixed(1)} 112,${y(today).toFixed(1)}`
+function sparklinePoints(dailyCounts: readonly number[]): string {
+  const max = Math.max(...dailyCounts, 1)
+  const step =
+    dailyCounts.length > 1
+      ? SPARKLINE_WIDTH / (dailyCounts.length - 1)
+      : SPARKLINE_WIDTH / 2
+  return dailyCounts
+    .map((count, index) => {
+      const x = index * step
+      const y = SPARKLINE_HEIGHT - 4 - (count / max) * (SPARKLINE_HEIGHT - 8)
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
 }
 
 function trendNode(changePercent: number | null): ReactElement | null {
@@ -56,9 +67,6 @@ export default async function AdminDashboardPage() {
   const { kpis, endingToday, queues, quickActions, recentLeads } =
     await getWorkspaceData(session)
   const nowMs = Date.now()
-  const criticalEnding = endingToday.filter(
-    (row) => Date.parse(row.endsAt) - nowMs < CRITICAL_LOOKAHEAD_MS,
-  ).length
 
   const cards: ReactElement[] = []
   if (kpis.activeAuctions) {
@@ -74,7 +82,10 @@ export default async function AdminDashboardPage() {
     )
   }
   if (kpis.endingToday) {
-    const alertProps = criticalEnding > 0 ? { alert: criticalEnding } : {}
+    // Demo rule: the KPI carries its amber attention badge whenever at least
+    // one auction ends today (Europe/Tallinn calendar day).
+    const alertProps =
+      kpis.endingToday.count > 0 ? { alert: kpis.endingToday.count } : {}
     cards.push(
       <KpiCard
         key="ending-today"
@@ -99,19 +110,20 @@ export default async function AdminDashboardPage() {
               sub: (
                 <>
                   <svg
-                    viewBox="0 0 112 28"
+                    viewBox={`0 0 ${String(SPARKLINE_WIDTH)} ${String(SPARKLINE_HEIGHT)}`}
                     preserveAspectRatio="none"
-                    aria-hidden="true"
+                    role="img"
+                    aria-label={`Pakkumised viimased ${String(BIDS_SPARKLINE_DAYS)} päeva`}
                     className="h-6 w-full text-accent"
                   >
+                    <title>{`Pakkumisi päevas, viimased ${String(BIDS_SPARKLINE_DAYS)} päeva`}</title>
                     <polyline
-                      points={sparklinePoints(
-                        kpis.bidsToday.yesterdayCount,
-                        kpis.bidsToday.count,
-                      )}
+                      points={sparklinePoints(kpis.bidsToday.dailyCounts)}
                       fill="none"
                       stroke="currentColor"
                       strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                       vectorEffect="non-scaling-stroke"
                     />
                   </svg>
@@ -128,6 +140,10 @@ export default async function AdminDashboardPage() {
       kpis.pendingApprovals.companies,
       kpis.pendingApprovals.underbids,
     )
+    // Red only when something is actually pending (spec dashboard parity).
+    const pendingTotal =
+      (kpis.pendingApprovals.companies ?? 0) +
+      (kpis.pendingApprovals.underbids ?? 0)
     cards.push(
       <KpiCard
         key="pending-approvals"
@@ -135,7 +151,7 @@ export default async function AdminDashboardPage() {
         value={`${String(kpis.pendingApprovals.companies ?? 0)} + ${String(
           kpis.pendingApprovals.underbids ?? 0,
         )}`}
-        danger
+        {...(pendingTotal > 0 ? { danger: true } : {})}
         {...(sub !== null ? { sub } : {})}
         href={workspaceKpiHrefs.pendingApprovals}
       />,
@@ -200,7 +216,7 @@ export default async function AdminDashboardPage() {
       </section>
       <div className="grid grid-cols-1 items-stretch gap-lg min-[1024px]:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <EndingToday rows={endingToday} nowMs={nowMs} />
-        <SystemHealth queues={queues} />
+        {isAdminRole(session.role) ? <SystemHealth queues={queues} /> : null}
         <QuickActions rows={quickActions} />
         <RecentLeads rows={recentLeads} />
       </div>

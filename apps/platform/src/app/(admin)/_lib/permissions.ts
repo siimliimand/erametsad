@@ -86,7 +86,16 @@ export const adminPermissions: readonly AdminPermission[] = [
   'audit:read',
 ]
 
-const ADMIN_ALLOWED: readonly AdminPermission[] = [...adminPermissions]
+// D-6 tier: Seaded is read-only for admin — only superadmin holds
+// settings:write (13-settings "Access"); every settings save re-checks it.
+const ADMIN_ALLOWED: readonly AdminPermission[] = adminPermissions.filter(
+  (permission) => permission !== 'settings:write',
+)
+
+// Kept as an explicit deny so allow xor deny holds for every role pair.
+const ADMIN_DENIED: readonly AdminPermission[] = ['settings:write']
+
+const SUPERADMIN_ALLOWED: readonly AdminPermission[] = [...adminPermissions]
 
 const SPECIALIST_ALLOWED: readonly AdminPermission[] = [
   'workspace:view',
@@ -164,13 +173,13 @@ const SELLER_DENIED: readonly AdminPermission[] = [
 
 export const ROLE_ALLOWED_PERMISSIONS: Record<StaffRole, ReadonlySet<AdminPermission>> = {
   admin: new Set(ADMIN_ALLOWED),
-  superadmin: new Set(ADMIN_ALLOWED),
+  superadmin: new Set(SUPERADMIN_ALLOWED),
   specialist: new Set(SPECIALIST_ALLOWED),
   seller: new Set(SELLER_ALLOWED),
 }
 
 export const ROLE_DENIED_PERMISSIONS: Record<StaffRole, ReadonlySet<AdminPermission>> = {
-  admin: new Set(),
+  admin: new Set(ADMIN_DENIED),
   superadmin: new Set(),
   specialist: new Set(SPECIALIST_DENIED),
   seller: new Set(SELLER_DENIED),
@@ -300,7 +309,7 @@ export const ADMIN_MODULES: readonly AdminModuleDefinition[] = [
   { id: 'contracts', label: 'Lepingud', href: '/admin/contracts' },
   { id: 'leads', label: 'Juhtlõimed', href: '/admin/leads' },
   { id: 'inquiries', label: 'Päringud', href: '/admin/inquiries' },
-  { id: 'content', label: 'Sisu', href: '/admin/content' },
+  { id: 'content', label: 'Sisuhaldus', href: '/admin/content' },
   { id: 'statistics', label: 'Statistika', href: '/admin/statistics' },
   { id: 'settings', label: 'Seaded', href: '/admin/settings' },
   { id: 'audit-log', label: 'Auditlogi', href: '/admin/audit' },

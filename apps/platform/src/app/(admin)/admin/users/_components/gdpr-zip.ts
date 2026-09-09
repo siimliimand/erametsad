@@ -7,6 +7,11 @@ export interface GdprZipEntry {
   data: Uint8Array
 }
 
+/** UTF-8 JSON ZIP entry, pretty-printed for the operator's archive. */
+export function gdprJsonEntry(name: string, value: unknown): GdprZipEntry {
+  return { name, data: new TextEncoder().encode(JSON.stringify(value, null, 2)) }
+}
+
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256)
   for (let n = 0; n < 256; n++) {

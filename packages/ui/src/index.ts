@@ -29,7 +29,7 @@ export {
   type DataTableProps,
 } from './components/DataTable';
 export { MapEstonia } from './components/content/MapEstonia';
-export type { MapEstoniaProps, MapPin } from './components/content/MapEstonia';
+export type { MapEstoniaProps, MapPin, MapCoordinates } from './components/content/MapEstonia';
 export { StickyTOC } from './components/content/StickyTOC';
 export type { StickyTOCProps, TOCSection } from './components/content/StickyTOC';
 export { SearchableAccordion } from './components/content/SearchableAccordion';
@@ -65,4 +65,5 @@ export type {
   PageBlocksProps,
   PageBlockView,
   ResolvedBlockConfig,
+  TestimonialItemConfig,
 } from './components/content/page-blocks/types';

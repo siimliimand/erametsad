@@ -3,9 +3,11 @@
 > **In brief:** Create and edit an auction through a step-by-step wizard.
 | Area | admin |
 |---|---|
-| **Route** | `/oksjonid/uus` and `/oksjonid/:id/muuda` |
+| **Route** | `/admin/auctions/new` and `/admin/auctions/:id/edit` |
 | **Access** | admin, superadmin; specialist (own lots; cannot change specialist assign, cannot override fee) |
 | **In nav** | from 02 toolbar / row action |
+
+Otsus (D-1): routes follow the implemented `/admin/*` scheme; earlier drafts used `/oksjonid/uus` and `/oksjonid/:id/muuda`.
 
 ## Purpose & user goals
 Create and edit the complete lot model (plan §5.4) through a 7-step wizard with autosave, validation summary and a diff-review before publishing. This is the densest form in the system.
@@ -20,7 +22,7 @@ Create and edit the complete lot model (plan §5.4) through a 7-step wizard with
 │ 3 Maa&mets ◀│  │ Raiemahu (m³)      [980    ]                      │ │
 │ 4 Hind     ○│  │ Katastritunnused   [+ lisa] 34801:001:0217 ✓      │ │
 │ 5 Sisu     ○│  │ Kinnistu reg.-nr   [+ lisa] 150934                │ │
-│ 6 Pakett   ○│  │ Puuliigid (24)     [MA.KU.NU ▾] 3 valitud         │ │
+│ 6 Pakett   ○│  │ Puuliigid (26)     [MA.KU.NU ▾] 3 valitud         │ │
 │ 7 Ülevaade ○│  │ Raieliigid         [VR HR ▾] 2 valitud             │ │
 │              │  │ Eraldised          [+ lisa] "4 VR"                │ │
 │ ⚠ 2 viga    │  │ Metsateatise nr    [+ lisa] 50001182112           │ │
@@ -34,10 +36,10 @@ Step 6 hidden unless objectType=package. Mobile: steps become top dropdown + lin
 
 ## Block-by-block spec — steps
 **Step 1 Tüüp ja mehaanika**
-- Objekti tüüp*: radio forest / property / field / package (cards with icons). Choosing property/field/package auto-sets auctionType=sealed (open disabled with tooltip "Kinnistu/põllumaa/pakett müüakse pimepakkumisega"; admin may still not override — hard rule).
+- Objekti tüüp*: radio cards `raieoigus / kinnistu / kiire / pakett`. Choosing kinnistu or pakett auto-sets auctionType=sealed (open disabled with tooltip "Kinnistu ja pakett müüakse ainult pimepakkumisega"; admin may still not override — hard rule). Choosing `kiire` creates a kiiroksjon lot: the Kiiroksjon toggle locks on ("Kiire oksjoni tüüp on alati kiiroksjon"). Otsus (D-2): the object model is `raieoigus / kinnistu / kiire / pakett` — the draft's forest/property/field/package model (with a põllumaa type) is not implemented; põllumaa does not exist as a type.
 - Oksjoni tüüp*: avatud (tõusev) / suletud (pimepakkumine). bidStep shown only in step 4 if open.
-- ☐ Kiiroksjon (48 h) — toggle; sets defaults: duration 48h, minBid €1 (editable), enables reservePrice (step 4, secret).
-- ☐ Automaatselt pikenev lõpp (anti-sniping) + N minutes input (default from settings 13; 1–30). Helper text: "Viimase N minuti jooksul tehtud pakkumine pikendab lõppu N minuti võrra."
+- ☐ Kiiroksjon (24–72 h, 48 h suggested) — toggle; sets defaults: minBid €1 (editable), enables reservePrice (step 4, secret, required).
+- ☐ Automaatselt pikenev lõpp (anti-sniping) + N minutes input (default 5 from settings 13; 1–30). Otsus (D-14): the anti-snipe default is 5 minutes (the Settings default `anti_snipe_duration_minutes = 5`; the old 5-vs-13 open question is closed). Helper text: "Viimase N minuti jooksul tehtud pakkumine pikendab lõppu N minuti võrra."
 - Algus* / Lõpp*: datetime pickers, TZ Europe/Tallinn always displayed ("UTC+3 suvi"); validation: start > now+10min for new publishes, **min duration 1 h** (kiiroksjon: exactly 48h suggested, 24–72 allowed), max 90 days; endTime editable later only by admin (logged).
 
 **Step 2 Asukoht**
@@ -48,7 +50,7 @@ Step 6 hidden unless objectType=package. Mobile: steps become top dropdown + lin
 **Step 3 Maa ja mets**
 - Pindala ha* (0.01–10000), Raiemahu m³ (forest only).
 - Katastritunnused* repeater — validation regex `^\d{5}:\d{3}:\d{4}$` ("XX:XXX:XXXX"), inline error "Vorming peab olema 34801:001:0217".
-- Kinnistu register numbers repeater (numeric). Puuliigid multi-select, 24 fixed codes (MA.KU.NU.LH.SD.TS.TA.SA.VA.JA.KP.KS.HB.LM.LV.PN.PP.PA.SP.PK.TY.KL.KD.RE.TM.PI) with Estonian names in dropdown. Raieliigid multi-select (AR,HL,HR,KR,LR,RD,SR,TR,VE,VR). Eraldised repeater free text ("4 VR"). Metsateatise nr repeater (numeric 8–12).
+- Kinnistu register numbers repeater (numeric). Puuliigid multi-select, 26 fixed codes (MA.KU.NU.LH.SD.TS.TA.SA.VA.JA.KP.KS.HB.LM.LV.PN.PP.PA.SP.PK.TY.KL.KD.RE.TM.PI) with Estonian names in dropdown. Otsus (D-13): the draft said "24 codes" while listing 26; the code implements the 26 listed codes, so the docs say 26. Raieliigid multi-select (AR,HL,HR,KR,LR,RD,SR,TR,VE,VR). Eraldised repeater free text ("4 VR"). Metsateatise nr repeater (numeric 8–12).
 - Raie teostamise tähtaeg date; Väljaveo tähtaeg date (≥ raie tähtaeg warning). Kooskõlastused select: müüja/ostja/kooskõlastatud; Väljaveoteed select same options. ☐ Rendi-/kasutusleping maal → rendi tähtaeg date.
 
 **Step 4 Hind**
@@ -93,7 +95,7 @@ Audit-logged: create, publish (scheduled/now), field diffs on save (secret maske
 ## Validation summary (step 7 gate — full list)
 | Gate | Rule |
 |---|---|
-| Tüüp | objectType + auctionType set; sealed forced for property/field/package |
+| Tüüp | objectType + auctionType set; sealed forced for kinnistu/pakett; kiire is always a quick auction |
 | Ajad | start ≥ now+10 min (new), end − start ≥ 1 h (kiiroksjon 24–72 h), end ≤ start+90 d |
 | Asukoht | county+parish set; coordinates present (warning only if missing) |
 | Maa & mets | area > 0; cadastres ≥ 1, all regex-valid; volume set if forest; loggingDeadline ≤ removalDeadline (warning) |

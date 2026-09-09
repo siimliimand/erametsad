@@ -34,6 +34,7 @@ function makeCard(overrides: Partial<KanbanCardView> = {}): KanbanCardView {
     contactName: 'Mari Maasikas',
     formName: 'Metsamajanduskava',
     cadastr: '78402:003:0210',
+    countyName: 'Harju',
     status: 'new',
     assignedSpecialistId: 'spec-1',
     assignedSpecialistName: 'Mari Maasikas',
@@ -161,6 +162,18 @@ async function typeNote(value: string): Promise<void> {
   })
 }
 
+async function typeReference(value: string): Promise<void> {
+  const input = queryDialog().querySelector<HTMLInputElement>(
+    'input[aria-label="Oksjoni või lepingu viide"]',
+  )
+  if (input === null) throw new Error('reference input not found')
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await Promise.resolve()
+  })
+}
+
 describe('kanban card metadata', () => {
   it('renders the demo-parity card content and announces the keyboard affordance', async () => {
     await mountKanban([makeCard()])
@@ -176,8 +189,14 @@ describe('kanban card metadata', () => {
     expect(card.querySelector('[title="Katastritunnus"]')?.textContent).toBe(
       '78402:003:0210',
     )
+    expect(card.querySelector('[title="Maakond"]')?.textContent).toBe('Harju')
     expect(card.textContent).toContain('Metsamajanduskava')
     expect(card.querySelector('[title="Mari Maasikas"]')?.textContent).toBe('MM')
+  })
+
+  it('omits the county chip when the lead has no county yet', async () => {
+    await mountKanban([makeCard({ countyName: null })])
+    expect(queryCard().querySelector('[title="Maakond"]')).toBeNull()
   })
 
   it('renders SLA level badges, the next action and the unassigned pill', async () => {
@@ -283,18 +302,44 @@ describe('keyboard move menu', () => {
     expect(document.activeElement).toBe(items[4])
   })
 
-  it('moves the card, dispatches the action and refreshes on success', async () => {
+  it('collects the first note before Võetud ühendust and then dispatches (task 8.2)', async () => {
     moveAction.mockResolvedValue({ ok: true })
     await mountKanban([makeCard()])
     await pressKey(queryCard(), 'Enter')
     await click(menuItem('Võetud ühendust'))
 
+    expect(queryDialog().textContent).toContain('Esimene märkus')
+    expect(moveAction).not.toHaveBeenCalled()
+
+    await typeNote('Helistasin, klient huvitatud')
+    await click(dialogButton('Kinnita'))
     expect(moveAction).toHaveBeenCalledTimes(1)
-    expect(moveAction).toHaveBeenCalledWith({ leadId: LEAD_ID, status: 'contacted' })
-    expect(container.querySelector('[role="menu"]')).toBeNull()
+    expect(moveAction).toHaveBeenCalledWith({
+      leadId: LEAD_ID,
+      status: 'contacted',
+      note: 'Helistasin, klient huvitatud',
+    })
     expect(columnCardLabels('Võetud ühendust')).toHaveLength(1)
-    expect(columnCardLabels('Uus')).toHaveLength(0)
     expect(state.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('collects a reference or a note before Leping (task 8.2)', async () => {
+    moveAction.mockResolvedValue({ ok: true })
+    await mountKanban([makeCard()])
+    await pressKey(queryCard(), 'Enter')
+    await click(menuItem('Leping'))
+
+    expect(queryDialog().textContent).toContain('Lepingu viide või märkus')
+    expect(moveAction).not.toHaveBeenCalled()
+
+    await typeReference('oksjon 42 / leping LP-2026-001')
+    await click(dialogButton('Kinnita'))
+    expect(moveAction).toHaveBeenCalledTimes(1)
+    expect(moveAction).toHaveBeenCalledWith({
+      leadId: LEAD_ID,
+      status: 'contract',
+      reference: 'oksjon 42 / leping LP-2026-001',
+    })
   })
 
   it('reverts the optimistic move and shows the error when the action fails', async () => {
@@ -305,6 +350,8 @@ describe('keyboard move menu', () => {
     await mountKanban([makeCard()])
     await pressKey(queryCard(), 'Enter')
     await click(menuItem('Leping'))
+    await typeReference('LP-1')
+    await click(dialogButton('Kinnita'))
 
     expect(columnCardLabels('Uus')).toHaveLength(1)
     expect(columnCardLabels('Leping')).toHaveLength(0)
@@ -334,6 +381,8 @@ describe('keyboard move menu', () => {
     await mountKanban([makeCard()])
     await pressKey(queryCard(), 'Enter')
     await click(menuItem('Võetud ühendust'))
+    await typeNote('Helistasin, klient huvitatud')
+    await click(dialogButton('Kinnita'))
 
     const trigger = container.querySelector<HTMLButtonElement>(
       '[aria-haspopup="menu"]',

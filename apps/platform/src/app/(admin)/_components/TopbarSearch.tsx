@@ -3,9 +3,9 @@
 /**
  * Topbar search trigger plus the Cmd/Ctrl+K route-jump palette. The
  * trigger replicates the demo topbar-search field; the palette groups
- * module routes (labels mirror ADMIN_MODULES) and filters them as the
- * operator types. SSR stays static: listeners attach inside effects and
- * the palette itself only renders through the client OverlayPortal.
+ * derive from ADMIN_MODULES (one jump target per admin module) and
+ * filter as the operator types. SSR stays static: listeners attach inside
+ * effects and the palette itself only renders through the client OverlayPortal.
  */
 
 import { useRouter } from 'next/navigation'
@@ -15,6 +15,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { SearchIcon } from './icons'
 import { OverlayPortal } from './ui/OverlayPortal'
 import { trapTabKey, useDialogFocus, useEscapeKey } from './ui/useOverlay'
+import { ADMIN_MODULES } from '../_lib/permissions'
 
 interface PaletteRoute {
   label: string
@@ -27,41 +28,23 @@ interface PaletteGroup {
   routes: readonly PaletteRoute[]
 }
 
-// Static route map so palette hrefs stay in sync with the module registry
-// and existing page routes; labels are the ADMIN_MODULES strings.
-const PALETTE_GROUPS: readonly PaletteGroup[] = [
-  {
-    id: 'auctions',
-    label: 'Oksjonid',
-    routes: [
-      { label: 'Oksjonid', href: '/admin/auctions' },
-      { label: 'Uus oksjon', href: '/admin/auctions/new' },
-    ],
-  },
-  {
-    id: 'users',
-    label: 'Kasutajad',
-    routes: [{ label: 'Kasutajad', href: '/admin/users' }],
-  },
-  {
-    id: 'leads',
-    label: 'Juhtlõimed',
-    routes: [{ label: 'Juhtlõimed', href: '/admin/leads' }],
-  },
-  {
-    id: 'contracts',
-    label: 'Lepingud',
-    routes: [
-      { label: 'Lepingud', href: '/admin/contracts' },
-      { label: 'Lepingu mallid', href: '/admin/contracts/templates' },
-    ],
-  },
-  {
-    id: 'settings',
-    label: 'Seaded',
-    routes: [{ label: 'Seaded', href: '/admin/settings' }],
-  },
-]
+// Second routes inside a module (wizard, template list) beyond the module
+// root; keyed by AdminModuleId so the 13-module base stays registry-driven.
+const EXTRA_ROUTES: Partial<Record<string, readonly PaletteRoute[]>> = {
+  auctions: [{ label: 'Uus oksjon', href: '/admin/auctions/new' }],
+  contracts: [{ label: 'Lepingu mallid', href: '/admin/contracts/templates' }],
+}
+
+// Derived from ADMIN_MODULES so the palette can never drift from the nav
+// registry: every module gets a jump target, in sidebar order.
+export const PALETTE_GROUPS: readonly PaletteGroup[] = ADMIN_MODULES.map((module) => ({
+  id: module.id,
+  label: module.label,
+  routes: [module, ...(EXTRA_ROUTES[module.id] ?? [])].map(({ label, href }) => ({
+    label,
+    href,
+  })),
+}))
 
 const kbdClass =
   'rounded-[6px] border border-border bg-bgPage px-1.5 font-mono text-[11px] leading-4 font-medium text-inkMuted'

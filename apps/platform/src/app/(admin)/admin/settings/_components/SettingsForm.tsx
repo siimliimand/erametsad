@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
+import { FeeFields } from './FeeFields'
 import { IntegrationKeys } from './IntegrationKeys'
 import { MaintenanceMode } from './MaintenanceMode'
 import { RoleMatrix } from './RoleMatrix'
@@ -7,12 +8,14 @@ import { SettingsSaveForm } from './SettingsSaveForm'
 import {
   FormField,
   FormSelectField,
-  FormTextareaField,
 } from '../../../_components/FormField'
 import { TriangleAlertIcon } from '../../../_components/icons'
+import { CheckboxField } from '../../content/_components/CheckboxField'
 import { FeeChangeBanner } from '../../content/_components/FeeChangeBanner'
 import {
+  featureFlagDefinitions,
   readAuctionDefaults,
+  readFlagObject,
   sealedApproverRoles,
 } from '../../content/_components/settings-audit'
 
@@ -67,10 +70,7 @@ export function SettingsForm({
 }: {
   settings?: SettingsDoc | undefined
 }) {
-  const featureFlagsText =
-    settings?.featureFlags === null || settings?.featureFlags === undefined
-      ? ''
-      : JSON.stringify(settings.featureFlags, null, 2)
+  const currentFlags = readFlagObject(settings?.featureFlags)
   const auctionDefaults = readAuctionDefaults(settings)
 
   return (
@@ -111,24 +111,55 @@ export function SettingsForm({
                   defaultValue={settings?.orgRegCode ?? ''}
                 />
                 <FormField
-                  label="Aadress"
-                  name="orgAddress"
-                  defaultValue={settings?.orgAddress ?? ''}
+                  label="KMKR number"
+                  name="orgVatCode"
+                  hint="Käibemaksukohustuslase number (näiteks EE101286155)."
+                  defaultValue={settings?.orgVatCode ?? ''}
+                />
+                <FormField
+                  label="Klienditoe e-post"
+                  name="supportEmail"
+                  type="email"
+                  defaultValue={settings?.supportEmail ?? ''}
+                />
+                <FormField
+                  label="Klienditoe telefon"
+                  name="supportPhone"
+                  type="tel"
+                  defaultValue={settings?.supportPhone ?? ''}
                 />
               </div>
+              <FormField
+                label="Alias-domeen"
+                name="aliasDomain"
+                hint="Portaali varjunimi (näiteks oksjonid.erametsad.ee)."
+                defaultValue={settings?.aliasDomain ?? ''}
+              />
+              <FormField
+                label="Aadress"
+                name="orgAddress"
+                defaultValue={settings?.orgAddress ?? ''}
+              />
             </SettingsSaveForm>
             <MaintenanceMode enabled={settings?.maintenanceEnabled ?? false} />
             <SettingsSaveForm section="lipud">
               <h3 className="text-label font-semibold text-ink">
                 Funktsioonide lipud
               </h3>
-              <FormTextareaField
-                label="Lipude JSON"
-                name="featureFlags"
-                rows={4}
-                hint='Näiteks {"requireFrameworkContract": true}. Oksjonite vaikesätted (auctionDefaults) hallatakse Oksjonite reeglite rubriigis.'
-                defaultValue={featureFlagsText}
-              />
+              <div className="flex flex-col gap-sm">
+                {featureFlagDefinitions.map((definition) => (
+                  <CheckboxField
+                    key={definition.key}
+                    label={definition.label}
+                    name={definition.key}
+                    hint={definition.description}
+                    defaultChecked={currentFlags[definition.key] === true}
+                  />
+                ))}
+              </div>
+              <p className="text-bodySm text-inkMuted">
+                Oksjonite vaikesätted (auctionDefaults) hallatakse Oksjonite reeglite rubriigis.
+              </p>
             </SettingsSaveForm>
           </SettingsSection>
 
@@ -199,35 +230,37 @@ export function SettingsForm({
                   defaultValue={auctionDefaults.sealedApproverRole}
                 />
               </div>
+              <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
+                <FormField
+                  label="Minimaalne oksjoni kestus (tundi)"
+                  name="minAuctionDurationHours"
+                  type="number"
+                  min="1"
+                  max="72"
+                  step="1"
+                  required
+                  hint="Oksjoni lõppuaeg ei tohi olla lähemal kui üks tund (1–72)."
+                  defaultValue={settings?.minAuctionDurationHours ?? 1}
+                />
+              </div>
+              <CheckboxField
+                label="Automaatpakkuja lubatud"
+                name="autobidderEnabled"
+                hint="Globaalne lülitus. Välja lülitamisel ei saa pakkujad automaatpakkujaid seadistada."
+                defaultChecked={settings?.autobidderEnabled ?? true}
+              />
             </SettingsSaveForm>
           </SettingsSection>
 
           <SettingsSection id="sec-tasud" title="Teenustasud">
             <SettingsSaveForm section="tasud">
               <FeeChangeBanner />
-              <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
-                <FormField
-                  label="Vahendustasu (%)"
-                  name="feePercent"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  required
-                  hint="Kehtib ainult uutele oksjonidele."
-                  defaultValue={settings?.feePercent ?? 3}
-                />
-                <FormField
-                  label="Käibemaks (%)"
-                  name="vatPercent"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  required
-                  defaultValue={settings?.vatPercent ?? 22}
-                />
-              </div>
+              <FeeFields
+                feePercent={settings?.feePercent ?? 3}
+                vatPercent={settings?.vatPercent ?? 22}
+                quickAuctionFeePercent={settings?.quickAuctionFeePercent ?? null}
+                minimumFeeCents={settings?.minimumFeeCents ?? 0}
+              />
             </SettingsSaveForm>
           </SettingsSection>
 

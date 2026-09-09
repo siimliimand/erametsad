@@ -54,6 +54,12 @@ export interface SessionRow {
   sessionId: string
   createdAt: string
   userId: string
+  // Spec delta (admin-people / sessions table): device, IP hash and last
+  // activity are optional until the sessions schema carries them; absent
+  // data renders as an em dash.
+  device?: string | null
+  ipHash?: string | null
+  lastActiveAt?: string | null
 }
 
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -219,6 +225,31 @@ export function IdentityTab({
                 key: 'createdAt',
                 label: 'Algatatud',
                 render: (row) => formatDateTime(row.createdAt),
+              },
+              {
+                key: 'device',
+                label: 'Seade',
+                render: (row) => (
+                  <span className="text-bodySm text-ink-muted">{row.device ?? '—'}</span>
+                ),
+              },
+              {
+                key: 'ipHash',
+                label: 'IP räsi',
+                render: (row) => (
+                  <span className="font-mono text-bodySm text-ink-muted">
+                    {row.ipHash ? row.ipHash.slice(0, 12) : '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'lastActiveAt',
+                label: 'Viimati aktiivne',
+                render: (row) => (
+                  <span className="text-bodySm text-ink-muted">
+                    {row.lastActiveAt ? formatDateTime(row.lastActiveAt) : '—'}
+                  </span>
+                ),
               },
               {
                 key: 'actions',

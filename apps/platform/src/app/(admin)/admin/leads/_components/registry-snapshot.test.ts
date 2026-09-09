@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   crossCheckBoardMembership,
+  detectNameDiscrepancy,
   deriveLegalForm,
   resolveRegistrySnapshot,
 } from './registry-snapshot'
@@ -30,6 +31,21 @@ describe('resolveRegistrySnapshot', () => {
     expect(snapshot.verified).toBe(true)
   })
 
+  it('carries the registry panel fields asukoht and KMKR nr', () => {
+    const snapshot = resolveRegistrySnapshot('12345678', null, null)
+    expect(snapshot).toHaveProperty('address')
+    expect(snapshot).toHaveProperty('kmkrNr')
+  })
+
+  it('leaves asukoht and KMKR nr empty while the fixtures carry none', () => {
+    const known = resolveRegistrySnapshot('12345678', 'Metsatark OÜ', null)
+    expect(known.address).toBeNull()
+    expect(known.kmkrNr).toBeNull()
+    const unknown = resolveRegistrySnapshot('00000000', 'Tundmatu OÜ', null)
+    expect(unknown.address).toBeNull()
+    expect(unknown.kmkrNr).toBeNull()
+  })
+
   it('marks a deleted registry entry as KUSTUTATUD', () => {
     const snapshot = resolveRegistrySnapshot('45678901', 'Puidukoda OÜ', null)
     expect(snapshot.status).toBe('KUSTUTATUD')
@@ -42,6 +58,27 @@ describe('resolveRegistrySnapshot', () => {
     expect(snapshot.verified).toBe(false)
     expect(snapshot.legalName).toBe('Tundmatu OÜ')
     expect(snapshot.boardMembers).toEqual([])
+  })
+})
+
+describe('detectNameDiscrepancy', () => {
+  it('reports both names when the applicant name differs from the registry name', () => {
+    const discrepancy = detectNameDiscrepancy('Mari Mets OÜ', 'Metsatark OÜ', true)
+    expect(discrepancy).toEqual({ applicantName: 'Mari Mets OÜ', registryName: 'Metsatark OÜ' })
+  })
+
+  it('ignores case and extra whitespace', () => {
+    expect(detectNameDiscrepancy('  mari   mets OÜ ', 'Mari Mets OÜ', true)).toBeNull()
+  })
+
+  it('needs a verified registry hit', () => {
+    expect(detectNameDiscrepancy('Mari Mets OÜ', 'Metsatark OÜ', false)).toBeNull()
+  })
+
+  it('returns null when either name is missing', () => {
+    expect(detectNameDiscrepancy(null, 'Metsatark OÜ', true)).toBeNull()
+    expect(detectNameDiscrepancy('Mari Mets OÜ', null, true)).toBeNull()
+    expect(detectNameDiscrepancy('', '', true)).toBeNull()
   })
 })
 

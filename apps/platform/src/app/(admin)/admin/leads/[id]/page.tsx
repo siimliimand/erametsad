@@ -5,7 +5,9 @@ import {
   addLeadNoteAction,
   assignLeadSpecialistAction,
   moveLeadStatusFormAction,
+  setLeadCountyAction,
   setLeadNextActionAction,
+  softDeleteLeadAction,
 } from '../../../_actions/ops'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import {
@@ -18,7 +20,8 @@ import { PageHeader } from '../../../_components/PageHeader'
 import { requireAdminRepositories } from '../../../_lib/admin'
 import { formatDateTime, leadStatusLabels, LeadStatusPill } from '../../../_lib/labels'
 import { can, leadInScope, leadScope } from '../../../_lib/permissions'
-import { roundRobinSuggestion } from '../_components/lead-flow'
+import { resolveLeadLifecycleFlags, roundRobinSuggestion } from '../_components/lead-flow'
+import { leadAttachmentUrl, resolveLeadSubmission } from '../_components/lead-submission'
 
 import { getRepositories } from '@/lib/data/runtime'
 import type { Specialist } from '@/lib/data/schema'
@@ -78,6 +81,15 @@ export default async function LeadDetailPage({
     sort: 'name',
     pagination: false,
   })
+
+  const { docs: counties } = await repositories.find({
+    collection: 'counties',
+    sort: 'name',
+    pagination: false,
+  })
+  const countyName = lead.countyId
+    ? (counties.find((county) => county.id === lead.countyId)?.name ?? null)
+    : null
 
   // Consent record: the latest cookie-consent decision tied to the lead's
   // stored IP hash; a marketing rejection marks contact as forbidden.
@@ -155,6 +167,17 @@ export default async function LeadDetailPage({
     }
   }
 
+  // Task 8.3: original submitted message + attachments live only in the
+  // creation audit entry; the section renders when either exists.
+  const submission = resolveLeadSubmission(leadAudits)
+
+  // Task 8.2: soft-delete tombstone and duplicate-merge cross-links live in
+  // the append-only audit trail.
+  const lifecycle = resolveLeadLifecycleFlags(leadAudits)
+  const lifecycleTargetShortId = lifecycle.mergedIntoId
+    ? `#${lifecycle.mergedIntoId.slice(0, 8)}`
+    : null
+
   // Round-robin suggestion: active specialists, fewest open-pipeline leads first.
   const openCounts = new Map<string, number>()
   for (const specialist of specialists) {
@@ -211,6 +234,22 @@ export default async function LeadDetailPage({
         </div>
       ) : null}
 
+      {lifecycle.mergedIntoId && lifecycleTargetShortId ? (
+        <div className="mb-md rounded-input border border-info bg-info-light px-md py-sm text-bodySm text-info">
+          See juhtlõige on ühendatud juhtlõimega{' '}
+          <Link href={`/admin/leads/${lifecycle.mergedIntoId}`} className="underline">
+            {lifecycleTargetShortId}
+          </Link>
+          .
+        </div>
+      ) : null}
+      {lifecycle.deleted ? (
+        <div className="mb-md rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
+          Arhiveeritud (pehme kustutamine)
+          {lifecycle.deleteReason ? ` — põhjus: ${lifecycle.deleteReason}` : ''}.
+        </div>
+      ) : null}
+
       <div className="mb-sm grid max-w-container-sm grid-cols-1 gap-sm rounded-card border border-border bg-bgPage p-md sm:grid-cols-2">
         <Field label="Allikavorm">{lead.formName}</Field>
         <Field label="Lehekülg">{lead.pageSlug ?? '—'}</Field>
@@ -241,6 +280,7 @@ export default async function LeadDetailPage({
             (lead.cadastr ?? '—')
           )}
         </Field>
+        <Field label="Maakond">{countyName ?? '—'}</Field>
         <Field label="Allikas">{lead.source ?? '—'}</Field>
         <Field label="Nõusolek turunduseks">
           {consentWithdrawn
@@ -262,7 +302,7 @@ export default async function LeadDetailPage({
         </Field>
       </div>
 
-      {can(session.role, 'leads:write') ? (
+      {can(session.role, 'leads:write') && !lifecycle.deleted ? (
         <div className="mb-sm grid max-w-container-sm grid-cols-1 gap-sm">
           <form
             action={moveLeadStatusFormAction}
@@ -271,12 +311,17 @@ export default async function LeadDetailPage({
             <input type="hidden" name="id" value={lead.id} />
             <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
               <FormSelectField label="Oleku muutus" name="status" options={statusOptions} defaultValue={lead.status} />
+              <FormField
+                label="Oksjoni/lepingu viide"
+                name="reference"
+                hint="Nõutav Lepingu olekus, kui märkus puudub."
+              />
             </div>
             <FormTextareaField
               label="Märkus / põhjus"
               name="note"
               rows={2}
-              hint="Kohustuslik kvalifitseerimisel ja mittekvalifitseerimisel (vähemalt 5 tähemärki)."
+              hint="Kohustuslik esimesel ühenduse võtmisel, kvalifitseerimisel ja mittekvalifitseerimisel (vähemalt 5 tähemärki). Lepingu puhul piisab oksjoni/lepingu viitest."
             />
             <button type="submit" className={primaryButtonClass}>
               Muuda olekut
@@ -311,6 +356,31 @@ export default async function LeadDetailPage({
           </form>
 
           <form
+            action={setLeadCountyAction}
+            className="space-y-sm rounded-card border border-border bg-bgPage p-md"
+          >
+            <input type="hidden" name="id" value={lead.id} />
+            <p className="text-bodySm text-ink-muted">
+              Maakond tuletatakse esimesest katastrist; siin saab selle käsitsi üle kirjutada.
+            </p>
+            <FormSelectField
+              label="Maakond"
+              name="countyId"
+              options={[
+                { value: '', label: 'Määramata' },
+                ...counties.map((county) => ({
+                  value: county.id,
+                  label: county.name,
+                })),
+              ]}
+              defaultValue={lead.countyId ?? ''}
+            />
+            <button type="submit" className={primaryButtonClass}>
+              Määra maakond
+            </button>
+          </form>
+
+          <form
             action={setLeadNextActionAction}
             className="space-y-sm rounded-card border border-border bg-bgPage p-md"
           >
@@ -332,7 +402,56 @@ export default async function LeadDetailPage({
               Salvesta märkus
             </button>
           </form>
+
+          {session.role === 'superadmin' ? (
+            <form
+              action={softDeleteLeadAction}
+              className="space-y-sm rounded-card border border-danger bg-danger-light p-md"
+            >
+              <input type="hidden" name="id" value={lead.id} />
+              <p className="text-bodySm text-danger">
+                Pehme kustutamine arhiveerib juhtlõime koos tüüpitud põhjusega; rida jääb
+                andmebaasi ja sissekanne läheb auditilogisse.
+              </p>
+              <FormTextareaField
+                label="Kustutamise põhjus (kohustuslik)"
+                name="reason"
+                rows={2}
+                required
+              />
+              <button type="submit" className={primaryButtonClass}>
+                Kustuta (pehme)
+              </button>
+            </form>
+          ) : null}
         </div>
+      ) : null}
+
+      {submission.message || submission.attachments.length > 0 ? (
+        <section className="mb-sm max-w-container-sm rounded-card border border-border bg-bgPage p-md">
+          <h2 className="mb-sm font-heading text-h4 font-bold text-ink">Esialgne teade ja manused</h2>
+          {submission.message ? (
+            <p className="mb-sm whitespace-pre-line rounded-input border border-border bg-bg-mist px-3 py-2 text-bodySm text-ink">
+              {submission.message}
+            </p>
+          ) : null}
+          {submission.attachments.length > 0 ? (
+            <ul className="space-y-1 text-bodySm">
+              {submission.attachments.map((key) => (
+                <li key={key}>
+                  <a
+                    className="text-primary underline"
+                    href={leadAttachmentUrl(key)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {key}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
       ) : null}
 
       <section className="max-w-container-sm rounded-card border border-border bg-bgPage p-md">

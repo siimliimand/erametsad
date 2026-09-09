@@ -2,6 +2,7 @@ export type DomainEventType =
   | 'auction.published'
   | 'bid.created'
   | 'auction.ended'
+  | 'auction.sold'
   | 'contract.ready'
   | 'outbid'
   | 'auction.won'

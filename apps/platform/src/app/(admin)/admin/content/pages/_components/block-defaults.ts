@@ -47,7 +47,12 @@ function defaultValueForField(field: ZodTypeAny): unknown {
   const { type } = peelSchema(field)
   if (type instanceof z.ZodString) return ''
   if (type instanceof z.ZodNumber) return type.minValue ?? 0
+  if (type instanceof z.ZodBoolean) return false
   if (type instanceof z.ZodLiteral) return type.value
+  if (type instanceof z.ZodEnum) {
+    const values = type.options as readonly string[]
+    return values[0]
+  }
   if (type instanceof z.ZodUnion) {
     const first = (type.options as readonly z.ZodTypeAny[])[0]
     return first === undefined ? undefined : defaultValueForField(first)

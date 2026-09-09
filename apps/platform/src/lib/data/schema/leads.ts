@@ -16,6 +16,7 @@ export const leads = sqliteTable(
     phone: text('phone'),
     email: text('email'),
     cadastr: text('cadastr'),
+    countyId: text('county_id'),
     consentAt: text('consent_at').notNull(),
     source: text('source'),
     status: text('status', { enum: leadStatuses }).notNull().default('new'),

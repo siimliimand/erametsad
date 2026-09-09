@@ -12,15 +12,18 @@ import {
   buildR2Key,
   buildRenditionKey,
   declaredRenditions,
+  focalCoordinateFrom,
   formatFileSize,
   initialRenditionsFor,
   isAllowedMimeType,
   isEditorImageMimeType,
+  isImageMimeType,
   mediaUrlFor,
   parseRenditions,
   sanitizeFilename,
   validateEditorAttachmentUpload,
   validateEditorImageUpload,
+  validateMediaAlt,
   validateMediaUpload,
 } from './media-upload'
 
@@ -304,5 +307,40 @@ describe('parseRenditions (re-exported from the renditions module)', () => {
   it('degrades junk column values to null', () => {
     expect(parseRenditions('{oops')).toBeNull()
     expect(parseRenditions(null)).toBeNull()
+  })
+})
+
+describe('isImageMimeType + validateMediaAlt (task 3.6 alt gate)', () => {
+  it('classifies image mime types against PDFs', () => {
+    expect(isImageMimeType('image/jpeg')).toBe(true)
+    expect(isImageMimeType('image/webp')).toBe(true)
+    expect(isImageMimeType('application/pdf')).toBe(false)
+  })
+
+  it('requires a non-empty alt for images only', () => {
+    expect(validateMediaAlt('image/png', 'Mets raieõigusega')).toBeNull()
+    expect(validateMediaAlt('image/png', '   ')).toBe('Alt-tekst on piltide puhul kohustuslik.')
+    expect(validateMediaAlt('image/png', null)).toBe('Alt-tekst on piltide puhul kohustuslik.')
+    expect(validateMediaAlt('application/pdf', null)).toBeNull()
+    expect(validateMediaAlt('application/pdf', '')).toBeNull()
+  })
+})
+
+describe('focalCoordinateFrom (task 3.6 focal columns)', () => {
+  it('accepts fractions and percents inside 0..1', () => {
+    expect(focalCoordinateFrom(0)).toBe(0)
+    expect(focalCoordinateFrom(1)).toBe(1)
+    expect(focalCoordinateFrom(0.42)).toBe(0.42)
+    expect(focalCoordinateFrom('42')).toBe(0.42)
+    expect(focalCoordinateFrom('42,5')).toBe(0.425)
+    expect(focalCoordinateFrom(100)).toBe(1)
+  })
+
+  it('rejects out-of-range and junk values', () => {
+    expect(focalCoordinateFrom(-0.1)).toBeNull()
+    expect(focalCoordinateFrom(150)).toBeNull()
+    expect(focalCoordinateFrom('abc')).toBeNull()
+    expect(focalCoordinateFrom(undefined)).toBeNull()
+    expect(focalCoordinateFrom(null)).toBeNull()
   })
 })

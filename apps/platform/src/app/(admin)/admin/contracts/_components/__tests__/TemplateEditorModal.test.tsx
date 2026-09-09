@@ -30,6 +30,7 @@ interface EditorMountProps {
   initialSourceContent?: string | null
   initialSourceFormat?: 'html' | 'txt' | null
   nextVersion?: string
+  generatedCount?: number
 }
 
 async function mountEditor(props: EditorMountProps = {}, withToast = false): Promise<void> {
@@ -44,6 +45,7 @@ async function mountEditor(props: EditorMountProps = {}, withToast = false): Pro
       initialSourceContent: props.initialSourceContent ?? null,
       initialSourceFormat: props.initialSourceFormat ?? null,
       ...(props.nextVersion === undefined ? {} : { nextVersion: props.nextVersion }),
+      ...(props.generatedCount === undefined ? {} : { generatedCount: props.generatedCount }),
     })
     root.render(withToast ? createElement(ToastProvider, null, editor) : editor)
     await Promise.resolve()
@@ -95,11 +97,19 @@ function buttonByLabel(label: string, scope: ParentNode = document.body): HTMLBu
   return el
 }
 
-function chip(token: string): HTMLButtonElement {
+function findChip(token: string): HTMLButtonElement | null {
   const label = `Sisesta kohatäide {{${token}}}`
-  const el = document.body.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
-  if (el === null) throw new Error(`chip not found: ${label}`)
+  return document.body.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
+}
+
+function chip(token: string): HTMLButtonElement {
+  const el = findChip(token)
+  if (el === null) throw new Error(`chip not found: ${label(token)}`)
   return el
+}
+
+function label(token: string): string {
+  return `Sisesta kohatäide {{${token}}}`
 }
 
 async function click(element: HTMLElement): Promise<void> {
@@ -149,10 +159,29 @@ async function openEditor(): Promise<void> {
 }
 
 function versionInput(): HTMLInputElement {
-  // The footer "Uus versioon" input is the only input inside the dialog.
-  const el = dialog().querySelector<HTMLInputElement>('input')
+  // The footer "Uus versioon" input lives in the border-t footer, past the
+  // catalogue search input in the modal body.
+  const el = dialog().querySelector<HTMLInputElement>('div.border-t input')
   if (el === null) throw new Error('version input not found')
   return el
+}
+
+function tokenSearchInput(): HTMLInputElement {
+  const el = dialog().querySelector<HTMLInputElement>('input[type="search"]')
+  if (el === null) throw new Error('token search input not found')
+  return el
+}
+
+async function typeSearch(value: string): Promise<void> {
+  const input = tokenSearchInput()
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      input,
+      value,
+    )
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await Promise.resolve()
+  })
 }
 
 function toastRegion(): HTMLElement {
@@ -300,6 +329,53 @@ describe('TemplateEditorModal chip insertion across reopen', () => {
     await click(chip('lot.id'))
     await nextFrame()
     expect(editorTextarea().value).toBe('{{lot.id}}Lepingu tekst')
+  })
+})
+
+describe('TemplateEditorModal catalogue search', () => {
+  it('narrows the catalogue chips to the matching tokens', async () => {
+    await mountEditor()
+    await openEditor()
+    expect(chip('bid.amount')).toBeInstanceOf(HTMLButtonElement)
+    await typeSearch('cadastre')
+    expect(findChip('lot.cadastres')).toBeInstanceOf(HTMLButtonElement)
+    expect(findChip('bid.amount')).toBeNull()
+    expect(dialog().textContent).toContain('Oksjon')
+    expect(dialog().textContent).not.toContain('Pakett')
+  })
+
+  it('shows an empty state and recovers after clearing the query', async () => {
+    await mountEditor()
+    await openEditor()
+    await typeSearch('ei-ole-olemas')
+    expect(dialog().textContent).toContain('Kohatäiteid ei leitud.')
+    expect(findChip('bid.amount')).toBeNull()
+    await typeSearch('')
+    expect(chip('bid.amount')).toBeInstanceOf(HTMLButtonElement)
+  })
+})
+
+describe('TemplateEditorModal in-use warning', () => {
+  it('hides the warning banner when the version has no generated contracts', async () => {
+    await mountEditor({ generatedCount: 0 })
+    await openEditor()
+    expect(document.body.querySelector('[role="alert"]')).toBeNull()
+  })
+
+  it('names the generated-contract count in the warning banner', async () => {
+    await mountEditor({ generatedCount: 3 })
+    await openEditor()
+    const alert = document.body.querySelector<HTMLElement>('[role="alert"]')
+    if (alert === null) throw new Error('warning banner not found')
+    expect(alert.textContent).toContain('3 lepingut on sellest malliversioonist loodud.')
+    expect(alert.textContent).toContain('uue passiivse versiooni')
+  })
+
+  it('uses the singular for exactly one generated contract', async () => {
+    await mountEditor({ generatedCount: 1 })
+    await openEditor()
+    const alert = document.body.querySelector<HTMLElement>('[role="alert"]')
+    expect(alert?.textContent).toContain('1 leping on sellest malliversioonist loodud.')
   })
 })
 

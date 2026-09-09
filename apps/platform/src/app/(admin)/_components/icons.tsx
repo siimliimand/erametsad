@@ -7,6 +7,7 @@ import {
   Copy,
   Ellipsis,
   ExternalLink,
+  Flag,
   MapPinHouse,
   Package,
   Pencil,
@@ -312,6 +313,10 @@ export function CalendarClockIcon(props: SVGProps<SVGSVGElement>) {
 
 export function TriangleAlertIcon(props: SVGProps<SVGSVGElement>) {
   return <TriangleAlert className={iconClass} {...props} />
+}
+
+export function FlagIcon(props: SVGProps<SVGSVGElement>) {
+  return <Flag className={iconClass} {...props} />
 }
 
 export function SearchIcon(props: SVGProps<SVGSVGElement>) {

@@ -10,7 +10,7 @@ import {
   loggingTypeCodes,
   speciesCodes,
 } from '../_lib/auction-schema'
-import type { AuctionGateSubject } from '../_lib/auction-schema'
+import type { ApprovalOptionValue, AuctionGateSubject } from '../_lib/auction-schema'
 
 import { auctionObjectTypes } from '@/lib/data/schema'
 import type { AuctionObjectType } from '@/lib/data/schema'
@@ -86,6 +86,20 @@ export interface AuctionWizardState {
   loggingDeadline: string
   removalDeadline: string
   leaseDeadline: string
+  /**
+   * Rendi-/kasutusleping checkbox gating the lease deadline field (docs 03
+   * step 3): checked shows and requires the deadline input. Optional so the
+   * pre-5.7 seed paths stay valid, mirroring the `storageLocationApproval`
+   * precedent; a stored lease deadline without the flag reads as checked.
+   */
+  hasLeaseAgreement?: boolean
+  /**
+   * Kooskõlastused (ladustamiskohad) and väljaveoteed codes ('seller' |
+   * 'buyer' | 'approved'); '' = unset. Optional so the pre-5.1 seed paths
+   * stay valid, mirroring the `files` precedent.
+   */
+  storageLocationApproval?: string
+  removalRoads?: string
   /** Pakett passthrough so a wizard save never wipes the stored value. */
   propertyCount: number | null
   specialistId: string
@@ -125,6 +139,12 @@ export interface AuctionWizardInitial {
   aliasEmail: string | null
   /** Signed portal draft-preview URL; null until the lot exists. */
   guestPreviewHref: string | null
+  /**
+   * Stored copy's updatedAt at load time; the conflict-detection base for
+   * server autosave. Null/absent lets the first autosave adopt the server
+   * version (the server shells do not pass it yet).
+   */
+  updatedAt?: string | null
   state: AuctionWizardState
 }
 
@@ -235,6 +255,8 @@ const FIELD_STEP: Record<string, number> = {
   deadlines: 3,
   areaHa: 3,
   volumeM3: 3,
+  storageLocationApproval: 3,
+  removalRoads: 3,
   minBid: 4,
   minBidEur: 4,
   bidStepEur: 4,
@@ -352,7 +374,12 @@ export function buildAuctionPayload(
   }
   if (state.loggingDeadline !== '') deadlines.loggingDeadline = state.loggingDeadline
   if (state.removalDeadline !== '') deadlines.removalDeadline = state.removalDeadline
+  if (state.hasLeaseAgreement === true) deadlines.hasLeaseAgreement = true
   if (state.leaseDeadline !== '') deadlines.leaseDeadline = state.leaseDeadline
+  const storageLocationApproval = state.storageLocationApproval ?? ''
+  if (storageLocationApproval !== '') deadlines.storageLocationApproval = storageLocationApproval
+  const removalRoads = state.removalRoads ?? ''
+  if (removalRoads !== '') deadlines.removalRoads = removalRoads
   if (state.propertyCount !== null) payload.propertyCount = state.propertyCount
   payload.deadlines = deadlines
 
@@ -680,6 +707,13 @@ export const SPECIES_OPTIONS: readonly { value: string; label: string }[] = spec
 export const LOGGING_TYPE_OPTIONS: readonly { value: string; label: string }[] =
   loggingTypeCodes.map((code) => ({ value: code, label: code }))
 
+/** Kooskõlastused/väljaveoteed options (docs 03 step 3: müüja/ostja/kooskõlastatud). */
+export const APPROVAL_OPTIONS: readonly { value: ApprovalOptionValue; label: string }[] = [
+  { value: 'seller', label: 'Müüja' },
+  { value: 'buyer', label: 'Ostja' },
+  { value: 'approved', label: 'Kooskõlastatud' },
+]
+
 // ── Step rail marks (task 5.2; demo 03 wiz-side) ────────────────────────────
 
 export type WizardStepMark = 'done' | 'current' | 'todo' | 'disabled'
@@ -954,6 +988,20 @@ function draftStateFrom(value: unknown): AuctionWizardState | null {
     if (parsed === null) return null
     files = parsed
   }
+  // Additive state keys from task 5.1: absent in older version-1 drafts, so
+  // they restore only when stored, keeping parsed drafts byte-equal to the
+  // server state the dirty compare runs against.
+  const storageLocationApproval = draftString(record.storageLocationApproval) ?? ''
+  const removalRoads = draftString(record.removalRoads) ?? ''
+  // Task 5.7, same additive rule: present only when true, so an unchecked
+  // restore stays byte-equal to a server state without the key; a stored
+  // lease deadline reads as checked.
+  const hasLeaseAgreement =
+    typeof record.hasLeaseAgreement === 'boolean' && record.hasLeaseAgreement
+      ? true
+      : strings.leaseDeadline !== ''
+        ? true
+        : undefined
 
   return {
     title: strings.title,
@@ -986,6 +1034,9 @@ function draftStateFrom(value: unknown): AuctionWizardState | null {
     loggingDeadline: strings.loggingDeadline,
     removalDeadline: strings.removalDeadline,
     leaseDeadline: strings.leaseDeadline,
+    ...(hasLeaseAgreement !== undefined ? { hasLeaseAgreement } : {}),
+    ...(storageLocationApproval !== '' ? { storageLocationApproval } : {}),
+    ...(removalRoads !== '' ? { removalRoads } : {}),
     propertyCount: typeof propertyCount === 'number' ? propertyCount : null,
     specialistId: strings.specialistId,
     descriptionPublic: strings.descriptionPublic,
@@ -1017,4 +1068,206 @@ export function parseWizardDraft(raw: string): WizardDraft | null {
   }
   const state = draftStateFrom(record.state)
   return state === null ? null : { state, savedAt: record.savedAt }
+}
+
+// ── Step 7 read-only summary and published-lot diff (task 5.6) ──────────────
+
+const SUMMARY_OBJECT_TYPE_LABELS: Record<AuctionObjectType, string> = {
+  raieoigus: 'Raieõigus',
+  kinnistu: 'Metskinnistu',
+  pakett: 'Pakett',
+  kiire: 'Kiire oksjon',
+}
+
+const SUMMARY_AUCTION_TYPE_LABELS: Record<AuctionTypeValue, string> = {
+  open: 'Avatud',
+  sealed: 'Suletud',
+}
+
+/** Tallinn wall input ("2026-12-01T12:00") -> "01.12.2026 12:00"; '' stays ''. */
+function summaryWallValue(wall: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(wall.trim())
+  if (match === null) return ''
+  const [, year, month, day, hour, minute] = match
+  return `${day ?? ''}.${month ?? ''}.${year ?? ''} ${hour ?? ''}:${minute ?? ''}`
+}
+
+function summaryEuro(value: string): string {
+  const parsed = parseDecimal(value)
+  return parsed === undefined ? '' : `${value.trim()} €`
+}
+
+function summaryOrDash(value: string): string {
+  return value.trim() === '' ? '—' : value.trim()
+}
+
+function nameFromOptions(
+  list: readonly { id: string; name: string }[] | undefined,
+  id: string,
+): string {
+  if (id.trim() === '') return ''
+  return list?.find((entry) => entry.id === id)?.name ?? id
+}
+
+export interface WizardSummaryRow {
+  label: string
+  value: string
+}
+
+/** Read-only field summary for step 7 (Ülevaade), display-ready strings. */
+export function wizardSummaryRows(
+  initial: AuctionWizardInitial,
+  state: AuctionWizardState,
+  options: Pick<AuctionWizardOptions, 'counties' | 'parishes' | 'specialists'>,
+): WizardSummaryRow[] {
+  const countyName = nameFromOptions(options.counties, state.countyId)
+  const parishName = nameFromOptions(options.parishes, state.parishId)
+  const locationParts = [countyName, parishName, state.address.trim()].filter(
+    (part) => part !== '',
+  )
+  const reserveValue =
+    state.reserveEur.trim() !== ''
+      ? summaryEuro(state.reserveEur)
+      : initial.hasReserve
+        ? 'määratud (varjatud)'
+        : ''
+  const rows: WizardSummaryRow[] = [
+    { label: 'Nimi', value: summaryOrDash(state.title) },
+    {
+      label: 'Objekt',
+      value:
+        SUMMARY_OBJECT_TYPE_LABELS[state.objectType] +
+        (state.isQuickAuction ? ' · kiiroksjon' : ''),
+    },
+    { label: 'Mehaanika', value: SUMMARY_AUCTION_TYPE_LABELS[state.auctionType] },
+    { label: 'Algusaeg', value: summaryOrDash(summaryWallValue(state.startsAt)) },
+    { label: 'Lõppaeg', value: summaryOrDash(summaryWallValue(state.endsAt)) },
+    { label: 'Alghind', value: summaryOrDash(summaryEuro(state.minBidEur)) },
+    { label: 'Pakkumuse samm', value: summaryOrDash(summaryEuro(state.bidStepEur)) },
+    { label: 'Piirhind', value: summaryOrDash(reserveValue) },
+    { label: 'Pindala', value: summaryOrDash(state.areaHa.trim() === '' ? '' : `${state.areaHa.trim()} ha`) },
+    {
+      label: 'Maht',
+      value: summaryOrDash(state.volumeM3.trim() === '' ? '' : `${state.volumeM3.trim()} m³`),
+    },
+    { label: 'Asukoht', value: summaryOrDash(locationParts.join(', ')) },
+    {
+      label: 'Katastrid',
+      value: summaryOrDash(state.cadastres.map((value) => value.trim()).filter((value) => value !== '').join(', ')),
+    },
+    {
+      label: 'Spetsialist',
+      value: summaryOrDash(nameFromOptions(options.specialists, state.specialistId)),
+    },
+  ]
+  return rows
+}
+
+export interface WizardDiffRow {
+  label: string
+  saved: string
+  current: string
+  /**
+   * True for reserve changes: both columns render "muudetud (varjatud)",
+   * the stored amount never crosses to the client (spec scenario).
+   */
+  masked: boolean
+}
+
+interface DiffField {
+  key: string
+  label: string
+  get: (state: AuctionWizardState) => string
+}
+
+const DIFF_FIELDS: readonly DiffField[] = [
+  { key: 'title', label: 'Nimi', get: (s) => summaryOrDash(s.title) },
+  {
+    key: 'objectType',
+    label: 'Objekt',
+    get: (s) =>
+      SUMMARY_OBJECT_TYPE_LABELS[s.objectType] + (s.isQuickAuction ? ' · kiiroksjon' : ''),
+  },
+  { key: 'auctionType', label: 'Mehaanika', get: (s) => SUMMARY_AUCTION_TYPE_LABELS[s.auctionType] },
+  { key: 'startsAt', label: 'Algusaeg', get: (s) => summaryOrDash(summaryWallValue(s.startsAt)) },
+  { key: 'endsAt', label: 'Lõppaeg', get: (s) => summaryOrDash(summaryWallValue(s.endsAt)) },
+  { key: 'minBidEur', label: 'Alghind', get: (s) => summaryOrDash(summaryEuro(s.minBidEur)) },
+  {
+    key: 'bidStepEur',
+    label: 'Pakkumuse samm',
+    get: (s) => summaryOrDash(summaryEuro(s.bidStepEur)),
+  },
+  {
+    key: 'areaHa',
+    label: 'Pindala',
+    get: (s) => summaryOrDash(s.areaHa.trim() === '' ? '' : `${s.areaHa.trim()} ha`),
+  },
+  {
+    key: 'volumeM3',
+    label: 'Maht',
+    get: (s) => summaryOrDash(s.volumeM3.trim() === '' ? '' : `${s.volumeM3.trim()} m³`),
+  },
+  { key: 'address', label: 'Aadress', get: (s) => summaryOrDash(s.address) },
+  {
+    key: 'cadastres',
+    label: 'Katastrid',
+    get: (s) =>
+      summaryOrDash(s.cadastres.map((value) => value.trim()).filter((value) => value !== '').join(', ')),
+  },
+]
+
+function truncated(value: string, max = 80): string {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value
+}
+
+/**
+ * Two-column diff (salvestatud vs praegune) for editing a published lot:
+ * only fields whose display value changed, in field order. The reserve row
+ * appears masked on both sides whenever the operator entered an amount —
+ * the stored value is write-only, so there is nothing else to show (D5).
+ */
+export function wizardFieldDiff(
+  initial: AuctionWizardInitial,
+  state: AuctionWizardState,
+  options: Pick<AuctionWizardOptions, 'counties' | 'parishes' | 'specialists'>,
+): WizardDiffRow[] {
+  const rows: WizardDiffRow[] = []
+  for (const field of DIFF_FIELDS) {
+    const saved = field.get(initial.state)
+    const current = field.get(state)
+    if (saved === current) continue
+    rows.push({ label: field.label, saved, current, masked: false })
+  }
+  for (const key of ['countyId', 'parishId', 'specialistId'] as const) {
+    const list =
+      key === 'countyId'
+        ? options.counties
+        : key === 'parishId'
+          ? options.parishes
+          : options.specialists
+    const saved = nameFromOptions(list, initial.state[key])
+    const current = nameFromOptions(list, state[key])
+    if (saved === current) continue
+    const label = key === 'countyId' ? 'Maakond' : key === 'parishId' ? 'Vald' : 'Spetsialist'
+    rows.push({ label, saved: summaryOrDash(saved), current: summaryOrDash(current), masked: false })
+  }
+  const savedDescription = truncated(initial.state.descriptionPublic)
+  const currentDescription = truncated(state.descriptionPublic)
+  if (savedDescription !== currentDescription) {
+    rows.push({
+      label: 'Avalik info',
+      saved: summaryOrDash(savedDescription),
+      current: summaryOrDash(currentDescription),
+      masked: false,
+    })
+  }
+  if (initial.state.reserveEur !== state.reserveEur) {
+    rows.push({
+      label: 'Piirhind',
+      saved: 'muudetud (varjatud)',
+      current: 'muudetud (varjatud)',
+      masked: true,
+    })
+  }
+  return rows
 }

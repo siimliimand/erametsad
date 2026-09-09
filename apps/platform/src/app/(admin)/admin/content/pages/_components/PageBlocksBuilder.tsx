@@ -44,7 +44,6 @@ const itemCountUnits: Partial<Record<PageBlockType, { one: string; many: string 
   cards: { one: 'kaart', many: 'kaarti' },
   accordion: { one: 'rida', many: 'rida' },
   stats: { one: 'näitarv', many: 'näitarvu' },
-  testimonials: { one: 'kliendilugu', many: 'kliendilugu' },
   faq: { one: 'küsimus', many: 'küsimust' },
 }
 
@@ -61,9 +60,14 @@ function blockSummary(block: BuilderBlock): string {
         ? (block.config.heading ?? '')
         : firstLine(block.config.body)
     case 'form':
-      return block.config.slug
+      return `${block.config.slug} · ${block.config.type}`
     case 'cta':
       return block.config.heading
+    case 'testimonials': {
+      return block.config.heading?.trim()
+        ? block.config.heading
+        : `${String(block.config.limit)} kliendilugu`
+    }
     case 'ticker': {
       const unit = block.config.limit === 1 ? 'oksjon' : 'oksjonit'
       return block.config.heading?.trim()
@@ -73,7 +77,6 @@ function blockSummary(block: BuilderBlock): string {
     case 'cards':
     case 'accordion':
     case 'stats':
-    case 'testimonials':
     case 'faq': {
       const count = block.config.items.length
       const units = itemCountUnits[block.type] ?? { one: 'rida', many: 'rida' }

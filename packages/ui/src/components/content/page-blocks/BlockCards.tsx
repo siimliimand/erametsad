@@ -1,3 +1,6 @@
+import { Axe, Clock, Coins, FileText, Map, Shield, Sprout, Trees } from 'lucide-react'
+import type { ComponentType } from 'react'
+
 import { Card } from '../../Card'
 
 import type { CardItemConfig, CardsBlockConfig } from './types'
@@ -6,6 +9,25 @@ const COLUMN_CLASSES: Record<2 | 3 | 4, string> = {
   2: 'sm:grid-cols-2',
   3: 'sm:grid-cols-2 lg:grid-cols-3',
   4: 'sm:grid-cols-2 lg:grid-cols-4',
+}
+
+/** Lucide map for the card ikoon select; unknown names render no icon. */
+const ITEM_ICONS: Record<string, ComponentType<{ className?: string }>> = {
+  trees: Trees,
+  axe: Axe,
+  sprout: Sprout,
+  map: Map,
+  shield: Shield,
+  clock: Clock,
+  coins: Coins,
+  'file-text': FileText,
+}
+
+function CardIcon({ name }: { name: string | undefined }) {
+  if (name === undefined) return null
+  const Icon = ITEM_ICONS[name]
+  if (Icon === undefined) return null
+  return <Icon className="h-6 w-6 text-primary" aria-hidden="true" />
 }
 
 // Description lines become bullet points, as in the process cards on avaleht.
@@ -20,7 +42,8 @@ function CardBody({ item }: { item: CardItemConfig }) {
   const lines = item.description !== undefined ? descriptionLines(item.description) : []
   return (
     <>
-      <h3 className="font-heading text-h4 text-ink">
+      <CardIcon name={item.icon} />
+      <h3 className={`font-heading text-h4 text-ink ${item.icon !== undefined ? 'mt-sm' : ''}`}>
         {item.href !== undefined ? (
           <a
             href={item.href}

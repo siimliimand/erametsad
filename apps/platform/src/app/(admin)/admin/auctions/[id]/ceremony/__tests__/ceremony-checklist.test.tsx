@@ -4,9 +4,14 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { EventSourceStub } from './ceremony-fixtures'
-import type { SealedCeremonyChecklist } from '../../../../../_actions/auctions'
+import type {
+  SealedCeremonyActionState,
+  SealedCeremonyChecklist,
+} from '../../../../../_actions/auctions'
+import { ToastProvider } from '../../../../../_components/ui/Toast'
 import {
   CeremonyChecklist,
+  CeremonyUnsoldShortcut,
   ceremonyChecklistPass,
 } from '../_components/ceremony-checklist'
 
@@ -14,12 +19,25 @@ const auditMocks = vi.hoisted(() => ({
   fetchSealedCeremonyAuditAction: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
-  useParams: () => ({ id: 'auction-1' }),
+const shortcutMocks = vi.hoisted(() => ({
+  markSealedUnsoldShortcutAction: vi.fn(),
+  refresh: vi.fn(),
 }))
+
+vi.mock('next/navigation', () => {
+  const router = { refresh: shortcutMocks.refresh }
+  return {
+    useParams: () => ({ id: 'auction-1' }),
+    useRouter: () => router,
+  }
+})
 
 vi.mock('../_lib/fetch-sealed-audit', () => ({
   fetchSealedCeremonyAuditAction: auditMocks.fetchSealedCeremonyAuditAction,
+}))
+
+vi.mock('../../../../../_actions/auctions', () => ({
+  markSealedUnsoldShortcutAction: shortcutMocks.markSealedUnsoldShortcutAction,
 }))
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -149,3 +167,133 @@ describe('CeremonyChecklist rendering', () => {
     )
   })
 })
+
+describe('CeremonyUnsoldShortcut (empty-lot müümata)', () => {
+  const shortcutState = (overrides: Partial<SealedCeremonyActionState> = {}): SealedCeremonyActionState => ({
+    ok: false,
+    phase: 'checklist',
+    error: null,
+    ...overrides,
+  })
+
+  async function typeReason(text: string): Promise<void> {
+    const textarea = container.querySelector<HTMLTextAreaElement>('textarea[name="reason"]')
+    if (textarea === null) throw new Error('reason textarea not found')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(textarea, text)
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+  }
+
+  async function submitShortcutForm(): Promise<void> {
+    const form = container.querySelector('[role="dialog"] form')
+    if (form === null) throw new Error('shortcut form not found')
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      await Promise.resolve()
+    })
+  }
+
+  async function mountShortcut(): Promise<void> {
+    await act(async () => {
+      container = document.createElement('div')
+      document.body.appendChild(container)
+      root = createRoot(container)
+      root.render(
+        createElement(ToastProvider, null, createElement(CeremonyUnsoldShortcut, { auctionId: 'auction-1' })),
+      )
+      await Promise.resolve()
+    })
+  }
+
+  it('explains the shortcut and opens the confirm dialog', async () => {
+    await mountShortcut()
+
+    expect(container.textContent).toContain('Müümata otsetee')
+    expect(container.textContent).toContain('ei ole ühtki kehtivat pakkumist')
+
+    const trigger = [...container.querySelectorAll('button')].find(
+      (candidate) => candidate.textContent === 'Märgi müümata',
+    )
+    if (trigger === undefined) throw new Error('shortcut trigger not found')
+    await clickShortcutTrigger(trigger)
+
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog).not.toBeNull()
+    expect(dialog?.textContent).toContain('HOIATUS')
+  })
+
+  it('keeps the submit locked until the reason reaches 5 characters', async () => {
+    await mountShortcut()
+    await clickShortcutTrigger(findTrigger())
+
+    const submitBefore = shortcutSubmitButton()
+    expect(submitBefore.disabled).toBe(true)
+
+    await typeReason('ei')
+    expect(shortcutSubmitButton().disabled).toBe(true)
+
+    await typeReason('pole kehtivaid pakkumisi')
+    expect(shortcutSubmitButton().disabled).toBe(false)
+  })
+
+  it('submits the reason, toasts success and refreshes', async () => {
+    shortcutMocks.markSealedUnsoldShortcutAction.mockResolvedValue(
+      shortcutState({ ok: true, phase: 'unsold' }),
+    )
+    await mountShortcut()
+    await clickShortcutTrigger(findTrigger())
+    await typeReason('pole kehtivaid pakkumisi')
+    await submitShortcutForm()
+
+    expect(shortcutMocks.markSealedUnsoldShortcutAction).toHaveBeenCalledTimes(1)
+    const formData = shortcutMocks.markSealedUnsoldShortcutAction.mock.calls[0]?.[1] as FormData
+    expect(formData.get('auctionId')).toBe('auction-1')
+    expect(formData.get('reason')).toBe('pole kehtivaid pakkumisi')
+    expect(container.querySelector('[role="status"]')?.textContent).toContain(
+      'Oksjon kuulutatud müümata',
+    )
+    expect(shortcutMocks.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('toasts the server error and keeps the dialog open', async () => {
+    shortcutMocks.markSealedUnsoldShortcutAction.mockResolvedValue(
+      shortcutState({ error: 'Oksjonil on kehtivaid pakkumisi — tulemus otsustakse avamistseremoonial.' }),
+    )
+    await mountShortcut()
+    await clickShortcutTrigger(findTrigger())
+    await typeReason('pole kehtivaid pakkumisi')
+    await submitShortcutForm()
+
+    expect(container.querySelector('[role="status"]')?.textContent).toContain(
+      'Müümata märkimine ebaõnnestus',
+    )
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull()
+  })
+})
+
+function findTrigger(): HTMLButtonElement {
+  const trigger = [...container.querySelectorAll('button')].find(
+    (candidate) => candidate.textContent === 'Märgi müümata',
+  )
+  if (trigger === undefined) throw new Error('shortcut trigger not found')
+  return trigger
+}
+
+async function clickShortcutTrigger(trigger: HTMLButtonElement): Promise<void> {
+  await act(async () => {
+    trigger.click()
+    await Promise.resolve()
+  })
+}
+
+function shortcutSubmitButton(): HTMLButtonElement {
+  const dialog = container.querySelector('[role="dialog"]')
+  if (dialog === null) throw new Error('shortcut dialog not found')
+  const button = [...dialog.querySelectorAll('button')].find(
+    (candidate) => candidate.textContent === 'Kinnita müümata' || candidate.textContent === 'Kinnitan…',
+  )
+  if (button === undefined) throw new Error('shortcut submit not found')
+  return button
+}

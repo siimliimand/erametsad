@@ -1,4 +1,4 @@
-import type { LotCardProps, PageBlockView } from '@erametsad/ui'
+import type { LotCardProps, PageBlockView, TestimonialItemConfig } from '@erametsad/ui'
 
 import { listAuctions, type AuctionSummary } from '@/lib/auction/queries'
 import { safeParseBlockConfig } from '@/lib/content/blocks'
@@ -33,6 +33,7 @@ function toLotProps(summary: AuctionSummary): LotCardProps {
     status: 'active',
     href: `https://${PORTAL_HOSTNAME}/oksjon/${summary.id}`,
     ctaLabel: 'Vaata oksjonit',
+    objectType: summary.objectType,
     typeLabel: OBJECT_TYPE_LABELS[summary.objectType],
     ...(summary.parish ? { parish: summary.parish.name } : {}),
     ...(summary.volume !== null ? { volumeM3: summary.volume } : {}),
@@ -109,6 +110,54 @@ export async function loadTickerLots(): Promise<LotCardProps[]> {
     return auctions
       .filter((lot): lot is AuctionSummary & { endsAt: string } => lot.endsAt !== null)
       .map(toLotProps)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Published testimonials for `testimonials` blocks, newest first, with
+ * avatar media resolved to URLs. Empty on failure; the block then renders
+ * nothing (mirrors the ticker empty-state contract).
+ */
+export async function loadPageTestimonials(): Promise<TestimonialItemConfig[]> {
+  try {
+    const repos = await getRepositories()
+    const { docs } = await repos.find({
+      collection: 'testimonials',
+      where: { status: { equals: 'published' } },
+      sort: '-createdAt',
+      pagination: false,
+    })
+    const avatarIds = [
+      ...new Set(
+        docs
+          .map((testimonial) => testimonial.avatarId)
+          .filter((avatarId): avatarId is string => avatarId !== null),
+      ),
+    ]
+    const imageUrlByAvatarId = new Map<string, string>()
+    if (avatarIds.length > 0) {
+      const mediaResult = await repos.find({
+        collection: 'media',
+        where: { id: { in: avatarIds }, url: { exists: true } },
+        pagination: false,
+      })
+      for (const asset of mediaResult.docs) {
+        if (asset.url) imageUrlByAvatarId.set(asset.id, asset.url)
+      }
+    }
+    return docs.map((testimonial) => {
+      const image = testimonial.avatarId
+        ? imageUrlByAvatarId.get(testimonial.avatarId)
+        : undefined
+      return {
+        quote: testimonial.content,
+        author: testimonial.name,
+        ...(testimonial.role !== null ? { role: testimonial.role } : {}),
+        ...(image !== undefined ? { image } : {}),
+      }
+    })
   } catch {
     return []
   }

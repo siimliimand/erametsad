@@ -7,7 +7,7 @@
  * primary/accent/cta/info tokens, so charts follow the (admin) token scope.
  */
 
-export type ChartColor = 'primary' | 'accent' | 'cta' | 'info'
+export type ChartColor = 'primary' | 'accent' | 'cta' | 'info' | 'danger'
 
 /** Same variables the Tailwind color tokens resolve to (tailwind.config.ts). */
 const CHART_COLORS: Record<ChartColor, string> = {
@@ -15,6 +15,7 @@ const CHART_COLORS: Record<ChartColor, string> = {
   accent: 'var(--color-accent)',
   cta: 'var(--color-cta)',
   info: 'var(--color-info)',
+  danger: 'var(--color-danger)',
 }
 
 /** Demo axis text: 500 10px mono, muted, tabular. */
@@ -28,19 +29,19 @@ const AXIS_TITLE_CLASS = 'fill-inkMuted font-body text-[10px] font-medium'
 const LEGEND_ITEM_CLASS =
   'flex items-center gap-[7px] text-label font-medium text-inkMuted'
 
-export interface MonthlyBarsSeries {
-  /** Legend and tooltip name, e.g. "Alghind". */
+export interface MonthlyStackedSeries {
+  /** Legend and tooltip name, e.g. "Müüdud". */
   name: string
   color: ChartColor
-  /** One value per month, whole euros (month i ↔ months[i]). */
+  /** One value per month, stacked bottom-up (month i ↔ months[i]). */
   values: readonly number[]
 }
 
-export interface MonthlyBarsData {
-  /** Estonian short month labels, one per bar group, e.g. "Jaan". */
+export interface MonthlyStackedData {
+  /** Estonian short month labels, one per bar, e.g. "Jaan". */
   months: readonly string[]
-  /** Two or more series render as grouped bars per month. */
-  series: readonly MonthlyBarsSeries[]
+  /** Stacking order bottom → top; every month stacks all series. */
+  series: readonly MonthlyStackedSeries[]
 }
 
 export interface TypeDonutSegment {
@@ -164,17 +165,17 @@ function YAxis({
 }
 
 const BAR_WIDTH = 17
-const BAR_GAP = 4
 
 /**
- * Grouped monthly bars (demo "Oksjonite tulemused kuupõhiselt"):
- * one bar group per month, one bar per series, y-axis in thousands of euros.
+ * Stacked monthly bars (statistikalehe "Oksjonite tulemused kuupõhiselt"):
+ * one bar per month, one stacked segment per series (müüdud / müümata /
+ * tühistatud counts), y-axis in plain counts.
  */
-export function MonthlyBarsChart({
+export function MonthlyStackedChart({
   data,
-  ariaLabel = 'Tulpdiagramm: oksjonite alghind ja lõpphind kuude lõikes, tuhat eurot',
+  ariaLabel = 'Tulpdiagramm: oksjonite tulemused kuude lõikes (müüdud, müümata, tühistatud)',
 }: {
-  data: MonthlyBarsData
+  data: MonthlyStackedData
   ariaLabel?: string
 }) {
   const width = 720
@@ -186,15 +187,16 @@ export function MonthlyBarsChart({
   const plotWidth = width - left - right
   const plotHeight = height - top - bottom
 
-  const allValues = data.series.flatMap((series) => [...series.values])
-  const hasData = data.months.length > 0 && allValues.length > 0
+  const monthTotals = data.months.map((_, monthIndex) =>
+    data.series.reduce((total, series) => total + (series.values[monthIndex] ?? 0), 0),
+  )
+  const hasData = data.months.length > 0 && monthTotals.some((total) => total > 0)
   if (!hasData) {
     return <ChartEmptyState minHeight={220} />
   }
 
-  const scale = niceScale(Math.max(...allValues))
+  const scale = niceScale(Math.max(...monthTotals))
   const groupWidth = plotWidth / data.months.length
-  const pairWidth = 2 * BAR_WIDTH + BAR_GAP
 
   return (
     <svg
@@ -210,36 +212,38 @@ export function MonthlyBarsChart({
         top={top}
         plotHeight={plotHeight}
         scale={scale}
-        title={scale.max >= 100000 ? 'tuhat €' : '€'}
+        title="oksjonit"
       />
       <g>
         {data.months.map((month, monthIndex) => {
-          const groupX =
-            left + monthIndex * groupWidth + (groupWidth - pairWidth) / 2
+          const barX = left + monthIndex * groupWidth + (groupWidth - BAR_WIDTH) / 2
+          let stackBase = 0
           return (
             <g key={month}>
-              {data.series.map((series, seriesIndex) => {
+              {data.series.map((series) => {
                 const value = series.values[monthIndex] ?? 0
-                const barHeight = Math.max(1, plotHeight * (value / scale.max))
-                const x = groupX + seriesIndex * (BAR_WIDTH + BAR_GAP)
+                if (value <= 0) return null
+                const segmentHeight = plotHeight * (value / scale.max)
+                const yTop = top + plotHeight - stackBase - segmentHeight
+                stackBase += segmentHeight
                 return (
                   <rect
                     key={series.name}
-                    x={x}
-                    y={top + plotHeight - barHeight}
+                    x={barX}
+                    y={yTop}
                     width={BAR_WIDTH}
-                    height={barHeight}
+                    height={segmentHeight}
                     rx={2}
                     fill={CHART_COLORS[series.color]}
                   >
                     <title>
-                      {`${month} · ${series.name} ${formatNumber(value)} €`}
+                      {`${month} · ${series.name} ${formatNumber(value)}`}
                     </title>
                   </rect>
                 )
               })}
               <text
-                x={groupX + pairWidth / 2}
+                x={barX + BAR_WIDTH / 2}
                 y={height - 10}
                 textAnchor="middle"
                 className={AXIS_TEXT_CLASS}
@@ -255,13 +259,13 @@ export function MonthlyBarsChart({
 }
 
 /**
- * Legend for the bars card head (demo: swatch + series name). Rendered from
- * the same series data so header colors can never drift from bar colors.
+ * Legend for the stacked bars card head (demo: swatch + series name). Rendered
+ * from the same series data so header colors can never drift from bar colors.
  */
 export function ChartSeriesLegend({
   series,
 }: {
-  series: readonly MonthlyBarsSeries[]
+  series: readonly MonthlyStackedSeries[]
 }) {
   if (series.length === 0) return null
   return (

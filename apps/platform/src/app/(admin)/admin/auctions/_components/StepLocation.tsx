@@ -1,6 +1,6 @@
 'use client'
 
-import { MapEstonia, type MapPin } from '@erametsad/ui'
+import { MapEstonia, type MapCoordinates } from '@erametsad/ui'
 
 import { parseDecimal } from './wizard-model'
 import type { WizardStepContext } from './wizard-model'
@@ -10,6 +10,11 @@ import { FormSelectField, inputClass } from '../../../_components/FormField'
 const ESTONIA_CENTER: [number, number] = [58.6, 25.0]
 const ESTONIA_ZOOM = 7
 const PIN_ZOOM = 11
+
+/** Pin coordinates round-trip through the state strings at ~0.1 m precision. */
+function coordinateInput(value: number): string {
+  return value.toFixed(6)
+}
 
 function coordinateValue(value: string, min: number, max: number): number | null {
   const parsed = parseDecimal(value)
@@ -33,8 +38,15 @@ export function StepLocation({ state, patch, errors, options }: WizardStepContex
   const lat = coordinateValue(state.lat, -90, 90)
   const lng = coordinateValue(state.lng, -180, 180)
   const hasPin = lat !== null && lng !== null
-  const pins: MapPin[] = hasPin ? [{ lat, lng }] : []
+  const pins = hasPin ? [{ lat, lng }] : []
   const firstCadastre = state.cadastres.map((value) => value.trim()).find((value) => value !== '')
+
+  function pinAt(coordinates: MapCoordinates): void {
+    patch({
+      lat: coordinateInput(coordinates.lat),
+      lng: coordinateInput(coordinates.lng),
+    })
+  }
 
   function changeCounty(countyId: string): void {
     const parishStillInCounty =
@@ -128,11 +140,13 @@ export function StepLocation({ state, patch, errors, options }: WizardStepContex
           pins={pins}
           center={hasPin ? [lat, lng] : ESTONIA_CENTER}
           zoom={hasPin ? PIN_ZOOM : ESTONIA_ZOOM}
+          onMapClick={pinAt}
+          onPinMove={pinAt}
         />
       </div>
       <FieldHint>
-        Sisesta koordinaadid kümnendarvuna ja kontrolli asukohta kaardil. Pin tõmmatakse kaardile
-        sisestatud laius- ja pikkuskraadi järgi.
+        Klõpsa kaardil, et paigutada marker, või lohista olemasolevat markerit uude kohta. Markeri
+        asukoht kirjutatakse laius- ja pikkuskraadi väljadesse.
       </FieldHint>
 
       <div className="flex flex-col gap-xs rounded-card border border-border bg-bgMist p-sm">
@@ -151,14 +165,6 @@ export function StepLocation({ state, patch, errors, options }: WizardStepContex
             Katastrikaart avaneb pärast esimese katastritunnuse lisamist (samm 3).
           </FieldHint>
         )}
-        <a
-          href="https://register.metsad.ee"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-fit text-label font-semibold text-primary underline-offset-2 hover:underline"
-        >
-          Ava Metsaregister
-        </a>
       </div>
     </div>
   )

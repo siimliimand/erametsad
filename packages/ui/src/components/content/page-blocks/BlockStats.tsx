@@ -21,6 +21,7 @@ export function BlockStats({ config }: { config: StatsBlockConfig }) {
                 style={{ fontFeatureSettings: '"tnum" 1' }}
               >
                 {item.value}
+                {item.suffix ?? ''}
               </p>
               <p className="mt-xs text-body text-white/80">{item.label}</p>
             </div>

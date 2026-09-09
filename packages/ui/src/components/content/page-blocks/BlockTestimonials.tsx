@@ -1,8 +1,23 @@
 import { Testimonial } from '../Testimonial'
 
-import type { TestimonialsBlockConfig } from './types'
+import type { TestimonialItemConfig, TestimonialsBlockConfig } from './types'
 
-export function BlockTestimonials({ config }: { config: TestimonialsBlockConfig }) {
+/**
+ * Renders items from the published `testimonials` collection (passed by the
+ * caller, sliced to the block limit). Renders nothing when the collection
+ * has no items, so live-data blocks never show placeholder copy on the
+ * marketing site.
+ */
+export function BlockTestimonials({
+  config,
+  items,
+}: {
+  config: TestimonialsBlockConfig
+  items: readonly TestimonialItemConfig[]
+}) {
+  if (items.length === 0) return null
+  const limit = config.limit ?? 6
+  const visible = items.slice(0, limit)
   return (
     <section className="mx-auto max-w-container-xl px-md py-xl md:px-lg">
       {config.heading !== undefined && (
@@ -13,7 +28,7 @@ export function BlockTestimonials({ config }: { config: TestimonialsBlockConfig 
           config.heading !== undefined ? 'mt-md' : ''
         }`}
       >
-        {config.items.map((item, index) => (
+        {visible.map((item, index) => (
           <li key={[item.author, index].join('-')}>
             <Testimonial
               quote={item.quote}

@@ -76,7 +76,10 @@ export const blockRegistry = {
   testimonials: {
     schema: testimonialsConfigSchema,
     label: 'Kliendilood',
-    meta: { description: 'Klientide tsitaadid ja hinnangud', icon: 'quote' },
+    meta: {
+      description: 'Avaldatud kliendilood testimonaalide kogumikust',
+      icon: 'quote',
+    },
   },
   faq: {
     schema: faqConfigSchema,

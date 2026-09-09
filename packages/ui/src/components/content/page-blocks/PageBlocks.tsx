@@ -1,6 +1,10 @@
-import { resolveBlockConfig } from './guards'
+import { resolveBlockConfig, testimonialItem } from './guards'
 
-import type { PageBlockView, PageBlocksProps } from './types'
+import type {
+  PageBlockView,
+  PageBlocksProps,
+  TestimonialItemConfig,
+} from './types'
 import { BlockAccordion } from './BlockAccordion'
 import { BlockCards } from './BlockCards'
 import { BlockCta } from './BlockCta'
@@ -19,7 +23,12 @@ import { BlockTicker } from './BlockTicker'
  * fail the structural guards are skipped so a single bad row cannot break a
  * page render.
  */
-export function PageBlocks({ blocks, tickerLots = [] }: PageBlocksProps) {
+export function PageBlocks({
+  blocks,
+  tickerLots = [],
+  tickerOnRefresh,
+  testimonials = [],
+}: PageBlocksProps) {
   return (
     <>
       {blocks.map((view: PageBlockView) => {
@@ -38,14 +47,28 @@ export function PageBlocks({ blocks, tickerLots = [] }: PageBlocksProps) {
             return <BlockForm key={view.id} config={resolved.config} />
           case 'ticker':
             return (
-              <BlockTicker key={view.id} config={resolved.config} lots={tickerLots} />
+              <BlockTicker
+                key={view.id}
+                config={resolved.config}
+                lots={tickerLots}
+                {...(tickerOnRefresh !== undefined ? { onRefresh: tickerOnRefresh } : {})}
+              />
             )
           case 'stats':
             return <BlockStats key={view.id} config={resolved.config} />
           case 'cta':
             return <BlockCta key={view.id} config={resolved.config} />
           case 'testimonials':
-            return <BlockTestimonials key={view.id} config={resolved.config} />
+            return (
+              <BlockTestimonials
+                key={view.id}
+                config={resolved.config}
+                items={testimonials.filter(
+                  (item): item is TestimonialItemConfig =>
+                    testimonialItem(item) !== null,
+                )}
+              />
+            )
           case 'faq':
             return <BlockFaq key={view.id} id={view.id} config={resolved.config} />
         }

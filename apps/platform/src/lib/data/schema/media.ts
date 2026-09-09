@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { check, index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 import { contentStatuses } from './content'
 import { inList } from './shared'
@@ -14,6 +14,9 @@ export const media = sqliteTable(
     width: integer('width'),
     height: integer('height'),
     alt: text('alt'),
+    // Focal point as 0..1 fractions of the image (nullable = center default).
+    focalX: real('focal_x'),
+    focalY: real('focal_y'),
     // Bytes live in R2 (upload.disableLocalStorage); the hook stores the key
     // and public URL instead of a local path.
     r2Key: text('r2_key'),
@@ -28,5 +31,7 @@ export const media = sqliteTable(
   (t) => [
     index('media_r2_key_idx').on(t.r2Key),
     check('media_status_check', sql`${t.status} IN ${sql.raw(inList(contentStatuses))}`),
+    check('media_focal_x_check', sql`(${t.focalX} IS NULL OR (${t.focalX} >= 0 AND ${t.focalX} <= 1))`),
+    check('media_focal_y_check', sql`(${t.focalY} IS NULL OR (${t.focalY} >= 0 AND ${t.focalY} <= 1))`),
   ],
 )

@@ -41,6 +41,7 @@ function firstParam(params: RawParams, key: string): string | undefined {
 
 interface QueueRow {
   bidId: string
+  bidderId: string
   auctionId: string
   auctionTitle: string
   auctionType: 'open' | 'sealed'
@@ -209,6 +210,7 @@ export default async function AdminBidsPage({
     const pendingHours = Math.max(0, (now - Date.parse(bid.createdAt)) / 3_600_000)
     rows.push({
       bidId: bid.id,
+      bidderId: bid.userId,
       auctionId: auction.id,
       auctionTitle: auction.title,
       auctionType: auction.type,
@@ -356,7 +358,11 @@ export default async function AdminBidsPage({
       render: (row) => (
         <span className="flex items-center gap-sm">
           <span className="font-semibold">{row.label}</span>
-          <IdentityRevealChip bidId={row.bidId} />
+          <IdentityRevealChip
+            bidId={row.bidId}
+            bidderId={row.bidderId}
+            canViewUsers={can(role, 'users:read')}
+          />
         </span>
       ),
     },

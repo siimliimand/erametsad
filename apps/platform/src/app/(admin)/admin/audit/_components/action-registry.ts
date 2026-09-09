@@ -27,6 +27,7 @@ export const auditActionGroups: readonly AuditActionGroup[] = [
       'user.impersonate',
       'user.gdpr_export',
       'user.gdpr_delete',
+      'user.shill_flag',
     ],
   },
   {
@@ -61,7 +62,7 @@ export const auditActionGroups: readonly AuditActionGroup[] = [
   {
     id: 'bids',
     label: 'Pakkumised',
-    actions: ['bid.approve', 'bid.reject', 'bid.export', 'anomaly.flag'],
+    actions: ['bid.approve', 'bid.reject', 'bid.export', 'anomaly.flag', 'bid.void'],
   },
   {
     id: 'contracts',
@@ -114,8 +115,12 @@ export const auditActionGroups: readonly AuditActionGroup[] = [
       'content.publish',
       'content.schedule',
       'content.restore',
+      'content.version.create',
+      'content.version.restore',
+      'content.blocks.save',
       'media.replace',
       'redirect.create',
+      'redirect.update',
       'redirect.delete',
       'menu.publish',
     ],
@@ -126,9 +131,12 @@ export const auditActionGroups: readonly AuditActionGroup[] = [
     actions: [
       'settings.change',
       'maintenance.start',
-      'maintenance.cancel',
+      'maintenance.end',
+      'maintenance.window_create',
+      'maintenance.window_delete',
       'flag.toggle',
       'public_stats.change',
+      'settings.key_reveal',
     ],
   },
   {
@@ -155,6 +163,154 @@ export function groupForAction(action: string): string | null {
 export function groupLabel(groupId: string): string {
   if (groupId === UNGROUPED_GROUP_ID) return 'Muud tegevused'
   return auditActionGroups.find((group) => group.id === groupId)?.label ?? groupId
+}
+
+/**
+ * Per-action Estonian human labels (spec admin-governance, task 1.7 +
+ * 4.7): full coverage of the registry groups plus the dotted keys the
+ * writers emit outside them. Unmapped keys fall back to the raw key so the
+ * UI never shows an empty action.
+ */
+const auditActionLabels: Record<string, string> = {
+  // Identiteet ja õigused
+  'user.identity_view': 'Isikuandmete vaatamine',
+  'user.right_grant': 'Pakkumisõiguse andmine',
+  'user.right_revoke': 'Pakkumisõiguse tühistamine',
+  'user.suspend': 'Konto peatamine',
+  'user.ban': 'Konto keelamine',
+  'user.force_logout': 'Sunnitud väljalogimine',
+  'user.impersonate': 'Vaatluse seanss',
+  'user.gdpr_export': 'Isikuandmete eksport',
+  'user.gdpr_delete': 'Konto kustutamine',
+  'user.shill_flag': 'Shill-uurimise märkimine',
+  // Oksjonid
+  'auction.create': 'Oksjoni loomine',
+  'auction.publish': 'Oksjoni avaldamine',
+  'auction.schedule': 'Oksjoni ajastamine',
+  'auction.update': 'Oksjoni muutmine',
+  'auction.end_manual': 'Oksjoni enneaegne lõpetamine',
+  'auction.relist': 'Oksjoni uuesti esile panek',
+  'auction.archive': 'Oksjoni arhiveerimine',
+  'auction.alias_regen': 'Alias-aadressi uuesti genereerimine',
+  'auction.fee_override': 'Tasude ülekirjutamine',
+  'auction.export': 'Oksjoni eksport',
+  // Suletud avamine
+  'sealed.sign_opener': 'Avaja allkiri',
+  'sealed.sign_approver': 'Kinnitaja allkiri',
+  'sealed.reveal': 'Pakkumiste avamine',
+  'sealed.winner_confirm': 'Võitja kinnitamine',
+  'sealed.void': 'Avamise tühistamine',
+  'sealed.mark_unsold': 'Müümata märkimine',
+  'sealed.house_backup': 'Varupakkumise otsus',
+  // Pakkumised
+  'bid.approve': 'Pakkumise kinnitamine',
+  'bid.reject': 'Pakkumise tagasilükkamine',
+  'bid.export': 'Pakkumiste eksport',
+  'bid.void': 'Juhtiva pakkumise tühistamine',
+  'anomaly.flag': 'Anomaalia märkimine',
+  // Lepingud
+  'contract.void': 'Lepingu tühistamine',
+  'contract.resend': 'Lepingu uuesti saatmine',
+  'contract.download_container': 'Lepingu konteineri allalaadimine',
+  'template.upload': 'Lepingu malli üleslaadimine',
+  'template.activate': 'Lepingu malli aktiveerimine',
+  'template.deactivate': 'Lepingu malli deaktiveerimine',
+  // Ettevõtted
+  'company.approve': 'Ettevõtte kinnitamine',
+  'company.reject': 'Ettevõtte taotluse keeld',
+  'company.hold': 'Ettevõtte taotluse hoid',
+  'company.registry_view': 'Ettevõtte registri vaatamine',
+  // Juhtlõimed
+  'lead.create_manual': 'Juhtlõime loomine',
+  'lead.assign': 'Juhtlõime määramine',
+  'lead.status': 'Juhtlõime oleku muutmine',
+  'lead.note': 'Juhtlõime märkuse lisamine',
+  'lead.next_action': 'Juhtlõime järgmise tegevuse määramine',
+  'lead.export': 'Juhtlõimede eksport',
+  'lead.delete': 'Juhtlõime kustutamine',
+  // Päringud
+  'request.forward': 'Päringu edastamine',
+  'request.close': 'Päringu sulgemine',
+  'request.mark_done': 'Päringu teostatuks märkimine',
+  'request.mark_responded': 'Päringu vastatuks märkimine',
+  'partner.create': 'Partneri loomine',
+  'partner.update': 'Partneri muutmine',
+  'partner.delete': 'Partneri kustutamine',
+  'partner.deactivate': 'Partneri deaktiveerimine',
+  // Sisu
+  'content.publish': 'Sisu avaldamine',
+  'content.schedule': 'Sisu avaldamise ajastamine',
+  'content.restore': 'Sisu taastamine',
+  'content.version.create': 'Lehe versiooni salvestamine',
+  'content.version.restore': 'Lehe versiooni taastamine',
+  'content.blocks.save': 'Lehe blokkide salvestamine',
+  'media.replace': 'Meediafaili asendamine',
+  'redirect.create': 'Suunamise loomine',
+  'redirect.update': 'Suunamise muutmine',
+  'redirect.delete': 'Suunamise kustutamine',
+  'menu.publish': 'Menüü avaldamine',
+  // Seaded
+  'settings.change': 'Seadete muutmine',
+  'maintenance.start': 'Hooldusrežiimi sisselülitamine',
+  'maintenance.end': 'Hooldusrežiimi väljalülitamine',
+  'maintenance.window_create': 'Hooldusakna loomine',
+  'maintenance.window_delete': 'Hooldusakna kustutamine',
+  'flag.toggle': 'Lüliti lülitamine',
+  'public_stats.change': 'Avalike statistikate muutmine',
+  'settings.key_reveal': 'Integratsioonivõtme paljastamine',
+  // Audit
+  'audit.export': 'Auditlogi eksport',
+}
+
+export function actionLabel(action: string): string {
+  return auditActionLabels[action] ?? action
+}
+
+/**
+ * Browser family for the drawer's "Brauser" field (spec: user-agent
+ * family). Order matters: Edge/Opera/Samsung ride a Chromium UA, so their
+ * markers are checked before Chrome, and Chrome before Safari.
+ */
+export function userAgentFamily(userAgent: string | null | undefined): string {
+  if (!userAgent || userAgent.trim().length === 0) return '—'
+  const families: readonly (readonly [RegExp, string])[] = [
+    [/Edg\//, 'Edge'],
+    [/OPR\/|Opera/, 'Opera'],
+    [/SamsungBrowser\//, 'Samsung Internet'],
+    [/FxiOS\/|Firefox\//, 'Firefox'],
+    [/CriOS\/|Chrome\//, 'Chrome'],
+    [/Safari\//, 'Safari'],
+    [/curl\//, 'curl'],
+  ]
+  for (const [pattern, label] of families) {
+    if (pattern.test(userAgent)) return label
+  }
+  return 'Tundmatu'
+}
+
+/**
+ * Reason for the Põhjus column and drawer (spec scenario: a settings save
+ * with a reason shows it in both). The dedicated era column wins; legacy
+ * entries keep their reason only inside the before/after JSON, so those are
+ * checked next.
+ */
+export function auditEntryReason(entry: {
+  reason?: string | null
+  before?: unknown
+  after?: unknown
+}): string | null {
+  if (typeof entry.reason === 'string' && entry.reason.trim().length > 0) {
+    return entry.reason.trim()
+  }
+  for (const payload of [entry.after, entry.before]) {
+    if (typeof payload === 'object' && payload !== null) {
+      const reason = (payload as Record<string, unknown>).reason
+      if (typeof reason === 'string' && reason.trim().length > 0) {
+        return reason.trim()
+      }
+    }
+  }
+  return null
 }
 
 /**

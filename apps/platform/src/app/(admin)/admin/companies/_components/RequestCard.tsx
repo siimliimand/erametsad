@@ -3,10 +3,12 @@
 import { Clock as ClockIcon } from 'lucide-react'
 import { useRef, useState } from 'react'
 
+import { slaChip } from './history-view'
 import {
   approveCompanyAccessRequestAction,
   holdCompanyAccessRequestAction,
   rejectCompanyAccessRequestAction,
+  registryRecheckAction,
 } from '../../../_actions/ops'
 import { primaryButtonClass, secondaryButtonClass } from '../../../_components/FormField'
 import { StatusChip, type StatusChipVariant } from '../../../_components/StatusChip'
@@ -28,8 +30,10 @@ import { Switch } from '../../../_components/ui/Switch'
 import { formatDateTime } from '../../../_lib/labels'
 import type {
   BoardMembershipCheck,
+  RegistryNameDiscrepancy,
   RegistrySnapshot,
 } from '../../leads/_components/registry-snapshot'
+import { detectNameDiscrepancy } from '../../leads/_components/registry-snapshot'
 
 import type { CompanyAccessRequest, CompanyAccessRequestStatus } from '@/lib/data/schema'
 
@@ -45,6 +49,30 @@ export interface DuplicateView {
   ownerName: string
 }
 
+/** One profile already registered on this company's registry code. */
+export interface ApplicantProfileView {
+  profileId: string
+  ownerName: string
+  approvalStatus: 'pending' | 'approved' | 'rejected'
+}
+
+/** Compact bidding history of the applicant (past bids and auctions). */
+export interface BiddingHistoryView {
+  bidCount: number
+  auctionCount: number
+  lastBidAt: string | null
+}
+
+/**
+ * Framework contract (raamleping) status of the applicant: signed with the
+ * date, unsigned when an active framework template exists, unknown when the
+ * gate has no active framework template.
+ */
+export interface FrameworkContractView {
+  state: 'signed' | 'unsigned' | 'unknown'
+  signedAt: string | null
+}
+
 export interface RequestCardData {
   request: CompanyAccessRequest
   snapshot: RegistrySnapshot
@@ -52,6 +80,13 @@ export interface RequestCardData {
   boardCheck: BoardMembershipCheck
   duplicate: DuplicateView | null
   waitingDays: number
+  /** Profiles already registered on the same registry code. */
+  existingProfiles: ApplicantProfileView[]
+  /** Applicant bidding history, null when no portal account was found. */
+  biddingHistory: BiddingHistoryView | null
+  frameworkContract: FrameworkContractView
+  /** Approve rights defaults read from Seaded (spec delta admin-people). */
+  defaultRights: readonly AuctionObjectTypeValue[]
 }
 
 // Local copy of lib/data/schema auctionObjectTypes so the client bundle does
@@ -66,9 +101,6 @@ const auctionObjectTypeRows = [
 
 type AuctionObjectTypeValue = (typeof auctionObjectTypeRows)[number]['value']
 
-// Settings 13 defaults: raieõigus ja kinnistu on ette valitud (design 07).
-const DEFAULT_RIGHTS: readonly AuctionObjectTypeValue[] = ['raieoigus', 'kinnistu']
-
 const statusChipVariant: Record<CompanyAccessRequestStatus, StatusChipVariant> = {
   pending: 'company:pending',
   held: 'company:held',
@@ -76,14 +108,25 @@ const statusChipVariant: Record<CompanyAccessRequestStatus, StatusChipVariant> =
   rejected: 'company:rejected',
 }
 
-function waitBadgeLabel(days: number): string {
-  return days === 1 ? 'Oodanud 1 päev' : `Oodanud ${String(days)} päeva`
+const slaChipToneClass: Record<ReturnType<typeof slaChip>['tone'], string> = {
+  neutral:
+    'bg-bg-mist text-ink-muted',
+  amber:
+    'bg-[var(--st-ended-bg)] text-[color:var(--st-ended-text)]',
+  red: 'bg-danger-light text-danger',
 }
 
-const defaultRightsState = () =>
-  Object.fromEntries(
-    auctionObjectTypeRows.map((row) => [row.value, DEFAULT_RIGHTS.includes(row.value)]),
-  ) as Record<AuctionObjectTypeValue, boolean>
+const profileStatusLabels: Record<ApplicantProfileView['approvalStatus'], string> = {
+  pending: 'ootel',
+  approved: 'kinnitatud',
+  rejected: 'tagasi lükatud',
+}
+
+const frameworkContractLabels: Record<FrameworkContractView['state'], string> = {
+  signed: 'Allkirjastatud',
+  unsigned: 'Allkirjastamata',
+  unknown: '—',
+}
 
 const panelLabelClass =
   'flex items-center gap-1.5 font-heading text-[11px] font-bold uppercase tracking-[0.06em] text-ink-muted'
@@ -105,18 +148,39 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
   const companyName = request.companyName ?? 'Ettevõte puudub'
   const blocked = snapshot.status === 'KUSTUTATUD'
   const uncheckedRegistry = !snapshot.verified
+  const nameDiscrepancy: RegistryNameDiscrepancy | null = detectNameDiscrepancy(
+    request.companyName,
+    snapshot.legalName,
+    snapshot.verified,
+  )
+  const sla = slaChip(waitingDays)
+  // Volikiri enforcement (spec delta admin-people): a failed board-member
+  // check forces the approve dialog to collect a justification and the
+  // power-of-attorney upload before the action can fire.
+  const volikiriRequired = boardCheck.level === 'none'
+
+  const defaultRightsState = () =>
+    Object.fromEntries(
+      auctionObjectTypeRows.map((row) => [row.value, data.defaultRights.includes(row.value)]),
+    ) as Record<AuctionObjectTypeValue, boolean>
 
   const [approveOpen, setApproveOpen] = useState(false)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [holdOpen, setHoldOpen] = useState(false)
   const [rejectBusy, setRejectBusy] = useState(false)
   const [rights, setRights] = useState<Record<AuctionObjectTypeValue, boolean>>(defaultRightsState)
+  const [justification, setJustification] = useState('')
+  const [volikiriFile, setVolikiriFile] = useState<File | null>(null)
 
   const rejectFormRef = useRef<HTMLFormElement>(null)
   const rejectReasonRef = useRef<HTMLInputElement>(null)
 
+  const volikiriSatisfied = justification.trim().length >= 5 && volikiriFile !== null
+
   const openApprove = () => {
     setRights(defaultRightsState())
+    setJustification('')
+    setVolikiriFile(null)
     setApproveOpen(true)
   }
 
@@ -144,9 +208,12 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
         <span className="ml-auto text-bodySm text-ink-muted">
           Esitatud: {formatDateTime(request.createdAt)}
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-pill bg-[var(--st-ended-bg)] px-2.5 py-0.5 text-label font-semibold text-[color:var(--st-ended-text)]">
+        <span
+          title="Taotluse ooteaeg: kollane üle 2 päeva, punane üle 5 päeva"
+          className={`inline-flex items-center gap-1.5 rounded-pill px-2.5 py-0.5 text-label font-semibold ${slaChipToneClass[sla.tone]}`}
+        >
           <ClockIcon className="h-3 w-3" aria-hidden="true" />
-          {waitBadgeLabel(waitingDays)}
+          {sla.label}
         </span>
         <StatusChip status={statusChipVariant[request.status]} />
       </header>
@@ -169,6 +236,14 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
               <div className={dataRowClass}>
                 <dt className="text-ink-muted">Registrikood</dt>
                 <dd className="m-0 font-mono text-ink">{request.regCode}</dd>
+              </div>
+              <div className={dataRowClass}>
+                <dt className="text-ink-muted">Asukoht</dt>
+                <dd className="m-0 min-w-0 break-words text-ink">{snapshot.address ?? '—'}</dd>
+              </div>
+              <div className={dataRowClass}>
+                <dt className="text-ink-muted">KMKR nr</dt>
+                <dd className="m-0 font-mono text-ink">{snapshot.kmkrNr ?? '—'}</dd>
               </div>
               <div className={dataRowClass}>
                 <dt className="text-ink-muted">Õiguslik vorm</dt>
@@ -213,6 +288,29 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
                 </dd>
               </div>
             </dl>
+            {nameDiscrepancy ? (
+              <div className={`${warnAmberClass} mt-2`}>
+                <TriangleAlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <strong>Nime erinevus.</strong> Taotleja sisestatud nimi ei kattu äriregistri
+                  nimega.
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="rounded-input border border-border bg-bgPage px-2.5 py-1.5">
+                      <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.06em] text-ink-muted">
+                        Taotleja sisestus
+                      </span>
+                      <span className="break-words font-medium">{nameDiscrepancy.applicantName}</span>
+                    </div>
+                    <div className="rounded-input border border-border bg-bgPage px-2.5 py-1.5">
+                      <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.06em] text-ink-muted">
+                        Äriregister
+                      </span>
+                      <span className="break-words font-medium">{nameDiscrepancy.registryName}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {boardCheck.level !== 'strong' && members.length > 0 ? (
               <p className="mb-0 mt-2 text-bodySm text-ink-muted">
                 Registri juhatus:{' '}
@@ -236,7 +334,8 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
               <div className={`${warnRedClass} mt-2`}>
                 <TriangleAlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>
-                  <strong>Taotleja ei ole juhatuse liige.</strong> Nõuab volikirja olemasolu kontrolli.
+                  <strong>Taotleja ei ole juhatuse liige.</strong> Ainult keeldumine või nõustumine
+                  põhjenduse ja volikirjaga.
                 </span>
               </div>
             ) : null}
@@ -244,6 +343,18 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
               <p className="mb-0 mt-2 text-bodySm font-medium text-danger">
                 Sisestatud andmed on kinnitamata — registrit vastet ei leitud.
               </p>
+            ) : null}
+            {canWrite ? (
+              <form action={registryRecheckAction} className="mt-2.5 border-t border-border pt-2.5">
+                <input type="hidden" name="id" value={request.id} />
+                <input type="hidden" name="redirectTo" value="/admin/companies" />
+                <button
+                  type="submit"
+                  className="inline-flex h-7 items-center rounded-button border border-border bg-bgPage px-2.5 text-label font-semibold text-ink-muted transition-colors duration-hover ease-hover hover:border-primary hover:text-primary"
+                >
+                  Kontrolli uuesti
+                </button>
+              </form>
             ) : null}
           </div>
         </section>
@@ -289,6 +400,67 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
             <blockquote className="m-0 rounded-r-input border-l-[3px] border-primary-light bg-bg-mist px-3.5 py-2.5 text-bodySm italic text-ink">
               {request.reason ?? '—'}
             </blockquote>
+          </div>
+          <div className="rounded-input border border-border p-3.5">
+            <h3 className={`${panelLabelClass} mb-2`}>
+              <UsersIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              Taotleja kontekst
+            </h3>
+            <dl className="m-0">
+              <div className={dataRowClass}>
+                <dt className="text-ink-muted">Olemasolevad profiilid</dt>
+                <dd className="m-0 min-w-0 text-ink">
+                  {data.existingProfiles.length > 0 ? (
+                    <span className="flex flex-col gap-1">
+                      {data.existingProfiles.map((profile) => (
+                        <span key={profile.profileId} className="break-words">
+                          {profile.ownerName}{' '}
+                          <span className="font-medium text-ink-muted">
+                            ({profileStatusLabels[profile.approvalStatus]})
+                          </span>
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    '—'
+                  )}
+                </dd>
+              </div>
+              <div className={dataRowClass}>
+                <dt className="text-ink-muted">Pakkumiste ajalugu</dt>
+                <dd className="m-0 min-w-0 break-words text-ink">
+                  {data.biddingHistory ? (
+                    <>
+                      {`${String(data.biddingHistory.bidCount)} pakkumist · ${String(data.biddingHistory.auctionCount)} oksjonit`}
+                      {data.biddingHistory.lastBidAt
+                        ? ` · viimane ${formatDateTime(data.biddingHistory.lastBidAt)}`
+                        : ''}
+                    </>
+                  ) : (
+                    '—'
+                  )}
+                </dd>
+              </div>
+              <div className={dataRowClass}>
+                <dt className="text-ink-muted">Raamleping</dt>
+                <dd className="m-0 min-w-0 break-words text-ink">
+                  <span
+                    className={
+                      data.frameworkContract.state === 'signed'
+                        ? 'font-semibold text-[color:var(--st-active-text)]'
+                        : data.frameworkContract.state === 'unsigned'
+                          ? 'font-semibold text-[color:var(--st-ended-text)]'
+                          : undefined
+                    }
+                  >
+                    {frameworkContractLabels[data.frameworkContract.state]}
+                  </span>
+                  {data.frameworkContract.state === 'signed' && data.frameworkContract.signedAt
+                    ? ` ${formatDateTime(data.frameworkContract.signedAt)}`
+                    : null}
+                </dd>
+              </div>
+            </dl>
           </div>
         </section>
       </div>
@@ -348,9 +520,19 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
         <Modal open={approveOpen} onClose={() => { setApproveOpen(false); }} title="Nõustu — aktiveeri profiil">
           <form action={approveCompanyAccessRequestAction} className="flex flex-col gap-3">
             <input type="hidden" name="id" value={request.id} />
+            <input type="hidden" name="redirectTo" value="/admin/companies" />
             <p className="m-0 text-bodySm text-ink">
               Aktiveeritav ettevõte: <strong>{companyName}</strong>
             </p>
+            {volikiriRequired ? (
+              <div className={warnRedClass}>
+                <TriangleAlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>
+                  <strong>Taotleja ei ole juhatuse liige.</strong> Nõustumine nõuab põhjendust ja
+                  volikirja (PDF/JPG/PNG, kuni 5 MB); mõlemad logitakse auditilogisse.
+                </span>
+              </div>
+            ) : null}
             <div className="flex flex-col gap-1">
               <span className="text-label font-semibold text-ink">
                 Vaikimisi antavad pakkumisõigused
@@ -383,6 +565,50 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
                 <input key={value} type="hidden" name="rights" value={value} />
               ) : null,
             )}
+            {volikiriRequired ? (
+              <>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor={`volikiri-justification-${request.id}`}
+                    className="text-label font-semibold text-ink"
+                  >
+                    Põhjendus (kohustuslik, min 5 tähemärki)
+                  </label>
+                  <textarea
+                    id={`volikiri-justification-${request.id}`}
+                    name="justification"
+                    rows={3}
+                    required
+                    minLength={5}
+                    value={justification}
+                    onChange={(event) => {
+                      setJustification(event.target.value)
+                    }}
+                    placeholder="Nt taotleja volitatud juhatuse poolt — volikiri lisatud."
+                    className={textareaClass}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor={`volikiri-file-${request.id}`}
+                    className="text-label font-semibold text-ink"
+                  >
+                    Volikiri (kohustuslik, PDF/JPG/PNG, kuni 5 MB)
+                  </label>
+                  <input
+                    id={`volikiri-file-${request.id}`}
+                    type="file"
+                    name="volikiri"
+                    required
+                    accept=".pdf,image/jpeg,image/png"
+                    onChange={(event) => {
+                      setVolikiriFile(event.target.files?.[0] ?? null)
+                    }}
+                    className="w-full rounded-input border border-border bg-bgPage px-3 py-2 text-bodySm text-ink"
+                  />
+                </div>
+              </>
+            ) : null}
             <label className="flex items-center gap-2 text-bodySm text-ink">
               <input
                 type="checkbox"
@@ -399,7 +625,7 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
               <button type="button" onClick={() => { setApproveOpen(false); }} className={secondaryButtonClass}>
                 Tühista
               </button>
-              <button type="submit" className={primaryButtonClass}>
+              <button type="submit" disabled={volikiriRequired && !volikiriSatisfied} className={primaryButtonClass}>
                 <CheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
                 Kinnita ja aktiveeri
               </button>
@@ -431,12 +657,14 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
           />
           <form ref={rejectFormRef} action={rejectCompanyAccessRequestAction} hidden>
             <input type="hidden" name="id" value={request.id} />
+            <input type="hidden" name="redirectTo" value="/admin/companies" />
             <input ref={rejectReasonRef} type="hidden" name="reason" defaultValue="" />
           </form>
 
           <Modal open={holdOpen} onClose={() => { setHoldOpen(false); }} title="Jäta taotlus ootele">
             <form action={holdCompanyAccessRequestAction} className="flex flex-col gap-3">
               <input type="hidden" name="id" value={request.id} />
+              <input type="hidden" name="redirectTo" value="/admin/companies" />
               <div className="flex flex-col gap-1">
                 <label htmlFor={`hold-note-${request.id}`} className="text-label font-semibold text-ink">
                   Sisemärkus (kohustuslik)

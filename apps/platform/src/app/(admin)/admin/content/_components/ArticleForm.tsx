@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
+import { RichTextFormValue } from './RichTextFormValue'
 import {
   contentPublicPath,
   redirectPathsForSlugChange,
@@ -14,19 +15,73 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../../../_components/FormField'
+import { requireAdminRepositories } from '../../../_lib/admin'
 import { contentStatusLabels } from '../../../_lib/labels'
+import {
+  articleCategoryLabels,
+  ogPreview,
+  SEO_DESCRIPTION_MAX,
+  SEO_TITLE_MAX,
+  seoCounter,
+  serpPreview,
+} from '../articles/_lib/article-seo'
 
 import type { ArticleDoc } from '@/lib/data/repositories'
-import { contentStatuses } from '@/lib/data/schema'
+import { articleCategories, contentStatuses } from '@/lib/data/schema'
 
 const statusOptions = contentStatuses.map((status) => ({
   value: status,
   label: contentStatusLabels[status],
 }))
 
+const categoryOptions = articleCategories.map((category) => ({
+  value: category,
+  label: articleCategoryLabels[category],
+}))
+
 const mediaIdHint = 'Meediafaili ID. Meediakogu haldus lisandub hiljem.'
 
-export function ArticleForm({ article }: { article?: ArticleDoc }) {
+function CharacterCounter({ value, max }: { value: string | null | undefined; max: number }) {
+  const counter = seoCounter(value, max)
+  return (
+    <p
+      className={`text-bodySm ${counter.over ? 'font-semibold text-danger' : 'text-inkMuted'}`}
+    >
+      {counter.length}/{counter.max} tähemärki{counter.over ? ' (üle lubatud)' : ''}
+    </p>
+  )
+}
+
+export async function ArticleForm({ article }: { article?: ArticleDoc }) {
+  const { repositories } = await requireAdminRepositories()
+  const { docs: specialists } = await repositories.find({
+    collection: 'specialists',
+    where: { active: { equals: true } },
+    sort: 'name',
+    pagination: false,
+  })
+  const specialistOptions = [
+    { value: '', label: '— pole määratud —' },
+    ...specialists.map((specialist) => ({ value: specialist.id, label: specialist.name })),
+  ]
+
+  const seoTitle = article?.seoTitle ?? ''
+  const seoDescription = article?.seoDescription ?? ''
+  const serp = serpPreview({
+    slug: article?.slug,
+    title: article?.title,
+    seoTitle,
+    excerpt: article?.excerpt,
+    seoDescription,
+  })
+  const og = ogPreview({
+    title: article?.title,
+    seoTitle,
+    excerpt: article?.excerpt,
+    seoDescription,
+    ogImageId: article?.ogImageId,
+  })
+
   const redirectPaths =
     article?.status === 'published'
       ? redirectPathsForSlugChange('articles', article.slug, article.slug)
@@ -46,20 +101,39 @@ export function ArticleForm({ article }: { article?: ArticleDoc }) {
         hint="Näiteks: metsa-muugi-juhend"
         defaultValue={article?.slug ?? ''}
       />
+      <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
+        <FormSelectField
+          label="Kategooria"
+          name="category"
+          options={categoryOptions}
+          defaultValue={article?.category ?? 'uudised'}
+        />
+        <FormSelectField
+          label="Autor-spetsialist"
+          name="authorSpecialistId"
+          options={specialistOptions}
+          hint="Klientide loo autoriks vali meeskonna spetsialist."
+          defaultValue={article?.authorSpecialistId ?? ''}
+        />
+      </div>
       <FormTextareaField
         label="Lühikirjeldus"
         name="excerpt"
         rows={2}
         defaultValue={article?.excerpt ?? ''}
       />
-      <FormTextareaField
-        label="Sisu"
+      <RichTextFormValue
         name="content"
-        rows={10}
-        hint="HTML sisu."
+        label="Sisu"
         defaultValue={article?.content ?? ''}
+        hint="Vormindatud sisu; salvestub HTML-ina."
       />
-      <FormField label="Autor" name="author" defaultValue={article?.author ?? ''} />
+      <FormField
+        label="Autor (vaba tekst)"
+        name="author"
+        hint="Vana välja vanadele artiklitele; uute artiklite autoriks vali spetsialist."
+        defaultValue={article?.author ?? ''}
+      />
       <FormField
         label="Sildid"
         name="tags"
@@ -91,6 +165,65 @@ export function ArticleForm({ article }: { article?: ArticleDoc }) {
         hint={mediaIdHint}
         defaultValue={article?.featuredImageId ?? ''}
       />
+      <section className="space-y-sm rounded-card border border-border p-md">
+        <h2 className="text-label font-semibold text-ink">SEO</h2>
+        <div className="space-y-1">
+          <FormField
+            label="SEO pealkiri"
+            name="seoTitle"
+            hint="Otsingutulekus kuvatav pealkiri."
+            defaultValue={seoTitle}
+          />
+          <CharacterCounter value={seoTitle} max={SEO_TITLE_MAX} />
+        </div>
+        <div className="space-y-1">
+          <FormTextareaField
+            label="SEO kirjeldus"
+            name="seoDescription"
+            rows={3}
+            hint="Otsingutulekus kuvatav kirjeldus."
+            defaultValue={seoDescription}
+          />
+          <CharacterCounter value={seoDescription} max={SEO_DESCRIPTION_MAX} />
+        </div>
+        <FormField
+          label="Kanooniline URL"
+          name="canonicalUrl"
+          hint="Kui artikkel kordab teise aadressi sisu, siis selle aadress."
+          defaultValue={article?.canonicalUrl ?? ''}
+        />
+        <FormField
+          label="OG-pildi ID"
+          name="ogImageId"
+          hint={`Jagamisel kuvatav pilt (soovituslik 1200×630). ${mediaIdHint}`}
+          defaultValue={article?.ogImageId ?? ''}
+        />
+        <CheckboxField
+          label="Indekseerimine lubatud"
+          name="robotsIndex"
+          hint="Kui märkimata, palutakse otsingumootoritel artikkel indekseerimata jätta (noindex)."
+          defaultChecked={article?.robotsIndex ?? true}
+        />
+        <div className="space-y-1 rounded-card bg-bgMist p-sm">
+          <p className="text-bodySm text-inkMuted">Otsingutuleku eelvaade</p>
+          <p className="text-bodySm text-primaryDark">{serp.url}</p>
+          <p className="text-body font-medium text-primary">{serp.title}</p>
+          <p className="text-bodySm text-ink">{serp.description}</p>
+        </div>
+        <div>
+          <p className="mb-1 text-bodySm text-inkMuted">Jagamise (OG) eelvaade</p>
+          <div className="overflow-hidden rounded-card border border-border">
+            <div className="flex h-36 items-center justify-center bg-bgMist px-sm text-bodySm text-inkMuted">
+              {og.imageId ? `OG pilt: ${og.imageId}` : 'OG pilt puudub'}
+            </div>
+            <div className="space-y-1 bg-bgPage p-sm">
+              <p className="text-bodySm uppercase text-inkMuted">{og.siteName}</p>
+              <p className="text-body font-medium text-ink">{og.title}</p>
+              <p className="text-bodySm text-inkMuted">{og.description}</p>
+            </div>
+          </div>
+        </div>
+      </section>
       {article?.status === 'published' && redirectPaths ? (
         <CheckboxField
           label="Loo suunamine vana aadressilt"

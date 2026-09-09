@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { StaffRole } from '../../../_lib/permissions'
 import {
-  ENDING_TODAY_WINDOW_MS,
+  BIDS_SPARKLINE_DAYS,
   RECENT_LEAD_LIMIT,
   approvalSplitSubline,
   auctionScopeWhere,
+  bidDailyCounts,
   bidTrendChangePercent,
   bidTrendSubline,
   bidsSince,
@@ -14,10 +15,13 @@ import {
   buildWorkspaceKpis,
   buildWorkspaceQueues,
   countByStatus,
+  countNewLeadsToday,
   endingTodayAuctions,
   endingTodayRows,
   getWorkspaceData,
-  isEndingWithin,
+  isAdminRole,
+  isEndingToday,
+  isNewLeadRow,
   leadScopeWhere,
   monthServiceFeeCents,
   newRequestsCountLabel,
@@ -27,8 +31,10 @@ import {
   sealedAwaitingCeremony,
   sentContractsCountLabel,
   startOfDayMs,
+  startOfTallinnDayMs,
   startOfMonthMs,
   successFeeCents,
+  successFeeExVatCents,
   underbidPendingNote,
   type WorkspaceAuctionSlice,
   type WorkspaceBidSlice,
@@ -43,6 +49,9 @@ import {
 const DAY_MS = 86_400_000
 const HOUR_MS = 3_600_000
 const NOW = new Date('2026-09-08T10:30:00.000Z').getTime()
+/** Europe/Tallinn is UTC+3 in September and UTC+2 in January. */
+const TALLINN_DAY_START = new Date('2026-09-07T21:00:00.000Z').getTime()
+const TALLINN_YESTERDAY_START = new Date('2026-09-06T21:00:00.000Z').getTime()
 
 function iso(ms: number): string {
   return new Date(ms).toISOString()
@@ -87,6 +96,9 @@ function lead(overrides: Partial<WorkspaceLeadSlice> = {}): WorkspaceLeadSlice {
     contactName: 'Mari Maasikas',
     formName: 'Metsa müük',
     source: null,
+    status: 'new',
+    countyId: null,
+    assignedSpecialistId: null,
     createdAt: iso(NOW - 60_000),
     ...overrides,
   }
@@ -103,21 +115,27 @@ function assertFiniteNumbers(value: unknown): void {
 }
 
 describe('ending-window filters', () => {
-  it('keeps the ending-today lookahead at 24 hours', () => {
-    expect(ENDING_TODAY_WINDOW_MS).toBe(DAY_MS)
+  it('uses the Europe/Tallinn calendar day for "Lõpevad täna"', () => {
+    expect(startOfTallinnDayMs(NOW)).toBe(TALLINN_DAY_START)
+
+    // Ends today inside the Tallinn day.
+    expect(isEndingToday(iso(TALLINN_DAY_START), NOW)).toBe(true)
+    expect(isEndingToday(iso(NOW + HOUR_MS), NOW)).toBe(true)
+    // Spec scenario: tomorrow 00:30 Europe/Tallinn is not today.
+    expect(isEndingToday(new Date('2026-09-08T21:30:00.000Z').toISOString(), NOW)).toBe(false)
+    expect(isEndingToday(new Date('2026-09-09T21:30:00.000Z').toISOString(), NOW)).toBe(false)
+    // Yesterday is not today either.
+    expect(isEndingToday(iso(TALLINN_DAY_START - 1), NOW)).toBe(false)
+    // Winter offset (UTC+2): January 15th starts at 22:00 UTC on the 14th.
+    const januaryNoon = new Date('2027-01-15T12:00:00.000Z').getTime()
+    expect(startOfTallinnDayMs(januaryNoon)).toBe(
+      new Date('2027-01-14T22:00:00.000Z').getTime(),
+    )
+    expect(isEndingToday(null, NOW)).toBe(false)
+    expect(isEndingToday('not-a-date', NOW)).toBe(false)
   })
 
-  it('treats the window edges inclusively and rejects bad timestamps', () => {
-    expect(isEndingWithin(iso(NOW), NOW, DAY_MS)).toBe(true)
-    expect(isEndingWithin(iso(NOW + DAY_MS), NOW, DAY_MS)).toBe(true)
-    expect(isEndingWithin(iso(NOW + DAY_MS + 1), NOW, DAY_MS)).toBe(false)
-    expect(isEndingWithin(iso(NOW - 1), NOW, DAY_MS)).toBe(false)
-    expect(isEndingWithin(null, NOW, DAY_MS)).toBe(false)
-    expect(isEndingWithin('', NOW, DAY_MS)).toBe(false)
-    expect(isEndingWithin('not-a-date', NOW, DAY_MS)).toBe(false)
-  })
-
-  it('keeps only active auctions inside the window, soonest first', () => {
+  it('keeps only active auctions ending today, soonest first', () => {
     const rows = endingTodayAuctions(
       [
         auction({ id: 'late', endsAt: iso(NOW + 30 * HOUR_MS) }),
@@ -167,20 +185,41 @@ describe('bid aggregations', () => {
     expect(kept.map((row) => row.id)).toEqual(['in'])
   })
 
-  it('splits bids into the today and yesterday windows with inclusive edges', () => {
-    const dayStart = startOfDayMs(NOW)
+  it('splits bids into the today and yesterday Tallinn days with inclusive edges', () => {
     const counts = bidsTodayCounts(
       [
-        bid({ id: 'b-1', createdAt: iso(dayStart) }),
+        bid({ id: 'b-1', createdAt: iso(TALLINN_DAY_START) }),
         bid({ id: 'b-2', createdAt: iso(NOW) }),
-        bid({ id: 'b-3', createdAt: iso(dayStart - 1) }),
-        bid({ id: 'b-4', createdAt: iso(dayStart - DAY_MS) }),
-        bid({ id: 'b-5', createdAt: iso(dayStart - DAY_MS - 1) }),
+        bid({ id: 'b-3', createdAt: iso(TALLINN_DAY_START - 1) }),
+        bid({ id: 'b-4', createdAt: iso(TALLINN_YESTERDAY_START) }),
+        bid({ id: 'b-5', createdAt: iso(TALLINN_YESTERDAY_START - 1) }),
         bid({ id: 'b-6', createdAt: 'not-a-date' }),
       ],
       NOW,
     )
     expect(counts).toEqual({ today: 2, yesterday: 2 })
+  })
+
+  it('builds the 7-day daily counts for the sparkline, oldest day first', () => {
+    const twoDaysAgo = TALLINN_YESTERDAY_START - DAY_MS
+    const counts = bidDailyCounts(
+      [
+        bid({ id: 'd-1', createdAt: iso(twoDaysAgo + HOUR_MS) }),
+        bid({ id: 'd-2', createdAt: iso(twoDaysAgo + 2 * HOUR_MS) }),
+        bid({ id: 'd-3', createdAt: iso(TALLINN_YESTERDAY_START + HOUR_MS) }),
+        bid({ id: 'd-4', createdAt: iso(TALLINN_DAY_START + HOUR_MS) }),
+        // Before the 7-day window (Tallinn Sep 2..Sep 8).
+        bid({ id: 'd-5', createdAt: iso(TALLINN_DAY_START - 6 * DAY_MS - 1) }),
+        bid({ id: 'd-6', createdAt: 'not-a-date' }),
+      ],
+      NOW,
+    )
+    expect(BIDS_SPARKLINE_DAYS).toBe(7)
+    expect(counts).toHaveLength(7)
+    expect(counts.slice(0, 4)).toEqual([0, 0, 0, 0])
+    expect(counts[4]).toBe(2)
+    expect(counts[5]).toBe(1)
+    expect(counts[6]).toBe(1)
   })
 
   it('returns zero bid counts for an empty slice', () => {
@@ -217,7 +256,7 @@ describe('bid aggregations', () => {
 })
 
 describe('fee math', () => {
-  it('charges the 3% + VAT default fee', () => {
+  it('charges the 3% + VAT default fee for contracts', () => {
     expect(successFeeCents(10_000, null)).toBe(366)
     expect(successFeeCents(3333, null)).toBe(122)
   })
@@ -225,6 +264,13 @@ describe('fee math', () => {
   it('honours the per-auction fee override including zero', () => {
     expect(successFeeCents(10_000, 10)).toBe(1220)
     expect(successFeeCents(10_000, 0)).toBe(0)
+  })
+
+  it('shows the dashboard fee without VAT', () => {
+    expect(successFeeExVatCents(10_000, null)).toBe(300)
+    expect(successFeeExVatCents(3333, null)).toBe(100)
+    expect(successFeeExVatCents(10_000, 10)).toBe(1000)
+    expect(successFeeExVatCents(10_000, 0)).toBe(0)
   })
 
   function feeAt(
@@ -239,9 +285,9 @@ describe('fee math', () => {
     )
   }
 
-  it('sums fees for completed and archived lots inside the month', () => {
-    expect(feeAt(iso(NOW))).toBe(366)
-    expect(feeAt(iso(NOW), 'archived')).toBe(366)
+  it('sums ex-VAT fees for completed and archived lots inside the month', () => {
+    expect(feeAt(iso(NOW))).toBe(300)
+    expect(feeAt(iso(NOW), 'archived')).toBe(300)
     expect(
       monthServiceFeeCents(
         [
@@ -260,7 +306,7 @@ describe('fee math', () => {
         ],
         NOW,
       ),
-    ).toBe(732)
+    ).toBe(600)
   })
 
   it('excludes completions before the month, in the future, or unparsable', () => {
@@ -346,29 +392,121 @@ describe('ending-today rows', () => {
 })
 
 describe('recent lead rows', () => {
-  it('takes the newest slice up to the default limit and maps every field', () => {
-    const newest = lead({ id: 'lead-1', contactName: 'Contact 1', source: 'Veebivorm' })
-    const rows = recentLeadRows([
-      newest,
-      lead({ id: 'lead-2', contactName: 'Contact 2', source: null }),
-      lead({ id: 'lead-3', contactName: 'Contact 3' }),
-      lead({ id: 'lead-4', contactName: 'Contact 4' }),
-    ])
-    expect(RECENT_LEAD_LIMIT).toBe(3)
-    expect(rows).toHaveLength(3)
+  const names = {
+    countyNameById: new Map([['county-1', 'Tartumaa']]),
+    specialistNameById: new Map([['spec-1', 'Jaan Spetsialist']]),
+  }
+
+  it('takes the newest slice up to the default limit and maps chips', () => {
+    const newest = lead({
+      id: 'lead-1',
+      contactName: 'Contact 1',
+      source: 'Veebivorm',
+      countyId: 'county-1',
+      assignedSpecialistId: 'spec-1',
+    })
+    const rows = recentLeadRows(
+      [
+        newest,
+        lead({ id: 'lead-2', contactName: 'Contact 2', source: null }),
+        lead({ id: 'lead-3', contactName: 'Contact 3' }),
+        lead({ id: 'lead-4', contactName: 'Contact 4' }),
+      ],
+      names,
+    )
+    expect(RECENT_LEAD_LIMIT).toBe(8)
+    expect(rows).toHaveLength(4)
     expect(rows[0]).toEqual({
       id: 'lead-1',
       createdAt: newest.createdAt,
       contactName: 'Contact 1',
       formName: 'Metsa müük',
       source: 'Veebivorm',
+      countyName: 'Tartumaa',
+      specialistName: 'Jaan Spetsialist',
+      href: '/admin/leads/lead-1',
     })
     expect(rows[1]?.source).toBeNull()
+    expect(rows[1]?.countyName).toBeNull()
+    expect(rows[1]?.specialistName).toBeNull()
+    expect(rows[1]?.href).toBe('/admin/leads/lead-2')
   })
 
-  it('honours a custom limit and empty input', () => {
-    expect(recentLeadRows([lead({ id: 'l-1' }), lead({ id: 'l-2' })], 1)).toHaveLength(1)
-    expect(recentLeadRows([])).toEqual([])
+  it('falls back to null names for unknown ids and honours limits', () => {
+    const rows = recentLeadRows(
+      [lead({ id: 'l-1', countyId: 'missing', assignedSpecialistId: 'gone' })],
+      names,
+      1,
+    )
+    expect(rows[0]?.countyName).toBeNull()
+    expect(rows[0]?.specialistName).toBeNull()
+    expect(recentLeadRows([], names)).toEqual([])
+  })
+})
+
+describe('new-lead KPI filter', () => {
+  it('counts leads created today that are unassigned or in status uus', () => {
+    expect(
+      isNewLeadRow(
+        { createdAt: iso(NOW), status: 'new', assignedSpecialistId: null },
+        NOW,
+      ),
+    ).toBe(true)
+    // Spec scenario: unassigned lead from today in status Võetud ühendust.
+    expect(
+      isNewLeadRow(
+        { createdAt: iso(NOW), status: 'contacted', assignedSpecialistId: null },
+        NOW,
+      ),
+    ).toBe(true)
+    expect(
+      isNewLeadRow(
+        { createdAt: iso(NOW), status: 'contacted', assignedSpecialistId: 'spec-1' },
+        NOW,
+      ),
+    ).toBe(false)
+    expect(
+      isNewLeadRow(
+        { createdAt: iso(NOW), status: 'new', assignedSpecialistId: 'spec-1' },
+        NOW,
+      ),
+    ).toBe(true)
+  })
+
+  it('rejects yesterday rows and bad timestamps', () => {
+    expect(
+      isNewLeadRow(
+        { createdAt: iso(TALLINN_DAY_START - 1), status: 'new', assignedSpecialistId: null },
+        NOW,
+      ),
+    ).toBe(false)
+    expect(
+      isNewLeadRow(
+        { createdAt: 'not-a-date', status: 'new', assignedSpecialistId: null },
+        NOW,
+      ),
+    ).toBe(false)
+  })
+
+  it('counts only matching rows in a slice', () => {
+    expect(
+      countNewLeadsToday(
+        [
+          lead({ id: 'l-1' }),
+          lead({ id: 'l-2', status: 'contacted' }),
+          lead({ id: 'l-3', status: 'contacted', assignedSpecialistId: 'spec-1' }),
+          lead({ id: 'l-4', createdAt: iso(TALLINN_DAY_START - DAY_MS) }),
+        ],
+        NOW,
+      ),
+    ).toBe(2)
+  })
+
+  it('treats the KPI as admin/superadmin-only', () => {
+    expect(isAdminRole('admin')).toBe(true)
+    expect(isAdminRole('superadmin')).toBe(true)
+    expect(isAdminRole('specialist')).toBe(false)
+    expect(isAdminRole('seller')).toBe(false)
   })
 })
 
@@ -383,6 +521,11 @@ describe('day and month boundaries', () => {
     expect(date.getSeconds()).toBe(0)
     expect(date.getMilliseconds()).toBe(0)
     expect(startOfDayMs(dayStart)).toBe(dayStart)
+  })
+
+  it('is idempotent on the Europe/Tallinn day start', () => {
+    expect(startOfTallinnDayMs(TALLINN_DAY_START)).toBe(TALLINN_DAY_START)
+    expect(startOfTallinnDayMs(TALLINN_DAY_START + DAY_MS - 1)).toBe(TALLINN_DAY_START)
   })
 
   it('puts startOfMonthMs at local midnight of the first day', () => {
@@ -449,7 +592,6 @@ describe('kpi sublines and count labels', () => {
 
 describe('buildWorkspaceKpis role scoping', () => {
   function richKpiInput(role: StaffRole): WorkspaceKpiInput {
-    const dayStart = startOfDayMs(NOW)
     return {
       role,
       now: NOW,
@@ -461,9 +603,9 @@ describe('buildWorkspaceKpis role scoping', () => {
       ],
       bids: [
         bid({ id: 'b-1', createdAt: iso(NOW) }),
-        bid({ id: 'b-2', createdAt: iso(dayStart) }),
+        bid({ id: 'b-2', createdAt: iso(TALLINN_DAY_START) }),
         bid({ id: 'b-3', createdAt: iso(NOW - 60_000) }),
-        bid({ id: 'b-4', createdAt: iso(dayStart - 12 * HOUR_MS) }),
+        bid({ id: 'b-4', createdAt: iso(TALLINN_YESTERDAY_START) }),
       ],
       pendingUnderbids: [
         bid({ id: 'u-1', status: 'pending_approval' }),
@@ -478,11 +620,16 @@ describe('buildWorkspaceKpis role scoping', () => {
   const fullKpis = {
     activeAuctions: { count: 2, scheduledCount: 1 },
     endingToday: { count: 1 },
-    bidsToday: { count: 3, yesterdayCount: 1, changePercent: 200 },
+    bidsToday: {
+      count: 3,
+      yesterdayCount: 1,
+      changePercent: 200,
+      dailyCounts: [0, 0, 0, 0, 0, 1, 3],
+    },
     pendingApprovals: { companies: 5, underbids: 2 },
     newLeads: { count: 4 },
     pendingSignature: { count: 2 },
-    serviceFeeMonth: { cents: 366, eur: 3.66 },
+    serviceFeeMonth: { cents: 300, eur: 3 },
   }
 
   it('shows every kpi for admin and superadmin', () => {
@@ -524,7 +671,12 @@ describe('buildWorkspaceKpis role scoping', () => {
     expect(kpis).toStrictEqual({
       activeAuctions: { count: 0, scheduledCount: 0 },
       endingToday: { count: 0 },
-      bidsToday: { count: 0, yesterdayCount: 0, changePercent: null },
+      bidsToday: {
+        count: 0,
+        yesterdayCount: 0,
+        changePercent: null,
+        dailyCounts: [0, 0, 0, 0, 0, 0, 0],
+      },
       pendingApprovals: { companies: 0, underbids: 0 },
       newLeads: { count: 0 },
       pendingSignature: { count: 0 },
@@ -688,12 +840,13 @@ interface RepositoryFixtures {
   pendingBids: unknown[]
   recentBids: unknown[]
   endingBids: unknown[]
-  recentLeads: unknown[]
-  newLeads: unknown[]
+  leads: unknown[]
   sentContracts: unknown[]
   companyApprovals: unknown[]
   rightsRequests: unknown[]
   serviceRequests: unknown[]
+  specialists: unknown[]
+  counties: unknown[]
 }
 
 function emptyFixtures(): RepositoryFixtures {
@@ -702,12 +855,13 @@ function emptyFixtures(): RepositoryFixtures {
     pendingBids: [],
     recentBids: [],
     endingBids: [],
-    recentLeads: [],
-    newLeads: [],
+    leads: [],
     sentContracts: [],
     companyApprovals: [],
     rightsRequests: [],
     serviceRequests: [],
+    specialists: [],
+    counties: [],
   }
 }
 
@@ -720,7 +874,7 @@ function docsFor(fixtures: RepositoryFixtures, args: FindArgs): unknown[] {
       if (where !== undefined && 'auction' in where) return fixtures.endingBids
       return where !== undefined ? fixtures.pendingBids : fixtures.recentBids
     case 'leads':
-      return args.sort === '-createdAt' ? fixtures.recentLeads : fixtures.newLeads
+      return fixtures.leads
     case 'contracts':
       return fixtures.sentContracts
     case 'company-access-request':
@@ -729,6 +883,10 @@ function docsFor(fixtures: RepositoryFixtures, args: FindArgs): unknown[] {
       return fixtures.rightsRequests
     case 'service-requests':
       return fixtures.serviceRequests
+    case 'specialists':
+      return fixtures.specialists
+    case 'counties':
+      return fixtures.counties
     default:
       return []
   }
@@ -777,7 +935,12 @@ describe('getWorkspaceData', () => {
       kpis: {
         activeAuctions: { count: 0, scheduledCount: 0 },
         endingToday: { count: 0 },
-        bidsToday: { count: 0, yesterdayCount: 0, changePercent: null },
+        bidsToday: {
+          count: 0,
+          yesterdayCount: 0,
+          changePercent: null,
+          dailyCounts: [0, 0, 0, 0, 0, 0, 0],
+        },
         pendingApprovals: { companies: 0, underbids: 0 },
         newLeads: { count: 0 },
         pendingSignature: { count: 0 },
@@ -822,14 +985,17 @@ describe('getWorkspaceData', () => {
     assertFiniteNumbers(data)
   })
 
-  it('runs unscoped queries for admin and keeps the new-lead status filter', async () => {
+  it('runs unscoped queries for admin and fetches leads once', async () => {
     const calls = seedRepositories()
     await getWorkspaceData({ userId: 'admin-1', role: 'admin' })
     expect(findCall(calls, 'auctions').where).toBeUndefined()
-    expect(findCall(calls, 'leads').where).toBeUndefined()
-    expect(findCall(calls, 'leads', (args) => args.sort === undefined).where).toEqual({
-      status: { equals: 'new' },
-    })
+    const leadsCall = findCall(calls, 'leads')
+    expect(leadsCall.where).toBeUndefined()
+    expect(leadsCall.sort).toBe('-createdAt')
+    expect(leadsCall.pagination).toBe(false)
+    expect(calls.filter((args) => args.collection === 'leads')).toHaveLength(1)
+    expect(findCall(calls, 'specialists').where).toBeUndefined()
+    expect(findCall(calls, 'counties').where).toBeUndefined()
   })
 
   it('scopes auction and lead queries to the specialist assignment', async () => {
@@ -839,9 +1005,6 @@ describe('getWorkspaceData', () => {
     expect(findCall(calls, 'leads').where).toEqual({
       assignedSpecialist: { equals: 'spec-1' },
     })
-    expect(findCall(calls, 'leads', (args) => args.sort === undefined).where).toEqual({
-      and: [{ assignedSpecialist: { equals: 'spec-1' } }, { status: { equals: 'new' } }],
-    })
   })
 
   it('scopes leads to none for the seller while keeping the new-lead filter', async () => {
@@ -849,9 +1012,6 @@ describe('getWorkspaceData', () => {
     await getWorkspaceData({ userId: 'seller-1', role: 'seller' })
     expect(findCall(calls, 'auctions').where).toEqual({ seller: { equals: 'seller-1' } })
     expect(findCall(calls, 'leads').where).toEqual({ id: { equals: '' } })
-    expect(findCall(calls, 'leads', (args) => args.sort === undefined).where).toEqual({
-      and: [{ id: { equals: '' } }, { status: { equals: 'new' } }],
-    })
   })
 
   it('counts only in-scope bids for the seller', async () => {
@@ -864,12 +1024,17 @@ describe('getWorkspaceData', () => {
       recentBids: [
         bid({ id: 'r-1', auctionId: 'own-1', createdAt: iso(NOW) }),
         bid({ id: 'r-2', auctionId: 'foreign', createdAt: iso(NOW) }),
-        bid({ id: 'r-3', auctionId: 'own-1', createdAt: iso(startOfDayMs(NOW) - 12 * HOUR_MS) }),
+        bid({ id: 'r-3', auctionId: 'own-1', createdAt: iso(TALLINN_YESTERDAY_START) }),
         bid({ id: 'r-4', auctionId: 'own-1', createdAt: iso(NOW - 3 * DAY_MS) }),
       ],
     })
     const data = await getWorkspaceData({ userId: 'seller-1', role: 'seller' })
-    expect(data.kpis.bidsToday).toEqual({ count: 1, yesterdayCount: 1, changePercent: 0 })
+    expect(data.kpis.bidsToday).toEqual({
+      count: 1,
+      yesterdayCount: 1,
+      changePercent: 0,
+      dailyCounts: [0, 0, 0, 0, 0, 1, 1],
+    })
     expect(data.kpis.pendingApprovals).toEqual({ companies: null, underbids: 1 })
     const underbids = data.quickActions.find((row) => row.key === 'underbids')
     expect(underbids?.count).toBe(1)
@@ -916,7 +1081,7 @@ describe('getWorkspaceData', () => {
       companyApprovals: [{ id: 'c-1' }, { id: 'c-2' }, { id: 'c-3' }],
       rightsRequests: [{ id: 'r-1' }],
       serviceRequests: [{ id: 'sr-1' }, { id: 'sr-2' }],
-      newLeads: [lead({ id: 'n-1' })],
+      leads: [lead({ id: 'n-1' })],
     })
     const data = await getWorkspaceData({ userId: 'admin-1', role: 'admin' })
     expect(data.queues).toEqual({
@@ -928,17 +1093,35 @@ describe('getWorkspaceData', () => {
     })
   })
 
-  it('caps recent leads at three and uses the shared fetch ceilings', async () => {
+  it('caps recent leads at eight and feeds the KPI from one fetch', async () => {
     const calls = seedRepositories({
-      recentLeads: [1, 2, 3, 4, 5].map((n) => lead({ id: `lead-${String(n)}` })),
-      newLeads: [lead({ id: 'new-1' }), lead({ id: 'new-2' })],
+      leads: [
+        // Nine countable rows (today, uus, unassigned) — newest first.
+        ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) =>
+          lead({ id: `lead-${String(n)}`, createdAt: iso(NOW - n * 60_000) }),
+        ),
+        // Assigned and already contacted: not a new lead.
+        lead({
+          id: 'lead-busy',
+          status: 'contacted',
+          assignedSpecialistId: 'spec-1',
+          createdAt: iso(NOW - 30_000),
+        }),
+        // New but from yesterday: not counted.
+        lead({ id: 'lead-old', createdAt: iso(TALLINN_DAY_START - 3_600_000) }),
+      ],
+      specialists: [{ id: 'spec-1', name: 'Jaan Spetsialist' }],
+      counties: [{ id: 'county-1', name: 'Tartumaa' }],
     })
     const data = await getWorkspaceData({ userId: 'admin-1', role: 'admin' })
-    expect(data.recentLeads.map((row) => row.id)).toEqual(['lead-1', 'lead-2', 'lead-3'])
-    expect(data.kpis.newLeads).toEqual({ count: 2 })
-    const recentLeadsCall = findCall(calls, 'leads')
-    expect(recentLeadsCall.sort).toBe('-createdAt')
-    expect(recentLeadsCall.limit).toBe(50)
+    expect(data.recentLeads).toHaveLength(8)
+    expect(data.recentLeads.map((row) => row.id)).toEqual(
+      [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `lead-${String(n)}`),
+    )
+    expect(data.kpis.newLeads).toEqual({ count: 9 })
+    const leadsCalls = calls.filter((args) => args.collection === 'leads')
+    expect(leadsCalls).toHaveLength(1)
+    expect(leadsCalls[0]?.sort).toBe('-createdAt')
     expect(findCall(calls, 'bids', (args) => args.where === undefined).limit).toBe(5000)
   })
 })

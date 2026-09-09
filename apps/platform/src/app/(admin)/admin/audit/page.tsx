@@ -1,4 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1'
+import { Download as DownloadIcon } from 'lucide-react'
 import Link from 'next/link'
 
 import {
@@ -8,6 +9,8 @@ import {
 } from './_components/AuditDrawer'
 import {
   auditActionGroups,
+  actionLabel,
+  auditEntryReason,
   entityTypeLabel,
   groupForAction,
   groupLabel,
@@ -15,9 +18,10 @@ import {
 } from './_components/action-registry'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
+import { secondaryButtonClass } from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
 import { requireAdminRepositories } from '../../_lib/admin'
-import { formatDateTime, userRoleLabels } from '../../_lib/labels'
+import { formatAuditDateTime, userRoleLabels } from '../../_lib/labels'
 import { can, staffRoles, type StaffRole } from '../../_lib/permissions'
 
 import { verifyAuditChain, type AuditEntryDoc, type UserDoc, type WhereClause } from '@/lib/data/repositories'
@@ -35,6 +39,7 @@ const EMPTY_LABEL = 'Filtritele vastavaid kirjeid ei leitud'
 
 const BANNER = 'Kirjed on muutumatud — muuta ega kustutada ei saa.'
 const SELF_VIEW_NOTE = 'Näidatakse ainult sinu enda tehtud kirjeid.'
+const RETENTION_NOTE = 'Säilitamine: 7 aastat.'
 
 /**
  * Date-only bounds expand to full local days in Europe/Tallinn. The from
@@ -70,6 +75,7 @@ interface AuditRow {
   actionGroup: string
   entityType: string | null
   entityId: string | null
+  reason: string | null
   hasDiff: boolean
 }
 
@@ -176,6 +182,10 @@ export default async function AdminAuditPage({
       actorId: doc.actorId,
       actorName: actor ? (actor.name ?? actor.email) : (doc.actorId ?? '—'),
       actorRole: actor ? actor.role : null,
+      reason: auditEntryReason(doc),
+      sessionId: doc.sessionId,
+      ipHash: doc.ipHash,
+      userAgent: doc.userAgent,
       before: doc.before,
       after: doc.after,
       prevHash: doc.prevHash,
@@ -247,6 +257,7 @@ export default async function AdminAuditPage({
       actionGroup: groupForAction(doc.action) ?? UNGROUPED_GROUP_ID,
       entityType: doc.entityType,
       entityId: doc.entityId,
+      reason: auditEntryReason(doc),
       hasDiff: doc.before !== null && doc.before !== undefined,
     }
   })
@@ -278,6 +289,15 @@ export default async function AdminAuditPage({
     return qs === '' ? '/admin/audit' : `/admin/audit?${qs}`
   }
 
+  // Export link reuses the list's shareable filter parameters; `entry` is a
+  // drawer deep-link, not a filter, so it stays out (same pattern as the
+  // auctions list csvHref).
+  const csvParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(currentValues)) {
+    if (key !== 'entry' && value) csvParams.set(key, value)
+  }
+  const csvHref = `/api/v1/admin/audit/export/csv?${csvParams.toString()}`
+
   const filterSelectClass =
     'h-9 rounded-input border border-border bg-bgPage px-2 text-bodySm text-ink'
   const activeFilterCount = [
@@ -291,9 +311,20 @@ export default async function AdminAuditPage({
 
   return (
     <div>
-      <PageHeader title="Auditlogi" description="Personalitegevuste muutumatu jälg." />
+      <PageHeader
+        title="Auditlogi"
+        description="Personalitegevuste muutumatu jälg."
+        actions={
+          isSuper ? (
+            <a href={csvHref} className={secondaryButtonClass}>
+              <DownloadIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+              Ekspordi filtreeritud CSV
+            </a>
+          ) : null
+        }
+      />
       <p className="mb-md rounded-card border border-border bg-bgMist px-md py-sm text-bodySm text-ink-muted">
-        {BANNER} {selfView ? SELF_VIEW_NOTE : null}
+        {BANNER} {RETENTION_NOTE} {selfView ? SELF_VIEW_NOTE : null}
       </p>
 
       <form
@@ -377,7 +408,7 @@ export default async function AdminAuditPage({
       >
       <DataTable
         columns={[
-          { key: 'createdAt', label: 'Aeg', render: (row) => <time dateTime={row.createdAt}>{formatDateTime(row.createdAt)}</time> },
+          { key: 'createdAt', label: 'Aeg', render: (row) => <time dateTime={row.createdAt}>{formatAuditDateTime(row.createdAt)}</time> },
           {
             key: 'actorName',
             label: 'Tegija',
@@ -396,10 +427,22 @@ export default async function AdminAuditPage({
             key: 'action',
             label: 'Tegevus',
             render: (row) => (
-              <span className="font-mono" title={groupLabel(row.actionGroup)}>
+              <span className="font-mono" title={actionLabel(row.action)}>
                 {row.action}
               </span>
             ),
+          },
+          {
+            key: 'reason',
+            label: 'Põhjus',
+            render: (row) =>
+              row.reason ? (
+                <span className="line-clamp-2 max-w-[16rem]" title={row.reason}>
+                  {row.reason}
+                </span>
+              ) : (
+                <span className="text-ink-muted">—</span>
+              ),
           },
           {
             key: 'entity',

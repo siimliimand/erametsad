@@ -6,10 +6,12 @@ import { redirect } from 'next/navigation'
 import { requireAdminRepositories } from '../_lib/admin'
 import {
   buildR2Key,
+  focalCoordinateFrom,
   getMediaBucket,
   getMediaQueue,
   initialRenditionsFor,
   mediaUrlFor,
+  validateMediaAlt,
   validateMediaUpload,
 } from '../admin/media/_lib/media-upload'
 
@@ -42,6 +44,43 @@ async function persist<T>(path: string, prefix: string, write: () => Promise<T>)
   }
 }
 
+/** Append-only audit write for media governance actions (task 3.6). */
+async function writeMediaAudit(
+  repositories: Awaited<ReturnType<typeof requireAdminRepositories>>['repositories'],
+  entry: {
+    actorId: string
+    action: string
+    entityId: string
+    after: unknown
+  },
+): Promise<void> {
+  await repositories.create({
+    collection: 'audit-entry',
+    data: {
+      actorId: entry.actorId,
+      action: entry.action,
+      entityType: 'media',
+      entityId: entry.entityId,
+      after: entry.after,
+    },
+  })
+}
+
+/** Focal form fields → nullable 0..1 columns; out-of-range values are rejected. */
+function readFocalPoint(
+  formData: FormData,
+  errorPath: string,
+): { focalX: number | null; focalY: number | null } {
+  const hasX = readText(formData, 'focalX').length > 0
+  const hasY = readText(formData, 'focalY').length > 0
+  const focalX = hasX ? focalCoordinateFrom(readText(formData, 'focalX')) : null
+  const focalY = hasY ? focalCoordinateFrom(readText(formData, 'focalY')) : null
+  if ((hasX && focalX === null) || (hasY && focalY === null)) {
+    redirectWithError(errorPath, 'Fookuspunkt peab olema vahemikus 0 kuni 100 protsenti.')
+  }
+  return { focalX, focalY }
+}
+
 export async function uploadMediaAction(formData: FormData): Promise<void> {
   const { repositories } = await requireAdminRepositories()
 
@@ -56,6 +95,13 @@ export async function uploadMediaAction(formData: FormData): Promise<void> {
     size: file.size,
   })
   if (validationError) redirectWithError(mediaPath, validationError)
+
+  // Alt gate (task 3.6): image uploads require a non-empty alt text.
+  const alt = readOptionalText(formData, 'alt')
+  const altError = validateMediaAlt(file.type, alt)
+  if (altError) redirectWithError(mediaPath, altError)
+
+  const { focalX, focalY } = readFocalPoint(formData, mediaPath)
 
   const bucket = await getMediaBucket()
   if (!bucket) redirectWithError(mediaPath, 'R2 salvestusruum pole saadaval.')
@@ -74,7 +120,9 @@ export async function uploadMediaAction(formData: FormData): Promise<void> {
         filename: file.name,
         mimeType: file.type,
         filesize: file.size,
-        alt: readOptionalText(formData, 'alt'),
+        alt,
+        focalX,
+        focalY,
         r2Key: key,
         url: mediaUrlFor(id),
         renditions: initialRenditionsFor(file.type),
@@ -133,13 +181,144 @@ export async function updateMediaAction(formData: FormData): Promise<void> {
     : null
   if (!current) redirectWithError(errorPath, 'Faili ei leitud.')
 
+  // Alt gate (task 3.6) at edit time, judged by the stored mime type.
+  const alt = readOptionalText(formData, 'alt')
+  const altError = validateMediaAlt(current.mimeType ?? '', alt)
+  if (altError) redirectWithError(errorPath, altError)
+
+  const { focalX, focalY } = readFocalPoint(formData, errorPath)
+
   await persist(errorPath, 'Faili salvestamine ebaõnnestus: ', () =>
     repositories.update({
       collection: 'media',
       id,
-      data: { filename, alt: readOptionalText(formData, 'alt') },
+      data: {
+        filename,
+        alt,
+        focalX,
+        focalY,
+      },
     }),
   )
+
+  revalidatePath(mediaPath)
+  revalidatePath(mediaItemPath(id))
+  redirect(mediaPath)
+}
+
+/**
+ * Replace-file action (task 3.6): swaps the stored R2 object while keeping
+ * the media row id (and therefore its URL). The new bytes pass the same
+ * validation as an upload; alt and focal survive unless the form sends new
+ * values. The old object is deleted only after the new one is in place, and
+ * the swap is audited (registry key media.replace).
+ */
+export async function replaceMediaFileAction(formData: FormData): Promise<void> {
+  const { session, repositories } = await requireAdminRepositories()
+
+  const id = readText(formData, 'id')
+  const errorPath = id.length > 0 ? mediaItemPath(id) : mediaPath
+
+  if (!id) redirectWithError(mediaPath, 'Faili identifikaator puudub.')
+
+  const file = formData.get('file')
+  if (!(file instanceof File)) {
+    redirectWithError(errorPath, 'Vali asendav fail.')
+  }
+
+  const validationError = validateMediaUpload({
+    filename: file.name,
+    mimeType: file.type,
+    size: file.size,
+  })
+  if (validationError) redirectWithError(errorPath, validationError)
+
+  const current = await persist(errorPath, 'Faili lugemine ebaõnnestus: ', () =>
+    repositories.findByID({ collection: 'media', id }),
+  )
+  if (!current) redirectWithError(errorPath, 'Faili ei leitud.')
+
+  // Alt gate: when the replacement is an image, the row must end up with a
+  // non-empty alt — the provided value or the stored one qualifies.
+  const alt = readOptionalText(formData, 'alt') ?? current.alt
+  const altError = validateMediaAlt(file.type, alt)
+  if (altError) redirectWithError(errorPath, altError)
+
+  const focalX = readText(formData, 'focalX').length > 0
+    ? focalCoordinateFrom(readText(formData, 'focalX'))
+    : current.focalX
+  const focalY = readText(formData, 'focalY').length > 0
+    ? focalCoordinateFrom(readText(formData, 'focalY'))
+    : current.focalY
+  if (
+    (readText(formData, 'focalX').length > 0 && focalX === null) ||
+    (readText(formData, 'focalY').length > 0 && focalY === null)
+  ) {
+    redirectWithError(errorPath, 'Fookuspunkt peab olema vahemikus 0 kuni 100 protsenti.')
+  }
+
+  const bucket = await getMediaBucket()
+  if (!bucket) redirectWithError(errorPath, 'R2 salvestusruum pole saadaval.')
+
+  const nextKey = buildR2Key(id, file.name)
+  const buffer = await file.arrayBuffer()
+
+  let failure: string | null = null
+  try {
+    // Put first, row second, old object last: a mid-way failure leaves
+    // either the old pair intact or a row pointing at stored bytes.
+    await bucket.put(nextKey, buffer, { httpMetadata: { contentType: file.type } })
+    await repositories.update({
+      collection: 'media',
+      id,
+      data: {
+        filename: file.name,
+        mimeType: file.type,
+        filesize: file.size,
+        alt,
+        focalX,
+        focalY,
+        r2Key: nextKey,
+        url: mediaUrlFor(id),
+        renditions: initialRenditionsFor(file.type),
+      },
+    })
+    if (current.r2Key && current.r2Key !== nextKey) {
+      await bucket.delete(current.r2Key)
+    }
+    await writeMediaAudit(repositories, {
+      actorId: session.userId,
+      action: 'media.replace',
+      entityId: id,
+      after: {
+        filename: file.name,
+        mimeType: file.type,
+        filesize: file.size,
+        previousFilename: current.filename,
+        previousMimeType: current.mimeType,
+        altKept: alt === current.alt,
+        focalKept: focalX === current.focalX && focalY === current.focalY,
+      },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) redirectWithError(errorPath, `Faili asendamine ebaõnnestus: ${failure}`)
+
+  if (initialRenditionsFor(file.type)) {
+    const queue = await getMediaQueue()
+    if (queue) {
+      try {
+        await queue.send({
+          type: 'media-renditions',
+          mediaId: id,
+          dedupeKey: `media-renditions:${id}`,
+        })
+      } catch (error) {
+        console.error(`[media] rendition enqueue failed for ${id}`, error)
+      }
+    }
+  }
 
   revalidatePath(mediaPath)
   revalidatePath(mediaItemPath(id))

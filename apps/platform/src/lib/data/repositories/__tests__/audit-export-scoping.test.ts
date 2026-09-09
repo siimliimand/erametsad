@@ -5,11 +5,11 @@ import { GET as jsonExportRoute } from '@/app/api/v1/admin/audit/export/json/rou
 import type { CoreRepositories } from '@/lib/data/repositories'
 
 /**
- * Route guard tests for the audit CSV/JSON export routes (task 15.4): the
- * routes must enforce audit:read exactly like the list reads and scope an
- * admin to its own entries (the self-view rule), while a superadmin may
- * filter by any actor. requireAdminRepositories is mocked; permissions and
- * the export filtering helpers run for real.
+ * Route guard tests for the audit CSV/JSON export routes (task 15.4, gated by
+ * task 1.8): bulk downloads are superadmin-only — every other role gets 403
+ * before any read or audit write. A superadmin may filter by any actor and
+ * the export is audited before the file is returned. requireAdminRepositories
+ * is mocked; permissions and the export filtering helpers run for real.
  */
 
 const state = vi.hoisted((): {
@@ -125,7 +125,7 @@ describe('audit CSV export scoping', () => {
     const response = await csvExportRoute(exportRequest(CSV_URL, ''))
 
     expect(response.status).toBe(403)
-    expect(await response.json()).toEqual({ error: 'Ainult superadmin ja administraator.' })
+    expect(await response.json()).toEqual({ error: 'Ainult superadmin saab auditlogi andmeid eksportida.' })
     expect(exported.findCalls).toEqual([])
     expect(exported.creates).toEqual([])
   })
@@ -136,21 +136,20 @@ describe('audit CSV export scoping', () => {
     const response = await csvExportRoute(exportRequest(CSV_URL, ''))
 
     expect(response.status).toBe(403)
-    expect(await response.json()).toEqual({ error: 'Ainult superadmin ja administraator.' })
+    expect(await response.json()).toEqual({ error: 'Ainult superadmin saab auditlogi andmeid eksportida.' })
     expect(exported.findCalls).toEqual([])
     expect(exported.creates).toEqual([])
   })
 
-  it('scopes an admin to its own entries even with an actor param', async () => {
-    useSession('admin-1', 'admin')
+  it('answers 403 to an admin even with an actor param', async () => {
+    const exported = useSession('admin-1', 'admin')
 
     const response = await csvExportRoute(exportRequest(CSV_URL, 'actor=admin-2'))
 
-    expect(response.status).toBe(200)
-    const text = await response.text()
-    expect(text).toContain('entry-a1')
-    expect(text).not.toContain('entry-a2')
-    expect(text).not.toContain('entry-s1')
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ error: 'Ainult superadmin saab auditlogi andmeid eksportida.' })
+    expect(exported.findCalls).toEqual([])
+    expect(exported.creates).toEqual([])
   })
 
   it('lets a superadmin filter by any actor', async () => {
@@ -178,7 +177,7 @@ describe('audit CSV export scoping', () => {
   })
 
   it('audits the export before the file is returned', async () => {
-    const exported = useSession('admin-1', 'admin')
+    const exported = useSession('superadmin-1', 'superadmin')
 
     const response = await csvExportRoute(exportRequest(CSV_URL, 'actor=admin-2'))
 
@@ -186,11 +185,11 @@ describe('audit CSV export scoping', () => {
     expect(exported.creates).toHaveLength(1)
     expect(exported.creates[0]?.collection).toBe('audit-entry')
     expect(exported.creates[0]?.data).toMatchObject({
-      actorId: 'admin-1',
+      actorId: 'superadmin-1',
       action: 'audit.export',
       entityType: 'audit-entry',
       entityId: 'bulk',
-      after: { format: 'csv', rowCount: 1, filters: { actor: 'admin-1' } },
+      after: { format: 'csv', rowCount: 1, filters: { actor: 'admin-2' } },
     })
   })
 })
@@ -202,19 +201,20 @@ describe('audit JSON export scoping', () => {
     const response = await jsonExportRoute(exportRequest(JSON_URL, ''))
 
     expect(response.status).toBe(403)
-    expect(await response.json()).toEqual({ error: 'Ainult superadmin ja administraator.' })
+    expect(await response.json()).toEqual({ error: 'Ainult superadmin saab auditlogi andmeid eksportida.' })
     expect(exported.findCalls).toEqual([])
     expect(exported.creates).toEqual([])
   })
 
-  it('scopes an admin to its own entries even with an actor param', async () => {
-    useSession('admin-1', 'admin')
+  it('answers 403 to an admin even with an actor param', async () => {
+    const exported = useSession('admin-1', 'admin')
 
     const response = await jsonExportRoute(exportRequest(JSON_URL, 'actor=admin-2'))
 
-    expect(response.status).toBe(200)
-    const body = (await response.json()) as { id: string }[]
-    expect(body.map((row) => row.id)).toEqual(['entry-a1'])
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ error: 'Ainult superadmin saab auditlogi andmeid eksportida.' })
+    expect(exported.findCalls).toEqual([])
+    expect(exported.creates).toEqual([])
   })
 
   it('lets a superadmin filter by any actor', async () => {

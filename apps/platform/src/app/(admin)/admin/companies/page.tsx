@@ -1,7 +1,24 @@
+import Link from 'next/link'
+
+import { HistoryExportButton } from './_components/HistoryExportButton'
+import type {
+  ApplicantProfileView,
+  ApplicantView,
+  BiddingHistoryView,
+  DuplicateView,
+  FrameworkContractView,
+} from './_components/RequestCard'
 import { RequestCard } from './_components/RequestCard'
-import type { ApplicantView, DuplicateView } from './_components/RequestCard'
+import {
+  buildCompanyHistoryRow,
+  companyApproveRightsDefaults,
+  matchesCompanyHistoryFilters,
+  parseCompanyHistoryFilters,
+  paginateCompanyHistory,
+} from './_components/history-view'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
+import { FormField, FormSelectField, primaryButtonClass, secondaryButtonClass } from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
 import { StatusChip, type StatusChipVariant } from '../../_components/StatusChip'
 import { requireAdminRepositories } from '../../_lib/admin'
@@ -13,9 +30,9 @@ import {
 } from '../leads/_components/registry-snapshot'
 
 
-import type { AuditEntryDoc, UserDoc } from '@/lib/data/repositories'
+import type { AuditEntryDoc, ProfileDoc, UserDoc } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
-import type { CompanyAccessRequest, CompanyAccessRequestStatus, auctionObjectTypes  } from '@/lib/data/schema'
+import type { CompanyAccessRequest, CompanyAccessRequestStatus, auctionObjectTypes } from '@/lib/data/schema'
 
 export const metadata = { title: 'Ettevõtte taotlused' }
 
@@ -40,17 +57,54 @@ interface RequestCardView {
   boardCheck: ReturnType<typeof crossCheckBoardMembership>
   duplicate: DuplicateView | null
   waitingDays: number
+  existingProfiles: ApplicantProfileView[]
+  biddingHistory: BiddingHistoryView | null
+  frameworkContract: FrameworkContractView
+  defaultRights: (typeof auctionObjectTypes)[number][]
 }
 
 const dangerBlockClass =
   'rounded-input border border-danger bg-danger-light px-sm py-xs text-bodySm text-danger'
 
+/** History pagination link that preserves the active filters. */
+function PaginationLink({
+  base,
+  page,
+  label,
+}: {
+  base: Record<string, string | undefined>
+  page: number
+  label: string
+}) {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(base)) {
+    if (value) search.set(key, value)
+  }
+  search.set('lehekulg', String(page))
+  return (
+    <Link
+      href={`/admin/companies?${search.toString()}`}
+      className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
+    >
+      {label}
+    </Link>
+  )
+}
+
 export default async function CompanyAccessRequestsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ viga?: string; teade?: string; vaade?: string }>
+  searchParams: Promise<{
+    viga?: string
+    teade?: string
+    vaade?: string
+    otsus?: string
+    kuupaev?: string
+    q?: string
+    lehekulg?: string
+  }>
 }) {
-  const { viga, teade, vaade } = await searchParams
+  const { viga, teade, vaade, otsus, kuupaev, q, lehekulg } = await searchParams
   const { session } = await requireAdminRepositories()
   if (!can(session.role, 'companies:read')) {
     return (
@@ -100,28 +154,36 @@ export default async function CompanyAccessRequestsPage({
   const applicantsByEmail = new Map(applicantUsers.map((user) => [user.email, user]))
 
   const regCodes = [...new Set(requests.map((request) => request.regCode))]
-  const { docs: approvedProfiles } =
+  const { docs: regCodeProfiles } =
     regCodes.length > 0
       ? await repositories.find({
           collection: 'profile',
-          where: {
-            and: [
-              { companyRegCode: { in: regCodes } },
-              { approvalStatus: { equals: 'approved' } },
-            ],
-          },
+          where: { companyRegCode: { in: regCodes } },
           pagination: false,
         })
-      : { docs: [] }
-  const duplicateByRegCode = new Map<string, DuplicateView>()
-  for (const profile of approvedProfiles) {
+      : { docs: [] as ProfileDoc[] }
+  const profilesByRegCode = new Map<string, ProfileDoc[]>()
+  for (const profile of regCodeProfiles) {
     if (!profile.companyRegCode) continue
+    const list = profilesByRegCode.get(profile.companyRegCode) ?? []
+    list.push(profile)
+    profilesByRegCode.set(profile.companyRegCode, list)
+  }
+  const duplicateByRegCode = new Map<string, DuplicateView>()
+  for (const profile of regCodeProfiles) {
+    if (!profile.companyRegCode || profile.approvalStatus !== 'approved') continue
     const owner = applicantUsers.find((user) => user.id === profile.userId)
     duplicateByRegCode.set(profile.companyRegCode, {
       profileId: profile.id,
       ownerName: owner?.name ?? owner?.email ?? profile.userId,
     })
   }
+
+  // Approve rights defaults read from Seaded (spec delta admin-people). The
+  // defaults ride the featureFlags JSON under a reserved key; until the
+  // Seaded form gains the field, the documented design default applies.
+  const { docs: settingsRows } = await repositories.find({ collection: 'settings', limit: 1 })
+  const defaultRights = companyApproveRightsDefaults(settingsRows[0]?.featureFlags)
 
   const { docs: requestAudits } = await repositories.find({
     collection: 'audit-entry',
@@ -135,6 +197,75 @@ export default async function CompanyAccessRequestsPage({
     const list = auditsByRequestId.get(entry.entityId) ?? []
     list.push(entry)
     auditsByRequestId.set(entry.entityId, list)
+  }
+
+  // Applicant context (spec delta admin-people): bidding history and the
+  // framework contract (raamleping) status for every applicant with a
+  // portal account, plus the per-code existing profiles list.
+  const applicantIds = applicantUsers.map((user) => user.id)
+  const [{ docs: applicantBids }, frameworkTemplate] = await Promise.all([
+    applicantIds.length > 0
+      ? repositories.find({
+          collection: 'bids',
+          where: { user: { in: applicantIds } },
+          sort: '-createdAt',
+          pagination: false,
+          limit: 5000,
+        })
+      : Promise.resolve({ docs: [] as { userId: string; auctionId: string; createdAt: string }[] }),
+    repositories.find({
+      collection: 'contract-templates',
+      where: {
+        and: [
+          { type: { equals: 'framework' } },
+          { active: { equals: true } },
+        ],
+      },
+      limit: 1,
+    }),
+  ])
+  const biddingHistoryByUser = new Map<string, BiddingHistoryView>()
+  const bidsByUser = new Map<string, { count: number; auctions: Set<string>; lastBidAt: string | null }>()
+  for (const bid of applicantBids) {
+    const current = bidsByUser.get(bid.userId) ?? {
+      count: 0,
+      auctions: new Set<string>(),
+      lastBidAt: null as string | null,
+    }
+    current.count += 1
+    current.auctions.add(bid.auctionId)
+    if (current.lastBidAt === null || bid.createdAt > current.lastBidAt) {
+      current.lastBidAt = bid.createdAt
+    }
+    bidsByUser.set(bid.userId, current)
+  }
+  for (const [userId, stats] of bidsByUser) {
+    biddingHistoryByUser.set(userId, {
+      bidCount: stats.count,
+      auctionCount: stats.auctions.size,
+      lastBidAt: stats.lastBidAt,
+    })
+  }
+
+  const frameworkTemplateId = frameworkTemplate.docs[0]?.id ?? null
+  const { docs: signedFrameworkContracts } = frameworkTemplateId
+    ? await repositories.find({
+        collection: 'contracts',
+        where: {
+          and: [
+            { template: { equals: frameworkTemplateId } },
+            { status: { equals: 'signed' } },
+            ...(applicantIds.length > 0 ? [{ signedBy: { in: applicantIds } }] : []),
+          ],
+        },
+        pagination: false,
+      })
+    : { docs: [] }
+  const frameworkSignedAtByUser = new Map<string, string>()
+  for (const contract of signedFrameworkContracts) {
+    if (contract.signedBy && contract.signedAt) {
+      frameworkSignedAtByUser.set(contract.signedBy, contract.signedAt)
+    }
   }
 
   const nowMs = Date.now()
@@ -166,6 +297,28 @@ export default async function CompanyAccessRequestsPage({
           0,
           Math.floor((nowMs - Date.parse(request.createdAt)) / 86400000),
         ),
+        existingProfiles: (profilesByRegCode.get(request.regCode) ?? []).map((profile) => ({
+          profileId: profile.id,
+          ownerName:
+            applicantUsers.find((user) => user.id === profile.userId)?.name ??
+            profile.displayName ??
+            profile.userId,
+          approvalStatus: profile.approvalStatus,
+        })),
+        biddingHistory: applicantUser
+          ? (biddingHistoryByUser.get(applicantUser.id) ?? {
+              bidCount: 0,
+              auctionCount: 0,
+              lastBidAt: null,
+            })
+          : null,
+        frameworkContract: (() => {
+          if (!applicantUser) return { state: 'unknown', signedAt: null } as const
+          const signedAt = frameworkSignedAtByUser.get(applicantUser.id)
+          if (signedAt) return { state: 'signed', signedAt } as const
+          return { state: frameworkTemplateId ? 'unsigned' : 'unknown', signedAt: null } as const
+        })(),
+        defaultRights,
       }
     })
   openCards.sort((a, b) => {
@@ -174,34 +327,49 @@ export default async function CompanyAccessRequestsPage({
     return Date.parse(a.request.createdAt) - Date.parse(b.request.createdAt)
   })
 
-  const decidedRows = requests
-    .filter((request) => request.status === 'approved' || request.status === 'rejected')
+  // History tab (spec delta admin-people): decision/date/freetext filters,
+  // pagination, and an audited CSV export.
+  const historyFilters = parseCompanyHistoryFilters({ decision: otsus, date: kuupaev, q })
+  const historyRows = requests
+    .filter(
+      (request): request is CompanyAccessRequest & { status: 'approved' | 'rejected' } =>
+        request.status === 'approved' || request.status === 'rejected',
+    )
     .map((request) => {
       const applicantUser = request.requesterEmail
         ? applicantsByEmail.get(request.requesterEmail)
         : undefined
       const entries = auditsByRequestId.get(request.id) ?? []
-      const rejectEntry = entries.find((entry) => entry.action === 'company.reject')
-      const approveEntry = entries.find((entry) => entry.action === 'company.approve')
-      const rejectAfter = rejectEntry?.after as { reason?: unknown } | undefined
-      const approveAfter = approveEntry?.after as { rights?: unknown } | undefined
+      const rejectAfter = entries.find((entry) => entry.action === 'company.reject')?.after as
+        | { reason?: unknown }
+        | undefined
+      const approveAfter = entries.find((entry) => entry.action === 'company.approve')?.after as
+        | { rights?: unknown }
+        | undefined
       const rights = Array.isArray(approveAfter?.rights) ? approveAfter.rights : []
-      return {
-        id: request.id,
-        company: `${request.companyName ?? '—'} (${request.regCode})`,
-        applicant: `${applicantUser?.name ?? request.requesterName ?? '—'} · ${maskIsikukood(applicantUser?.isikukood)}`,
-        status: request.status,
-        reviewedAt: request.reviewedAt,
+      return buildCompanyHistoryRow({
+        request: {
+          id: request.id,
+          regCode: request.regCode,
+          companyName: request.companyName,
+          requesterName: request.requesterName,
+          requesterEmail: request.requesterEmail,
+          status: request.status,
+          reviewedAt: request.reviewedAt,
+        },
+        applicant: {
+          name: applicantUser?.name ?? null,
+          isikukoodMasked: maskIsikukood(applicantUser?.isikukood),
+        },
         reviewerName: request.reviewedBy
           ? (reviewerNames.get(request.reviewedBy) ?? request.reviewedBy)
-          : '—',
-        reason:
-          typeof rejectAfter?.reason === 'string'
-            ? rejectAfter.reason
-            : '—',
-        rights,
-      }
+          : null,
+        rejectReason: typeof rejectAfter?.reason === 'string' ? rejectAfter.reason : null,
+        rights: rights.filter((right): right is string => typeof right === 'string'),
+      })
     })
+    .filter((row) => matchesCompanyHistoryFilters(row, historyFilters))
+  const historyPage = paginateCompanyHistory(historyRows, lehekulg)
 
   const tabBaseClass =
     'inline-flex items-center gap-2 rounded-input px-3.5 py-1.5 text-label font-semibold transition-colors duration-hover ease-hover'
@@ -236,40 +404,122 @@ export default async function CompanyAccessRequestsPage({
         </a>
         <a href="/admin/companies?vaade=ajalugu" className={tabClass(historyView)}>
           Ajalugu
-          <span className={tabCountClass(historyView)}>{String(decidedRows.length)}</span>
+          <span className={tabCountClass(historyView)}>{String(historyRows.length)}</span>
         </a>
       </div>
 
       {historyView ? (
-        <DataTable
-          columns={[
-            { key: 'reviewedAt', label: 'Kuupäev', render: (row) => formatDateTime(row.reviewedAt) },
-            { key: 'company', label: 'Ettevõte' },
-            { key: 'applicant', label: 'Taotleja' },
-            {
-              key: 'status',
-              label: 'Otsus',
-              render: (row) => <StatusChip status={statusChipVariant[row.status]} />,
-            },
-            { key: 'reviewerName', label: 'Otsustaja' },
-            { key: 'reason', label: 'Keeldumise põhjus' },
-            {
-              key: 'rights',
-              label: 'Antud õigused',
-              render: (row) =>
-                row.rights.length > 0
-                  ? row.rights
-                      .map((right) => {
-                        if (typeof right !== 'string') return String(right)
-                        return auctionObjectTypeLabels[right as (typeof auctionObjectTypes)[number]]
-                      })
-                      .join(', ')
-                  : '—',
-            },
-          ]}
-          rows={decidedRows}
-          emptyLabel="Läbivaadatud taotlusi ei ole."
-        />
+        <>
+          <form
+            method="get"
+            className="mb-md flex max-w-container-sm flex-wrap items-end gap-sm rounded-card border border-border bg-bgPage p-md"
+          >
+            <input type="hidden" name="vaade" value="ajalugu" />
+            <div className="w-40">
+              <FormSelectField
+                label="Otsus"
+                name="otsus"
+                defaultValue={historyFilters.decision ?? ''}
+                options={[
+                  { value: '', label: 'Kõik' },
+                  { value: 'approved', label: 'Nõustutud' },
+                  { value: 'rejected', label: 'Keeldutud' },
+                ]}
+              />
+            </div>
+            <div className="w-40">
+              <FormField
+                label="Kuupäev"
+                name="kuupaev"
+                type="date"
+                defaultValue={historyFilters.date ?? ''}
+              />
+            </div>
+            <div className="w-56">
+              <FormField
+                label="Otsing"
+                name="q"
+                type="search"
+                defaultValue={q ?? ''}
+                hint="Ettevõte, taotleja, registrikood"
+              />
+            </div>
+            <button type="submit" className={primaryButtonClass}>
+              Filtreeri
+            </button>
+            <Link href="/admin/companies?vaade=ajalugu" className={secondaryButtonClass}>
+              Tühjenda
+            </Link>
+          </form>
+          <div className="mb-md flex flex-wrap items-center justify-between gap-sm">
+            <span className="text-label text-ink-muted">
+              {`${String(historyPage.total)} rida · lehekülg ${String(historyPage.page)}/${String(historyPage.pageCount)}`}
+            </span>
+            <HistoryExportButton
+              filters={{
+                decision: historyFilters.decision ?? undefined,
+                date: historyFilters.date ?? undefined,
+                q: historyFilters.freetext,
+              }}
+              disabled={historyPage.total === 0}
+            />
+          </div>
+          <DataTable
+            columns={[
+              { key: 'reviewedAt', label: 'Kuupäev', render: (row) => formatDateTime(row.reviewedAt) },
+              {
+                key: 'company',
+                label: 'Ettevõte',
+                render: (row) => `${row.companyName ?? '—'} (${row.regCode})`,
+              },
+              { key: 'applicant', label: 'Taotleja' },
+              {
+                key: 'status',
+                label: 'Otsus',
+                render: (row) => <StatusChip status={statusChipVariant[row.status]} />,
+              },
+              { key: 'reviewerName', label: 'Otsustaja' },
+              { key: 'reason', label: 'Keeldumise põhjus' },
+              {
+                key: 'rights',
+                label: 'Antud õigused',
+                render: (row) =>
+                  row.rights.length > 0
+                    ? row.rights
+                        .map((right) => {
+                          if (typeof right !== 'string') return String(right)
+                          return auctionObjectTypeLabels[right as (typeof auctionObjectTypes)[number]]
+                        })
+                        .join(', ')
+                    : '—',
+              },
+            ]}
+            rows={historyPage.rows}
+            emptyLabel="Filtritele ei vasta ühtegi läbivaadatud taotlust."
+          />
+          {historyPage.pageCount > 1 ? (
+            <div className="mt-md flex items-center justify-between">
+              {historyPage.page > 1 ? (
+                <PaginationLink
+                  base={{ vaade: 'ajalugu', otsus, kuupaev, q }}
+                  page={historyPage.page - 1}
+                  label="← Eelmine"
+                />
+              ) : (
+                <span />
+              )}
+              {historyPage.page < historyPage.pageCount ? (
+                <PaginationLink
+                  base={{ vaade: 'ajalugu', otsus, kuupaev, q }}
+                  page={historyPage.page + 1}
+                  label="Järgmine →"
+                />
+              ) : (
+                <span />
+              )}
+            </div>
+          ) : null}
+        </>
       ) : openCards.length === 0 ? (
         <div className="rounded-card border border-border bg-bgPage px-md py-lg text-center text-bodySm text-ink-muted">
           Uusi taotlusi ei ole.

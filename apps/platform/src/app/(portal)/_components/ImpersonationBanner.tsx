@@ -1,8 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import { stopImpersonationAction } from '@/app/(admin)/_actions/users'
+import {
+  impersonationStateAction,
+  stopImpersonationAction,
+} from '@/app/(admin)/_actions/users'
 import type { PortalAuthState } from '@/app/(portal)/_lib/session'
 
 function isRedirectSignal(error: unknown): boolean {
@@ -10,13 +13,65 @@ function isRedirectSignal(error: unknown): boolean {
   return typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')
 }
 
+function remainingLabel(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
 /**
  * Sticky amber view-session banner (demo 06-users .imp-banner): shown in the
  * portal while an admin impersonation session is active. Kirjutustegevused
  * on server-side blokeeritud; LÕPETA VAATLUS ends and audits the session.
+ * The 30-minute TTL (spec delta admin-people) shows as a countdown fed by
+ * the session row's expiresAt; at zero the stop action ends the session.
  */
 export function ImpersonationBanner({ auth }: { auth: PortalAuthState | null }) {
   const [ending, setEnding] = useState(false)
+  const [expiresAt, setExpiresAt] = useState<string | null>(null)
+  const [remainingMs, setRemainingMs] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!auth?.impersonatedBy) return
+    let cancelled = false
+    impersonationStateAction()
+      .then((state) => {
+        if (!cancelled && state.active && state.expiresAt) {
+          setExpiresAt(state.expiresAt)
+        }
+      })
+      .catch(() => {
+        // No expiry feed: the banner keeps its static form.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [auth?.impersonatedBy])
+
+  useEffect(() => {
+    if (!expiresAt) return
+    const target = new Date(expiresAt).getTime()
+    const tick = () => {
+      setRemainingMs(target - Date.now())
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => {
+      clearInterval(interval)
+    }
+  }, [expiresAt])
+
+  const endedByTimeout = remainingMs !== null && remainingMs <= 0
+
+  useEffect(() => {
+    if (!endedByTimeout || ending) return
+    setEnding(true)
+    stopImpersonationAction().catch((caught: unknown) => {
+      if (isRedirectSignal(caught)) return
+      setEnding(false)
+    })
+  }, [endedByTimeout, ending])
 
   if (!auth?.impersonatedBy) return null
 
@@ -41,6 +96,10 @@ export function ImpersonationBanner({ auth }: { auth: PortalAuthState | null }) 
       <span className="min-w-0 flex-1">
         Vaatled keskkonda kasutajana: <strong>{auth.profileName ?? auth.userId}</strong> —
         Kirjutustegevused on blokeeritud
+        {remainingMs !== null && !endedByTimeout ? (
+          <span className="ml-2 font-mono">· {remainingLabel(remainingMs)}</span>
+        ) : null}
+        {endedByTimeout ? <span className="ml-2">· Vaatlus on lõppemas…</span> : null}
       </span>
       <button
         type="button"

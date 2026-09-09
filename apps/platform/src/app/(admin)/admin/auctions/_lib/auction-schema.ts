@@ -24,6 +24,17 @@ export const loggingTypeCodes = ['AR', 'HL', 'HR', 'KR', 'LR', 'RD', 'SR', 'TR',
 export const ANTI_SNIPE_MIN_MINUTES = 1
 export const ANTI_SNIPE_MAX_MINUTES = 30
 
+/**
+ * Step-3 approval options shared by kooskõlastused (ladustamiskohad) and
+ * väljaveoteed; stored as codes inside the deadlines JSON (docs 03 step 3).
+ */
+export const approvalOptionValues = ['seller', 'buyer', 'approved'] as const
+export type ApprovalOptionValue = (typeof approvalOptionValues)[number]
+
+const approvalOption = z.enum(approvalOptionValues, {
+  errorMap: () => ({ message: 'Vali müüja, ostja või kooskõlastatud.' }),
+})
+
 const eurAmount = z
   .number({ invalid_type_error: 'Sisesta summa numbrina.' })
   .finite('Sisesta summa numbrina.')
@@ -60,18 +71,33 @@ export const packageRowSchema = z.object({
   minBidEur: eurAmount.optional(),
 })
 
-export const deadlinesSchema = z.object({
-  loggingDeadline: dateOnly.optional(),
-  removalDeadline: dateOnly.optional(),
-  leaseDeadline: dateOnly.optional(),
-  antiSnipeEnabled: z.boolean().optional(),
-  antiSnipeMinutes: z
-    .number()
-    .int('Anti-snipe minutid peavad olema täisarv.')
-    .min(ANTI_SNIPE_MIN_MINUTES, `Anti-snipe vähemalt ${String(ANTI_SNIPE_MIN_MINUTES)} minutit.`)
-    .max(ANTI_SNIPE_MAX_MINUTES, `Anti-snipe kuni ${String(ANTI_SNIPE_MAX_MINUTES)} minutit.`)
-    .optional(),
-})
+export const deadlinesSchema = z
+  .object({
+    loggingDeadline: dateOnly.optional(),
+    removalDeadline: dateOnly.optional(),
+    leaseDeadline: dateOnly.optional(),
+    // Rendi-/kasutusleping checkbox (docs 03 step 3): when the lot carries a
+    // lease agreement, the lease deadline becomes required.
+    hasLeaseAgreement: z.boolean().optional(),
+    storageLocationApproval: approvalOption.optional(),
+    removalRoads: approvalOption.optional(),
+    antiSnipeEnabled: z.boolean().optional(),
+    antiSnipeMinutes: z
+      .number()
+      .int('Anti-snipe minutid peavad olema täisarv.')
+      .min(ANTI_SNIPE_MIN_MINUTES, `Anti-snipe vähemalt ${String(ANTI_SNIPE_MIN_MINUTES)} minutit.`)
+      .max(ANTI_SNIPE_MAX_MINUTES, `Anti-snipe kuni ${String(ANTI_SNIPE_MAX_MINUTES)} minutit.`)
+      .optional(),
+  })
+  .superRefine((deadlines, ctx) => {
+    if (deadlines.hasLeaseAgreement === true && deadlines.leaseDeadline === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['leaseDeadline'],
+        message: 'Rendi/kasutuslepingu tähtaeg on kohustuslik, kui leping on olemas.',
+      })
+    }
+  })
 
 export const auctionInputSchema = z
   .object({
@@ -190,6 +216,12 @@ export const auctionInputSchema = z
       addIssue('reservePriceEur', 'Kiiroksjonil on piirhind kohustuslik.')
     }
 
+    // Piirhind is a sealed/kiiroksjon mechanic: an open ascending lot has no
+    // reserve, so a submitted value is rejected instead of silently stored.
+    if (data.reservePriceEur !== undefined && data.auctionType !== 'sealed' && !data.isQuickAuction) {
+      addIssue('reservePriceEur', 'Piirhind on lubatud ainult pimepakkumise ja kiiroksjoni puhul.')
+    }
+
     if (data.objectType === 'raieoigus' && data.volumeM3 === undefined) {
       addIssue('volumeM3', 'Raiemahu on raieõiguse oksjonil kohustuslik.')
     }
@@ -241,6 +273,9 @@ export interface AuctionWriteData {
   compartments: string[]
   notifications: string[]
   deadlines: unknown
+  /** Lot-level measures on the real columns (migration 0018). */
+  areaHa?: number
+  volumeM3?: number
   descriptionPublic?: string | null
   descriptionInternal?: string | null
   descriptionSecondary?: string | null
@@ -286,13 +321,15 @@ export function toAuctionWriteData(input: AuctionInput): AuctionWriteData {
     loggingTypes: [...input.loggingTypes],
     compartments: input.compartments,
     notifications: input.forestNotifications,
+    ...(input.areaHa !== undefined ? { areaHa: input.areaHa } : {}),
+    ...(input.volumeM3 !== undefined ? { volumeM3: input.volumeM3 } : {}),
     deadlines: {
       ...input.deadlines,
       antiSnipeEnabled: input.antiSnipeEnabled,
       ...(input.antiSnipeMinutes !== undefined ? { antiSnipeMinutes: input.antiSnipeMinutes } : {}),
-      // The auctions table has no propertyCount/areaHa/volumeM3 columns yet;
-      // these scalars ride in the structured JSON until a migration adds
-      // them. Row-level area/volume totals keep coming from packageRows.
+      // The area_ha/volume_m3 columns (0018) are the list/sort source, but
+      // the guest preview still reads these scalars from the deadlines JSON,
+      // so the values keep mirroring here. propertyCount has no column.
       ...(input.propertyCount !== undefined ? { propertyCount: input.propertyCount } : {}),
       ...(input.areaHa !== undefined ? { areaHa: input.areaHa } : {}),
       ...(input.volumeM3 !== undefined ? { volumeM3: input.volumeM3 } : {}),
@@ -469,4 +506,62 @@ export function collectPublishGateFailures(subject: AuctionGateSubject): {
   }
 
   return { blocking, warnings }
+}
+
+/** Publish lead time: the start must sit at least this far in the future. */
+export const PUBLISH_START_LEAD_MINUTES = 10
+
+function deadlinesAreaHa(deadlines: unknown): number | null {
+  if (typeof deadlines !== 'object' || deadlines === null) return null
+  const value = (deadlines as Record<string, unknown>).areaHa
+  const numeric = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+export interface PublishReadinessSubject {
+  specialistId?: string | null
+  startsAt: string | null
+  areaHa?: number | null
+  deadlines?: unknown
+  packageRows?: unknown
+}
+
+/**
+ * Publish-only readiness gates evaluated against the stored lot (spec
+ * admin-auction-management): specialist assigned, start at least 10 minutes
+ * in the future, area greater than zero. Drafts save without them; the
+ * Ajasta intent applies the start gate, Avalda kohe and the publish action
+ * apply all three.
+ */
+export function collectPublishReadinessFailures(subject: PublishReadinessSubject): PublishGateFailure[] {
+  const blocking: PublishGateFailure[] = []
+
+  const specialistId = typeof subject.specialistId === 'string' ? subject.specialistId.trim() : ''
+  if (specialistId === '') {
+    blocking.push({
+      step: 'Sisu',
+      field: 'specialistId',
+      message: 'Määra vastutav spetsialist enne avaldamist.',
+    })
+  }
+
+  if (subject.startsAt === null || Number.isNaN(Date.parse(subject.startsAt))) {
+    blocking.push({ step: 'Tüüp ja mehaanika', field: 'startsAt', message: 'Määra oksjonile algusaeg.' })
+  } else if (Date.parse(subject.startsAt) < Date.now() + PUBLISH_START_LEAD_MINUTES * 60_000) {
+    blocking.push({
+      step: 'Tüüp ja mehaanika',
+      field: 'startsAt',
+      message: 'Algusaeg peab olema vähemalt 10 minutit tulevikus.',
+    })
+  }
+
+  const area =
+    subject.areaHa ??
+    deadlinesAreaHa(subject.deadlines) ??
+    extractNumberTotal(subject.packageRows, AREA_KEYS)
+  if (area === null || area <= 0) {
+    blocking.push({ step: 'Maa ja mets', field: 'areaHa', message: 'Pindala (ha) peab olema suurem kui 0.' })
+  }
+
+  return blocking
 }

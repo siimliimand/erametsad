@@ -2,26 +2,35 @@
 
 import {
   ArrowLeftRight,
+  CheckCircle2,
   ChevronDown,
   Eye,
+  Flag,
+  Network,
   SearchCheck,
   Swords,
   TimerReset,
   TriangleAlert,
   UserPlus,
 } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type UIEvent } from 'react'
 
 import { flagInternalReviewAction } from './_actions'
 import {
   detectAnomalies,
-  NEW_ACCOUNT_BURST_WINDOW_MINUTES,
   NEW_ACCOUNT_MAX_AGE_DAYS,
-  RAPID_OVERTAKE_WINDOW_MINUTES,
+  RAPID_OVERTAKE_WINDOW_SECONDS,
   type DetectedAnomaly,
 } from './_lib/anomalies'
-import { endAuctionManuallyAction, revealBidderIdentityAction, type BidderIdentityView } from '../../../../_actions/auctions'
+import {
+  approveUnderbidAction,
+  endAuctionManuallyAction,
+  rejectUnderbidAction,
+  revealBidderIdentityAction,
+  type BidderIdentityView,
+} from '../../../../_actions/auctions'
 import {
   bidSourceLabels,
   bidStatusLabels,
@@ -43,6 +52,11 @@ export interface MonitorBidRow {
   bidderId: string | null
   bidderAlias: number | null
   bidderAccountCreatedAt: string | null
+  /**
+   * Salted IP hash; the page includes it only for roles allowed to see
+   * anomaly evidence (audit:read), so it never reaches sellers.
+   */
+  ipHash: string | null
 }
 
 export interface MonitorExtensionEntry {
@@ -53,6 +67,23 @@ export interface MonitorExtensionEntry {
   windowMinutes: number | null
   bidId: string | null
   live: boolean
+}
+
+export interface MonitorUnderbidRow {
+  key: string
+  bidId: string
+  bidderId: string
+  bidderAlias: number | null
+  /** null on sealed lots: the amount stays in the envelope until opening. */
+  amountEur: number | null
+  submittedAt: string
+  /**
+   * What the leading amount becomes when this alapakkumine is accepted:
+   * approveAlapakkumine promotes the bid itself, so this is the bid's own
+   * amount — provided only when no strictly higher leader blocks it.
+   */
+  resultingLeadingEur: number | null
+  canBecomeLeading: boolean
 }
 
 type ConnectionState = 'connecting' | 'live' | 'offline'
@@ -189,6 +220,7 @@ function formatClock(iso: string): string {
  * the page props; anonymity rules allow amounts and times only.
  */
 function MonitorHeadStrip({
+  auctionId,
   isSealed,
   sealedCount,
   ended,
@@ -201,8 +233,10 @@ function MonitorHeadStrip({
   currentPriceEur,
   bidStepEur,
   canEndManually,
+  canExportBids,
   onEndManually,
 }: {
+  auctionId: string
   isSealed: boolean
   sealedCount: number | null
   ended: boolean
@@ -215,6 +249,7 @@ function MonitorHeadStrip({
   currentPriceEur: number
   bidStepEur: number | null
   canEndManually: boolean
+  canExportBids: boolean
   onEndManually: () => void
 }) {
   return (
@@ -275,15 +310,25 @@ function MonitorHeadStrip({
         )}
       </p>
 
-      {canEndManually && !ended ? (
+      {canEndManually || canExportBids ? (
         <div className="ml-auto flex gap-2">
-          <button
-            type="button"
-            onClick={onEndManually}
-            className="inline-flex h-7 items-center rounded-button border border-danger bg-transparent px-3 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light"
-          >
-            Lõpeta käsitsi
-          </button>
+          {canExportBids ? (
+            <a
+              href={`/api/v1/admin/bids/export?auction=${encodeURIComponent(auctionId)}`}
+              className="inline-flex h-7 items-center rounded-button border border-border bg-transparent px-3 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary"
+            >
+              Ekspordi pakkumiste logi
+            </a>
+          ) : null}
+          {canEndManually && !ended ? (
+            <button
+              type="button"
+              onClick={onEndManually}
+              className="inline-flex h-7 items-center rounded-button border border-danger bg-transparent px-3 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light"
+            >
+              Lõpeta käsitsi
+            </button>
+          ) : null}
         </div>
       ) : null}
     </section>
@@ -295,84 +340,147 @@ function anomalyCardView(anomaly: DetectedAnomaly): {
   title: string
   description: string
 } {
+  if (anomaly.kind === 'ip-cluster') {
+    return {
+      icon: Network,
+      title: 'IP klaster',
+      description: `${anomaly.labels.join(' · ')} — sama IP ${String(anomaly.bidCount)} pakkumisel`,
+    }
+  }
   if (anomaly.kind === 'new-account-burst') {
+    const label = anomaly.labels[0]
     return {
       icon: UserPlus,
       title:
-        anomaly.bidderAlias === null
+        label === undefined
           ? 'Uue konto pakkumiste jada'
-          : `Uue konto pakkumiste jada — Pakkuja #${String(anomaly.bidderAlias)}`,
-      description: `Konto alla ${String(NEW_ACCOUNT_MAX_AGE_DAYS)} päeva; ${String(anomaly.bidCount)} pakkumist ${String(NEW_ACCOUNT_BURST_WINDOW_MINUTES)} minuti jooksul`,
+          : `Uue konto pakkumiste jada — ${label}`,
+      description: `Konto alla ${String(NEW_ACCOUNT_MAX_AGE_DAYS)} päeva — ${String(anomaly.bidCount)} pakkumist`,
     }
   }
+  const labelA = anomaly.labels[0]
+  const labelB = anomaly.labels[1]
   const pair =
-    anomaly.bidderAliasA === null || anomaly.bidderAliasB === null
+    labelA === undefined || labelB === undefined
       ? 'Kaks pakkujat'
-      : `Pakkuja #${String(anomaly.bidderAliasA)} ↔ Pakkuja #${String(anomaly.bidderAliasB)}`
+      : `${labelA} ↔ ${labelB}`
   return {
     icon: ArrowLeftRight,
     title: 'Kiire ülevõtmine (shill kahtlus)',
-    description: `${pair} — juhtivus vahetus ${String(anomaly.flips)} korda ${String(RAPID_OVERTAKE_WINDOW_MINUTES)} minuti jooksul`,
+    description: `${pair} — juhtivus vahetus ${String(anomaly.overtakes)} korda, iga vahetus alla ${String(RAPID_OVERTAKE_WINDOW_SECONDS)} sekundi`,
   }
 }
 
+/** Estonian delta text for the evidence timeline, e.g. "+2,5 s". */
+function formatDelta(deltaMs: number): string {
+  if (deltaMs >= 60_000) {
+    const minutes = Math.floor(deltaMs / 60_000)
+    const seconds = Math.round((deltaMs % 60_000) / 1000)
+    return `${String(minutes)} min ${String(seconds)} s`
+  }
+  const seconds = Math.round((deltaMs / 1000) * 10) / 10
+  return `${seconds.toFixed(1).replace('.', ',')} s`
+}
+
 /**
- * Anomalies & shill warnings panel (demo 04-bids-monitoring). Advisory
- * heuristics only — nothing here blocks bids. The footer flags the current
- * findings for internal review through one audited `anomaly.flag` entry.
+ * True when any bidder involved in the anomaly carries a shill flag: the
+ * kind-specific ids plus every bidder in the evidence timeline.
  */
-function AnomaliesPanel({
+function anomalyInvolvesFlaggedBidder(
+  anomaly: DetectedAnomaly,
+  flaggedBidderIds: ReadonlySet<string>,
+): boolean {
+  if (flaggedBidderIds.size === 0) return false
+  const kindIds =
+    anomaly.kind === 'new-account-burst'
+      ? [anomaly.bidderId]
+      : anomaly.kind === 'rapid-overtake'
+        ? [anomaly.bidderIdA, anomaly.bidderIdB]
+        : []
+  return (
+    kindIds.some((bidderId) => flaggedBidderIds.has(bidderId)) ||
+    anomaly.timeline.some(
+      (entry) => entry.bidderId !== null && flaggedBidderIds.has(entry.bidderId),
+    )
+  )
+}
+
+/**
+ * One expandable anomaly card: the collapsed row names the finding, the
+ * expanded evidence block shows the affected labels with their bid counts,
+ * the masked IP prefixes, and the bid-time deltas of the involved bids.
+ * "Märgi uurimiseks" flags this one finding through the audited
+ * `anomaly.flag` audit entry. A card with a shill-flagged bidder shows the
+ * flag mark on the collapsed summary.
+ */
+function AnomalyCard({
   auctionId,
-  anomalies,
-  canFlag,
+  anomaly,
+  flaggedBidderIds,
 }: {
   auctionId: string
-  anomalies: readonly DetectedAnomaly[]
-  canFlag: boolean
+  anomaly: DetectedAnomaly
+  flaggedBidderIds: ReadonlySet<string>
 }) {
   const [flagged, setFlagged] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const view = anomalyCardView(anomaly)
+  const Icon = view.icon
+  const involvesFlagged = anomalyInvolvesFlaggedBidder(anomaly, flaggedBidderIds)
 
   return (
-    <section
-      aria-label="Anomaaliad ja shill-hoiatused"
-      className="mb-md rounded-card border border-border bg-bgPage px-md py-sm shadow-card"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-sm">
-        <h2 className="text-label font-semibold text-ink-muted">Anomaaliad &amp; shill-hoiatused</h2>
-        <span className="inline-flex items-center gap-1 text-label font-semibold text-danger">
-          <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
-          {String(anomalies.length)} anomaaliat tuvastatud
-        </span>
-      </div>
-      <ul className="mt-sm flex flex-col gap-xs">
-        {anomalies.map((anomaly) => {
-          const view = anomalyCardView(anomaly)
-          const Icon = view.icon
-          return (
-            <li
-              key={`${anomaly.kind}-${anomaly.kind === 'new-account-burst' ? anomaly.bidderId : `${anomaly.bidderIdA}-${anomaly.bidderIdB}`}`}
-              className="flex gap-2.5 rounded-input border border-l-4 border-border border-l-danger bg-danger-light px-sm py-xs"
-            >
-              <Icon className="mt-0.5 h-4 w-4 flex-none text-danger" aria-hidden="true" />
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-bodySm font-semibold text-ink">{view.title}</span>
-                <span className="text-label text-ink-muted">{view.description}</span>
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-      {canFlag ? (
-        <div className="mt-sm border-t border-border pt-sm">
+    <li className="rounded-input border border-l-4 border-border border-l-danger bg-danger-light px-sm py-xs">
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-start gap-2.5 [&::-webkit-details-marker]:hidden">
+          <Icon className="mt-0.5 h-4 w-4 flex-none text-danger" aria-hidden="true" />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="flex items-center gap-1.5 text-bodySm font-semibold text-ink">
+              {involvesFlagged ? <FlagMark /> : null}
+              {view.title}
+            </span>
+            <span className="text-label text-ink-muted">{view.description}</span>
+          </span>
+          <ChevronDown
+            className="mt-0.5 h-3.5 w-3.5 flex-none text-ink-muted transition-transform duration-hover ease-hover group-open:rotate-180"
+            aria-hidden="true"
+          />
+        </summary>
+        <div className="mt-xs flex flex-col gap-xs border-t border-danger/20 pt-xs">
+          <p className="text-label text-ink">
+            {anomaly.labels
+              .map((label, index) => {
+                const count = anomaly.bidCounts[index]
+                return `${label}${count === undefined ? '' : ` — ${String(count)} pakkumist`}`
+              })
+              .join(' · ')}
+          </p>
+          {anomaly.ipPrefixes.length > 0 ? (
+            <p className="text-label text-ink">
+              IP-d: {anomaly.ipPrefixes.map((prefix) => `${prefix}…`).join(' · ')}
+            </p>
+          ) : null}
+          <p className="text-label font-semibold text-ink-muted">Pakkumiste ajajoon:</p>
+          <ul className="flex flex-col gap-0.5">
+            {anomaly.timeline.map((entry) => (
+              <li key={entry.bidId ?? `${entry.placedAt}-${entry.label}`} className="flex gap-2 text-label text-ink">
+                <time dateTime={entry.placedAt} title={formatDateTime(entry.placedAt)}>
+                  {formatClock(entry.placedAt)}
+                </time>
+                <span>{entry.label}</span>
+                {entry.deltaMs !== null ? (
+                  <span className="text-ink-muted">+{formatDelta(entry.deltaMs)}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
           {flagged ? (
             <span
               role="status"
-              className="inline-flex items-center gap-1 rounded-pill bg-primary-light px-3 py-1 text-label font-semibold text-primaryDark"
+              className="inline-flex w-fit items-center gap-1 rounded-pill bg-primary-light px-3 py-1 text-label font-semibold text-primaryDark"
             >
               <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
-              Märgitud sisejuurdluseks — kirje auditilogis
+              Märgitud uurimiseks — kirje auditilogis
             </span>
           ) : (
             <>
@@ -381,7 +489,7 @@ function AnomaliesPanel({
                 disabled={pending}
                 onClick={() => {
                   startTransition(async () => {
-                    const result = await flagInternalReviewAction(auctionId, anomalies)
+                    const result = await flagInternalReviewAction(auctionId, [anomaly])
                     if (result.ok) {
                       setFlagged(true)
                     } else {
@@ -389,19 +497,250 @@ function AnomaliesPanel({
                     }
                   })
                 }}
-                className="inline-flex h-7 items-center gap-1.5 rounded-button border border-danger bg-transparent px-3 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-7 w-fit items-center gap-1.5 rounded-button border border-danger bg-transparent px-3 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <SearchCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                {pending ? 'Märgin…' : 'Märgi sisejuurdluseks'}
+                {pending ? 'Märgin…' : 'Märgi uurimiseks'}
               </button>
               {error !== null ? (
-                <span className="ml-2 text-label font-semibold text-danger">{error}</span>
+                <span className="text-label font-semibold text-danger">{error}</span>
               ) : null}
             </>
           )}
         </div>
-      ) : null}
+      </details>
+    </li>
+  )
+}
+
+/**
+ * Anomalies & shill warnings panel (demo 04-bids-monitoring). Advisory
+ * heuristics only — nothing here blocks bids. The whole panel mounts only
+ * for roles the page gates server-side (audit:read: admin/superadmin), so
+ * sellers never receive anomaly evidence.
+ */
+function AnomaliesPanel({
+  auctionId,
+  anomalies,
+  flaggedBidderIds,
+}: {
+  auctionId: string
+  anomalies: readonly DetectedAnomaly[]
+  flaggedBidderIds: ReadonlySet<string>
+}) {
+  return (
+    <section
+      aria-label="Anomaaliad ja shill-hoiatused"
+      className="mb-md rounded-card border border-border bg-bgPage px-md py-sm shadow-card"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-sm">
+        <h2 className="text-label font-semibold text-ink-muted">Anomaaliad &amp; shill-hoiatused</h2>
+        {anomalies.length > 0 ? (
+          <span className="inline-flex items-center gap-1 text-label font-semibold text-danger">
+            <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+            {String(anomalies.length)} anomaaliat tuvastatud
+          </span>
+        ) : null}
+      </div>
+      {anomalies.length === 0 ? (
+        <p
+          role="status"
+          className="mt-sm inline-flex items-center gap-1.5 rounded-input border border-l-4 border-border border-l-primary bg-primary-light px-sm py-xs text-bodySm font-semibold text-primaryDark"
+        >
+          <CheckCircle2 className="h-4 w-4 flex-none" aria-hidden="true" />
+          Anomaaliaid ei tuvastatud
+        </p>
+      ) : (
+        <ul className="mt-sm flex flex-col gap-xs">
+          {anomalies.map((anomaly) => (
+            <AnomalyCard
+              key={anomaly.id}
+              auctionId={auctionId}
+              anomaly={anomaly}
+              flaggedBidderIds={flaggedBidderIds}
+            />
+          ))}
+        </ul>
+      )}
     </section>
+  )
+}
+
+/**
+ * Alapakkumised block (demo 04-bids-monitoring): this auction's pending
+ * under-bids with the "Vaata kõik" link into the global queue. Accept runs
+ * through a confirm modal naming the resulting leading amount — approving
+ * promotes the alapakkumine itself (approveAlapakkumine), so the confirmed
+ * amount is the bid's own, and only when no strictly higher leader blocks
+ * the promotion. Reject keeps the typed ≥5-character reason rule; both
+ * decisions reuse the shared audited actions and land back on the monitor.
+ */
+function UnderbidsPanel({
+  auctionId,
+  rows,
+  canDecide,
+  nowMs,
+}: {
+  auctionId: string
+  rows: readonly MonitorUnderbidRow[]
+  canDecide: boolean
+  nowMs: number
+}) {
+  const [confirmingBidId, setConfirmingBidId] = useState<string | null>(null)
+  const monitorPath = `/admin/auctions/${encodeURIComponent(auctionId)}/monitor`
+
+  return (
+    <section
+      aria-label="Alapakkumised"
+      className="mb-md rounded-card border border-border bg-bgPage px-md py-sm shadow-card"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-sm">
+        <h2 className="text-label font-semibold text-ink-muted">
+          Alapakkumised ({String(rows.length)} ootel)
+        </h2>
+        <Link
+          href="/admin/bids"
+          className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
+        >
+          Vaata kõik
+        </Link>
+      </div>
+      {rows.length === 0 ? (
+        <p className="mt-sm text-bodySm text-ink-muted">Ootel alapakkumisi ei ole.</p>
+      ) : (
+        <ul className="mt-sm flex flex-col gap-xs">
+          {rows.map((row) => (
+            <li
+              key={row.key}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-input border border-border bg-bg-mist px-sm py-xs"
+            >
+              <span className="text-bodySm font-semibold tabular-nums text-ink">
+                {row.amountEur === null ? '—' : formatEurAmount(row.amountEur)}
+              </span>
+              <span className="text-bodySm text-ink-muted">
+                {row.bidderAlias === null ? 'Pakkuja' : `Pakkuja #${String(row.bidderAlias)}`}
+              </span>
+              <time
+                dateTime={row.submittedAt}
+                title={formatDateTime(row.submittedAt)}
+                className="text-label text-ink-muted"
+              >
+                {formatRelativeTime(row.submittedAt, nowMs)}
+              </time>
+              {row.amountEur !== null && !row.canBecomeLeading ? (
+                <span className="text-label text-ink-muted">
+                  Kõrgem pakkuja on juba juhtiv
+                </span>
+              ) : null}
+              {canDecide ? (
+                <span className="ml-auto flex flex-wrap items-center gap-sm">
+                  {row.amountEur !== null && row.canBecomeLeading ? (
+                    <form action={approveUnderbidAction}>
+                      <input type="hidden" name="auctionId" value={auctionId} />
+                      <input type="hidden" name="bidId" value={row.bidId} />
+                      <input type="hidden" name="redirectTo" value={monitorPath} />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmingBidId(row.bidId)
+                        }}
+                        className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
+                      >
+                        Nõustu
+                      </button>
+                      {confirmingBidId === row.bidId ? (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-md">
+                          <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby={`underbid-confirm-${row.key}`}
+                            className="w-full max-w-md rounded-card border border-border bg-bgPage p-md"
+                          >
+                            <h3
+                              id={`underbid-confirm-${row.key}`}
+                              className="font-heading text-h4 font-bold text-ink"
+                            >
+                              Kinnita alapakkumine
+                            </h3>
+                            <p className="mt-xs text-bodySm text-ink">
+                              Alapakkumine{' '}
+                              <strong className="font-mono font-medium">
+                                {formatEurAmount(row.resultingLeadingEur)}
+                              </strong>{' '}
+                              muutub juhtivaks pakkumiseks. Pakkuja teavitatakse kohe.
+                            </p>
+                            <div className="mt-md flex justify-end gap-sm">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setConfirmingBidId(null)
+                                }}
+                                className="inline-flex h-10 items-center rounded-button border border-border bg-bgPage px-4 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary"
+                              >
+                                Tühista
+                              </button>
+                              <button
+                                type="submit"
+                                className="inline-flex h-10 items-center rounded-button bg-primary px-4 text-label font-semibold text-ink-inverse transition-opacity duration-hover ease-hover hover:opacity-90"
+                              >
+                                Kinnita
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </form>
+                  ) : null}
+                  <details className="relative">
+                    <summary className="cursor-pointer text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:text-danger/80">
+                      Keeldu põhjusega
+                    </summary>
+                    <form
+                      action={rejectUnderbidAction}
+                      className="mt-xs flex w-72 flex-col gap-xs rounded-card border border-border bg-bgPage p-sm shadow-md"
+                    >
+                      <input type="hidden" name="auctionId" value={auctionId} />
+                      <input type="hidden" name="bidId" value={row.bidId} />
+                      <input type="hidden" name="redirectTo" value={monitorPath} />
+                      <label className="flex flex-col gap-xs text-label text-ink-muted">
+                        Keeldumise põhjus (kohustuslik, min 5 tähemärki)
+                        <textarea
+                          name="reason"
+                          required
+                          minLength={5}
+                          rows={2}
+                          className="rounded-input border border-border bg-bgPage px-2 py-1 text-bodySm text-ink"
+                          placeholder="Sisesta põhjus, mis edastatakse pakkujale"
+                        />
+                      </label>
+                      <button
+                        type="submit"
+                        className="rounded-button border border-danger px-3 py-1 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light"
+                      >
+                        Lükka tagasi
+                      </button>
+                    </form>
+                  </details>
+                </span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+/**
+ * Shill-flag marker (spec delta admin-people): flagged bidders carry this
+ * icon on their reveal chip and on the anomaly cards that involve them.
+ */
+function FlagMark({ className = '' }: { className?: string }) {
+  return (
+    <span className={`inline-flex items-center ${className}`} title="Märgitud shill-uurimiseks">
+      <Flag className="h-3 w-3 text-danger" aria-hidden="true" />
+      <span className="sr-only">Märgitud shill-uurimiseks</span>
+    </span>
   )
 }
 
@@ -411,22 +750,48 @@ function AnomaliesPanel({
  * shared `revealBidderIdentityAction`, which writes the `user.identity_view`
  * audit entry BEFORE the identity value reaches the client. On success the
  * chip unmounts to the revealed name with an explicit audit marker; the
- * server action's error text renders on failure.
+ * server action's error text renders on failure. With `users:read` the
+ * revealed name links into the bidder's Kasutajad detail view.
  */
-function BidderRevealChip({ bidId, alias }: { bidId: string | null; alias: number }) {
+function BidderRevealChip({
+  bidId,
+  bidderId,
+  alias,
+  canViewUsers,
+  flagged,
+}: {
+  bidId: string | null
+  bidderId: string | null
+  alias: number
+  canViewUsers: boolean
+  flagged: boolean
+}) {
   const [identity, setIdentity] = useState<BidderIdentityView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
   if (identity !== null) {
+    const name = (
+      <>
+        {identity.name ?? identity.email}
+        {identity.name !== null ? (
+          <span className="ml-1 font-normal text-ink-muted">({identity.email})</span>
+        ) : null}
+      </>
+    )
     return (
       <span className="inline-flex flex-wrap items-center gap-x-1">
-        <span className="text-label font-semibold text-ink">
-          {identity.name ?? identity.email}
-          {identity.name !== null ? (
-            <span className="ml-1 font-normal text-ink-muted">({identity.email})</span>
-          ) : null}
-        </span>
+        {flagged ? <FlagMark /> : null}
+        {canViewUsers && bidderId !== null ? (
+          <Link
+            href={`/admin/users/${encodeURIComponent(bidderId)}`}
+            className="text-label font-semibold text-ink underline-offset-2 transition-colors duration-hover ease-hover hover:text-primary hover:underline"
+          >
+            {name}
+          </Link>
+        ) : (
+          <span className="text-label font-semibold text-ink">{name}</span>
+        )}
         <span className="rounded-pill bg-primary-light px-2 py-0.5 text-label font-semibold text-primaryDark">
           paljastatud — logitud auditisse
         </span>
@@ -439,29 +804,37 @@ function BidderRevealChip({ bidId, alias }: { bidId: string | null; alias: numbe
   }
 
   if (bidId === null) {
-    return <span className="text-label font-medium text-ink-muted">Pakkuja #{String(alias)}</span>
+    return (
+      <span className="inline-flex items-center gap-1">
+        {flagged ? <FlagMark /> : null}
+        <span className="text-label font-medium text-ink-muted">Pakkuja #{String(alias)}</span>
+      </span>
+    )
   }
 
   return (
-    <button
-      type="button"
-      disabled={pending}
-      title="Paljasta pakkuja nimi (logitakse auditisse)"
-      onClick={() => {
-        startTransition(async () => {
-          const reveal = await revealBidderIdentityAction(bidId)
-          if (reveal.ok) {
-            setIdentity(reveal.identity)
-          } else {
-            setError(reveal.error)
-          }
-        })
-      }}
-      className="inline-flex h-6 items-center gap-1 rounded-pill border border-border px-2 text-label font-semibold text-ink-muted transition-colors duration-hover ease-hover hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      <Eye className="h-3 w-3" aria-hidden="true" />
-      {pending ? 'Avan…' : `Pakkuja #${String(alias)}`}
-    </button>
+    <span className="inline-flex items-center gap-1">
+      {flagged ? <FlagMark /> : null}
+      <button
+        type="button"
+        disabled={pending}
+        title="Paljasta pakkuja nimi (logitakse auditisse)"
+        onClick={() => {
+          startTransition(async () => {
+            const reveal = await revealBidderIdentityAction(bidId)
+            if (reveal.ok) {
+              setIdentity(reveal.identity)
+            } else {
+              setError(reveal.error)
+            }
+          })
+        }}
+        className="inline-flex h-6 items-center gap-1 rounded-pill border border-border px-2 text-label font-semibold text-ink-muted transition-colors duration-hover ease-hover hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Eye className="h-3 w-3" aria-hidden="true" />
+        {pending ? 'Avan…' : `Pakkuja #${String(alias)}`}
+      </button>
+    </span>
   )
 }
 
@@ -473,10 +846,14 @@ function BidderRevealChip({ bidId, alias }: { bidId: string | null; alias: numbe
 function FeedBidRow({
   row,
   nowMs,
+  canViewUsers,
+  flagged = false,
   indented = false,
 }: {
   row: MonitorBidRow
   nowMs: number
+  canViewUsers: boolean
+  flagged?: boolean
   indented?: boolean
 }) {
   return (
@@ -497,7 +874,13 @@ function FeedBidRow({
         {row.bidderAlias === null ? (
           <span className="text-bodySm text-ink-muted">—</span>
         ) : (
-          <BidderRevealChip bidId={row.bidId} alias={row.bidderAlias} />
+          <BidderRevealChip
+            bidId={row.bidId}
+            bidderId={row.bidderId}
+            alias={row.bidderAlias}
+            canViewUsers={canViewUsers}
+            flagged={flagged}
+          />
         )}
       </td>
       <td className="h-10 px-3 text-bodySm font-semibold text-ink">{formatEurAmount(row.amountEur)}</td>
@@ -526,11 +909,15 @@ function FeedBidRow({
 function FeedBurstRow({
   entry,
   nowMs,
+  canViewUsers,
+  flaggedBidderIds,
   open,
   onToggle,
 }: {
   entry: Extract<FeedEntry, { kind: 'burst' }>
   nowMs: number
+  canViewUsers: boolean
+  flaggedBidderIds: ReadonlySet<string>
   open: boolean
   onToggle: () => void
 }) {
@@ -557,7 +944,16 @@ function FeedBurstRow({
         </td>
       </tr>
       {open
-        ? entry.rows.map((row) => <FeedBidRow key={row.key} row={row} nowMs={nowMs} indented />)
+        ? entry.rows.map((row) => (
+            <FeedBidRow
+              key={row.key}
+              row={row}
+              nowMs={nowMs}
+              canViewUsers={canViewUsers}
+              flagged={row.bidderId !== null && flaggedBidderIds.has(row.bidderId)}
+              indented
+            />
+          ))
         : null}
     </>
   )
@@ -588,7 +984,13 @@ export function BidMonitor({
   antiSnipeMinutes,
   initialExtensions,
   canEndManually,
-  canFlagAnomalies,
+  canViewAnomalies,
+  canExportBids,
+  canViewUsers,
+  canViewCeremony,
+  canDecideUnderbids,
+  underbids,
+  flaggedBidderIds,
 }: {
   auctionId: string
   title: string
@@ -605,7 +1007,23 @@ export function BidMonitor({
   antiSnipeMinutes: number
   initialExtensions: MonitorExtensionEntry[]
   canEndManually: boolean
-  canFlagAnomalies: boolean
+  /**
+   * Server-side anomaly gate (audit:read: admin/superadmin). When false the
+   * panel never mounts and the rows arrive without ip_hash data, so the
+   * anomalies and their evidence stay hidden from sellers and specialists.
+   */
+  canViewAnomalies: boolean
+  canExportBids: boolean
+  canViewUsers: boolean
+  canViewCeremony: boolean
+  canDecideUnderbids: boolean
+  underbids: MonitorUnderbidRow[]
+  /**
+   * Shill-flagged bidder ids of this lot (spec delta admin-people), built
+   * server-side from the `user.shill_flag` audit entries. Flagged bidders
+   * show the flag icon on their reveal chip and on anomaly cards.
+   */
+  flaggedBidderIds: readonly string[]
 }) {
   const router = useRouter()
   const [rows, setRows] = useState<MonitorBidRow[]>(initialRows)
@@ -626,6 +1044,7 @@ export function BidMonitor({
   const [expandedBursts, setExpandedBursts] = useState<ReadonlySet<string>>(new Set())
   const [endModalOpen, setEndModalOpen] = useState(false)
   const [endReason, setEndReason] = useState('')
+  const flaggedSet = useMemo(() => new Set(flaggedBidderIds), [flaggedBidderIds])
 
   // Server-synced clock: the skew is fixed once against the server render
   // time, then the countdown ticks locally against it.
@@ -868,13 +1287,14 @@ export function BidMonitor({
     [rows],
   )
   const anomalies = useMemo(
-    () => detectAnomalies(rows, Date.now() - skewRef.current),
-    [rows],
+    () => (canViewAnomalies ? detectAnomalies(rows, Date.now() - skewRef.current) : []),
+    [rows, canViewAnomalies],
   )
 
   return (
     <div>
       <MonitorHeadStrip
+        auctionId={auctionId}
         isSealed={isSealed}
         sealedCount={sealedCount}
         ended={ended}
@@ -887,6 +1307,7 @@ export function BidMonitor({
         currentPriceEur={currentPriceEur}
         bidStepEur={bidStepEur}
         canEndManually={canEndManually}
+        canExportBids={canExportBids}
         onEndManually={() => {
           setEndModalOpen(true)
         }}
@@ -896,9 +1317,19 @@ export function BidMonitor({
         {isSealed ? (
           <div className="flex flex-col gap-1 rounded-card border border-border bg-bgPage px-md py-sm">
             <span className="text-label font-semibold text-ink-muted">Suletud pakkumised</span>
-            <span className="font-heading text-h3 font-bold text-ink">
-              {sealedCount === null ? '—' : String(sealedCount)}
-            </span>
+            {canViewCeremony ? (
+              <Link
+                href={`/admin/auctions/${encodeURIComponent(auctionId)}/ceremony`}
+                title="Ava avamistseremoonia"
+                className="w-fit font-heading text-h3 font-bold text-ink transition-colors duration-hover ease-hover hover:text-primary"
+              >
+                {sealedCount === null ? '—' : String(sealedCount)}
+              </Link>
+            ) : (
+              <span className="font-heading text-h3 font-bold text-ink">
+                {sealedCount === null ? '—' : String(sealedCount)}
+              </span>
+            )}
             <span className="text-bodySm text-ink-muted">Summad krüptitud kuni avamiseni</span>
           </div>
         ) : (
@@ -1112,12 +1543,20 @@ export function BidMonitor({
                 ) : (
                   feedEntries.map((entry) =>
                     entry.kind === 'row' ? (
-                      <FeedBidRow key={entry.row.key} row={entry.row} nowMs={Date.now() - skewRef.current} />
+                      <FeedBidRow
+                        key={entry.row.key}
+                        row={entry.row}
+                        nowMs={Date.now() - skewRef.current}
+                        canViewUsers={canViewUsers}
+                        flagged={entry.row.bidderId !== null && flaggedSet.has(entry.row.bidderId)}
+                      />
                     ) : (
                       <FeedBurstRow
                         key={entry.key}
                         entry={entry}
                         nowMs={Date.now() - skewRef.current}
+                        canViewUsers={canViewUsers}
+                        flaggedBidderIds={flaggedSet}
                         open={expandedBursts.has(entry.key)}
                         onToggle={() => {
                           setExpandedBursts((current) => {
@@ -1149,8 +1588,19 @@ export function BidMonitor({
         </p>
       )}
 
-      {anomalies.length > 0 ? (
-        <AnomaliesPanel auctionId={auctionId} anomalies={anomalies} canFlag={canFlagAnomalies} />
+      <UnderbidsPanel
+        auctionId={auctionId}
+        rows={underbids}
+        canDecide={canDecideUnderbids && !ended}
+        nowMs={Date.now() - skewRef.current}
+      />
+
+      {canViewAnomalies ? (
+        <AnomaliesPanel
+          auctionId={auctionId}
+          anomalies={anomalies}
+          flaggedBidderIds={flaggedSet}
+        />
       ) : null}
 
       {extensions.length > 0 ? (

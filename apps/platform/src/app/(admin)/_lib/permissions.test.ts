@@ -42,11 +42,26 @@ describe('isStaffRole', () => {
 })
 
 describe('permission matrix', () => {
-  it('admits admin and superadmin to every permission', () => {
-    for (const role of ['admin', 'superadmin'] as const) {
-      expect(sorted(allowedFor(role))).toEqual(sorted(adminPermissions))
-      expect(ROLE_DENIED_PERMISSIONS[role].size).toBe(0)
+  it('admits superadmin to every permission', () => {
+    expect(sorted(allowedFor('superadmin'))).toEqual(sorted(adminPermissions))
+    expect(ROLE_DENIED_PERMISSIONS.superadmin.size).toBe(0)
+  })
+
+  it('admits admin to every permission except settings:write (D-6 read-only tier)', () => {
+    expect(sorted(allowedFor('admin'))).toEqual(
+      sorted(adminPermissions.filter((permission) => permission !== 'settings:write')),
+    )
+    expect(sorted([...ROLE_DENIED_PERMISSIONS.admin])).toEqual(sorted(['settings:write']))
+    expect(can('admin', 'settings:read')).toBe(true)
+  })
+
+  it('restricts settings:write to superadmin', () => {
+    for (const role of staffRoles) {
+      expect(can(role, 'settings:write'), `${role}/settings:write`).toBe(role === 'superadmin')
     }
+    expect(() => {
+      assertCan('admin', 'settings:write')
+    }).toThrow(PermissionDeniedError)
   })
 
   it('gives the specialist its operations scope', () => {
@@ -278,7 +293,7 @@ describe('module visibility map', () => {
       'Lepingud',
       'Juhtlõimed',
       'Päringud',
-      'Sisu',
+      'Sisuhaldus',
       'Statistika',
       'Seaded',
       'Auditlogi',

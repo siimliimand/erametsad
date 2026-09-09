@@ -1,28 +1,39 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { requireAdminRepositories } from '../_lib/admin'
-import { auctionStatusLabels } from '../_lib/labels'
+import { auctionStatusLabels, maskIsikukood } from '../_lib/labels'
 import {
   assertCan,
   auctionInScope,
   auctionScope,
+  can,
   PermissionDeniedError,
   type StaffRole,
 } from '../_lib/permissions'
 import {
+  SUCCESS_FEE_PERCENT_DEFAULT,
+  successFeeCents,
+  VAT_PERCENT,
+} from '../admin/_lib/workspace'
+import {
   applyQuickAuctionDefaults,
   auctionInputSchema,
   collectPublishGateFailures,
+  collectPublishReadinessFailures,
   slugifyTitle,
   toAuctionWriteData,
+  type AuctionGateSubject,
   type AuctionInput,
   type AuctionWriteData,
+  type PublishGateFailure,
+  type PublishReadinessSubject,
 } from '../admin/auctions/_lib/auction-schema'
 import { tallinnWallTimeToUtcIso } from '../admin/content/_components/scheduled-publish'
+import { readAuctionDefaults } from '../admin/content/_components/settings-audit'
 
 import { verifyAdminAccessToken } from '@/lib/auth/jwt'
 import { verifyPassword } from '@/lib/auth/password'
@@ -32,6 +43,8 @@ import {
   type ApproveDecision,
   type RejectDecision,
 } from '@/lib/bidding/alapakkumine'
+import { clampAntiSnipeMinutes } from '@/lib/bidding/anti-snipe'
+import { computeIpHash } from '@/lib/bidding/place-bid'
 import {
   decryptSealedBids,
   getSealedBidsForAuction,
@@ -44,8 +57,8 @@ import {
 } from '@/lib/bidding/sealed-opening'
 import { createCache } from '@/lib/cache'
 import { prepareContract } from '@/lib/contracts/service'
-import type { AuctionDoc, CoreRepositories } from '@/lib/data/repositories'
-import { eurosToCents } from '@/lib/data/repositories/money'
+import type { AuctionDoc, CoreRepositories, SettingsDoc } from '@/lib/data/repositories'
+import { centsToEuros, eurosToCents } from '@/lib/data/repositories/money'
 import { getRepositories } from '@/lib/data/runtime'
 import { eventBus } from '@/lib/notifications/event-bus'
 import { upsertSnapshot } from '@/lib/stats/aggregation'
@@ -87,6 +100,49 @@ function feedbackPathFrom(formData: FormData, fallback: string): string {
 
 function auctionDetailPath(auctionId: string): string {
   return `/admin/auctions/${auctionId}`
+}
+
+/** Wizard submit intent behind the three footer buttons (task 5.5). */
+type WizardIntent = 'draft' | 'schedule' | 'publish'
+
+function wizardIntent(formData: FormData): WizardIntent {
+  const value = readText(formData, 'intent')
+  return value === 'schedule' || value === 'publish' ? value : 'draft'
+}
+
+/** Gate inputs from the stored (or just-written) lot row. */
+function gateSubjectOfAuction(auction: AuctionDoc): AuctionGateSubject {
+  return {
+    objectType: auction.objectType,
+    type: auction.type,
+    isQuickAuction: auction.isQuickAuction,
+    startsAt: auction.startsAt,
+    endsAt: auction.endsAt,
+    minBidCents: auction.minBidCents,
+    reservePriceCents: auction.reservePriceCents,
+    cadastres: auction.cadastres,
+    countyId: auction.countyId,
+    parishId: auction.parishId,
+    packageRows: auction.packageRows,
+    media: auction.media,
+  }
+}
+
+function readinessSubjectOfAuction(auction: AuctionDoc): PublishReadinessSubject {
+  return {
+    specialistId: typeof auction.specialistId === 'string' ? auction.specialistId : null,
+    startsAt: typeof auction.startsAt === 'string' ? auction.startsAt : null,
+    areaHa: typeof auction.areaHa === 'number' ? auction.areaHa : null,
+    deadlines: auction.deadlines,
+    packageRows: auction.packageRows,
+  }
+}
+
+function blockingGateSummary(blocking: PublishGateFailure[]): string {
+  return blocking
+    .slice(0, 5)
+    .map((gate) => `${gate.step} → ${gate.message}`)
+    .join(' | ')
 }
 
 /**
@@ -224,8 +280,10 @@ const writeKeyByInputKey: Record<string, string> = {
   antiSnipeEnabled: 'deadlines',
   antiSnipeMinutes: 'deadlines',
   propertyCount: 'deadlines',
-  areaHa: 'deadlines',
-  volumeM3: 'deadlines',
+  // Real columns (migration 0018); the deadlines JSON mirror still travels
+  // through toAuctionWriteData for guest preview reads.
+  areaHa: 'areaHa',
+  volumeM3: 'volumeM3',
   descriptionPublic: 'descriptionPublic',
   descriptionInternal: 'descriptionInternal',
   descriptionSecondary: 'descriptionSecondary',
@@ -254,8 +312,21 @@ function restrictToPresentKeys(
 
 function audit(
   repositories: CoreRepositories,
-  entry: { actorId: string; action: string; entityType: string; entityId: string; after: unknown },
+  entry: {
+    actorId: string
+    action: string
+    entityType: string
+    entityId: string
+    after: unknown
+    reason?: string
+    context?: {
+      sessionId: string | null
+      ipHash: string | null
+      userAgent: string | null
+    }
+  },
 ): Promise<unknown> {
+  const context = entry.context
   return repositories.create({
     collection: 'audit-entry',
     data: {
@@ -264,13 +335,44 @@ function audit(
       entityType: entry.entityType,
       entityId: entry.entityId,
       after: entry.after,
+      ...(entry.reason ? { reason: entry.reason } : {}),
+      ...(context?.sessionId ? { sessionId: context.sessionId } : {}),
+      ...(context?.ipHash ? { ipHash: context.ipHash } : {}),
+      ...(context?.userAgent ? { userAgent: context.userAgent } : {}),
     },
   })
+}
+
+/**
+ * Request context for the audit era columns (task 4.7): session id from the
+ * access token, salted IP hash and user agent from the request headers.
+ * Best-effort only — outside a request scope the fields fall back to null.
+ */
+async function auditRequestContext(): Promise<{
+  sessionId: string | null
+  ipHash: string | null
+  userAgent: string | null
+}> {
+  try {
+    const headerList = await headers()
+    const token = (await cookies()).get('access_token')?.value
+    const payload = token ? verifyAdminAccessToken(token) : null
+    const ip = headerList.get('x-forwarded-for')?.split(',')[0]?.trim()
+    const userAgent = headerList.get('user-agent')?.trim()
+    return {
+      sessionId: payload?.sessionId ?? null,
+      ipHash: ip && ip.length > 0 ? computeIpHash(ip) : null,
+      userAgent: userAgent && userAgent.length > 0 ? userAgent.slice(0, 512) : null,
+    }
+  } catch {
+    return { sessionId: null, ipHash: null, userAgent: null }
+  }
 }
 
 export async function createAuctionAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
 
+  const intent = wizardIntent(formData)
   const raw = formToAuctionInput(formData)
   const input = parseAuctionInputOrRedirect(raw, newAuctionPath)
   const writeData = toAuctionWriteData(input)
@@ -330,6 +432,18 @@ export async function createAuctionAction(formData: FormData): Promise<void> {
     redirectWithError(newAuctionPath, `Oksjoni loomine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
   }
 
+  // The draft exists at this point, so a failed gate lands back on the new
+  // lot's editor with the draft preserved; success notices go to the detail.
+  if (intent !== 'draft') {
+    await applyWizardIntent(
+      repositories,
+      session.userId,
+      intent,
+      { error: `${auctionDetailPath(created.id)}/edit`, notice: auctionDetailPath(created.id) },
+      created,
+    )
+  }
+
   revalidatePath('/admin/auctions')
   redirect(auctionDetailPath(created.id))
 }
@@ -340,6 +454,7 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
   const id = readText(formData, 'id')
   const detailPath = auctionDetailPath(id)
   const editPath = `${detailPath}/edit`
+  const intent = wizardIntent(formData)
   if (!id) redirectWithError('/admin/auctions', 'Muudatuseks puudub oksjoni identifikaator.')
 
   const auction = await repositories.findByID({ collection: 'auctions', id })
@@ -353,7 +468,12 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
 
   // An active (or scheduled) lot locks its mechanics: only content fields
   // may change; force requires manual end + re-list (docs 03 interactions).
+  // Admin/superadmin may push mechanic changes through the lock by posting
+  // mechanicsOverride=true; the override is recorded in the audit entry.
   const mechanicsLocked = auction.status === 'active' || auction.status === 'scheduled'
+  const overrideRequested = readText(formData, 'mechanicsOverride') === 'true'
+  const canOverrideMechanics = session.role === 'admin' || session.role === 'superadmin'
+  let mechanicsOverridden = false
   if (mechanicsLocked) {
     // zod defaults must not count as submitted values: the quick-auction
     // flag conflicts only when the payload actually carries it.
@@ -367,7 +487,11 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
       (input.objectType !== auction.objectType) ||
       (submittedQuick !== null && submittedQuick !== auction.isQuickAuction)
     if (mechanicsConflict) {
-      redirectWithError(editPath, 'Aktiivse oksjoni mehaanikat muuta ei saa.')
+      if (overrideRequested && canOverrideMechanics) {
+        mechanicsOverridden = true
+      } else {
+        redirectWithError(editPath, 'Aktiivse oksjoni mehaanikat muuta ei saa.')
+      }
     }
   }
 
@@ -416,6 +540,7 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
           ? { specialistId: requestedSpecialist }
           : {}),
         ...(mechanicsLocked ? { mechanicsLocked: true } : {}),
+        ...(mechanicsOverridden ? { mechanicsOverride: true } : {}),
       },
     })
   } catch (error) {
@@ -425,9 +550,163 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
     redirectWithError(editPath, `Oksjoni salvestamine ebaõnnestus: ${failure}`)
   }
 
+  // Ajasta/Avalda kohe run their gates against the just-persisted state;
+  // locked lots (active/ended/…) fall back to a plain content save.
+  if (intent !== 'draft' && (auction.status === 'draft' || auction.status === 'scheduled')) {
+    await applyWizardIntent(repositories, session.userId, intent, { error: detailPath, notice: detailPath }, {
+      ...auction,
+      ...updateData,
+      specialistId: writeData.specialistId ?? auction.specialistId,
+    })
+  }
+
   revalidatePath('/admin/auctions')
   revalidatePath(detailPath)
   redirect(detailPath)
+}
+
+export interface AuctionAutosaveResult {
+  ok: boolean
+  /**
+   * True when the stored copy was written by someone else after the
+   * client's base updatedAt; the stored lot is left untouched and the
+   * wizard shows the conflict banner with the takeover option (task 5.6).
+   */
+  conflict: boolean
+  /** Server save time (UTC ISO) on success; null otherwise. */
+  savedAt: string | null
+  /** Current server updatedAt — the client's next conflict base. */
+  updatedAt: string | null
+  error: string | null
+}
+
+/**
+ * Background draft autosave behind the wizard's idle/step/blur triggers
+ * (task 5.6): the 5.5 mustand path without the redirect. Same permission,
+ * scope, schema and partial-update semantics as updateAuctionAction, but
+ * failures and conflicts come back as values so the editor bar can show
+ * them instead of navigating away. Draft content only — the status never
+ * changes here and the mechanics of a scheduled/active lot are refused.
+ */
+export async function autosaveAuctionDraftAction(
+  id: string,
+  payloadJson: string,
+  baseUpdatedAt: string | null,
+): Promise<AuctionAutosaveResult> {
+  const { session, repositories } = await requireAdminRepositories()
+  const fail = (
+    error: string,
+    conflict = false,
+    updatedAt: string | null = null,
+  ): AuctionAutosaveResult => ({ ok: false, conflict, savedAt: null, updatedAt, error })
+
+  try {
+    assertCan(session.role, 'auctions:write')
+  } catch (error) {
+    if (error instanceof PermissionDeniedError) return fail(error.message)
+    throw error
+  }
+  if (id.trim() === '') {
+    return fail('Mustandi salvestamiseks puudub oksjoni identifikaator.')
+  }
+  const auction = await repositories
+    .findByID({ collection: 'auctions', id })
+    .catch(() => null)
+  if (!auction) return fail('Oksjonit ei leitud.')
+  if (
+    !auctionInScope(auctionScope(session.role, session.userId), {
+      specialistId: auction.specialistId,
+      sellerId: auction.sellerId,
+    })
+  ) {
+    return fail('Oksjon ei ole teie tööulatuses.')
+  }
+
+  let raw: Record<string, unknown>
+  try {
+    const parsed: unknown = JSON.parse(payloadJson)
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('not an object')
+    }
+    raw = parsed as Record<string, unknown>
+  } catch {
+    return fail('Vigane mustandi andmete JSON.')
+  }
+  const parsedInput = auctionInputSchema.safeParse(raw)
+  if (!parsedInput.success) {
+    const summary = parsedInput.error.issues
+      .slice(0, 5)
+      .map((issue) => `${issue.path.join('.') || 'vorm'}: ${issue.message}`)
+      .join('; ')
+    return fail(`Oksjoni andmed ei läbinud valideerimist: ${summary}`)
+  }
+  const input = applyQuickAuctionDefaults(parsedInput.data)
+  const writeData = toAuctionWriteData(input)
+
+  // Optimistic concurrency: a newer server copy means another staff member
+  // saved in between — never overwrite; the client takes over explicitly.
+  if (baseUpdatedAt !== null && auction.updatedAt !== baseUpdatedAt) {
+    return fail('Mustand on vahepeal serveris uuendatud.', true, auction.updatedAt)
+  }
+
+  // Mirror of updateAuctionAction's mechanics lock; autosave carries no
+  // override path — the wizard payload omits mechanics on locked lots, so a
+  // present changed mechanic means a stale or tampered client.
+  if (auction.status === 'active' || auction.status === 'scheduled') {
+    const mechanicsConflict =
+      (input.startsAt !== undefined && input.startsAt !== auction.startsAt) ||
+      (input.endsAt !== undefined && input.endsAt !== auction.endsAt) ||
+      (input.auctionType !== auction.type) ||
+      (input.objectType !== auction.objectType)
+    if (mechanicsConflict) {
+      return fail('Aktiivse oksjoni mehaanikat muuta ei saa.')
+    }
+  }
+
+  if (session.role === 'specialist') {
+    writeData.specialistId = session.userId
+  }
+  const feeChanged =
+    input.feeOverridePercent !== undefined &&
+    input.feeOverridePercent !== auction.feeOverridePercent
+  if (feeChanged) {
+    try {
+      assertCan(session.role, 'auctions:fee-override')
+    } catch (error) {
+      if (error instanceof PermissionDeniedError) return fail(error.message)
+      throw error
+    }
+  }
+
+  const updateData = restrictToPresentKeys(writeData, raw)
+  try {
+    const updated = await repositories.update({
+      collection: 'auctions',
+      id,
+      data: updateData,
+    })
+    const updatedAt =
+      typeof updated.updatedAt === 'string'
+        ? updated.updatedAt
+        : new Date().toISOString()
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'auction.autosave',
+      entityType: 'auction',
+      entityId: id,
+      after: {
+        // Field names only: values (and the reserve fact) never travel
+        // into the audit entry (D5/D7).
+        fields: Object.keys(updateData).sort(),
+        ...(baseUpdatedAt === null ? { adoptedBase: true } : {}),
+      },
+    })
+    return { ok: true, conflict: false, savedAt: new Date().toISOString(), updatedAt, error: null }
+  } catch (error) {
+    return fail(
+      `Mustandi salvestamine ebaõnnestus: ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
 }
 
 export async function deleteAuctionAction(formData: FormData): Promise<void> {
@@ -510,6 +789,8 @@ async function cloneAuctionDraft(
       loggingTypes: auction.loggingTypes,
       compartments: auction.compartments,
       notifications: auction.notifications,
+      areaHa: auction.areaHa,
+      volumeM3: auction.volumeM3,
       deadlines: auction.deadlines,
       minBidCents: auction.minBidCents,
       bidStepCents: auction.bidStepCents,
@@ -527,6 +808,50 @@ async function cloneAuctionDraft(
       sellerId: auction.sellerId,
     },
   })
+}
+
+/**
+ * Anti-snipe re-check for the manual end: while the newest bid sits inside
+ * the current per-auction anti-snipe window, the end time must be allowed
+ * to extend first, so the manual end is refused and the operator retries
+ * after the extension. Sealed lots never anti-snipe (checkAntiSnipe), and
+ * lots with the toggle off end freely. Returns the Estonian block message
+ * or null when the end may go through.
+ */
+async function antiSnipeManualEndBlock(
+  repositories: CoreRepositories,
+  auction: AuctionDoc,
+): Promise<string | null> {
+  if (auction.type === 'sealed') return null
+  const deadlines =
+    auction.deadlines !== null && typeof auction.deadlines === 'object'
+      ? (auction.deadlines as Record<string, unknown>)
+      : null
+  if (deadlines?.antiSnipeEnabled !== true) return null
+
+  const endsAtMs = typeof auction.endsAt === 'string' ? Date.parse(auction.endsAt) : Number.NaN
+  if (!Number.isFinite(endsAtMs)) return null
+
+  const rawMinutes = deadlines.antiSnipeMinutes
+  const minutes = clampAntiSnipeMinutes(typeof rawMinutes === 'number' ? rawMinutes : undefined)
+  const windowStartMs = endsAtMs - minutes * 60_000
+  if (Date.now() < windowStartMs) return null
+
+  const newest = await repositories.find({
+    collection: 'bids',
+    where: { and: [{ auction: { equals: auction.id } }] },
+    sort: '-createdAt',
+    limit: 1,
+  })
+  const newestCreatedAt = newest.docs[0]?.createdAt
+  const newestMs =
+    typeof newestCreatedAt === 'string' ? Date.parse(newestCreatedAt) : Number.NaN
+  if (!Number.isFinite(newestMs) || newestMs < windowStartMs) return null
+
+  return (
+    `Antissnipe: oksjonile tuli pakkumine viimase ${String(minutes)} minuti jooksul ` +
+    'ja lõpuaeg pikeneb. Proovi lõpetamist pärast pikendust uuesti.'
+  )
 }
 
 /**
@@ -560,6 +885,9 @@ export async function endAuctionManuallyAction(formData: FormData): Promise<void
   if (outcome !== 'winner' && outcome !== 'unsold') {
     redirectWithError(feedbackPath, 'Vali lõpetamise tulemus: võitja kuulutamine või müümata märkimine.')
   }
+
+  const antiSnipeBlock = await antiSnipeManualEndBlock(repositories, auction)
+  if (antiSnipeBlock !== null) redirectWithError(feedbackPath, antiSnipeBlock)
 
   const leading = await repositories.find({
     collection: 'bids',
@@ -771,6 +1099,106 @@ async function broadcastAuctionPublished(auctionId: string): Promise<void> {
   }
 }
 
+/**
+ * Status transition behind "Avalda kohe" / publish (docs 02, task 5.5):
+ * draft -> active must pass through scheduled, the guard chain is
+ * draft -> scheduled -> active and each update is one step. Emits the
+ * `auction.publish` audit entry and the DO broadcast.
+ */
+async function publishAuctionRow(
+  repositories: CoreRepositories,
+  auction: AuctionDoc,
+  options: { actorId: string; auditNote?: string | null; warnings?: PublishGateFailure[] },
+): Promise<'scheduled' | 'active'> {
+  const nowIso = new Date().toISOString()
+  const startsAtMs = typeof auction.startsAt === 'string' ? Date.parse(auction.startsAt) : Number.NaN
+  const target: 'scheduled' | 'active' = startsAtMs > Date.now() ? 'scheduled' : 'active'
+  // draft -> active must pass through scheduled; the guard chain is
+  // draft -> scheduled -> active and each update is one step.
+  if (auction.status === 'draft' && target === 'active') {
+    await repositories.update({
+      collection: 'auctions',
+      id: auction.id,
+      data: { status: 'scheduled', scheduledAt: auction.startsAt },
+    })
+  }
+  await repositories.update({
+    collection: 'auctions',
+    id: auction.id,
+    data:
+      target === 'scheduled'
+        ? { status: 'scheduled', scheduledAt: auction.startsAt }
+        : { status: 'active', activatedAt: nowIso },
+  })
+  await audit(repositories, {
+    actorId: options.actorId,
+    action: 'auction.publish',
+    entityType: 'auction',
+    entityId: auction.id,
+    after: {
+      status: target,
+      ...(options.auditNote ? { auditNote: options.auditNote } : {}),
+      ...(options.warnings && options.warnings.length > 0 ? { warnings: options.warnings } : {}),
+    },
+  })
+  await broadcastAuctionPublished(auction.id)
+  return target
+}
+
+/**
+ * Ajasta / Avalda kohe after a wizard save (task 5.5). Runs the readiness
+ * gates against the just-persisted lot, then walks the immutable status
+ * chain one step at a time. Always redirects; never returns.
+ */
+async function applyWizardIntent(
+  repositories: CoreRepositories,
+  actorId: string,
+  intent: 'schedule' | 'publish',
+  paths: { error: string; notice: string },
+  auction: AuctionDoc,
+): Promise<never> {
+  if (intent === 'schedule') {
+    const timingGate = collectPublishReadinessFailures(readinessSubjectOfAuction(auction)).find(
+      (gate) => gate.field === 'startsAt',
+    )
+    if (timingGate) {
+      redirectWithError(paths.error, `Ajastamine ei ole lubatud: ${timingGate.message}`)
+    }
+    if (!auction.endsAt || Date.parse(auction.endsAt) <= Date.parse(auction.startsAt ?? '')) {
+      redirectWithError(paths.error, 'Ajastamiseks määra lõppaeg pärast algusaega.')
+    }
+    await repositories.update({
+      collection: 'auctions',
+      id: auction.id,
+      data: { status: 'scheduled', scheduledAt: auction.startsAt },
+    })
+    await audit(repositories, {
+      actorId,
+      action: 'auction.schedule',
+      entityType: 'auction',
+      entityId: auction.id,
+      after: { status: 'scheduled', startsAt: auction.startsAt, endsAt: auction.endsAt },
+    })
+    revalidatePath('/admin/auctions')
+    revalidatePath(paths.notice)
+    redirectNotice(paths.notice, 'teade', 'Oksjon ajastatud.')
+  }
+
+  const blocking = [
+    ...collectPublishGateFailures(gateSubjectOfAuction(auction)).blocking,
+    ...collectPublishReadinessFailures(readinessSubjectOfAuction(auction)),
+  ]
+  if (blocking.length > 0) {
+    redirectWithError(paths.error, `Avaldamine on blokeeritud: ${blockingGateSummary(blocking)}`)
+  }
+
+  await publishAuctionRow(repositories, auction, { actorId })
+
+  revalidatePath('/admin/auctions')
+  revalidatePath(paths.notice)
+  redirectNotice(paths.notice, 'teade', 'Oksjon on avaldatud.')
+}
+
 export async function publishAuctionAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
 
@@ -797,62 +1225,26 @@ export async function publishAuctionAction(formData: FormData): Promise<void> {
   }
 
   // Publish gates (docs 03 validation summary): blocking failures stop the
-  // publish, warnings travel in the audit entry without blocking.
-  const gates = collectPublishGateFailures({
-    objectType: auction.objectType,
-    type: auction.type,
-    isQuickAuction: auction.isQuickAuction,
-    startsAt: auction.startsAt,
-    endsAt: auction.endsAt,
-    minBidCents: auction.minBidCents,
-    reservePriceCents: auction.reservePriceCents,
-    cadastres: auction.cadastres,
-    countyId: auction.countyId,
-    parishId: auction.parishId,
-    packageRows: auction.packageRows,
-    media: auction.media,
-  })
-  if (gates.blocking.length > 0) {
-    const summary = gates.blocking
-      .slice(0, 5)
-      .map((gate) => `${gate.step} → ${gate.message}`)
-      .join(' | ')
-    redirectWithError(detailPath, `Avaldamine on blokeeritud: ${summary}`)
+  // publish, warnings travel in the audit entry without blocking. The
+  // readiness gates (specialist, 10-minute lead, area) apply on top.
+  const gates = collectPublishGateFailures(gateSubjectOfAuction(auction))
+  const blocking = [
+    ...gates.blocking,
+    ...collectPublishReadinessFailures(readinessSubjectOfAuction(auction)),
+  ]
+  if (blocking.length > 0) {
+    redirectWithError(detailPath, `Avaldamine on blokeeritud: ${blockingGateSummary(blocking)}`)
   }
 
-  const nowIso = new Date().toISOString()
-  const target = Date.parse(auction.startsAt) > Date.now() ? 'scheduled' : 'active'
   const auditNote = readOptionalText(formData, 'auditNote')
 
   let failure: string | null = null
+  let target: 'scheduled' | 'active' = 'scheduled'
   try {
-    // draft -> active must pass through scheduled; the guard chain is
-    // draft -> scheduled -> active and each update is one step.
-    if (auction.status === 'draft' && target === 'active') {
-      await repositories.update({
-        collection: 'auctions',
-        id,
-        data: { status: 'scheduled', scheduledAt: auction.startsAt },
-      })
-    }
-    await repositories.update({
-      collection: 'auctions',
-      id,
-      data:
-        target === 'scheduled'
-          ? { status: 'scheduled', scheduledAt: auction.startsAt }
-          : { status: 'active', activatedAt: nowIso },
-    })
-    await audit(repositories, {
+    target = await publishAuctionRow(repositories, auction, {
       actorId: session.userId,
-      action: 'auction.publish',
-      entityType: 'auction',
-      entityId: id,
-      after: {
-        status: target,
-        ...(auditNote ? { auditNote } : {}),
-        ...(gates.warnings.length > 0 ? { warnings: gates.warnings } : {}),
-      },
+      auditNote,
+      warnings: gates.warnings,
     })
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
@@ -860,8 +1252,6 @@ export async function publishAuctionAction(formData: FormData): Promise<void> {
   if (failure) {
     redirectWithError(detailPath, `Avalikustamine ebaõnnestus: ${failure}`)
   }
-
-  await broadcastAuctionPublished(id)
 
   revalidatePath('/admin/auctions')
   revalidatePath(detailPath)
@@ -1008,8 +1398,12 @@ export async function rejectAuctionBidAction(formData: FormData): Promise<void> 
     redirectWithError('/admin/auctions', 'Pakkumuse otsustamiseks puudub identifikaator.')
   }
   const detailPath = auctionDetailPath(auctionId)
+  const reason = readText(formData, 'reason')
+  if (reason.length < MIN_REASON_LENGTH) {
+    redirectWithError(detailPath, reasonHint)
+  }
 
-  const decision: RejectDecision = await rejectAlapakkumine(auctionId, bidId)
+  const decision: RejectDecision = await rejectAlapakkumine(auctionId, bidId, reason)
   if (decision.outcome !== 'rejected') {
     redirectWithError(
       detailPath,
@@ -1024,11 +1418,11 @@ export async function rejectAuctionBidAction(formData: FormData): Promise<void> 
     action: 'bid_rejected',
     entityType: 'bid',
     entityId: bidId,
-    after: { auctionId },
+    after: { auctionId, amountEur: decision.bid.amount, reason, bidderNotified: true },
   })
 
   revalidatePath(detailPath)
-  redirect(`${detailPath}?teade=${encodeURIComponent('Alapakkumus tagasi lükatud.')}`)
+  redirect(`${detailPath}?teade=${encodeURIComponent('Alapakkumus tagasi lükatud; pakkuja teavitatud põhjusega.')}`)
 }
 
 export async function generateContractAction(formData: FormData): Promise<void> {
@@ -1081,6 +1475,18 @@ export async function generateContractAction(formData: FormData): Promise<void> 
   )
 }
 
+export interface RevealedBidderIdentity {
+  name: string | null
+  email: string | null
+  /** Isikukood või registrikood maskeeritult (D-16: viimased 4 märki nähtavad). */
+  maskedCode: string | null
+  /** Company chip shows for registrikood bidders. */
+  isCompany: boolean
+  userId: string | null
+  /** User detail link; set server-side only for roles holding users:read. */
+  userHref: string | null
+}
+
 export interface RevealedBidView {
   id: string
   amount: number
@@ -1092,6 +1498,13 @@ export interface RevealedBidView {
   rank: number | null
   /** Viik — varasem esitus võidab (top two amounts equal). */
   tie: boolean
+  /** Marginaal: hälvik järgmise kehtiva pakkumise suhtes (eurot); viimasel null. */
+  marginToNext?: number | null
+  /**
+   * Identity travels only on the ceremony's post-reveal read model, never
+   * on live bids; null when the snapshot is missing or undecryptable.
+   */
+  bidder?: RevealedBidderIdentity | null
 }
 
 export interface CeremonyState {
@@ -1294,6 +1707,8 @@ export async function voidSealedCeremonyAction(formData: FormData): Promise<void
       entityType: 'auction',
       entityId: auctionId,
       after: { reason, status: 'unsold', voidedBidCount: sealedBids.length },
+      reason,
+      context: await auditRequestContext(),
     })
 
     await ceremonyCache.delete(ceremonyRecordKey(auctionId))
@@ -1399,6 +1814,49 @@ async function findCeremonyAuditEntry(
   return entries.docs[0] ?? null
 }
 
+/** Success fee percent: per-auction override, then the global Tasud setting, then the default. */
+function feePercentFor(auction: AuctionDoc, settingsDoc: SettingsDoc | undefined): number {
+  const override = auction.feeOverridePercent
+  if (typeof override === 'number') return override
+  const globalFee = settingsDoc?.feePercent
+  return typeof globalFee === 'number' ? globalFee : SUCCESS_FEE_PERCENT_DEFAULT
+}
+
+export interface SealedCeremonyFeeEstimate {
+  feeCents: number
+  feePercent: number
+  vatPercent: number
+}
+
+/** Fee estimate for the ceremony winner modal: 3% + VAT charged on completion. */
+function feeEstimateFor(
+  topBidEuros: number,
+  auction: AuctionDoc,
+  settingsDoc: SettingsDoc | undefined,
+): SealedCeremonyFeeEstimate {
+  const feePercent = feePercentFor(auction, settingsDoc)
+  return {
+    feeCents: successFeeCents(eurosToCents(topBidEuros), feePercent),
+    feePercent,
+    vatPercent: VAT_PERCENT,
+  }
+}
+
+/** "Ettevõtte profiil ootel": company profile awaiting approval for a bidder. */
+async function companyProfilePending(
+  repositories: CoreRepositories,
+  userId: string | null,
+): Promise<boolean> {
+  if (userId === null || userId === '') return false
+  const docs = await repositories.find({
+    collection: 'profile',
+    where: { user: { equals: userId } },
+    limit: 1,
+  })
+  const profile = docs.docs[0] as { type?: unknown; approvalStatus?: unknown } | undefined
+  return profile?.type === 'company' && profile.approvalStatus === 'pending'
+}
+
 /** Ranked reveal views: valid bids amount-desc with earliest-wins ties, invalid bids greyed. */
 function rankedViews(decrypted: DecryptedBid[]): RevealedBidView[] {
   const valid = decrypted
@@ -1407,15 +1865,19 @@ function rankedViews(decrypted: DecryptedBid[]): RevealedBidView[] {
       if (b.amount !== a.amount) return b.amount - a.amount
       return Date.parse(a.createdAt) - Date.parse(b.createdAt)
     })
-  const views: RevealedBidView[] = valid.map((bid, index) => ({
-    id: bid.id,
-    amount: bid.amount,
-    createdAt: bid.createdAt,
-    valid: true,
-    invalidReason: null,
-    rank: index + 1,
-    tie: false,
-  }))
+  const views: RevealedBidView[] = valid.map((bid, index) => {
+    const next = valid[index + 1]
+    return {
+      id: bid.id,
+      amount: bid.amount,
+      createdAt: bid.createdAt,
+      valid: true,
+      invalidReason: null,
+      rank: index + 1,
+      tie: false,
+      marginToNext: next !== undefined ? bid.amount - next.amount : null,
+    }
+  })
   const top = views[0]
   const second = views[1]
   if (second !== undefined && top?.amount === second.amount) {
@@ -1430,9 +1892,48 @@ function rankedViews(decrypted: DecryptedBid[]): RevealedBidView[] {
       invalidReason: INVALID_BID_REASON,
       rank: null,
       tie: false,
+      marginToNext: null,
     })
   }
   return views
+}
+
+/**
+ * Identity view for the post-reveal record: built ONLY from the decrypted
+ * sealed-bid payload after the one-shot reveal, never from live bids. The
+ * code is masked server-side (D-16, last 4 visible) and the user detail
+ * link is included only for roles holding users:read.
+ */
+function bidderIdentityView(
+  bid: DecryptedBid | undefined,
+  canViewUsers: boolean,
+): RevealedBidderIdentity | null {
+  if (bid === undefined) return null
+  const rawSnapshot = bid.identitySnapshot
+  if (typeof rawSnapshot !== 'string' || rawSnapshot === '') return null
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(rawSnapshot) as Record<string, unknown>
+  } catch {
+    return null
+  }
+  const text = (key: string): string | null => {
+    const value = parsed[key]
+    return typeof value === 'string' && value.trim() !== '' ? value : null
+  }
+  const registrikood = text('registrikood')
+  const isikukood = text('isikukood')
+  const code = registrikood ?? isikukood
+  const userId = bid.user !== '' ? bid.user : null
+  return {
+    name: text('name'),
+    email: text('email'),
+    maskedCode: code !== null ? maskIsikukood(code) : null,
+    isCompany: registrikood !== null,
+    userId,
+    userHref:
+      canViewUsers && userId !== null ? `/admin/users/${encodeURIComponent(userId)}` : null,
+  }
 }
 
 export interface SealedCeremonyChecklist {
@@ -1455,6 +1956,14 @@ export interface SealedCeremonyContext {
   bids: RevealedBidView[]
   /** Server-side reserve comparison result; the reserve value itself never leaves the server (D5). */
   topMeetsReserve: boolean | null
+  /** Winner-modal fee estimate (3% + VAT success fee on completion); null before a ranked top bid exists. */
+  feeEstimate: SealedCeremonyFeeEstimate | null
+  /** Winner's company profile is pending approval — the confirm flow forces an explicit choice. */
+  winnerProfileHold: boolean
+  /** The viewer is the opener, a signer, or holds the configured approver role. */
+  viewerIsParticipant: boolean
+  /** Opening started (opener signed) and not yet concluded — other admins get a read-only view. */
+  openingInProgress: boolean
   winnerConfirmed: boolean
   voided: boolean
   error: string | null
@@ -1531,6 +2040,10 @@ export async function sealedCeremonyStateAction(auctionId: string): Promise<Seal
     revealedAt: null,
     bids: [],
     topMeetsReserve: null,
+    feeEstimate: null,
+    winnerProfileHold: false,
+    viewerIsParticipant: true,
+    openingInProgress: false,
     winnerConfirmed: false,
     voided: false,
     error: null,
@@ -1552,22 +2065,54 @@ export async function sealedCeremonyStateAction(auctionId: string): Promise<Seal
   const revealEntry = await findCeremonyAuditEntry(repositories, 'sealed.reveal', auctionId)
   const winnerEntry = await findCeremonyAuditEntry(repositories, 'sealed.winner_confirm', auctionId)
   const voidEntry = await findCeremonyAuditEntry(repositories, 'sealed.void', auctionId)
+  const settingsDocs = await repositories.find({ collection: 'settings', limit: 1 })
+  const settingsDoc = settingsDocs.docs[0]
 
   let bids: RevealedBidView[] = []
   let topMeetsReserve: boolean | null = null
+  let feeEstimate: SealedCeremonyFeeEstimate | null = null
+  let winnerProfileHold = false
   if (revealEntry !== null) {
     const decrypted = decryptSealedBids(await getSealedBidsForAuction(auctionId))
-    bids = rankedViews(decrypted)
+    // Identity is ceremony-scoped and post-reveal only: this replay runs
+    // behind the sealed:read gate and after the one-shot sealed.reveal
+    // entry. The users link rides along only for users:read roles.
+    const canViewUsers = can(session.role, 'users:read')
+    const decryptedById = new Map(decrypted.map((bid) => [bid.id, bid]))
+    bids = rankedViews(decrypted).map((bid) => ({
+      ...bid,
+      bidder: bidderIdentityView(decryptedById.get(bid.id), canViewUsers),
+    }))
     const topValid = bids.find((bid) => bid.valid)
     if (topValid && typeof auction.reservePriceCents === 'number') {
       topMeetsReserve = eurosToCents(topValid.amount) >= auction.reservePriceCents
     } else {
       topMeetsReserve = topValid !== undefined
     }
+    if (topValid) {
+      feeEstimate = feeEstimateFor(topValid.amount, auction, settingsDoc)
+      winnerProfileHold = await companyProfilePending(
+        repositories,
+        topValid.bidder?.userId ?? null,
+      )
+    }
   }
 
+  // "Avamine on pooleli": other admins get a read-only view while a signed
+  // ceremony is under way. The configured approver role must keep signing
+  // access, or the second signature could never arrive.
   const signaturesExpired =
-    record !== null && ((record.approver !== undefined && !signatureFresh(record.approver)) || !signatureFresh(record.opener))
+    record !== null &&
+    ((record.approver !== undefined && !signatureFresh(record.approver)) ||
+      !signatureFresh(record.opener))
+  const approverRole = readAuctionDefaults(settingsDoc).sealedApproverRole
+  const winnerConfirmed = winnerEntry !== null
+  const voided = voidEntry !== null
+  const viewerIsParticipant =
+    record === null ||
+    record.opener.userId === session.userId ||
+    record.approver?.userId === session.userId ||
+    session.role === approverRole
 
   return {
     auctionId,
@@ -1587,8 +2132,12 @@ export async function sealedCeremonyStateAction(auctionId: string): Promise<Seal
     revealedAt: revealEntry?.createdAt ?? null,
     bids,
     topMeetsReserve,
-    winnerConfirmed: winnerEntry !== null,
-    voided: voidEntry !== null,
+    feeEstimate,
+    winnerProfileHold,
+    viewerIsParticipant,
+    openingInProgress: record !== null && !winnerConfirmed && !voided,
+    winnerConfirmed,
+    voided,
     error: null,
   }
 }
@@ -1637,6 +2186,7 @@ export async function signSealedOpenerAction(
     entityType: 'auction',
     entityId: auctionId,
     after: { note: note ?? null },
+    context: await auditRequestContext(),
   })
   return { ok: true, phase: 'awaiting-approval', error: null }
 }
@@ -1654,6 +2204,14 @@ export async function signSealedApproverAction(
   const keyword = readText(formData, 'keyword')
   if (keyword !== CONFIRM_KEYWORD) {
     return { ok: false, phase: 'checklist', error: `Kirjuta kinnitusväljale "${CONFIRM_KEYWORD}".` }
+  }
+
+  // The second signature must come from the role configured in Seaded
+  // (Oksjonid defaults); an unset setting falls back to the superadmin.
+  const settingsDocs = await repositories.find({ collection: 'settings', limit: 1 })
+  const approverRole = readAuctionDefaults(settingsDocs.docs[0]).sealedApproverRole
+  if (session.role !== approverRole) {
+    return { ok: false, phase: 'checklist', error: `Avamise kinnitab ainult ${approverRole}.` }
   }
 
   const record = await loadCeremonyRecord(auctionId)
@@ -1681,6 +2239,7 @@ export async function signSealedApproverAction(
     entityType: 'auction',
     entityId: auctionId,
     after: { openerUserId: record.opener.userId },
+    context: await auditRequestContext(),
   })
   return { ok: true, phase: 'awaiting-approval', error: null }
 }
@@ -1763,6 +2322,7 @@ export async function revealSealedBidsAction(
       openerUserId: record.opener.userId,
       approverUserId: record.approver.userId,
     },
+    context: await auditRequestContext(),
   })
 
   return { ok: true, phase: 'revealed', error: null }
@@ -1787,6 +2347,7 @@ export async function confirmSealedCeremonyWinnerAction(
   const keyword = readText(formData, 'keyword')
   const password = readText(formData, 'password')
   const reason = readText(formData, 'reason')
+  const companyProfileDecision = readText(formData, 'companyProfileDecision')
 
   if (keyword !== CONFIRM_KEYWORD) {
     return { ok: false, phase: 'revealed', error: `Kirjuta kinnitusväljale "${CONFIRM_KEYWORD}".` }
@@ -1856,6 +2417,8 @@ export async function confirmSealedCeremonyWinnerAction(
       entityType: 'auction',
       entityId: auctionId,
       after: { reason: reason || null, topAmount: top?.amount ?? null },
+      ...(reason ? { reason } : {}),
+      context: await auditRequestContext(),
     })
     return { ok: true, phase: 'house-backup', error: null }
   }
@@ -1872,6 +2435,8 @@ export async function confirmSealedCeremonyWinnerAction(
       entityType: 'auction',
       entityId: auctionId,
       after: { reason, topAmount: top?.amount ?? null },
+      reason,
+      context: await auditRequestContext(),
     })
     return { ok: true, phase: 'unsold', error: null }
   }
@@ -1894,6 +2459,27 @@ export async function confirmSealedCeremonyWinnerAction(
   const target = decrypted.find((bid) => bid.id === top.id)
   if (!target) {
     return { ok: false, phase: 'revealed', error: 'Pakkumust ei leitud.' }
+  }
+
+  // "Ettevõtte profiil ootel": the winner's company profile awaits approval,
+  // so the operator must explicitly choose — proceed to the contract anyway
+  // or hold the confirmation. No silent default exists.
+  const companyProfileOotel = await companyProfilePending(repositories, target.user)
+  if (companyProfileOotel) {
+    if (companyProfileDecision !== 'proceed' && companyProfileDecision !== 'hold') {
+      return {
+        ok: false,
+        phase: 'revealed',
+        error: 'Ettevõtte profiil on ootel — vali: jätka lepinguga või hoia kinnitamine ootel.',
+      }
+    }
+    if (companyProfileDecision === 'hold') {
+      return {
+        ok: false,
+        phase: 'revealed',
+        error: 'Kinnitamine hoitakse ootel, kuni võitja ettevõtte profiil on kinnitatud.',
+      }
+    }
   }
 
   const failure: string | null = await (async (): Promise<string | null> => {
@@ -1953,6 +2539,34 @@ export async function confirmSealedCeremonyWinnerAction(
           },
         })
       }
+      // Winner and seller learn the outcome (with the fee estimate) at the
+      // confirm step — the moment the sale becomes certain.
+      const settingsDocs = await repositories.find({ collection: 'settings', limit: 1 })
+      const feeEstimateEur = centsToEuros(
+        successFeeCents(eurosToCents(top.amount), feePercentFor(auction, settingsDocs.docs[0])),
+      )
+      eventBus.emit({
+        type: 'auction.won',
+        userId: target.user,
+        payload: {
+          auctionId,
+          auctionTitle: auction.title,
+          winningBid: top.amount,
+          feeEstimateEur,
+        },
+      })
+      if (typeof auction.sellerId === 'string' && auction.sellerId !== '') {
+        eventBus.emit({
+          type: 'auction.sold',
+          userId: auction.sellerId,
+          payload: {
+            auctionId,
+            auctionTitle: auction.title,
+            finalPrice: top.amount,
+            feeEstimateEur,
+          },
+        })
+      }
       await audit(repositories, {
         actorId: session.userId,
         action: 'sealed.winner_confirm',
@@ -1965,7 +2579,11 @@ export async function confirmSealedCeremonyWinnerAction(
           reauth: reauthMethod,
           openerUserId: record.opener.userId,
           approverUserId: record.approver?.userId ?? null,
+          ...(companyProfileOotel
+            ? { companyProfileOotel: true, companyProfileDecision: 'proceed' }
+            : {}),
         },
+        context: await auditRequestContext(),
       })
       return null
     } catch (error) {
@@ -1977,6 +2595,78 @@ export async function confirmSealedCeremonyWinnerAction(
   }
 
   return { ok: true, phase: 'confirmed', error: null }
+}
+
+/**
+ * Empty-lot shortcut from the pre-flight checklist: a lot with zero valid
+ * sealed bids is declared unsold without the two-signature ceremony
+ * (single-admin rules). The server re-checks the empty state by decrypting,
+ * so a lot with any qualifying bid can never bypass the ceremony.
+ */
+export async function markSealedUnsoldShortcutAction(
+  _prev: SealedCeremonyActionState,
+  formData: FormData,
+): Promise<SealedCeremonyActionState> {
+  const { session, repositories } = await requireAdminRepositories()
+  const denied = ceremonyOperateOrError(session.role)
+  if (denied) return { ok: false, phase: 'checklist', error: denied }
+
+  const auctionId = readText(formData, 'auctionId')
+  const reason = readText(formData, 'reason')
+  if (reason.length < MIN_REASON_LENGTH) {
+    return {
+      ok: false,
+      phase: 'checklist',
+      error: `Müümata märkimine vajab põhjust (vähemalt ${String(MIN_REASON_LENGTH)} tähemärki).`,
+    }
+  }
+
+  const auction = await repositories.findByID({ collection: 'auctions', id: auctionId })
+  if (!auction) return { ok: false, phase: 'checklist', error: 'Oksjonit ei leitud.' }
+
+  // Idempotency precedes the status gate, mirroring the void path.
+  const existing = await findCeremonyAuditEntry(repositories, 'sealed.mark_unsold', auctionId)
+  if (existing !== null) return { ok: true, phase: 'unsold', error: null }
+  if (auction.status !== 'ended') {
+    return { ok: false, phase: 'checklist', error: 'Müümata otsetee kehtib ainult lõppenud oksjonil.' }
+  }
+
+  const decrypted = decryptSealedBids(await getSealedBidsForAuction(auctionId))
+  const validCount = decrypted.filter((bid) => bid.valid).length
+  if (validCount > 0) {
+    return {
+      ok: false,
+      phase: 'checklist',
+      error: 'Oksjonil on kehtivaid pakkumisi — tulemus otsustakse avamistseremoonial.',
+    }
+  }
+
+  try {
+    await repositories.update({
+      collection: 'auctions',
+      id: auctionId,
+      data: { status: 'unsold' },
+    })
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'sealed.mark_unsold',
+      entityType: 'auction',
+      entityId: auctionId,
+      after: { reason, shortcut: true, totalBids: decrypted.length, validCount: 0 },
+      reason,
+      context: await auditRequestContext(),
+    })
+  } catch (error) {
+    return {
+      ok: false,
+      phase: 'checklist',
+      error: `Müümata märkimine ebaõnnestus: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+
+  revalidatePath(auctionDetailPath(auctionId))
+  revalidatePath(`${auctionDetailPath(auctionId)}/ceremony`)
+  return { ok: true, phase: 'unsold', error: null }
 }
 
 /**
@@ -2076,6 +2766,8 @@ export async function voidSealedBidsAction(
         entityType: 'auction',
         entityId: auctionId,
         after: { reason, status: 'unsold', voidedBidCount: sealedBids.length },
+        reason,
+        context: await auditRequestContext(),
       })
 
       await ceremonyCache.delete(ceremonyRecordKey(auctionId))
@@ -2094,12 +2786,21 @@ export async function voidSealedBidsAction(
   return { ok: true, phase: 'unsold', error: null }
 }
 
-// ── Bulk schedule (task 2.2) ────────────────────────────────────────────────
+// ── Bulk schedule (task 2.2, extended by 5.3) ───────────────────────────────
 //
 // Draft-only scheduling from the auctions list: every selected lot is
 // scope-checked, then moved one immutable step (draft → scheduled) to a
 // shared Tallinn wall-time start. Non-draft selections are rejected with an
-// explicit list naming the offending rows (spec scenario).
+// explicit list naming the offending rows (spec scenario). Task 5.3 adds
+// the "nihuta kõiki lõppe ×h" shift: every row keeps its own end-time base
+// (its stored endsAt, else the shared one) shifted by the same N hours, so
+// the individual end-time offsets between rows survive the shift.
+
+function shiftedEndIso(baseIso: string, shiftHours: number): string {
+  return new Date(Date.parse(baseIso) + shiftHours * 60 * 60 * 1000).toISOString()
+}
+
+const MAX_SHIFT_HOURS = 8760
 
 export async function bulkScheduleAuctionsAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
@@ -2132,6 +2833,18 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
       redirectWithError(listPath, 'Lõppaeg peab olema pärast algusaega.')
     }
   }
+  const shiftRaw = readText(formData, 'shiftEndHours')
+  let shiftHours = 0
+  if (shiftRaw !== '') {
+    const parsed = Number.parseInt(shiftRaw, 10)
+    if (!Number.isInteger(parsed) || parsed < -MAX_SHIFT_HOURS || parsed > MAX_SHIFT_HOURS) {
+      redirectWithError(
+        listPath,
+        `Nihke sisend peab olema täisarv tundides (−${String(MAX_SHIFT_HOURS)}…${String(MAX_SHIFT_HOURS)}).`,
+      )
+    }
+    shiftHours = parsed
+  }
 
   // Reads run unscoped so in-scope drafts of any status are visible; the
   // per-row scope check below is the authorization boundary.
@@ -2139,6 +2852,7 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
   const scope = auctionScope(session.role, session.userId)
   const offending: string[] = []
   const schedulable: AuctionDoc[] = []
+  const rowEnds = new Map<string, string | null>()
   for (const id of ids) {
     const auction = await trusted
       .findByID({ collection: 'auctions', id })
@@ -2155,7 +2869,23 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
       offending.push(`${auction.title} (${auctionStatusLabels[auction.status]})`)
       continue
     }
+    let rowEnd: string | null = null
+    if (endsIso !== null || shiftHours !== 0) {
+      const base =
+        typeof auction.endsAt === 'string' && !Number.isNaN(Date.parse(auction.endsAt))
+          ? auction.endsAt
+          : endsIso
+      if (base !== null) {
+        const shifted = shiftedEndIso(base, shiftHours)
+        if (Date.parse(shifted) <= Date.parse(startsIso)) {
+          offending.push(`${auction.title} (nihutatud lõpp enne algust)`)
+          continue
+        }
+        rowEnd = shifted
+      }
+    }
     schedulable.push(auction)
+    rowEnds.set(auction.id, rowEnd)
   }
 
   if (offending.length > 0) {
@@ -2171,16 +2901,21 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
   let failure: string | null = null
   try {
     for (const auction of schedulable) {
+      const rowEnd = rowEnds.get(auction.id) ?? null
       await repositories.update({
         collection: 'auctions',
         id: auction.id,
         data: {
           status: 'scheduled',
           startsAt: startsIso,
-          ...(endsIso !== null ? { endsAt: endsIso } : {}),
           scheduledAt: startsIso,
+          ...(rowEnd !== null ? { endsAt: rowEnd } : {}),
         },
       })
+    }
+    const endsByAuction: Record<string, string> = {}
+    for (const [auctionId, rowEnd] of rowEnds) {
+      if (rowEnd !== null) endsByAuction[auctionId] = rowEnd
     }
     await audit(repositories, {
       actorId: session.userId,
@@ -2191,6 +2926,8 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
         count: schedulable.length,
         startsAt: startsIso,
         ...(endsIso !== null ? { endsAt: endsIso } : {}),
+        ...(shiftHours !== 0 ? { shiftHours } : {}),
+        ...(Object.keys(endsByAuction).length > 0 ? { endsByAuction } : {}),
         auctionIds: schedulable.map((auction) => auction.id),
       },
     })
@@ -2355,7 +3092,7 @@ export async function rejectUnderbidAction(formData: FormData): Promise<void> {
     redirectWithError(feedbackPath, 'Oksjon ei ole teie tööulatuses.')
   }
 
-  const decision: RejectDecision = await rejectAlapakkumine(auctionId, bidId)
+  const decision: RejectDecision = await rejectAlapakkumine(auctionId, bidId, reason)
   if (decision.outcome !== 'rejected') {
     if (decision.outcome === 'not_pending') {
       const earlier = await earlierDecisionMessage(trusted, bidId)

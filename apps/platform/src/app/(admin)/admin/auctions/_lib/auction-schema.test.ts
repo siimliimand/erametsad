@@ -7,6 +7,7 @@ import {
   applyQuickAuctionDefaults,
   auctionInputSchema,
   collectPublishGateFailures,
+  collectPublishReadinessFailures,
   slugifyTitle,
   toAuctionWriteData,
   type AuctionGateSubject,
@@ -225,6 +226,38 @@ describe('anti-snipe bounds', () => {
   })
 })
 
+describe('rendi-/kasutusleping deadline gate', () => {
+  it('requires the lease deadline when the lot has a lease agreement', () => {
+    const parsed = auctionInputSchema.safeParse({
+      ...validBase,
+      deadlines: { hasLeaseAgreement: true },
+    })
+    expect(parsed.success).toBe(false)
+    if (!parsed.success) {
+      const issue = parsed.error.issues.find(
+        (entry) => entry.path.join('.') === 'deadlines.leaseDeadline',
+      )
+      expect(issue?.message).toContain('Rendi/kasutuslepingu tähtaeg')
+    }
+  })
+
+  it('accepts the deadline together with the lease flag', () => {
+    const parsed = auctionInputSchema.safeParse({
+      ...validBase,
+      deadlines: { hasLeaseAgreement: true, leaseDeadline: '2027-06-30' },
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  it('accepts an absent lease deadline without the flag', () => {
+    const parsed = auctionInputSchema.safeParse({
+      ...validBase,
+      deadlines: { loggingDeadline: '2027-03-31' },
+    })
+    expect(parsed.success).toBe(true)
+  })
+})
+
 describe('mechanics per auction type', () => {
   it('requires a bid step of at least 1 EUR on open lots', () => {
     const parsed = auctionInputSchema.safeParse({ ...validBase, bidStepEur: 0.5 })
@@ -251,22 +284,30 @@ describe('mechanics per auction type', () => {
 })
 
 describe('write-only reserve conversion', () => {
+  /** Reserve is a sealed mechanic, so the conversion checks run on sealed. */
+  const sealedBase = {
+    ...validBase,
+    objectType: 'kinnistu',
+    auctionType: 'sealed',
+    bidStepEur: undefined,
+  }
+
   it('converts EUR fields to integer cents', () => {
     const parsed = auctionInputSchema.safeParse({
-      ...validBase,
+      ...sealedBase,
       reservePriceEur: 1234.56,
     })
     expect(parsed.success).toBe(true)
     if (parsed.success) {
       const writeData = toAuctionWriteData(applyQuickAuctionDefaults(parsed.data))
       expect(writeData.minBidCents).toBe(300000)
-      expect(writeData.bidStepCents).toBe(5000)
+      expect(writeData.bidStepCents).toBeNull()
       expect(writeData.reservePriceCents).toBe(123456)
     }
   })
 
   it('omits the reserve column when the operator did not re-enter it', () => {
-    const parsed = auctionInputSchema.safeParse(validBase)
+    const parsed = auctionInputSchema.safeParse(sealedBase)
     expect(parsed.success).toBe(true)
     if (parsed.success) {
       const writeData = toAuctionWriteData(applyQuickAuctionDefaults(parsed.data))
@@ -285,6 +326,98 @@ describe('write-only reserve conversion', () => {
     if (parsed.success) {
       expect(toAuctionWriteData(applyQuickAuctionDefaults(parsed.data)).minBidCents).toBe(100)
     }
+  })
+})
+
+describe('reserve gating per auction type', () => {
+  it('rejects a reserve on an open ascending lot', () => {
+    const parsed = auctionInputSchema.safeParse({
+      ...validBase,
+      reservePriceEur: 5000,
+    })
+    expect(parsed.success).toBe(false)
+    if (!parsed.success) {
+      expect(
+        parsed.error.issues.some(
+          (issue) => issue.path[0] === 'reservePriceEur' && issue.message.includes('ainult pimepakkumise'),
+        ),
+      ).toBe(true)
+    }
+  })
+
+  it('accepts a reserve on a sealed lot', () => {
+    const parsed = auctionInputSchema.safeParse({
+      ...validBase,
+      objectType: 'kinnistu',
+      auctionType: 'sealed',
+      bidStepEur: undefined,
+      reservePriceEur: 5000,
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  it('accepts a reserve on a kiiroksjon', () => {
+    const parsed = auctionInputSchema.safeParse({
+      ...validBase,
+      isQuickAuction: true,
+      minBidEur: undefined,
+      reservePriceEur: 5000,
+    })
+    expect(parsed.success).toBe(true)
+  })
+})
+
+describe('publish readiness gates', () => {
+  const readinessSubject = (overrides: Partial<Parameters<typeof collectPublishReadinessFailures>[0]> = {}) => ({
+    specialistId: 'specialist-1',
+    startsAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+    areaHa: 12.4,
+    deadlines: null,
+    packageRows: null,
+    ...overrides,
+  })
+
+  it('blocks without a specialist', () => {
+    const gates = collectPublishReadinessFailures(readinessSubject({ specialistId: null }))
+    expect(gates.some((gate) => gate.field === 'specialistId')).toBe(true)
+  })
+
+  it('blocks a start closer than 10 minutes', () => {
+    const gates = collectPublishReadinessFailures(
+      readinessSubject({ startsAt: new Date(Date.now() + 5 * 60_000).toISOString() }),
+    )
+    expect(gates.some((gate) => gate.field === 'startsAt' && gate.message.includes('10 minutit'))).toBe(true)
+  })
+
+  it('accepts a start at least 10 minutes out', () => {
+    const gates = collectPublishReadinessFailures(
+      readinessSubject({ startsAt: new Date(Date.now() + 11 * 60_000).toISOString() }),
+    )
+    expect(gates.some((gate) => gate.field === 'startsAt')).toBe(false)
+  })
+
+  it('blocks when the area is missing or zero', () => {
+    expect(
+      collectPublishReadinessFailures(readinessSubject({ areaHa: null })).some(
+        (gate) => gate.field === 'areaHa',
+      ),
+    ).toBe(true)
+    expect(
+      collectPublishReadinessFailures(readinessSubject({ areaHa: 0 })).some(
+        (gate) => gate.field === 'areaHa',
+      ),
+    ).toBe(true)
+  })
+
+  it('falls back to the deadlines mirror and package-row totals for area', () => {
+    expect(
+      collectPublishReadinessFailures(readinessSubject({ areaHa: null, deadlines: { areaHa: 3.5 } })),
+    ).toHaveLength(0)
+    expect(
+      collectPublishReadinessFailures(
+        readinessSubject({ areaHa: null, packageRows: [{ area: 2.5 }, { areaHa: 3 }] }),
+      ),
+    ).toHaveLength(0)
   })
 })
 

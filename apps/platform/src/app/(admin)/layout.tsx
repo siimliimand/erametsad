@@ -23,6 +23,14 @@ export const metadata: Metadata = {
 }
 
 function environmentBadgeLabel(): string | null {
+  // Stage (and any named non-production deployment) runs NODE_ENV=production
+  // on Workers, so an explicit NEXT_PUBLIC_ENVIRONMENT value decides the
+  // badge there; production and unset stay badge-free.
+  const deployment = process.env.NEXT_PUBLIC_ENVIRONMENT?.trim().toLowerCase()
+  if (deployment === 'stage' || deployment === 'staging') return 'Lava'
+  if (deployment === 'development' || deployment === 'dev') return 'Arendus'
+  if (deployment === 'test') return 'Test'
+  if (deployment === 'production' || deployment === 'prod') return null
   if (process.env.NODE_ENV === 'development') return 'Arendus'
   if (process.env.NODE_ENV === 'test') return 'Test'
   return null

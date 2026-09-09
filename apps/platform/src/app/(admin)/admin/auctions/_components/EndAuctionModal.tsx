@@ -5,16 +5,36 @@
  * gives the focus trap and Escape handling for free; the backdrop click and
  * the foot buttons funnel through dialog.close(), whose close event calls
  * onClose so the parent clears its endTarget row.
+ *
+ * The header previews the current leading bid (amount + relative time;
+ * anonymity rules — amounts and times only, never a bidder identity). When
+ * the end falls inside the final minute and anti-snipe is enabled, an info
+ * line states that the server re-checks the anti-snipe extension before
+ * the auction ends.
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { TriangleAlertIcon, XIcon } from '../../../_components/icons'
+import { CalendarClockIcon, TriangleAlertIcon, XIcon } from '../../../_components/icons'
+import { formatEur, formatRelativeTime } from '../../../_lib/labels'
+
+const FINAL_MINUTE_MS = 60_000
+const ANTI_SNIPE_DEFAULT_MINUTES = 5
 
 export interface EndAuctionModalAuction {
   id: string
   title: string
   context: string
+  /** Leading bid amount in cents; null when no leading bid exists. */
+  leadingBidCents?: number | null
+  /** Leading bid submission time (ISO-8601). */
+  leadingBidAt?: string | null
+  /** Planned end time (ISO-8601); drives the final-minute notice. */
+  endsAt?: string | null
+  /** Whether anti-snipe is enabled for this auction. */
+  antiSnipeEnabled?: boolean
+  /** Anti-snipe window in minutes (1–30); defaults to 5. */
+  antiSnipeMinutes?: number
 }
 
 interface EndAuctionModalProps {
@@ -22,6 +42,26 @@ interface EndAuctionModalProps {
   auction: EndAuctionModalAuction | null
   action: (formData: FormData) => void | Promise<void>
   onClose: () => void
+}
+
+/** Mounted-only clock: null until the first effect, so SSR stays identical. */
+function useNow(intervalMs = 1000): number | null {
+  const [now, setNow] = useState<number | null>(null)
+  useEffect(() => {
+    setNow(Date.now())
+    const timer = setInterval(() => {
+      setNow(Date.now())
+    }, intervalMs)
+    return () => {
+      clearInterval(timer)
+    }
+  }, [intervalMs])
+  return now
+}
+
+function clampAntiSnipeMinutesUi(value: number): number {
+  if (!Number.isFinite(value)) return ANTI_SNIPE_DEFAULT_MINUTES
+  return Math.min(30, Math.max(1, Math.round(value)))
 }
 
 export function EndAuctionModal({
@@ -32,6 +72,20 @@ export function EndAuctionModal({
   const dialogRef = useRef<HTMLDialogElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const openId = auction?.id ?? null
+  const now = useNow()
+
+  const leadingProvided = auction?.leadingBidCents !== undefined
+  const hasLeadingBid =
+    auction?.leadingBidCents !== null && auction?.leadingBidCents !== undefined
+  const antiSnipeEnabled = auction?.antiSnipeEnabled === true
+  const antiSnipeMinutes =
+    auction?.antiSnipeMinutes !== undefined
+      ? clampAntiSnipeMinutesUi(auction.antiSnipeMinutes)
+      : ANTI_SNIPE_DEFAULT_MINUTES
+  const endsAtMs =
+    auction?.endsAt != null && auction.endsAt !== '' ? Date.parse(auction.endsAt) : Number.NaN
+  const inFinalMinute =
+    antiSnipeEnabled && now !== null && Number.isFinite(endsAtMs) && endsAtMs - now <= FINAL_MINUTE_MS
 
   // Open/close follows the target row identity, so a parent re-render with
   // a fresh auction object never resets the form mid-typing. Reset on open
@@ -74,19 +128,38 @@ export function EndAuctionModal({
       }}
       className="w-[min(480px,100%)] rounded-card border border-border bg-bgPage p-0 text-ink shadow-modal [&::backdrop]:bg-[rgba(24,26,46,0.45)]"
     >
-      <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+      <div className="flex items-start gap-3 border-b border-border px-5 py-4">
         <span
           aria-hidden="true"
           className="grid h-9 w-9 shrink-0 place-items-center rounded-[8px] bg-dangerLight text-danger"
         >
           <TriangleAlertIcon className="h-[18px] w-[18px]" />
         </span>
-        <h2
-          id="end-auction-title"
-          className="flex-1 font-heading text-[16px] font-semibold text-ink"
-        >
-          Lõpeta käsitsi
-        </h2>
+        <div className="flex-1">
+          <h2
+            id="end-auction-title"
+            className="font-heading text-[16px] font-semibold text-ink"
+          >
+            Lõpeta käsitsi
+          </h2>
+          {auction && leadingProvided ? (
+            <p className="mt-0.5 text-label text-inkMuted">
+              {hasLeadingBid ? (
+                <>
+                  {'Juhtiv pakkumus: '}
+                  <span className="font-semibold text-ink">
+                    {formatEur(auction.leadingBidCents)}
+                  </span>
+                  {now !== null && auction.leadingBidAt != null
+                    ? ` · ${formatRelativeTime(auction.leadingBidAt, now)}`
+                    : ''}
+                </>
+              ) : (
+                'Juhtiv pakkumus puudub.'
+              )}
+            </p>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={requestClose}
@@ -110,6 +183,20 @@ export function EndAuctionModal({
             Lõpetamine on pöördumatu. Oksjon suletakse kohe ja otsust ei saa
             tühistada.
           </p>
+          {auction && inFinalMinute ? (
+            <p className="flex gap-2.5 rounded-[8px] bg-bgMist p-2.5 text-bodySm text-inkMuted">
+              <CalendarClockIcon
+                aria-hidden="true"
+                className="mt-px h-[15px] w-[15px] shrink-0"
+              />
+              <span>
+                Viimane minut: enne lõpetamist kontrollib server antissnipe
+                reeglit. Viimase {String(antiSnipeMinutes)} minuti jooksul
+                tehtud pakkumine pikendab lõpuaega ja lõpetamine lükatakse
+                tagasi.
+              </span>
+            </p>
+          ) : null}
           {auction ? (
             <p className="text-bodySm leading-5 text-inkMuted">
               {`Oksjon #${shortId} · ${auction.title} — ${auction.context}.`}

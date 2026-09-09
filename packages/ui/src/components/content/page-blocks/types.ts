@@ -24,6 +24,8 @@ export interface HeroBlockConfig {
   heading: string
   kicker?: string
   body?: string
+  /** Overlay strength over the hero background, 0–80 (percent). */
+  overlayStrength?: number
   image?: string
   primaryCta: BlockLinkConfig
   secondaryCta?: BlockLinkConfig
@@ -36,6 +38,8 @@ export interface TextBlockConfig {
 
 export interface CardItemConfig {
   title: string
+  /** Lucide icon name from the platform ikoon select; unknown names render nothing. */
+  icon?: string
   description?: string
   href?: string
 }
@@ -50,6 +54,8 @@ export interface CardsBlockConfig {
 export interface AccordionItemConfig {
   title: string
   content: string
+  /** Render this row expanded on first paint ("avatud vaikimisi"). */
+  defaultOpen?: boolean
 }
 
 export interface AccordionBlockConfig {
@@ -60,6 +66,10 @@ export interface AccordionBlockConfig {
 export interface FormBlockConfig {
   heading?: string
   description?: string
+  /** Lead-form kind from the platform select (pohivorm, kava, ...). */
+  type?: string
+  /** Panel placement: 'kaardil' (card) or 'heledal' (plain light background). */
+  paigutus?: string
   slug: string
 }
 
@@ -68,11 +78,19 @@ export interface TickerBlockConfig {
   linkLabel?: string
   linkHref?: string
   limit?: number
+  /** Object-type filter value; 'koik' or unknown values disable filtering. */
+  objectType?: string
+  /** Auto-refresh interval in seconds; 0 or unknown values disable it. */
+  autoRefreshSeconds?: number
 }
 
 export interface StatItemConfig {
   value: string
   label: string
+  /** Appended after the value: +, % or €. */
+  suffix?: string
+  /** Value origin per the platform select; informational until live wiring. */
+  source?: string
 }
 
 export interface StatsBlockConfig {
@@ -84,6 +102,8 @@ export interface CtaBlockConfig {
   heading: string
   body?: string
   cta: BlockLinkConfig
+  /** Band style: 'amber' banner or 'green' (default). */
+  style?: string
 }
 
 export interface TestimonialItemConfig {
@@ -93,9 +113,14 @@ export interface TestimonialItemConfig {
   image?: string
 }
 
+/**
+ * Testimonials render from the platform `testimonials` collection: the block
+ * config only picks the heading and how many items to show; the caller
+ * passes the published collection items (mirrors the ticker lots flow).
+ */
 export interface TestimonialsBlockConfig {
   heading?: string
-  items: TestimonialItemConfig[]
+  limit?: number
 }
 
 export interface FaqItemConfig {
@@ -129,4 +154,11 @@ export interface PageBlocksProps {
    * exists at all.
    */
   tickerLots?: readonly LotCardProps[]
+  /** Called by ticker blocks whose config enables auto-refresh. */
+  tickerOnRefresh?: () => void
+  /**
+   * Published `testimonials` collection items for `testimonials` blocks,
+   * resolved by the caller; each block slices its own limit.
+   */
+  testimonials?: readonly TestimonialItemConfig[]
 }

@@ -7,13 +7,17 @@ import { primaryButtonClass } from '../../../_components/FormField'
 import { PageHeader } from '../../../_components/PageHeader'
 import { PlusIcon } from '../../../_components/icons'
 import { requireAdminRepositories } from '../../../_lib/admin'
-import { formatDateTime } from '../../../_lib/labels'
+import { contentStatusLabels, formatDateTime } from '../../../_lib/labels'
+
+import type { ContentStatus } from '@/lib/data/schema'
 
 interface TestimonialRow {
   id: string
   name: string
   role: string | null
   featured: boolean
+  status: ContentStatus
+  rating: number | null
   createdAt: string
 }
 
@@ -37,6 +41,8 @@ export default async function AdminTestimonialsPage({
     name: testimonial.name,
     role: testimonial.role,
     featured: testimonial.featured,
+    status: testimonial.status,
+    rating: testimonial.rating,
     createdAt: testimonial.createdAt,
   }))
 
@@ -69,6 +75,16 @@ export default async function AdminTestimonialsPage({
             ),
           },
           { key: 'role', label: 'Amet', render: (row) => row.role ?? '—' },
+          {
+            key: 'status',
+            label: 'Olek',
+            render: (row) => contentStatusLabels[row.status],
+          },
+          {
+            key: 'rating',
+            label: 'Hinne',
+            render: (row) => row.rating ?? '—',
+          },
           {
             key: 'featured',
             label: 'Esile tõstetud',

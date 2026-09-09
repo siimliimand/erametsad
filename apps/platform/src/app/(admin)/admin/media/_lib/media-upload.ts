@@ -21,6 +21,35 @@ export function isAllowedMimeType(mimeType: string): boolean {
   return allowedMediaMimeTypes.includes(mimeType)
 }
 
+/** True for the image/* types the library accepts (PDF is not an image). */
+export function isImageMimeType(mimeType: string): boolean {
+  return mimeType.startsWith('image/')
+}
+
+/**
+ * Alt-text gate (task 3.6): image mime types must carry a non-empty alt at
+ * upload and edit; PDFs stay exempt. Estonian message, or null when fine.
+ */
+export function validateMediaAlt(mimeType: string, alt: string | null | undefined): string | null {
+  if (!isImageMimeType(mimeType)) return null
+  if (typeof alt !== 'string' || alt.trim().length === 0) {
+    return 'Alt-tekst on piltide puhul kohustuslik.'
+  }
+  return null
+}
+
+/**
+ * Coerces a stored/unknown focal coordinate onto a 0..1 number, or null.
+ * The picker writes fractions; the form inputs accept 0..100 percents.
+ */
+export function focalCoordinateFrom(raw: unknown): number | null {
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null
+  const value = typeof raw === 'string' ? Number(raw.replace(',', '.')) : raw
+  if (!Number.isFinite(value)) return null
+  const fraction = value > 1 && value <= 100 ? value / 100 : value
+  return fraction >= 0 && fraction <= 1 ? fraction : null
+}
+
 // sanitizeFilename moved to src/lib/media/renditions.ts (shared with the
 // rendition keys) and is re-exported below for this module's consumers.
 

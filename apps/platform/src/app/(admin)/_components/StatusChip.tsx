@@ -49,10 +49,11 @@ const variantChipClass: Record<StatusChipVariant, string> = {
   'user:active': 'bg-[var(--st-active-bg)] text-[color:var(--st-active-text)]',
   'user:suspended': 'bg-[var(--st-ended-bg)] text-[color:var(--st-ended-text)]',
   'user:banned': 'bg-danger-light text-danger',
-  // Demo 08-contracts glyph states.
+  // Demo 08-contracts glyph states; spec admin-commerce-ops pins the sent
+  // state to the blue (info) triad.
   'contract:prepared':
     'bg-[var(--st-draft-bg)] text-[color:var(--st-draft-text)]',
-  'contract:sent': 'bg-[var(--st-ended-bg)] text-[color:var(--st-ended-text)]',
+  'contract:sent': 'bg-info-light text-info',
   'contract:signed':
     'bg-[var(--st-contract-bg)] text-[color:var(--st-contract-text)]',
   'contract:voided': 'bg-danger-light text-danger',

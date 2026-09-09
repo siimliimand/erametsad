@@ -25,13 +25,12 @@ import type { Bid } from '@/lib/data/schema'
 
 const DAY_MS = 86_400_000
 
-/** Demo KPI 2 subline: "Lõpevad täna" means a 24-hour lookahead window. */
-export const ENDING_TODAY_WINDOW_MS = DAY_MS
+/** Demo KPI 2 subline: "Lõpevad täna" means the Europe/Tallinn calendar day. */
+export const BIDS_SPARKLINE_DAYS = 7
 
 /** Same fetch ceilings the bid monitor and auctions list pages use. */
 const RECENT_BID_FETCH_LIMIT = 5000
-const RECENT_LEAD_FETCH_LIMIT = 50
-export const RECENT_LEAD_LIMIT = 3
+export const RECENT_LEAD_LIMIT = 8
 
 /** Success fee: 3% + VAT by default, per-auction override via feeOverridePercent. */
 export const SUCCESS_FEE_PERCENT_DEFAULT = 3
@@ -49,10 +48,10 @@ export const workspaceKpiLabels = {
 
 /** Static KPI sublines; dynamic ones are built by the *Subline helpers below. */
 export const workspaceKpiSublabels = {
-  endingToday: '24h jooksul',
+  endingToday: 'Tallinna aja järgi',
   newLeads: 'täna käsitlemata',
   pendingSignature: 'saadetud lepingud',
-  serviceFeeMonth: 'prognoos',
+  serviceFeeMonth: 'prognoos, ilma käibemaksuta',
 } as const
 
 export const workspaceKpiHrefs = {
@@ -115,6 +114,9 @@ export interface WorkspaceLeadSlice {
   contactName: string
   formName: string
   source: string | null
+  status: string
+  countyId: string | null
+  assignedSpecialistId: string | null
   createdAt: string
 }
 
@@ -145,6 +147,10 @@ export interface RecentLeadRow {
   contactName: string
   formName: string
   source: string | null
+  countyName: string | null
+  specialistName: string | null
+  /** Detail link target in Juhtlõimed. */
+  href: string
 }
 
 export interface QuickActionRow {
@@ -164,6 +170,8 @@ export interface WorkspaceKpis {
     count: number
     yesterdayCount: number
     changePercent: number | null
+    /** Per-day counts for the 7-day sparkline, oldest first, today last. */
+    dailyCounts: number[]
   } | null
   pendingApprovals: {
     companies: number | null
@@ -248,6 +256,60 @@ export function startOfMonthMs(now: number): number {
   return date.getTime()
 }
 
+/** Local (wall-clock) parts of an instant in Europe/Tallinn. */
+function tallinnParts(instant: number): {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+  second: number
+} {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Tallinn',
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(new Date(instant))
+  const read = (type: string): number =>
+    Number(parts.find((part) => part.type === type)?.value)
+  return {
+    year: read('year'),
+    month: read('month'),
+    day: read('day'),
+    hour: read('hour'),
+    minute: read('minute'),
+    second: read('second'),
+  }
+}
+
+function tallinnWallUtcMs(instant: number): number {
+  const { year, month, day, hour, minute, second } = tallinnParts(instant)
+  return Date.UTC(year, month - 1, day, hour, minute, second)
+}
+
+/**
+ * UTC timestamp of local midnight in Europe/Tallinn for the instant's
+ * calendar day. The zone offset is sampled at midday of that local day, so
+ * DST transitions (Tallinn switches at 04:00 local) never skew the result.
+ */
+export function startOfTallinnDayMs(now: number): number {
+  const { year, month, day } = tallinnParts(now)
+  const wallMidnight = Date.UTC(year, month - 1, day)
+  const sample = wallMidnight + 12 * 3_600_000
+  const offsetMs = tallinnWallUtcMs(sample) - sample
+  return wallMidnight - offsetMs
+}
+
+/** Previous Tallinn calendar-day start, DST-safe (noon walks back a full day). */
+function previousDayStartMs(dayStart: number): number {
+  return startOfTallinnDayMs(dayStart - 12 * 3_600_000)
+}
+
 /** Translates the permission-layer scope into a repository where clause. */
 export function auctionScopeWhere(
   scope: AuctionScope,
@@ -283,29 +345,27 @@ export function countByStatus(
   )
 }
 
-export function isEndingWithin(
-  endsAt: string | null,
-  now: number,
-  windowMs: number,
-): boolean {
+/**
+ * "Lõpevad täna": the end time falls inside the current Europe/Tallinn
+ * calendar day (spec scenario: tomorrow 00:30 Tallinn is not today).
+ */
+export function isEndingToday(endsAt: string | null, now: number): boolean {
   if (!endsAt) return false
   const time = Date.parse(endsAt)
   if (Number.isNaN(time)) return false
-  const delta = time - now
-  return delta >= 0 && delta <= windowMs
+  const dayStart = startOfTallinnDayMs(now)
+  return time >= dayStart && time < dayStart + DAY_MS
 }
 
-/** Active auctions ending inside the window, soonest first. */
+/** Active auctions ending inside today's Tallinn calendar day, soonest first. */
 export function endingTodayAuctions(
   auctions: readonly WorkspaceAuctionSlice[],
   now: number,
-  windowMs: number = ENDING_TODAY_WINDOW_MS,
 ): EndingAuctionSlice[] {
   return auctions
     .filter(
       (auction): auction is EndingAuctionSlice =>
-        auction.status === 'active' &&
-        isEndingWithin(auction.endsAt, now, windowMs),
+        auction.status === 'active' && isEndingToday(auction.endsAt, now),
     )
     .sort((a, b) => (a.endsAt < b.endsAt ? -1 : a.endsAt > b.endsAt ? 1 : 0))
 }
@@ -333,16 +393,48 @@ export function bidsTodayCounts(
   bids: readonly WorkspaceBidSlice[],
   now: number,
 ): { today: number; yesterday: number } {
-  const dayStart = startOfDayMs(now)
+  const dayStart = startOfTallinnDayMs(now)
+  const yesterdayStart = previousDayStartMs(dayStart)
   let today = 0
   let yesterday = 0
   for (const bid of bids) {
     const time = Date.parse(bid.createdAt)
     if (Number.isNaN(time)) continue
     if (time >= dayStart) today += 1
-    else if (time >= dayStart - DAY_MS) yesterday += 1
+    else if (time >= yesterdayStart) yesterday += 1
   }
   return { today, yesterday }
+}
+
+/**
+ * Per-calendar-day bid counts for the dashboard sparkline: `days` buckets
+ * ending with today (Tallinn), oldest first. Rows outside the window and
+ * unparsable timestamps are dropped.
+ */
+export function bidDailyCounts(
+  bids: readonly WorkspaceBidSlice[],
+  now: number,
+  days: number = BIDS_SPARKLINE_DAYS,
+): number[] {
+  const dayStarts: number[] = []
+  let cursor = startOfTallinnDayMs(now)
+  for (let i = 0; i < days; i += 1) {
+    dayStarts.unshift(cursor)
+    cursor = previousDayStartMs(cursor)
+  }
+  const counts = dayStarts.map(() => 0)
+  const windowStart = dayStarts[0]
+  if (windowStart === undefined) return counts
+  for (const bid of bids) {
+    const time = Date.parse(bid.createdAt)
+    if (Number.isNaN(time) || time < windowStart) continue
+    const index = dayStarts.findIndex(
+      (dayStart, i) =>
+        time >= dayStart && time < (dayStarts[i + 1] ?? dayStart + DAY_MS),
+    )
+    if (index >= 0) counts[index] = (counts[index] ?? 0) + 1
+  }
+  return counts
 }
 
 /** Trend percentage vs yesterday; null when there is no yesterday baseline. */
@@ -377,6 +469,15 @@ export function successFeeCents(
   return Math.round((finalPriceCents * percent * (100 + VAT_PERCENT)) / 10_000)
 }
 
+/** Ex-VAT success fee (dashboard KPI): 3% of the price, VAT not added. */
+export function successFeeExVatCents(
+  finalPriceCents: number,
+  feeOverridePercent: number | null,
+): number {
+  const percent = feeOverridePercent ?? SUCCESS_FEE_PERCENT_DEFAULT
+  return Math.round((finalPriceCents * percent) / 100)
+}
+
 /** Live-table revenue KPI: completed lots this month, never snapshot tables. */
 export function monthServiceFeeCents(
   auctions: readonly WorkspaceAuctionSlice[],
@@ -399,9 +500,39 @@ export function monthServiceFeeCents(
       return total
     return (
       total +
-      successFeeCents(auction.finalPriceCents, auction.feeOverridePercent)
+      successFeeExVatCents(
+        auction.finalPriceCents,
+        auction.feeOverridePercent,
+      )
     )
   }, 0)
+}
+
+/**
+ * "Uued juhtlõimed" semantics: created today (Tallinn) AND either unassigned
+ * or still in status uus — so an unassigned lead already moved on still
+ * counts for today (spec scenario).
+ */
+export function isNewLeadRow(
+  lead: Pick<WorkspaceLeadSlice, 'createdAt' | 'status' | 'assignedSpecialistId'>,
+  now: number,
+): boolean {
+  const time = Date.parse(lead.createdAt)
+  if (Number.isNaN(time)) return false
+  if (time < startOfTallinnDayMs(now)) return false
+  return lead.assignedSpecialistId === null || lead.status === 'new'
+}
+
+export function countNewLeadsToday(
+  leads: readonly WorkspaceLeadSlice[],
+  now: number,
+): number {
+  return leads.filter((lead) => isNewLeadRow(lead, now)).length
+}
+
+/** Süsteemi tervis is an admin/superadmin-only card. */
+export function isAdminRole(role: StaffRole): boolean {
+  return role === 'admin' || role === 'superadmin'
 }
 
 export function endingTodayRows(
@@ -436,6 +567,10 @@ export function endingTodayRows(
 
 export function recentLeadRows(
   leads: readonly WorkspaceLeadSlice[],
+  names: {
+    countyNameById: ReadonlyMap<string, string>
+    specialistNameById: ReadonlyMap<string, string>
+  },
   limit: number = RECENT_LEAD_LIMIT,
 ): RecentLeadRow[] {
   return leads.slice(0, limit).map((lead) => ({
@@ -444,6 +579,15 @@ export function recentLeadRows(
     contactName: lead.contactName,
     formName: lead.formName,
     source: lead.source,
+    countyName:
+      lead.countyId !== null
+        ? (names.countyNameById.get(lead.countyId) ?? null)
+        : null,
+    specialistName:
+      lead.assignedSpecialistId !== null
+        ? (names.specialistNameById.get(lead.assignedSpecialistId) ?? null)
+        : null,
+    href: `/admin/leads/${lead.id}`,
   }))
 }
 
@@ -482,6 +626,7 @@ export function buildWorkspaceKpis(input: WorkspaceKpiInput): WorkspaceKpis {
       count: today,
       yesterdayCount: yesterday,
       changePercent: bidTrendChangePercent(today, yesterday),
+      dailyCounts: bidDailyCounts(bids, now),
     }
   }
   const companies = can(role, 'companies:read')
@@ -600,22 +745,17 @@ export async function getWorkspaceData(
   // exactOptionalPropertyTypes: the scope where joins only when defined.
   const auctionWhere = auctionScopeWhere(auctionScope(role, userId))
   const leadWhere = leadScopeWhere(leadScope(role, userId))
-  // The new-lead queue count must match the rail badge exactly (all in-scope
-  // rows), while the recent-leads list only needs the newest few.
-  const newLeadWhere =
-    leadWhere !== undefined
-      ? { and: [leadWhere, { status: { equals: 'new' } }] }
-      : ({ status: { equals: 'new' } } as const)
 
   const [
     auctionDocs,
     pendingBidDocs,
-    recentLeadDocs,
-    newLeadDocs,
+    leadDocs,
     sentContractDocs,
     companyDocs,
     rightsDocs,
     serviceDocs,
+    specialistDocs,
+    countyDocs,
     recentBidDocs,
   ] = await Promise.all([
     repositories.find({
@@ -629,15 +769,12 @@ export async function getWorkspaceData(
       sort: 'createdAt',
       pagination: false,
     }),
+    // One in-scope lead fetch feeds both the new-lead KPI (today AND
+    // unassigned-or-uus, filtered below) and the recent-leads list.
     repositories.find({
       collection: 'leads',
       ...(leadWhere !== undefined ? { where: leadWhere } : {}),
       sort: '-createdAt',
-      limit: RECENT_LEAD_FETCH_LIMIT,
-    }),
-    repositories.find({
-      collection: 'leads',
-      where: newLeadWhere,
       pagination: false,
     }),
     repositories.find({
@@ -660,6 +797,16 @@ export async function getWorkspaceData(
       where: { status: { equals: 'new' } },
       pagination: false,
     }),
+    repositories.find({
+      collection: 'specialists',
+      sort: 'name',
+      pagination: false,
+    }),
+    repositories.find({
+      collection: 'counties',
+      sort: 'name',
+      pagination: false,
+    }),
     can(role, 'bids:read')
       ? repositories.find({
           collection: 'bids',
@@ -668,6 +815,13 @@ export async function getWorkspaceData(
         })
       : Promise.resolve({ docs: emptyBids }),
   ])
+
+  const countyNameById = new Map(
+    countyDocs.docs.map((county) => [county.id, county.name]),
+  )
+  const specialistNameById = new Map(
+    specialistDocs.docs.map((specialist) => [specialist.id, specialist.name]),
+  )
 
   const auctions: WorkspaceAuctionSlice[] = auctionDocs.docs
   const auctionsById = new Map(auctions.map((auction) => [auction.id, auction]))
@@ -699,16 +853,16 @@ export async function getWorkspaceData(
     role,
     now,
     auctions,
-    bids: bidsSince(windowBids, startOfDayMs(now) - DAY_MS),
+    bids: bidsSince(windowBids, previousDayStartMs(startOfTallinnDayMs(now))),
     pendingUnderbids,
-    newLeadCount: newLeadDocs.docs.length,
+    newLeadCount: countNewLeadsToday(leadDocs.docs, now),
     contracts: sentContractDocs.docs,
     companyApprovalCount: companyDocs.docs.length,
   })
   const queues = buildWorkspaceQueues({
     role,
     auctions,
-    newLeadCount: newLeadDocs.docs.length,
+    newLeadCount: countNewLeadsToday(leadDocs.docs, now),
     companyApprovalCount: companyDocs.docs.length,
     rightsRequestCount: rightsDocs.docs.length,
     newServiceRequestCount: serviceDocs.docs.length,
@@ -725,6 +879,9 @@ export async function getWorkspaceData(
       companyApprovalCount: companyDocs.docs.length,
       sentContractCount: sentContractDocs.docs.length,
     }),
-    recentLeads: recentLeadRows(recentLeadDocs.docs),
+    recentLeads: recentLeadRows(leadDocs.docs, {
+      countyNameById,
+      specialistNameById,
+    }),
   }
 }

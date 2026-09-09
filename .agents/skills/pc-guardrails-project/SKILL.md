@@ -12,7 +12,7 @@ license: MIT
 
 - Three deployment units share one monorepo: marketing site (`erametsad.ee`), auction portal (`oksjonid.erametsad.ee`), and core backend + admin (`api.erametsad.ee` / `admin.erametsad.ee`). Do not split them into separate repositories.
 - Use subdomain routing per the established pattern: `erametsad.ee` (marketing), `oksjonid.erametsad.ee` (portal), `api.erametsad.ee` (API), `admin.erametsad.ee` (admin), optional `metsauhistu.erametsad.ee` (Phase 5). Prototype runs under `ww0.dev` (`erametsad.ww0.dev`, `oksjonid.erametsad.ww0.dev`, `api.erametsad.ww0.dev`, `admin.erametsad.ww0.dev`). Production `.ee` cutover is a separate future step.
-- The backend is a Next.js 15 App Router application on Cloudflare Workers (via OpenNext) with Cloudflare D1 (SQLite) via Drizzle ORM. The data layer uses a repository pattern (`apps/platform/src/lib/data/`) with 37 schema tables (including the CMS tables `page_blocks`, `page_versions`, the append-only `consent_log`, `newsletter_subscribers`, `analytics_events`, and the service-request tables `service_requests`, `partners`), access guards (`guards.ts`), and runtime helpers (`runtime.ts`). Do not use Payload CMS 3.
+- The backend is a Next.js 15 App Router application on Cloudflare Workers (via OpenNext) with Cloudflare D1 (SQLite) via Drizzle ORM. The data layer uses a repository pattern (`apps/platform/src/lib/data/`) with 39 schema tables (including the CMS tables `page_blocks`, `page_versions`, the append-only `consent_log`, `newsletter_subscribers`, `analytics_events`, the service-request tables `service_requests`, `partners`, and the governance tables `notification_templates`, `maintenance_windows`), access guards (`guards.ts`), and runtime helpers (`runtime.ts`). Do not use Payload CMS 3.
 - Auction timing is server-authoritative only. End-of-auction transitions are DO-alarm-driven with a cron sweep safety net, never triggered by a client request.
 - Bids are append-only. Corrections use compensating entries, not deletions or updates. Sealed bids are encrypted at rest until the admin opening ceremony.
 - The marketing site uses SSG/ISR where possible, with live data fetched client-side (auction ticker, form submissions).
@@ -64,7 +64,8 @@ license: MIT
 - eID (Smart-ID, Mobile-ID, ID-card) is the primary authentication method via eID Easy REST provider + demo fallback. JWT HS256 via Web Crypto (async canonical; node:crypto sync bridges remain temporarily). D1-backed sessions with token-family rotation.
 - Bidding rights are granted per auction type by admin. Validate rights server-side on every bid submission — never trust the client.
 - Lead and newsletter forms include honeypot fields and server-side rate limiting. Consent checkboxes are always visible, unchecked, and required — no pre-checked defaults.
-- All admin actions touching users, bids, or contracts are logged to an immutable audit log.
+- All admin actions touching users, bids, or contracts are logged to an immutable audit log. Audit entries carry optional reason/session/ip/UA context; the hash chain serializes era-safely so legacy rows still verify.
+- Settings writes are superadmin-only (`settings:write`); admins hold `settings:read` with a read-only banner (decision D-6).
 - CSP headers are set on all responses. Sealed bids are encrypted at rest. OWASP ASVS Level 2 is the security target.
 
 ## Dependencies

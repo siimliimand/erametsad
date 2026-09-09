@@ -18,6 +18,8 @@ export type BlockFieldDescriptor =
       label: string
       required: boolean
       multiline: boolean
+      /** Long-form copy fields (text body, accordion content) use the shared rich text editor. */
+      rich: boolean
       maxLength?: number
     }
   | {
@@ -27,6 +29,12 @@ export type BlockFieldDescriptor =
       required: boolean
       min?: number
       max?: number
+    }
+  | {
+      kind: 'boolean'
+      path: string
+      label: string
+      required: boolean
     }
   | {
       kind: 'select'
@@ -80,9 +88,68 @@ const fieldLabels: Record<string, string> = {
   answer: 'Vastus',
   content: 'Sisu',
   value: 'Näitarv',
+  suffix: 'Sufiks',
+  source: 'Allikas',
+  style: 'Stiil',
+  type: 'Vormi tüüp',
+  paigutus: 'Paigutus',
+  icon: 'Ikoon',
+  objectType: 'Objekti tüüp',
+  autoRefreshSeconds: 'Automaatvärskendus (s)',
+  overlayStrength: 'Varjutuse tugevus (%)',
+  defaultOpen: 'Avatud vaikimisi',
+}
+
+/**
+ * Per-block path overrides when the generic key label reads wrong for one
+ * block type (hero "body" is the intro; the testimonials limit is not about
+ * auctions).
+ */
+const pathLabels: Partial<Record<PageBlockType, Record<string, string>>> = {
+  hero: { body: 'Sissejuhatus' },
+  testimonials: { limit: 'Kuvatavaid kliendilugusid' },
+}
+
+/** Estonian labels for enum select values, keyed by the field path. */
+const selectOptionLabels: Record<string, Record<string, string>> = {
+  icon: {
+    trees: 'Puud',
+    axe: 'Raie',
+    sprout: 'Istutamine',
+    map: 'Kaart',
+    shield: 'Kaitse',
+    clock: 'Kiire',
+    coins: 'Hind',
+    'file-text': 'Dokument',
+  },
+  type: {
+    pohivorm: 'Põhivorm',
+    kava: 'Kava',
+    hooldusraie: 'Hooldusraie',
+    istutamine: 'Istutamine',
+  },
+  paigutus: { kaardil: 'Kaardil', heledal: 'Heledal taustal' },
+  objectType: {
+    koik: 'Kõik objektid',
+    raieoigus: 'Raieõigus',
+    kinnistu: 'Kinnistu',
+    kiire: 'Kiire oksjon',
+    pakett: 'Pakett',
+  },
+  suffix: { '+': 'Pluss (+)', '%': 'Protsent (%)', '€': 'Euro (€)' },
+  source: { staatiline: 'Staatiline', live: 'Reaalajas' },
+  style: { amber: 'Kollane', green: 'Roheline' },
 }
 
 const multilineMinLength = 500
+
+/**
+ * Builder paths whose string values carry sanitized HTML from the shared
+ * rich text editor (spec R-1: text blocks; the accordion per-item content).
+ * Keyed by "<block type>:<builder path>"; array items are indexed at render
+ * time in BlockSettingsFields, the descriptor keeps the item-relative path.
+ */
+const richTextStringPaths = new Set(['text:body', 'accordion:items.content'])
 
 interface ArrayLabels {
   section: string
@@ -100,20 +167,20 @@ const arrayLabels: Partial<Record<PageBlockType, Record<string, ArrayLabels>>> =
   stats: {
     items: { section: 'Näitarvud', item: 'Näitarv', add: 'Lisa näitarv' },
   },
-  testimonials: {
-    items: { section: 'Kliendilood', item: 'Kliendilugu', add: 'Lisa kliendilugu' },
-  },
   faq: {
     items: { section: 'Küsimused', item: 'Küsimus', add: 'Lisa küsimus' },
   },
 }
 
 function labelFor(type: PageBlockType, path: string, key: string): string {
-  return arrayLabels[type]?.[path]?.section ?? fieldLabels[key] ?? key
+  return (
+    pathLabels[type]?.[path] ?? arrayLabels[type]?.[path]?.section ?? fieldLabels[key] ?? key
+  )
 }
 
-function literalValue(literal: z.ZodLiteral<unknown>): unknown {
-  return literal.value
+function selectLabel(path: string, value: string): string {
+  if (path === 'columns') return `${value} veergu`
+  return selectOptionLabels[path]?.[value] ?? value
 }
 
 function stringDescriptor(
@@ -130,6 +197,7 @@ function stringDescriptor(
     label: labelFor(type, path, key),
     required,
     multiline: (maxLength ?? 0) >= multilineMinLength,
+    rich: richTextStringPaths.has(`${type}:${path}`),
     ...(maxLength !== undefined ? { maxLength } : {}),
   }
 }
@@ -138,7 +206,7 @@ function selectDescriptor(
   type: PageBlockType,
   path: string,
   key: string,
-  options: readonly z.ZodLiteral<unknown>[],
+  values: readonly unknown[],
   required: boolean,
 ): BlockFieldDescriptor {
   return {
@@ -146,12 +214,9 @@ function selectDescriptor(
     path,
     label: labelFor(type, path, key),
     required,
-    options: options.map((option) => {
-      const value = literalValue(option)
-      // Veergude arv gets a unit; other literal unions fall back to the value.
-      const label =
-        path === 'columns' ? `${String(value)} veergu` : String(value)
-      return { value: String(value), label }
+    options: values.map((value) => {
+      const stringValue = String(value)
+      return { value: stringValue, label: selectLabel(path, stringValue) }
     }),
   }
 }
@@ -178,13 +243,30 @@ function descriptorForField(
       ...(max !== undefined ? { max } : {}),
     }
   }
+  if (type instanceof z.ZodBoolean) {
+    return {
+      kind: 'boolean',
+      path,
+      label: labelFor(blockType, path, key),
+      required,
+    }
+  }
+  if (type instanceof z.ZodEnum) {
+    return selectDescriptor(blockType, path, key, type.options as readonly string[], required)
+  }
   if (type instanceof z.ZodUnion) {
     const unionOptions = type.options as readonly z.ZodTypeAny[]
     const literals = unionOptions.filter(
       (option): option is z.ZodLiteral<unknown> => option instanceof z.ZodLiteral,
     )
     if (literals.length !== unionOptions.length) return null
-    return selectDescriptor(blockType, path, key, literals, required)
+    return selectDescriptor(
+      blockType,
+      path,
+      key,
+      literals.map((literal) => literal.value),
+      required,
+    )
   }
   if (type instanceof z.ZodObject) {
     return {
@@ -276,7 +358,9 @@ export function updateDraftValue(
   const segments = path.split('.')
   const key = segments[segments.length - 1]
   if (key === undefined) return next
-  const parent = resolveAt(next, segments.slice(0, -1).join('.'))
+  // Top-level paths have no parent segment; the draft root is the parent.
+  const parentPath = segments.slice(0, -1).join('.')
+  const parent = parentPath === '' ? next : resolveAt(next, parentPath)
   if (Array.isArray(parent)) {
     parent[Number(key)] = value
   } else if (parent !== null && typeof parent === 'object') {

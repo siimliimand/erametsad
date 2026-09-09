@@ -19,7 +19,7 @@ Find any user, inspect identity/profiles/activity, manage per-auction-type biddi
 │ID│ Nimi / isikukood     │ Profiilid        │ Õigused       │ Olek       │
 │82│ Tõnis Kask           │ ○era  ●Tamm OÜ   │ R✓ K✓ P— B—  │ ● aktiivne │
 │79│ Kalle Tamm           │ ○era             │ R✓ K— P— B—  │ ● aktiivne │
-│… │ 3870516*****(masked) │                  │ 12 pakkumist │ sisse 26.08│
+│… │ ••••••0516 (masked)  │                  │ 12 pakkumist │ sisse 26.08│
 ├──┴──────────────────────┴──────────────────┴───────────────┴────────────┤
 │ Detail (Tõnis Kask #82) ← drawer/page                                     │
 │ [Identiteet][Profiilid][Õigused][Lepingud][Pakkumised][Teavitused][GDPR] │
@@ -30,7 +30,7 @@ Find any user, inspect identity/profiles/activity, manage per-auction-type biddi
 Mobile: list becomes cards; detail tabs stack.
 
 ## Block-by-block spec
-**List** — DataTable columns: ID; Nimi + isikukood masked (first 5 + `*****`; unmask on click = audit-logged view); Profiilid (chips era/ettevõte, company chip links to company profile, amber if approval pending); Õigused summary (R/K/P/B letters for raieõigus/kinnistu/põllumaa/pakett, ✓/—); Pakkumised count (all-time, link filtered); Olek (aktiivne/suletud/bännitud); Viimane sisseastumine (relative). Filters: profile type, status, granted right, county, freetext. Default sort last login desc. Row click → detail.
+**List** — DataTable columns: ID; Nimi + isikukood masked (last 4 visible, `••••••0516`; unmask on click = audit-logged view). Otsus (D-16): the spec draft showed the first digits visible (`3870516*****`); the implementation keeps the last-4 mask, and the docs follow the code (the leading digits encode the birth date); Profiilid (chips era/ettevõte, company chip links to company profile, amber if approval pending); Õigused summary (R/K/P/B letters for raieõigus/kinnistu/põllumaa/pakett, ✓/—); Pakkumised count (all-time, link filtered); Olek (aktiivne/suletud/bännitud); Viimane sisseastumine (relative). Filters: profile type, status, granted right, county, freetext. Default sort last login desc. Row click → detail.
 
 **Detail tabs**
 1. **Identiteet** — full name, isikukood (reveal button, logged), auth method (eID / parool), e-mail, phone, created_at, status; sessions list (device, IP hash, last active) with per-session force-logout.

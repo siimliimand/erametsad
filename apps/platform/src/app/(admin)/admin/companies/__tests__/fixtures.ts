@@ -28,6 +28,8 @@ export function makeSnapshot(overrides: Partial<RegistrySnapshot> = {}): Registr
     status: 'REGISTREERITUD',
     legalName: 'Mari Mets OÜ',
     legalForm: 'Osaühing',
+    address: 'Pärnu mnt 12, Tartu',
+    kmkrNr: 'EE101234567',
     boardMembers: [{ name: 'Mari Maasikas', role: 'Juhatuse liige' }],
     fetchedAt: '2026-08-01T09:00:00.000Z',
     verified: true,
@@ -50,6 +52,10 @@ export function makeRequestCardData(
     boardCheck: { level: 'weak', matchedName: 'Mari Maasikas' },
     duplicate: null,
     waitingDays: 3,
+    existingProfiles: [],
+    biddingHistory: { bidCount: 4, auctionCount: 2, lastBidAt: '2026-07-20T10:00:00.000Z' },
+    frameworkContract: { state: 'unsigned', signedAt: null },
+    defaultRights: ['raieoigus', 'kinnistu'],
     ...overrides,
   }
 }

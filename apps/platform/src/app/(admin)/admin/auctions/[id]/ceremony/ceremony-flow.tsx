@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 
+import { CeremonyUnsoldShortcut } from './_components/ceremony-checklist'
 import { CeremonyRecord } from './_components/ceremony-record'
 import { RevealPanel } from './_components/reveal-panel'
 import { SigningPanel } from './_components/signing-panel'
@@ -19,6 +20,9 @@ import type { StaffRole } from '../../../../_lib/permissions'
  * `signSealed*`/`revealSealedBids`/`confirmSealedCeremonyWinner`/`voidSealedBids`
  * actions;
  * the read model arrives via `sealedCeremonyStateAction` (server page).
+ * While the opening is in progress, admins outside the ceremony get a
+ * read-only "Avamine on pooleli" view; an empty lot offers the direct
+ * müümata shortcut from the checklist stage.
  */
 export function CeremonyFlow({
   auctionId,
@@ -38,6 +42,13 @@ export function CeremonyFlow({
   // Superadmin void stays available until the winner decision locks the lot
   // (post-confirm voids run through the contract module instead).
   const canVoid = session.role === 'superadmin' && context.status === 'ended'
+  const openingPooleli = context.openingInProgress && !context.viewerIsParticipant
+  const unsoldShortcutPossible =
+    context.status === 'ended' &&
+    !context.revealed &&
+    !context.winnerConfirmed &&
+    !context.voided &&
+    sealedBidCount === 0
 
   if (context.error !== null) {
     return (
@@ -63,7 +74,23 @@ export function CeremonyFlow({
         </p>
       </section>
 
-      {context.voided ? (
+      {openingPooleli ? (
+        <>
+          <div className="rounded-card border border-l-4 border-info bg-infoLight p-md">
+            <h2 className="mb-xs font-heading text-h4 font-bold text-info">
+              Avamine on pooleli
+            </h2>
+            <p className="text-bodySm text-info">
+              Teine administaator viib avamist parasjagu läbi. Kuni tseremoonia on lõpetatud, on
+              see vaate ainult loetav.
+            </p>
+          </div>
+          {context.revealed ? <CeremonyRecord context={context} /> : null}
+          <Link href={detailPath} className={secondaryButtonClass}>
+            Tagasi detailvaatesse
+          </Link>
+        </>
+      ) : context.voided ? (
         <>
           <div className="rounded-card border border-l-4 border-danger bg-dangerLight p-md">
             <h2 className="mb-xs font-heading text-h4 font-bold text-danger">Tühistatud</h2>
@@ -92,6 +119,8 @@ export function CeremonyFlow({
               auctionId={auctionId}
               bids={context.bids}
               topMeetsReserve={context.topMeetsReserve}
+              feeEstimate={context.feeEstimate}
+              winnerProfileHold={context.winnerProfileHold}
               isOpener={session.userId === context.opener?.userId}
               isSuperadmin={session.role === 'superadmin'}
               kiiroksjon={kiiroksjon}
@@ -109,6 +138,7 @@ export function CeremonyFlow({
             signaturesExpired={context.signaturesExpired}
             currentUserId={session.userId}
           />
+          {unsoldShortcutPossible ? <CeremonyUnsoldShortcut auctionId={auctionId} /> : null}
           {bothSigned ? (
             <RevealPanel
               auctionId={auctionId}

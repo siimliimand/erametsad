@@ -7,8 +7,12 @@ export const faqItems = sqliteTable(
   {
     id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
     question: text('question').notNull(),
+    // Short answer shown before the "Loe edasi…" expander; nullable because
+    // existing items only carry the full answer.
+    shortAnswer: text('short_answer'),
     // Payload richText; stored as TEXT per the jsonb mapping rule.
     answer: text('answer').notNull(),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
     categoryId: text('category_id')
       .notNull()
       .references(() => faqCategories.id),

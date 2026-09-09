@@ -170,6 +170,7 @@ export async function approveAlapakkumine(
 export async function rejectAlapakkumine(
   auctionId: string,
   bidId: string,
+  reason?: string,
 ): Promise<RejectDecision> {
   const repos = await getRepositories()
   const events: DomainEvent[] = []
@@ -211,7 +212,13 @@ export async function rejectAlapakkumine(
   events.push({
     type: 'bid.rejected',
     userId: bidderId,
-    payload: { auctionId, auctionTitle, bidId, amount },
+    payload: {
+      auctionId,
+      auctionTitle,
+      bidId,
+      amount,
+      ...(reason !== undefined ? { reason } : {}),
+    },
   })
 
   for (const event of events) {

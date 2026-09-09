@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  DEFAULT_LEAD_AUTO_ASSIGN_SETTINGS,
+  LEAD_AUTO_ASSIGN_FLAGS_KEY,
+  countyRoundRobinPick,
   evaluateLeadExitGuard,
   findDuplicateLead,
   kanbanColumns,
+  leadAutoAssignSettings,
   leadSlaBadge,
+  resolveLeadLifecycleFlags,
   roundRobinSuggestion,
 } from './lead-flow'
 
@@ -26,18 +31,62 @@ describe('evaluateLeadExitGuard', () => {
       from: 'new',
       to: 'contacted',
       assignedSpecialistId: null,
+      note: 'Esimene kontakt, klient huvitatud',
     })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toContain('spetsialist')
   })
 
-  it('allows leaving Uus once a specialist is assigned', () => {
-    const result = evaluateLeadExitGuard({
+  it('requires the first note to reach Võetud ühendust (task 8.2)', () => {
+    const blocked = evaluateLeadExitGuard({
       from: 'new',
       to: 'contacted',
       assignedSpecialistId: 'spec-1',
     })
-    expect(result.ok).toBe(true)
+    expect(blocked.ok).toBe(false)
+    if (!blocked.ok) expect(blocked.error).toContain('Esimene märkus')
+
+    const short = evaluateLeadExitGuard({
+      from: 'new',
+      to: 'contacted',
+      assignedSpecialistId: 'spec-1',
+      note: 'ok',
+    })
+    expect(short.ok).toBe(false)
+
+    const ok = evaluateLeadExitGuard({
+      from: 'new',
+      to: 'contacted',
+      assignedSpecialistId: 'spec-1',
+      note: 'Helistasin, klient huvitatud',
+    })
+    expect(ok.ok).toBe(true)
+  })
+
+  it('requires an auction/contract reference or a note to reach Leping (task 8.2)', () => {
+    const blocked = evaluateLeadExitGuard({
+      from: 'contacted',
+      to: 'contract',
+      assignedSpecialistId: 'spec-1',
+    })
+    expect(blocked.ok).toBe(false)
+    if (!blocked.ok) expect(blocked.error).toContain('viide')
+
+    const withReference = evaluateLeadExitGuard({
+      from: 'contacted',
+      to: 'contract',
+      assignedSpecialistId: 'spec-1',
+      reference: 'oksjon 42 / leping LP-2026-001',
+    })
+    expect(withReference.ok).toBe(true)
+
+    const withNote = evaluateLeadExitGuard({
+      from: 'contacted',
+      to: 'contract',
+      assignedSpecialistId: 'spec-1',
+      note: 'Raamleping allkirjastamisel',
+    })
+    expect(withNote.ok).toBe(true)
   })
 
   it('requires a qualification note to enter Kvalifitseeritud', () => {
@@ -75,13 +124,13 @@ describe('evaluateLeadExitGuard', () => {
     expect(ok.ok).toBe(true)
   })
 
-  it('ignores note requirements for other moves', () => {
+  it('requires the qualification note even when entering from Uus with a specialist', () => {
     const result = evaluateLeadExitGuard({
-      from: 'contacted',
-      to: 'contract',
+      from: 'new',
+      to: 'qualified',
       assignedSpecialistId: 'spec-1',
     })
-    expect(result.ok).toBe(true)
+    expect(result.ok).toBe(false)
   })
 
   it('lets a same-status move pass every guard', () => {
@@ -103,14 +152,86 @@ describe('evaluateLeadExitGuard', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toContain('Kvalifitseerimise märkus')
   })
+})
 
-  it('requires the qualification note even when entering from Uus with a specialist', () => {
-    const result = evaluateLeadExitGuard({
-      from: 'new',
-      to: 'qualified',
-      assignedSpecialistId: 'spec-1',
+describe('leadAutoAssignSettings (task 8.2)', () => {
+  it('defaults to enabled with the documented design default', () => {
+    expect(DEFAULT_LEAD_AUTO_ASSIGN_SETTINGS).toEqual({ enabled: true })
+    expect(leadAutoAssignSettings(undefined)).toEqual({ enabled: true })
+    expect(leadAutoAssignSettings('sõna')).toEqual({ enabled: true })
+    expect(leadAutoAssignSettings([1, 2])).toEqual({ enabled: true })
+  })
+
+  it('reads the reserved leadAutoAssign featureFlags key', () => {
+    expect(leadAutoAssignSettings({ [LEAD_AUTO_ASSIGN_FLAGS_KEY]: { enabled: false } })).toEqual({
+      enabled: false,
     })
-    expect(result.ok).toBe(false)
+    expect(leadAutoAssignSettings({ [LEAD_AUTO_ASSIGN_FLAGS_KEY]: { enabled: true } })).toEqual({
+      enabled: true,
+    })
+    expect(leadAutoAssignSettings({ [LEAD_AUTO_ASSIGN_FLAGS_KEY]: 'vigane' })).toEqual({
+      enabled: true,
+    })
+  })
+})
+
+describe('countyRoundRobinPick (task 8.2)', () => {
+  it('rotates to the active specialist with the fewest county leads', () => {
+    const pick = countyRoundRobinPick([
+      { id: 'a', active: true, countyLeadCount: 2 },
+      { id: 'b', active: true, countyLeadCount: 0 },
+      { id: 'c', active: true, countyLeadCount: 1 },
+    ])
+    expect(pick?.id).toBe('b')
+  })
+
+  it('skips inactive specialists and returns null without active ones', () => {
+    expect(
+      countyRoundRobinPick([
+        { id: 'a', active: false, countyLeadCount: 0 },
+        { id: 'b', active: true, countyLeadCount: 5 },
+      ])?.id,
+    ).toBe('b')
+    expect(countyRoundRobinPick([{ id: 'a', active: false, countyLeadCount: 0 }])).toBeNull()
+  })
+
+  it('breaks ties with the roster order so consecutive picks rotate', () => {
+    const roster = [
+      { id: 'a', active: true, countyLeadCount: 1 },
+      { id: 'b', active: true, countyLeadCount: 1 },
+    ]
+    expect(countyRoundRobinPick(roster)?.id).toBe('a')
+    expect(countyRoundRobinPick([...roster].reverse())?.id).toBe('b')
+  })
+})
+
+describe('resolveLeadLifecycleFlags (task 8.2)', () => {
+  it('resolves the merge cross-link and the soft-delete tombstone', () => {
+    const flags = resolveLeadLifecycleFlags([
+      { action: 'lead.note', after: { text: 'märkus' } },
+      { action: 'lead.merge', after: { mergedInto: 'target-1', taken: ['countyId'] } },
+      { action: 'lead.delete', after: { deleted: true, reason: 'Spam, testikirje' } },
+    ])
+    expect(flags).toEqual({
+      mergedIntoId: 'target-1',
+      deleted: true,
+      deleteReason: 'Spam, testikirje',
+    })
+  })
+
+  it('stays empty for ordinary timelines', () => {
+    expect(
+      resolveLeadLifecycleFlags([{ action: 'lead.status', after: { status: 'contacted' } }]),
+    ).toEqual({ mergedIntoId: null, deleted: false, deleteReason: null })
+  })
+
+  it('ignores malformed audit payloads', () => {
+    expect(
+      resolveLeadLifecycleFlags([
+        { action: 'lead.merge', after: 'vigane' },
+        { action: 'lead.delete', after: { deleted: false } },
+      ]),
+    ).toEqual({ mergedIntoId: null, deleted: false, deleteReason: null })
   })
 })
 

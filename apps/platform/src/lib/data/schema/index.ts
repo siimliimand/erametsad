@@ -27,8 +27,10 @@ export * from './counties'
 export * from './faq-categories'
 export * from './faq-items'
 export * from './legal-documents'
+export * from './maintenance-windows'
 export * from './media'
 export * from './newsletter-subscribers'
+export * from './notification-templates'
 export * from './page-blocks'
 export * from './page-versions'
 export * from './pages'
@@ -57,8 +59,10 @@ import type { faqCategories as faqCategoriesTable } from './faq-categories'
 import type { faqItems as faqItemsTable } from './faq-items'
 import type { leads as leadsTable } from './leads'
 import type { legalDocuments as legalDocumentsTable } from './legal-documents'
+import type { maintenanceWindows as maintenanceWindowsTable } from './maintenance-windows'
 import type { media as mediaTable } from './media'
 import type { newsletterSubscribers as newsletterSubscribersTable } from './newsletter-subscribers'
+import type { notificationTemplates as notificationTemplatesTable } from './notification-templates'
 import type { notifications as notificationsTable } from './notifications'
 import type { pageBlocks as pageBlocksTable } from './page-blocks'
 import type { pageVersions as pageVersionsTable } from './page-versions'
@@ -120,12 +124,16 @@ export type FaqItem = InferSelectModel<typeof faqItemsTable>
 export type NewFaqItem = InferInsertModel<typeof faqItemsTable>
 export type LegalDocument = InferSelectModel<typeof legalDocumentsTable>
 export type NewLegalDocument = InferInsertModel<typeof legalDocumentsTable>
+export type MaintenanceWindow = InferSelectModel<typeof maintenanceWindowsTable>
+export type NewMaintenanceWindow = InferInsertModel<typeof maintenanceWindowsTable>
 // Named MediaAsset, not Media: the bare name collides too easily at import
 // sites (next/image, CSS media types), same reasoning as NotificationRow.
 export type MediaAsset = InferSelectModel<typeof mediaTable>
 export type NewMediaAsset = InferInsertModel<typeof mediaTable>
 export type NewsletterSubscriber = InferSelectModel<typeof newsletterSubscribersTable>
 export type NewNewsletterSubscriber = InferInsertModel<typeof newsletterSubscribersTable>
+export type NotificationTemplate = InferSelectModel<typeof notificationTemplatesTable>
+export type NewNotificationTemplate = InferInsertModel<typeof notificationTemplatesTable>
 export type Page = InferSelectModel<typeof pagesTable>
 export type NewPage = InferInsertModel<typeof pagesTable>
 export type PageBlock = InferSelectModel<typeof pageBlocksTable>

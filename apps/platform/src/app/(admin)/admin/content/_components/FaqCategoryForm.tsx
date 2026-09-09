@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { CheckboxField } from './CheckboxField'
 import { saveFaqCategoryAction } from '../../../_actions/content'
 import {
   FormField,
@@ -31,6 +32,12 @@ export function FaqCategoryForm({ category }: { category?: FaqCategory }) {
         min="0"
         step="1"
         defaultValue={category?.order ?? 0}
+      />
+      <CheckboxField
+        label="Aktiivne"
+        name="active"
+        hint="Kui märkimata, ei kuvata kategooriat küsimuste loendis."
+        defaultChecked={category?.active ?? true}
       />
       <div className="flex items-center gap-sm pt-xs">
         <button type="submit" className={primaryButtonClass}>

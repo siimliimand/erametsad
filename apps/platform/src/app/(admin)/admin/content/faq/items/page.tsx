@@ -17,6 +17,9 @@ interface FaqItemRow {
   question: string
   categoryTitle: string
   order: number
+  active: boolean
+  shortAnswer: string | null
+  answer: string
 }
 
 export const metadata = { title: 'KKK küsimused' }
@@ -44,6 +47,9 @@ export default async function AdminFaqItemsPage({
     question: item.question,
     categoryTitle: categoryTitles.get(item.categoryId) ?? '—',
     order: item.order,
+    active: item.active,
+    shortAnswer: item.shortAnswer,
+    answer: item.answer,
   }))
 
   const filterOptions = [
@@ -92,8 +98,30 @@ export default async function AdminFaqItemsPage({
               </Link>
             ),
           },
+          {
+            key: 'answer',
+            label: 'Vastus',
+            render: (row) => (
+              <div className="max-w-md space-y-xs">
+                <p className="text-bodySm text-ink">{row.shortAnswer ?? '—'}</p>
+                <details>
+                  <summary className="cursor-pointer text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover">
+                    Loe edasi…
+                  </summary>
+                  <p className="mt-xs text-bodySm whitespace-pre-wrap text-inkMuted">
+                    {row.answer}
+                  </p>
+                </details>
+              </div>
+            ),
+          },
           { key: 'categoryTitle', label: 'Kategooria' },
           { key: 'order', label: 'Järjekord' },
+          {
+            key: 'active',
+            label: 'Aktiivne',
+            render: (row) => (row.active ? 'Jah' : 'Ei'),
+          },
           {
             key: 'actions',
             label: 'Tegevused',

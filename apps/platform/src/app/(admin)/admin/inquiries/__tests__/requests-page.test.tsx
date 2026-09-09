@@ -25,6 +25,8 @@ vi.mock('../../../_actions/ops', () => ({
   forwardServiceRequestAction: vi.fn(),
   markRequestRespondedAction: vi.fn(),
   retryRequestForwardAction: vi.fn(),
+  markRequestDoneAction: vi.fn(),
+  closeRequestAction: vi.fn(),
 }))
 
 vi.mock('../../../_lib/admin', () => ({
@@ -45,7 +47,7 @@ const getRepositoriesMock = vi.mocked(getRepositories)
 interface RequestDoc {
   id: string
   type: 'kava' | 'hooldusraie' | 'istutamine'
-  status: 'new' | 'routed'
+  status: 'new' | 'routed' | 'teostatud' | 'suletud'
   createdAt: string
   updatedAt: string
   payload: Record<string, unknown>
@@ -256,6 +258,164 @@ function rowByClient(name: string): HTMLTableRowElement {
   return row
 }
 
+describe('masked client names and preview columns (task 8.5)', () => {
+  it('masks client names in the table but keeps the full name in the detail panel', async () => {
+    await mountPage({ detail: 'req-new' })
+
+    expect(rowByClient('Eve L.').textContent).toContain('Eve L.')
+    expect(mainTableRows().map((row) => row.textContent)).not.toContain('Eve Lind')
+    expect(container.textContent).toContain('Eve Lind')
+  })
+
+  it('previews the payload content and counts attachments with a ZIP link', async () => {
+    useDocs({
+      'service-requests': [
+        makeRequest({
+          id: 'req-att',
+          contactName: 'Eve Lind',
+          payload: {
+            contact: { name: 'Eve Lind' },
+            county: 'HH',
+            comment: 'Palun pakkumine võimalikult peaegu.',
+            cadastres: ['78402:003:0210'],
+          },
+          attachments: ['service-requests/1-plaan.pdf', 'service-requests/2-kaart.png'],
+        }),
+      ],
+      partners,
+      'audit-entry': [],
+    })
+    await mountPage()
+
+    const row = rowByClient('Eve L.')
+    expect(row.textContent).toContain('Palun pakkumine võimalikult peaegu.')
+    expect(row.textContent).toContain('2 · ZIP')
+    const zipLink = row.querySelector('a[href^="/admin/inquiries/attachments-zip"]')
+    expect(zipLink?.getAttribute('href')).toBe(
+      '/admin/inquiries/attachments-zip?paaring=req-att',
+    )
+  })
+
+  it('shows a dash when the payload carries no previewable content', async () => {
+    useDocs({
+      'service-requests': [
+        makeRequest({
+          id: 'req-empty',
+          contactName: 'Eve Lind',
+          payload: { contact: { name: 'Eve Lind' } },
+        }),
+      ],
+      partners,
+      'audit-entry': [],
+    })
+    await mountPage()
+
+    expect(rowByClient('Eve L.').textContent).toContain('—')
+  })
+})
+
+describe('list filters (task 8.5)', () => {
+  const docs = (): Record<string, unknown[]> => ({
+    'service-requests': [
+      makeRequest({
+        id: 'req-harju',
+        contactName: 'Eve Lind',
+        createdAt: '2026-03-01T10:00:00.000Z',
+        payload: {
+          contact: { name: 'Eve Lind' },
+          county: 'HH',
+          cadastres: ['78402:003:0210'],
+        },
+      }),
+      makeRequest({
+        id: 'req-tartu',
+        contactName: 'Mati Tamm',
+        createdAt: '2026-04-11T10:00:00.000Z',
+        payload: {
+          contact: { name: 'Mati Tamm' },
+          county: 'TA',
+          cadastres: ['78904:101:0123'],
+        },
+      }),
+    ],
+    partners,
+    'audit-entry': [],
+  })
+
+  it('filters by county from the payload', async () => {
+    useDocs(docs())
+    await mountPage({ maakond: 'TA' })
+
+    expect(mainTableRows()).toHaveLength(1)
+    expect(rowByClient('Mati T.').textContent).toContain('Tartu')
+  })
+
+  it('filters by the created date', async () => {
+    useDocs(docs())
+    await mountPage({ kuupaev: '2026-03-01' })
+
+    expect(mainTableRows()).toHaveLength(1)
+    expect(rowByClient('Eve L.').textContent).toContain('Harju')
+  })
+
+  it('searches free text over name and cadastres', async () => {
+    useDocs(docs())
+    await mountPage({ otsing: '78904' })
+
+    expect(mainTableRows()).toHaveLength(1)
+    expect(rowByClient('Mati T.').textContent).toContain('Tartu')
+  })
+})
+
+describe('done and close row actions (task 8.4)', () => {
+  const docs = (): Record<string, unknown[]> => ({
+    'service-requests': [
+      makeRequest({ id: 'req-active', contactName: 'Eve Lind' }),
+      makeRequest({
+        id: 'req-done',
+        contactName: 'Mati Tamm',
+        status: 'teostatud',
+      }),
+      makeRequest({
+        id: 'req-closed',
+        contactName: 'Anu Kask',
+        status: 'suletud',
+      }),
+    ],
+    partners,
+    'audit-entry': [],
+  })
+
+  it('offers Märgi teostatuks and Sulge only while a request is open', async () => {
+    useDocs(docs())
+    await mountPage()
+
+    expect(rowByClient('Eve L.').textContent).toContain('Märgi teostatuks')
+    expect(rowByClient('Eve L.').textContent).toContain('Sulge')
+  })
+
+  it('renders the teostatud and suletud chips with no remaining actions', async () => {
+    useDocs(docs())
+    await mountPage()
+
+    expect(rowByClient('Mati T.').textContent).toContain('teostatud')
+    expect(rowByClient('Mati T.').textContent).not.toContain('Märgi teostatuks')
+    expect(rowByClient('Mati T.').textContent).toContain('Sulge')
+
+    expect(rowByClient('Anu K.').textContent).toContain('suletud')
+    expect(rowByClient('Anu K.').textContent).not.toContain('Märgi teostatuks')
+    expect(rowByClient('Anu K.').textContent).not.toContain('Sulge')
+  })
+
+  it('filters by the new statuses', async () => {
+    useDocs(docs())
+    await mountPage({ olek: 'teostatud' })
+
+    expect(mainTableRows()).toHaveLength(1)
+    expect(rowByClient('Mati T.').textContent).toContain('teostatud')
+  })
+})
+
 function trackingSection(): HTMLElement {
   const heading = [...container.querySelectorAll('h3')].find(
     (candidate) => candidate.textContent === 'Vastuste jälgimine',
@@ -320,16 +480,16 @@ describe('requests list states and expired tint', () => {
   it('tints expired rows and labels new, sent, answered and expired states', async () => {
     await mountPage()
 
-    const expired = rowByClient('Priit Põhjamets')
+    const expired = rowByClient('Priit P.')
     expect(expired.className).toContain('bg-dangerLight')
     expect(expired.textContent).toContain('aegunud')
 
-    const approaching = rowByClient('Anu Kask')
+    const approaching = rowByClient('Anu K.')
     expect(approaching.className).not.toContain('bg-dangerLight')
     expect(approaching.textContent).toContain('saadetud')
 
-    expect(rowByClient('Mati Tamm').textContent).toContain('vastatud (1)')
-    expect(rowByClient('Eve Lind').textContent).toContain('uus')
+    expect(rowByClient('Mati T.').textContent).toContain('vastatud (1)')
+    expect(rowByClient('Eve L.').textContent).toContain('uus')
   })
 })
 
@@ -367,5 +527,163 @@ describe('requests list role gating', () => {
 
     expect(container.textContent).toContain('Ainult administraatorile ja spetsialistidele.')
     expect(container.querySelector('table')).toBeNull()
+  })
+})
+
+function forwardLogSection(): HTMLElement {
+  const heading = [...container.querySelectorAll('h3')].find(
+    (candidate) => candidate.textContent === 'Edastamise log',
+  )
+  if (heading === undefined) throw new Error('forward log section not found')
+  const section = heading.parentElement
+  if (section === null) throw new Error('forward log body not found')
+  return section
+}
+
+function forwardLogRows(): HTMLTableRowElement[] {
+  const body = forwardLogSection().querySelector('tbody')
+  if (body === null) throw new Error('forward log table not found')
+  return [...body.querySelectorAll<HTMLTableRowElement>('tr')]
+}
+
+function forwardLogRow(index: number): HTMLTableRowElement {
+  const row = forwardLogRows()[index]
+  if (row === undefined) throw new Error(`forward log row ${String(index)} not found`)
+  return row
+}
+
+function forwardLogCell(rowIndex: number, cellIndex: number): HTMLElement {
+  const cell = forwardLogRow(rowIndex).querySelectorAll('td')[cellIndex]
+  if (cell === undefined) throw new Error(`forward log cell ${String(cellIndex)} not found`)
+  return cell
+}
+
+describe('forwarding log Vastanud/Märkus/järjekorras columns (task 8.6)', () => {
+  it('renders the real response time and the partner note', async () => {
+    useDocs({
+      'service-requests': [
+        makeRequest({
+          id: 'req-answered',
+          contactName: 'Mati Tamm',
+          status: 'routed',
+          routedTo: ['p1'],
+          updatedAt: daysAgoAt(2),
+        }),
+      ],
+      partners,
+      'audit-entry': [
+        makeAudit('a1', 'request.forward', 'req-answered', 2, {
+          partnerId: 'p1',
+          partnerName: 'Metsapartner OÜ',
+          recipient: 'partner@meil.ee',
+          emailResult: { success: true },
+        }),
+        makeAudit('a4', 'request.mark_responded', 'req-answered', 1, {
+          partnerId: 'p1',
+          partnerName: 'Metsapartner OÜ',
+          note: 'Hindame ja vastame esmaspäevaks',
+        }),
+      ],
+    })
+    await mountPage({ detail: 'req-answered' })
+
+    const headers = [...forwardLogSection().querySelectorAll('th')].map((th) => th.textContent)
+    expect(headers).toContain('Vastanud')
+    expect(headers).toContain('Märkus')
+
+    const forwardRow = forwardLogRow(0)
+    expect(forwardRow.textContent).not.toContain('järjekorras')
+    // The Vastanud cell holds a formatted timestamp instead of a dash.
+    const vastanudCell = forwardLogCell(0, 3)
+    expect(vastanudCell.textContent).not.toBe('—')
+    expect(vastanudCell.textContent).toMatch(/\d/)
+
+    expect(forwardLogCell(0, 4).textContent).toBe('Hindame ja vastame esmaspäevaks')
+  })
+
+  it('marks delivered but unanswered forwards as järjekorras', async () => {
+    await mountPage({ detail: 'req-expired' })
+
+    const row = forwardLogRow(0)
+    expect(row.textContent).toContain('järjekorras')
+    expect(forwardLogCell(0, 3).textContent).toContain('järjekorras')
+    expect(forwardLogCell(0, 4).textContent).toBe('—')
+  })
+
+  it('offers a märkus input with the Märgi vastatuks action', async () => {
+    await mountPage({ detail: 'req-expired' })
+
+    const noteInput = forwardLogSection().querySelector<HTMLInputElement>(
+      'input[name="note"][aria-label="Märkus"]',
+    )
+    expect(noteInput).not.toBeNull()
+    expect(forwardLogSection().textContent).toContain('Märgi vastatuks')
+  })
+})
+
+describe('preselect count from Seaded (task 8.6)', () => {
+  it('preselects fewer partners when the reserved settings key lowers the count', async () => {
+    useDocs({
+      'service-requests': [
+        makeRequest({ id: 'req-new', contactName: 'Eve Lind', updatedAt: daysAgoAt(1) }),
+      ],
+      partners,
+      'audit-entry': [],
+      settings: [{ id: 'settings-1', featureFlags: { inquiryRouting: { preselectCount: 1 } } }],
+    })
+    await mountPage({ detail: 'req-new' })
+
+    const checked = [
+      ...container.querySelectorAll<HTMLInputElement>('input[name="partnerIds"]:checked'),
+    ]
+    const all = [...container.querySelectorAll<HTMLInputElement>('input[name="partnerIds"]')]
+    expect(all).toHaveLength(2)
+    expect(checked).toHaveLength(1)
+  })
+
+  it('keeps the default preselect of 3 without a settings row', async () => {
+    await mountPage({ detail: 'req-new' })
+
+    const all = [...container.querySelectorAll<HTMLInputElement>('input[name="partnerIds"]')]
+    const checked = all.filter((input) => input.checked)
+    expect(all).toHaveLength(2)
+    expect(checked).toHaveLength(2)
+  })
+})
+
+describe('manual e-mail copy fallback (task 8.6)', () => {
+  it('offers the rendered e-mail text for copying when no partner matches', async () => {
+    useDocs({
+      'service-requests': [
+        makeRequest({
+          id: 'req-new',
+          contactName: 'Eve Lind',
+          payload: {
+            contact: { name: 'Eve Lind', phone: '+37251110000', email: 'eve@meil.ee' },
+            county: 'HH',
+            cadastres: ['78402:003:0210'],
+          },
+        }),
+      ],
+      partners: [],
+      'audit-entry': [],
+    })
+    await mountPage({ detail: 'req-new' })
+
+    expect(container.textContent).toContain('Käsitsi saatmine')
+    const copyButton = [...container.querySelectorAll('button')].find(
+      (candidate) => candidate.textContent === 'Kopeeri e-kirja tekst',
+    )
+    expect(copyButton).toBeDefined()
+    const textarea = container.querySelector<HTMLTextAreaElement>('textarea[aria-label="E-kirja tekst"]')
+    expect(textarea?.value).toContain('Erametsa päring: kava')
+    expect(textarea?.value).toContain('Kontakt:')
+    expect(textarea?.value).toContain('Katastritunnused: 78402:003:0210')
+  })
+
+  it('hides the fallback when a partner matches', async () => {
+    await mountPage({ detail: 'req-new' })
+
+    expect(container.textContent).not.toContain('Kopeeri e-kirja tekst')
   })
 })

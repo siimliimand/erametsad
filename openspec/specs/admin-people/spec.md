@@ -5,36 +5,29 @@ TBD - created by archiving change phase-5-admin-backend. Update Purpose after ar
 ## Requirements
 ### Requirement: Users search and masked identity
 
-The users list SHALL search by isikukood, email, registrikood, and name,
-and SHALL render the isikukood masked. Click-to-reveal SHALL require a
-confirmation and SHALL write a `user.identity_view` audit entry before
-the full value is shown. Search by isikukood SHALL work against the
-hash index while the column stays encrypted.
+The users list SHALL additionally filter by profile type, status, granted
+right, and county, and SHALL show the documented columns: profile chips with
+approval state, a rights summary per object type, an all-time bid count, and
+the last login. The default sort SHALL be last login descending. A shill
+flag action SHALL be available with a "märgitud" filter.
 
-#### Scenario: Reveal is audited
+#### Scenario: Filter by right
 
-- **WHEN** an admin reveals a user's isikukood
-- **THEN** the value is displayed and an audit entry records the actor,
-  target user, and timestamp
+- **WHEN** the operator filters by the raieõigus right
+- **THEN** only users holding that right are listed
 
 ### Requirement: Rights matrix with reasons
 
-User detail SHALL present the per-objectType rights matrix (forest,
-property, field, package) with grant state, grantor, and timestamps.
-Grant and revoke SHALL require a typed reason, SHALL offer user
-notification (on by default), and SHALL be audit-logged. Revocation
-history SHALL remain visible as a timeline.
+The rights matrix SHALL render per-profile rows when the profiles hold
+different rights, and a revoke on a user with a leading bid SHALL warn with
+the bid reference and offer the superadmin void path.
 
-#### Scenario: Grant without a reason is rejected
+#### Scenario: Leading-bid revoke warning
 
-- **WHEN** the operator grants a right with an empty reason
-- **THEN** the action is rejected and nothing is stored
-
-#### Scenario: Grant takes effect on the next bid
-
-- **WHEN** a right is granted for an object type
-- **THEN** the user's next bid submission for that type passes the
-  rights check
+- **WHEN** the operator revokes a right from a user holding the leading bid
+  on an active auction
+- **THEN** the form warns with the bid number and offers the superadmin void
+  option
 
 ### Requirement: Suspend with autobidder cancellation
 
@@ -50,33 +43,25 @@ and notify the user. The action SHALL be audit-logged.
 
 ### Requirement: Company access approvals
 
-Company access request review SHALL present request cards with a
-registry fixture panel (legal name, legal form, registry status, board
-members, fetched-at time) and an applicant panel. The review SHALL warn
-on duplicate registrikood against an approved profile, SHALL
-cross-check board membership (strong match by isikukood, weak by exact
-name), and SHALL hard-block approval when the registry status is
-KUSTUTATUD. Approve SHALL activate the company profile, grant the
-default rights chosen in a pre-filled checklist, and notify the
-applicant; reject SHALL require a typed reason included in the
-notification; hold SHALL record an internal note and reminder date.
-A history tab SHALL list decided requests with decision, decider, and
-reason.
+The company approval card SHALL additionally show:
 
-#### Scenario: Duplicate registrikood warning
+- the registry panel fields asukoht and KMKR nr;
+- a "Kontrolli uuesti" re-fetch button whose view is audit-logged;
+- an amber name-discrepancy block comparing the applicant and registry names;
+- the applicant's existing profiles, bidding history, and framework contract
+  status;
+- volikiri enforcement: a failed board-member check permits only rejection or
+  an approval with justification and a power-of-attorney upload;
+- an SLA chip amber after 2 days and red after 5 days ("oodatud {n} p");
+- approval rights defaults read from Seaded;
+- a history tab with decision/date/freetext filters, pagination, and an
+  audited CSV export.
 
-- **WHEN** a request arrives for a registrikood that already has an
-  approved profile
-- **THEN** the card shows the existing profile and its owner with
-  guidance to route access through the existing owner or reject
+#### Scenario: Board check failure forces a choice
 
-#### Scenario: Approve grants default rights
-
-- **WHEN** an operator approves a request with the default-rights
-  checklist accepted
-- **THEN** the profile activates, one right entry per checked type is
-  created with reason "Ettevõtte vaikimisi õigused", and the applicant
-  is notified
+- **WHEN** the applicant is not a board member and no volikiri is attached
+- **THEN** approve stays disabled until a justification with an upload is
+  provided, or the operator rejects
 
 ### Requirement: User detail drawer
 
@@ -94,19 +79,13 @@ deep links. Identity unmasking inside the drawer SHALL stay audited.
 
 ### Requirement: Impersonation
 
-Admins and superadmins SHALL start a read-only impersonation session for
-a user after giving a reason (minimum 5 characters), and the action SHALL
-write a `user.impersonate` audit entry. While impersonating, every portal
-write action (bids, autobidders, contracts, signing, profile changes)
-SHALL be rejected server-side, and the admin SHALL see a persistent amber
-banner with a LÕPETA VAATLUS control that ends the session and audits the
-stop.
+Impersonation SHALL have a 30-minute maximum duration enforced server-side,
+and the banner SHALL show the remaining time as a countdown.
 
-#### Scenario: Impersonated writes are blocked
+#### Scenario: TTL expiry
 
-- **WHEN** an impersonation session submits a portal bid or signature
-- **THEN** the action is rejected server-side with an explicit error and
-  no state changes
+- **WHEN** 30 minutes have elapsed
+- **THEN** the impersonation session ends
 
 ### Requirement: Ban
 
@@ -123,17 +102,17 @@ pill in the users list.
 
 ### Requirement: GDPR export and anonymization
 
-Staff SHALL trigger a user data export (ZIP download link delivered to
-the operator) and an anonymize-and-delete flow. Anonymization SHALL
-remove or mask personal data while preserving accounting-relevant rows
-for the 7-year retention period. Both actions SHALL be audited
-(`user.gdpr_export`, `user.gdpr_delete`).
+Both GDPR actions SHALL require a typed reason and a double confirm. Delete
+SHALL run a pre-check report (active bids, open contracts, retention items),
+observe a 14-day cooling-off cancellable in the portal, pseudonymise the
+user's bid and contract rows, and delete unopened sealed bids. The export ZIP
+SHALL include the consent log and signed contract PDFs.
 
-#### Scenario: Anonymize keeps invoices
+#### Scenario: Delete blocked by cooling-off
 
-- **WHEN** a user with past contracts is anonymized
-- **THEN** contract and billing rows survive with masked personal fields
-  and the audit entry records the actor and reason
+- **WHEN** an anonymization is requested with an active bid
+- **THEN** the pre-check report lists the bid and the delete requires
+  resolution or explicit override flow
 
 ### Requirement: Company approvals parity
 
@@ -148,4 +127,16 @@ cross-check and reject-reason behavior SHALL be preserved.
 - **WHEN** a request is approved, rejected, or held
 - **THEN** the card shows the decision mark and reason, and the pending
   rail badge count decreases for approvals and rejections
+
+### Requirement: Shill flags
+
+Staff with user permissions SHALL be able to flag a user for shill
+investigation with a mandatory reason. Flagged users SHALL be filterable in
+the users list and marked with an icon on anomaly cards in the bid monitor.
+
+#### Scenario: Flag and filter
+
+- **WHEN** an admin flags a bidder for shill investigation
+- **THEN** the user appears under the "märgitud" filter and their reveal chip
+  shows the flag icon
 

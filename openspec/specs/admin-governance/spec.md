@@ -5,49 +5,49 @@ TBD - created by archiving change phase-5-admin-backend. Update Purpose after ar
 ## Requirements
 ### Requirement: Audit log viewer
 
-The admin SHALL provide an audit log viewer [S] with filters (actor,
-action group, entity type, date range, entity id), server-side
-pagination, and a detail drawer showing actor, session, IP hash, the
-full before/after JSON as a two-column diff with changed-leaf
-highlighting, and the recorded reason. Secret fields (reserve price,
-integration keys, isikukood values) SHALL render as `<salajane>`
-instead of their values. Superadmin SHALL see all entries; admin SHALL
-see their own entries only. The table SHALL have no update or delete
-path.
+The audit viewer SHALL additionally provide:
 
-#### Scenario: Diff masks secrets
+- a Põhjus column in the table;
+- reason, session id, IP hash, and user-agent family in the detail drawer;
+- millisecond timestamps in Europe/Tallinn;
+- per-action Estonian human labels as the action tooltip;
+- entity links out to the owning module;
+- the retention notice "Säilitamine: 7 aastat";
+- a filtered-CSV export button, superadmin-only.
 
-- **WHEN** an audit entry records a reserve price change
-- **THEN** the diff shows `<salajane>` for the value while recording
-  that the change happened
+#### Scenario: Reason shown
 
-#### Scenario: Admin self-view
+- **WHEN** a settings change was saved with a reason
+- **THEN** the reason appears in the table column and the drawer
 
-- **WHEN** an admin opens the audit log
-- **THEN** only entries authored by that admin are listed and export is
-  unavailable
+#### Scenario: Export restricted
+
+- **WHEN** an admin (not superadmin) opens the audit page
+- **THEN** the export button is not rendered and the export routes reject
 
 ### Requirement: Settings with audited saves
 
-The settings screen [S] SHALL provide the Üldine, Tasud, Oksjonid, and
-Lipud sections. Every save SHALL require a reason and SHALL write a
-`settings.change` audit entry with the before/after values (secrets
-excluded). The Oksjonid section SHALL control the anti-snipe default
-minutes (1-30), the alapakkumine default and decision deadline,
-the sealed revision cap, the kiiroksjon duration bounds, and the
-sealed-approver role. Fee changes SHALL state that they apply to new
-auctions only.
+Settings SHALL additionally provide:
 
-#### Scenario: Save without a reason is rejected
+- Üldandmed: KMKR number, support e-mail, support phone, alias domain;
+- Teenustasud: kiiroksjoni fee override, minimum fee, and a live sample
+  calculation; the default fee validated as 0-10 percent;
+- Oksjonireeglid: global autobidder toggle and minimum auction duration;
+- Lipud: named binary toggles (sealed_bids, sms_notifications, map_view,
+  quick_auction, saved_search_digests, statistics_public, partner_portal)
+  instead of a JSON textarea.
 
-- **WHEN** the operator saves a settings section with an empty reason
-- **THEN** the save is rejected and no values change
+All saves keep the mandatory written reason and audit diff.
 
-#### Scenario: Anti-snipe default change
+#### Scenario: Fee bound enforced
 
-- **WHEN** the anti-snipe default changes from 5 to 10 minutes
-- **THEN** existing lots keep their per-lot value and new lots default
-  to 10
+- **WHEN** the operator saves a default fee of 55 percent
+- **THEN** the save is rejected with the range error
+
+#### Scenario: Flag toggle
+
+- **WHEN** the operator disables the sms_notifications flag
+- **THEN** the named toggle persists and the audit entry records the change
 
 ### Requirement: CMS draft, publish, and scheduled publishing
 
@@ -88,50 +88,39 @@ because permissions are code-defined.
 
 ### Requirement: Maintenance mode
 
-Superadmins SHALL toggle maintenance mode from settings. Enabling SHALL
-require typing the confirmation word HOOLDUS, SHALL write
-`maintenance.start` to the audit log, and SHALL gate public (marketing
-and portal) requests behind a maintenance response while staff admin
-routes stay accessible. Disabling SHALL audit `maintenance.end`.
+Maintenance SHALL additionally support scheduled windows (start, end, scope,
+creator, note) rendered as an "aknad" table, and a conflict checker that
+blocks saving a window in which any auction ends, with a force-confirm
+escape.
 
-#### Scenario: Public is gated, admin is not
+#### Scenario: Conflict blocks save
 
-- **WHEN** maintenance mode is on
-- **THEN** public hosts serve the maintenance response and an
-  authenticated staff admin route still loads
+- **WHEN** the operator saves a window containing an auction end time
+- **THEN** the save is blocked and the conflicting auctions are listed
 
 ### Requirement: Integration key display
 
-The integrations section SHALL render one card per external service with
-a masked key value sourced from the environment, a reveal action that
-writes a `settings.key_reveal` audit entry before showing the value, and
-a connection status indicator.
+Integration cards SHALL cover Smart-ID/eID Easy, e-mail, Äriregister, SMS,
+and the map server; each card SHALL offer a "Testi ühendust" action with the
+last-check timestamp and result, and a write-only rotation field.
 
-#### Scenario: Reveal is audited
+#### Scenario: Connection test
 
-- **WHEN** an operator reveals an integration key
-- **THEN** the audit log gains a `settings.key_reveal` entry with actor
-  and reason before the value is rendered
+- **WHEN** the operator tests an integration
+- **THEN** the card shows OK with latency or the failure reason and the last
+  check time
 
 ### Requirement: Hash-chained audit log
 
-Every audit entry SHALL be chained: at write time the system SHALL
-compute `hash = SHA-256(prevHash || canonical(entry))` and store both
-`prevHash` and `hash`. A backfill SHALL chain all existing entries in
-chronological order. The audit page SHALL show a chain-verification
-indicator ("Ahela kontroll: OK") computed from the stored chain, and any
-mismatch SHALL surface as a failure state.
+Audit entries SHALL additionally carry reason, sessionId, ipHash (salted),
+and userAgent columns. The hash chain SHALL continue to verify entries
+written before the columns existed.
 
-#### Scenario: Tampering is detectable
+#### Scenario: Mixed-era chain verifies
 
-- **WHEN** an entry is modified or removed outside the write path
-- **THEN** chain verification fails for that entry and every entry after
-  it
-
-#### Scenario: Backfill is deterministic
-
-- **WHEN** the backfill runs twice over unchanged data
-- **THEN** it produces identical hashes
+- **WHEN** the nightly integrity check runs over a chain containing
+  pre-migration and post-migration rows
+- **THEN** verification reports OK
 
 ### Requirement: Audit detail drawer and exports
 
@@ -144,4 +133,30 @@ reads (admins see only their own actions; superadmins see all).
 
 - **WHEN** an admin without superadmin exports the log
 - **THEN** the export contains only that admin's entries
+
+### Requirement: Notification templates
+
+Seaded SHALL provide a Teavitused section backed by a notification-templates
+store (event, channel, subject, body, version, active, updatedBy) with a
+template list, an editor with a variable inserter, a test send, version
+history with restore, and an SMS character and segment counter. Template
+edits SHALL be audit-logged with the mandatory reason.
+
+#### Scenario: Test send
+
+- **WHEN** the operator sends a test of an e-mail template
+- **THEN** the send is attempted to the operator's own address and the result
+  is shown
+
+### Requirement: Settings access tiers
+
+Admin and superadmin settings access SHALL follow one documented tier model:
+either both may write (spec updated) or admin is read-only with a
+"Muutmise õigus puudub" banner while superadmin writes (code updated). The
+chosen tier SHALL be enforced in permissions.
+
+#### Scenario: Read-only tier
+
+- **WHEN** the read-only tier is chosen and an admin opens Seaded
+- **THEN** fields render disabled with the banner naming the superadmin
 

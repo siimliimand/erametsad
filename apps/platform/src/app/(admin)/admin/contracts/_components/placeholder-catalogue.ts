@@ -106,6 +106,27 @@ export function isKnownToken(token: string): boolean {
   return KNOWN_TOKENS.has(token)
 }
 
+/**
+ * Case-insensitive catalogue search for the editor sidebar (spec
+ * admin-commerce-ops): a group survives when any of its tokens matches the
+ * needle, and it keeps only the matching tokens.
+ */
+export function filterPlaceholderGroups(
+  groups: readonly PlaceholderGroup[],
+  rawQuery: string,
+): PlaceholderGroup[] {
+  const needle = rawQuery.trim().toLowerCase()
+  if (needle === '') return [...groups]
+  const filtered: PlaceholderGroup[] = []
+  for (const group of groups) {
+    const tokens = group.tokens.filter((token) => token.toLowerCase().includes(needle))
+    if (tokens.length > 0) {
+      filtered.push({ label: group.label, tokens })
+    }
+  }
+  return filtered
+}
+
 export function validateTemplateTokens(
   type: ContractTemplateType,
   tokens: readonly string[],

@@ -1,3 +1,4 @@
+import { deriveCountyCodeFromCadastre } from './cadastre-county'
 import { getRepositories } from '../data/runtime'
 
 export interface LeadInput {
@@ -23,6 +24,17 @@ export async function ingestLead(data: LeadInput): Promise<Record<string, unknow
 
   const repos = await getRepositories()
 
+  const countyCode = deriveCountyCodeFromCadastre(data.cadastr)
+  let countyId: string | null = null
+  if (countyCode) {
+    const { docs } = await repos.find({
+      collection: 'counties',
+      where: { code: { equals: countyCode } },
+      limit: 1,
+    })
+    countyId = docs[0]?.id ?? null
+  }
+
   const doc = await repos.create({
     collection: 'leads',
     data: {
@@ -32,6 +44,7 @@ export async function ingestLead(data: LeadInput): Promise<Record<string, unknow
       phone: data.phone,
       email: data.email,
       cadastr: data.cadastr ?? '',
+      countyId,
       consentAt: data.consentAt,
       source: data.source ?? 'web',
       ipHash: data.ipHash ?? null,
