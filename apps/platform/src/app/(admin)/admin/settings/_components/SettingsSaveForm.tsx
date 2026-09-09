@@ -16,11 +16,11 @@ export interface SettingsSwitchField {
   checked: boolean
 }
 
-// The audited action always redirects: success lands on /admin/content/settings
+// The audited action always redirects: success lands on /admin/settings
 // (optionally ?ok=tasud), validation failures land there with ?viga=..., and an
 // expired session redirects to /login. Only a settings redirect without viga is
 // a save; the other cases keep their existing redirect-driven handling.
-const settingsRedirectPrefix = '/admin/content/settings'
+const settingsRedirectPrefix = '/admin/settings'
 
 // Mirrors UserDrawer.isRedirectSignal: a redirecting server action rejects with
 // a NEXT_REDIRECT digest (`NEXT_REDIRECT;replace;<url>;<status>`).

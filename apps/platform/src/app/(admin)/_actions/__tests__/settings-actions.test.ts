@@ -97,7 +97,7 @@ const form = (entries: Record<string, string>): FormData => {
   return formData
 }
 
-const SETTINGS_PATH = '/admin/content/settings'
+const SETTINGS_PATH = '/admin/settings'
 
 describe('updateSettingsAction (audited saves)', () => {
   let repos: Repos

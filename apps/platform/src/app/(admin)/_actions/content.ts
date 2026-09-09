@@ -51,7 +51,7 @@ const legalDocumentsPath = '/admin/content/legal-documents'
 const redirectsPath = '/admin/content/redirects'
 const specialistsPath = '/admin/content/specialists'
 const statisticsPath = '/admin/content/statistics'
-const settingsPath = '/admin/content/settings'
+const settingsPath = '/admin/settings'
 
 function readText(formData: FormData, key: string): string {
   const value = formData.get(key)
