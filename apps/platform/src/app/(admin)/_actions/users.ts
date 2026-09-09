@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { requireAdminRepositories } from '../_lib/admin'
@@ -24,6 +24,7 @@ import {
   revokeUserSessions,
   writeSessionCookies,
 } from '@/lib/auth/session'
+import { computeIpHash } from '@/lib/bidding/place-bid'
 import type { CoreRepositories, UserDoc } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 import { auctionObjectTypes, userRoles } from '@/lib/data/schema'
@@ -106,9 +107,37 @@ function assertPermissionOrRedirect(role: Parameters<typeof can>[0], permission:
 }
 
 /**
+ * Request context for the audit era columns (task 4.7): session id from the
+ * access token, salted IP hash and user agent from the request headers.
+ * Best-effort only — outside a request scope the fields fall back to null.
+ */
+async function auditRequestContext(): Promise<{
+  sessionId: string | null
+  ipHash: string | null
+  userAgent: string | null
+}> {
+  try {
+    const headerList = await headers()
+    const token = (await cookies()).get('access_token')?.value
+    const payload = token ? verifyAccessToken(token) : null
+    const ip = headerList.get('x-forwarded-for')?.split(',')[0]?.trim()
+    const userAgent = headerList.get('user-agent')?.trim()
+    return {
+      sessionId: payload?.sessionId ?? null,
+      ipHash: ip && ip.length > 0 ? computeIpHash(ip) : null,
+      userAgent: userAgent && userAgent.length > 0 ? userAgent.slice(0, 512) : null,
+    }
+  } catch {
+    return { sessionId: null, ipHash: null, userAgent: null }
+  }
+}
+
+/**
  * Append-only audit write. Like the other admin modules, the write runs on
  * unguarded system repositories after the admin permission check —
  * notifications cannot be created through a staff guard context at all.
+ * The task-4.7 era columns (reason, sessionId, ipHash, userAgent) ride the
+ * optional extras; `context` comes from auditRequestContext().
  */
 async function audit(
   repositories: CoreRepositories,
@@ -119,8 +148,15 @@ async function audit(
     entityId: string
     before?: unknown
     after: unknown
+    reason?: string
+    context?: {
+      sessionId: string | null
+      ipHash: string | null
+      userAgent: string | null
+    }
   },
 ): Promise<void> {
+  const context = entry.context
   await repositories.create({
     collection: 'audit-entry',
     data: {
@@ -130,6 +166,10 @@ async function audit(
       entityId: entry.entityId,
       ...(entry.before !== undefined ? { before: entry.before } : {}),
       after: entry.after,
+      ...(entry.reason ? { reason: entry.reason } : {}),
+      ...(context?.sessionId ? { sessionId: context.sessionId } : {}),
+      ...(context?.ipHash ? { ipHash: context.ipHash } : {}),
+      ...(context?.userAgent ? { userAgent: context.userAgent } : {}),
     },
   })
 }
@@ -429,6 +469,8 @@ export async function grantAuctionRightAction(formData: FormData): Promise<void>
       entityType: 'user',
       entityId: userId,
       after: { objectType, grantedAt, reason, notified: notify },
+      reason,
+      context: await auditRequestContext(),
     })
 
     if (notify) {
@@ -494,6 +536,8 @@ export async function revokeAuctionRightAction(formData: FormData): Promise<void
       entityId: userId,
       before: { objectType: right.objectType, revokedAt: null },
       after: { objectType: right.objectType, revokedAt, reason, notified: notify },
+      reason,
+      context: await auditRequestContext(),
     })
 
     if (notify) {
@@ -580,6 +624,8 @@ export async function suspendUserAction(formData: FormData): Promise<void> {
         reason,
         autobiddersCancelled: activeAutobidders.docs.length,
       },
+      reason,
+      context: await auditRequestContext(),
     })
 
     await notifyUser(repositories, {
@@ -639,6 +685,8 @@ export async function resumeUserAction(formData: FormData): Promise<void> {
       entityId: userId,
       before: { status: 'suspended' },
       after: { status: 'active', resumed: true, reason },
+      reason,
+      context: await auditRequestContext(),
     })
 
     await notifyUser(repositories, {
@@ -692,6 +740,7 @@ export async function revealIsikukoodAction(
       entityType: 'user',
       entityId: user.id,
       after: { field: 'isikukood' },
+      context: await auditRequestContext(),
     })
   } catch {
     return { ok: false, error: 'Paljastamise logimine ebaõnnestus; väärtust ei näidatud.' }
@@ -800,6 +849,8 @@ export async function startImpersonationAction(formData: FormData): Promise<void
       entityType: 'user',
       entityId: user.id,
       after: { phase: 'start', reason, sessionId, expiresAt, ttlMinutes: 30 },
+      reason,
+      context: await auditRequestContext(),
     })
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
@@ -858,6 +909,7 @@ export async function stopImpersonationAction(): Promise<void> {
         sessionId,
         ...(expired ? { expired: true } : {}),
       },
+      context: await auditRequestContext(),
     })
   } catch {
     // Availability of the stop path takes precedence over the stop entry.
@@ -994,6 +1046,8 @@ export async function banUserAction(userId: string, reason: string): Promise<Use
         autobiddersCancelled: activeAutobidders.docs.length,
         registrationBlocked: true,
       },
+      reason,
+      context: await auditRequestContext(),
     })
 
     await notifyUser(repositories, {
@@ -1075,6 +1129,8 @@ export async function flagUserForShillAction(
       entityType: 'user',
       entityId: userId,
       after: { phase: 'flagged', reason },
+      reason,
+      context: await auditRequestContext(),
     })
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
@@ -1118,6 +1174,8 @@ export async function unflagUserForShillAction(
       entityType: 'user',
       entityId: userId,
       after: { phase: 'cleared', reason },
+      reason,
+      context: await auditRequestContext(),
     })
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
@@ -1270,6 +1328,8 @@ export async function exportUserGdprAction(
         ...(r2Key ? { r2Key } : {}),
         archived,
       },
+      reason,
+      context: await auditRequestContext(),
     })
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
@@ -1353,6 +1413,8 @@ export async function anonymizeUserAction(
           blocking: precheck.blocking,
         },
       },
+      reason,
+      context: await auditRequestContext(),
     })
 
     await notifyUser(repositories, {
@@ -1515,6 +1577,8 @@ async function executeUserDelete(
         contractsMasked: contracts.length,
         sealedBidsPurged: unopenedSealedBids.length,
       },
+      reason,
+      context: await auditRequestContext(),
     })
 
     // No user notification: the account is unusable and the address masked,
@@ -1707,6 +1771,8 @@ export async function voidLeadingBidAction(bidId: string, reason: string): Promi
         amountCents: bid.amountCents,
         reason,
       },
+      reason,
+      context: await auditRequestContext(),
     })
 
     await notifyUser(repositories, {
@@ -1795,6 +1861,7 @@ export async function cancelAccountDeletionAction(): Promise<UserActionResult> {
         requestedAt: status.requestedAt,
         coolingOffUntil: status.coolingOffUntil,
       },
+      context: await auditRequestContext(),
     })
 
     await notifyUser(repositories, {

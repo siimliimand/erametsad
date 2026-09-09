@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { requireAdminRepositories } from '../_lib/admin'
@@ -13,6 +14,8 @@ import {
 } from '../admin/settings/_components/integration-keys'
 import type { IntegrationCheckState, IntegrationProbe } from '../admin/settings/_components/integration-keys'
 
+import { verifyAccessToken } from '@/lib/auth/jwt'
+import { computeIpHash } from '@/lib/bidding/place-bid'
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { maintenanceScopes, type MaintenanceScope } from '@/lib/data/schema'
 import { db } from '@/lib/db'
@@ -29,6 +32,33 @@ function redirectWithError(message: string): never {
   redirect(`${settingsPath}?viga=${encodeURIComponent(message)}`)
 }
 
+/**
+ * Request context for the audit era columns (task 4.7): session id from the
+ * access token, salted IP hash and user agent from the request headers.
+ * Every lookup is best-effort — outside a request scope (tests, queue
+ * consumers) the fields fall back to null and the write still succeeds.
+ */
+async function auditRequestContext(): Promise<{
+  sessionId: string | null
+  ipHash: string | null
+  userAgent: string | null
+}> {
+  try {
+    const headerList = await headers()
+    const token = (await cookies()).get('access_token')?.value
+    const payload = token ? verifyAccessToken(token) : null
+    const ip = headerList.get('x-forwarded-for')?.split(',')[0]?.trim()
+    const userAgent = headerList.get('user-agent')?.trim()
+    return {
+      sessionId: payload?.sessionId ?? null,
+      ipHash: ip && ip.length > 0 ? computeIpHash(ip) : null,
+      userAgent: userAgent && userAgent.length > 0 ? userAgent.slice(0, 512) : null,
+    }
+  } catch {
+    return { sessionId: null, ipHash: null, userAgent: null }
+  }
+}
+
 /** Append-only audit write; the hash chain is handled by the repository. */
 async function writeAudit(
   repositories: CoreRepositories,
@@ -39,8 +69,16 @@ async function writeAudit(
     entityType?: string
     before?: unknown
     after: unknown
+    /** Dedicated era column; also kept inside before/after for the diff. */
+    reason?: string
+    context?: {
+      sessionId: string | null
+      ipHash: string | null
+      userAgent: string | null
+    }
   },
 ): Promise<unknown> {
+  const context = entry.context
   return repositories.create({
     collection: 'audit-entry',
     data: {
@@ -50,6 +88,10 @@ async function writeAudit(
       entityId: entry.entityId,
       ...(entry.before !== undefined ? { before: entry.before } : {}),
       after: entry.after,
+      ...(entry.reason ? { reason: entry.reason } : {}),
+      ...(context?.sessionId ? { sessionId: context.sessionId } : {}),
+      ...(context?.ipHash ? { ipHash: context.ipHash } : {}),
+      ...(context?.userAgent ? { userAgent: context.userAgent } : {}),
     },
   })
 }
@@ -129,6 +171,8 @@ export async function setMaintenanceModeAction(formData: FormData): Promise<void
     entityId: current?.id ?? 'settings',
     before: { maintenanceEnabled: current?.maintenanceEnabled ?? false, ...(reason ? { reason } : {}) },
     after: { maintenanceEnabled: enabled, ...(reason ? { reason } : {}) },
+    reason,
+    context: await auditRequestContext(),
   })
 
   revalidatePath(settingsPath)
@@ -171,6 +215,7 @@ export async function revealIntegrationKeyAction(keyId: string): Promise<RevealK
       env: key.envVar,
       ...(rotated ? { source: 'settings' } : { source: 'env' }),
     },
+    context: await auditRequestContext(),
   })
 
   return { ok: true, value }
@@ -269,6 +314,7 @@ export async function testIntegrationConnectionAction(
     action: 'settings.change',
     entityId: current?.id ?? 'settings',
     after: { integrationCheck: { key: key.id, ok: state.ok, latencyMs: state.latencyMs } },
+    context: await auditRequestContext(),
   })
 
   return state
@@ -336,6 +382,8 @@ export async function rotateIntegrationKeyAction(
     entityId: key.id,
     before: { key: key.id, env: key.envVar },
     after: { key: key.id, env: key.envVar, rotated: true, reason: reason.trim() },
+    reason: reason.trim(),
+    context: await auditRequestContext(),
   })
 
   return { ok: true }
@@ -478,6 +526,8 @@ export async function saveMaintenanceWindowAction(input: {
       conflictCount: conflicts.length,
       forced: conflicts.length > 0,
     },
+    reason,
+    context: await auditRequestContext(),
   })
 
   revalidatePath(settingsPath)
@@ -520,6 +570,8 @@ export async function deleteMaintenanceWindowAction(
       reason: trimmed,
     },
     after: { deleted: true, reason: trimmed },
+    reason: trimmed,
+    context: await auditRequestContext(),
   })
 
   revalidatePath(settingsPath)

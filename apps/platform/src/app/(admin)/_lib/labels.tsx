@@ -197,6 +197,29 @@ export function formatDateTime(value: string | null | undefined): string {
     : date.toLocaleString('et-EE', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+/**
+ * Audit viewer formatter (task 4.7): millisecond precision, always in
+ * Europe/Tallinn regardless of the server's zone. Milliseconds are
+ * zone-independent (an epoch remainder), so only the wall clock needs the
+ * explicit timeZone.
+ */
+export function formatAuditDateTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const wallClock = new Intl.DateTimeFormat('et-EE', {
+    timeZone: 'Europe/Tallinn',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(date)
+  return `${wallClock}.${String(date.getUTCMilliseconds()).padStart(3, '0')}`
+}
+
 export function formatEur(cents: number | null | undefined): string {
   if (cents === null || cents === undefined) return '—'
   return (cents / 100).toLocaleString('et-EE', {

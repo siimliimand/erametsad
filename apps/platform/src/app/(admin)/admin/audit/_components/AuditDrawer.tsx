@@ -5,9 +5,9 @@ import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { AuditDiff } from './AuditDiff'
-import { auditEntryDenies, entityTypeLabel, groupLabel } from './action-registry'
+import { auditEntryDenies, entityTypeLabel, groupLabel, userAgentFamily } from './action-registry'
 import { Drawer } from '../../../_components/ui/Drawer'
-import { formatDateTime, userRoleLabels } from '../../../_lib/labels'
+import { formatAuditDateTime, userRoleLabels } from '../../../_lib/labels'
 
 import type { UserRole } from '@/lib/data/schema'
 
@@ -32,6 +32,11 @@ export interface AuditDrawerEntry {
   actorId: string | null
   actorName: string
   actorRole: UserRole | null
+  /** Era column or the JSON fallback resolved by auditEntryReason. */
+  reason: string | null
+  sessionId: string | null
+  ipHash: string | null
+  userAgent: string | null
   before: unknown
   after: unknown
   prevHash: string | null
@@ -78,12 +83,21 @@ function RelatedRow({ related }: { related: AuditDrawerRelatedEntry }) {
   return (
     <li className="flex items-center gap-3 border-b border-border py-2 last:border-b-0">
       <time dateTime={related.createdAt} className="shrink-0 font-mono text-[11px] text-inkMuted">
-        {formatDateTime(related.createdAt)}
+        {formatAuditDateTime(related.createdAt)}
       </time>
       <span className="shrink-0 font-mono text-bodySm text-ink">{related.action}</span>
       <span className="min-w-0 flex-1 truncate text-bodySm text-inkMuted">{related.actorName}</span>
       {openControl}
     </li>
+  )
+}
+
+function DetailField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <>
+      <dt className="text-inkMuted">{label}</dt>
+      <dd className="min-w-0 break-all">{children}</dd>
+    </>
   )
 }
 
@@ -116,7 +130,7 @@ function AuditEntryDetail({ entry }: { entry: AuditDrawerEntry }) {
           </dd>
           <dt className="text-inkMuted">Aeg</dt>
           <dd>
-            <time dateTime={entry.createdAt}>{formatDateTime(entry.createdAt)}</time>
+            <time dateTime={entry.createdAt}>{formatAuditDateTime(entry.createdAt)}</time>
           </dd>
           <dt className="text-inkMuted">Olem</dt>
           <dd>
@@ -129,6 +143,38 @@ function AuditEntryDetail({ entry }: { entry: AuditDrawerEntry }) {
           </dd>
           <dt className="text-inkMuted">Rühm</dt>
           <dd>{groupLabel(entry.actionGroup)}</dd>
+        </dl>
+      </section>
+
+      <section aria-label="Kontekst">
+        <h3 className={sectTitleClass}>Kontekst</h3>
+        <dl className="mt-2 grid grid-cols-[10rem_1fr] gap-x-sm gap-y-2xs text-bodySm text-ink">
+          <DetailField label="Põhjus">
+            {entry.reason ?? <span className="text-inkMuted">—</span>}
+          </DetailField>
+          <DetailField label="Seanss">
+            {entry.sessionId ? (
+              <span className="font-mono" title={entry.sessionId}>
+                {entry.sessionId.slice(0, 8)}
+              </span>
+            ) : (
+              <span className="text-inkMuted">—</span>
+            )}
+          </DetailField>
+          <DetailField label="IP-räsi">
+            {entry.ipHash ? (
+              <span className="font-mono" title={entry.ipHash}>
+                {entry.ipHash.slice(0, 12)}…
+              </span>
+            ) : (
+              <span className="text-inkMuted">—</span>
+            )}
+          </DetailField>
+          <DetailField label="Brauser">
+            {entry.userAgent
+              ? `${userAgentFamily(entry.userAgent)} (${entry.userAgent.slice(0, 60)})`
+              : '—'}
+          </DetailField>
         </dl>
       </section>
 
@@ -196,7 +242,7 @@ export function AuditDrawerProvider({
         }}
         size="lg"
         title={selected ? `Kirje #${selected.id.slice(0, 8)}` : ''}
-        subtitle={selected ? `${selected.action} · ${formatDateTime(selected.createdAt)}` : undefined}
+        subtitle={selected ? `${selected.action} · ${formatAuditDateTime(selected.createdAt)}` : undefined}
         footer={
           selected ? (
             <div className="flex w-full flex-wrap items-center justify-between gap-2">

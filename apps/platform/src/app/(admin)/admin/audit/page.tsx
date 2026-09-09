@@ -9,6 +9,8 @@ import {
 } from './_components/AuditDrawer'
 import {
   auditActionGroups,
+  actionLabel,
+  auditEntryReason,
   entityTypeLabel,
   groupForAction,
   groupLabel,
@@ -19,7 +21,7 @@ import { ErrorNotice } from '../../_components/ErrorNotice'
 import { secondaryButtonClass } from '../../_components/FormField'
 import { PageHeader } from '../../_components/PageHeader'
 import { requireAdminRepositories } from '../../_lib/admin'
-import { formatDateTime, userRoleLabels } from '../../_lib/labels'
+import { formatAuditDateTime, userRoleLabels } from '../../_lib/labels'
 import { can, staffRoles, type StaffRole } from '../../_lib/permissions'
 
 import { verifyAuditChain, type AuditEntryDoc, type UserDoc, type WhereClause } from '@/lib/data/repositories'
@@ -37,6 +39,7 @@ const EMPTY_LABEL = 'Filtritele vastavaid kirjeid ei leitud'
 
 const BANNER = 'Kirjed on muutumatud — muuta ega kustutada ei saa.'
 const SELF_VIEW_NOTE = 'Näidatakse ainult sinu enda tehtud kirjeid.'
+const RETENTION_NOTE = 'Säilitamine: 7 aastat.'
 
 /**
  * Date-only bounds expand to full local days in Europe/Tallinn. The from
@@ -72,6 +75,7 @@ interface AuditRow {
   actionGroup: string
   entityType: string | null
   entityId: string | null
+  reason: string | null
   hasDiff: boolean
 }
 
@@ -178,6 +182,10 @@ export default async function AdminAuditPage({
       actorId: doc.actorId,
       actorName: actor ? (actor.name ?? actor.email) : (doc.actorId ?? '—'),
       actorRole: actor ? actor.role : null,
+      reason: auditEntryReason(doc),
+      sessionId: doc.sessionId,
+      ipHash: doc.ipHash,
+      userAgent: doc.userAgent,
       before: doc.before,
       after: doc.after,
       prevHash: doc.prevHash,
@@ -249,6 +257,7 @@ export default async function AdminAuditPage({
       actionGroup: groupForAction(doc.action) ?? UNGROUPED_GROUP_ID,
       entityType: doc.entityType,
       entityId: doc.entityId,
+      reason: auditEntryReason(doc),
       hasDiff: doc.before !== null && doc.before !== undefined,
     }
   })
@@ -315,7 +324,7 @@ export default async function AdminAuditPage({
         }
       />
       <p className="mb-md rounded-card border border-border bg-bgMist px-md py-sm text-bodySm text-ink-muted">
-        {BANNER} {selfView ? SELF_VIEW_NOTE : null}
+        {BANNER} {RETENTION_NOTE} {selfView ? SELF_VIEW_NOTE : null}
       </p>
 
       <form
@@ -399,7 +408,7 @@ export default async function AdminAuditPage({
       >
       <DataTable
         columns={[
-          { key: 'createdAt', label: 'Aeg', render: (row) => <time dateTime={row.createdAt}>{formatDateTime(row.createdAt)}</time> },
+          { key: 'createdAt', label: 'Aeg', render: (row) => <time dateTime={row.createdAt}>{formatAuditDateTime(row.createdAt)}</time> },
           {
             key: 'actorName',
             label: 'Tegija',
@@ -418,10 +427,22 @@ export default async function AdminAuditPage({
             key: 'action',
             label: 'Tegevus',
             render: (row) => (
-              <span className="font-mono" title={groupLabel(row.actionGroup)}>
+              <span className="font-mono" title={actionLabel(row.action)}>
                 {row.action}
               </span>
             ),
+          },
+          {
+            key: 'reason',
+            label: 'Põhjus',
+            render: (row) =>
+              row.reason ? (
+                <span className="line-clamp-2 max-w-[16rem]" title={row.reason}>
+                  {row.reason}
+                </span>
+              ) : (
+                <span className="text-ink-muted">—</span>
+              ),
           },
           {
             key: 'entity',

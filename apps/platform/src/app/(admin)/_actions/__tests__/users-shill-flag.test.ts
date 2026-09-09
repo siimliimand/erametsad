@@ -149,6 +149,8 @@ describe('flagUserForShillAction (shill flag marker)', () => {
         entityType: 'user',
         entityId: 'user-9',
         after: { phase: 'flagged', reason: REASON },
+        // Task 4.7: the reason rides the dedicated era column as well.
+        reason: REASON,
       },
     })
   })
@@ -205,6 +207,8 @@ describe('unflagUserForShillAction (clear marker)', () => {
           entityType: 'user',
           entityId: 'user-9',
           after: { phase: 'cleared', reason: 'märge ei kinnitunud' },
+          // Task 4.7: the reason rides the dedicated era column as well.
+          reason: 'märge ei kinnitunud',
         },
       },
     ])

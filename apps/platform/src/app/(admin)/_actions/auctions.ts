@@ -37,7 +37,6 @@ import {
 
 import { verifyAdminAccessToken } from '@/lib/auth/jwt'
 import { verifyPassword } from '@/lib/auth/password'
-import { computeIpHash } from '@/lib/bidding/place-bid'
 import {
   approveAlapakkumine,
   rejectAlapakkumine,
@@ -45,6 +44,7 @@ import {
   type RejectDecision,
 } from '@/lib/bidding/alapakkumine'
 import { clampAntiSnipeMinutes } from '@/lib/bidding/anti-snipe'
+import { computeIpHash } from '@/lib/bidding/place-bid'
 import {
   decryptSealedBids,
   getSealedBidsForAuction,

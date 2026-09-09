@@ -204,6 +204,8 @@ describe('banUserAction (permanent ban marker)', () => {
         autobiddersCancelled: 2,
         registrationBlocked: true,
       },
+      // Task 4.7: the reason rides the dedicated era column as well.
+      reason: BAN_REASON,
     })
 
     const notification = repos.creates.find((entry) => entry.collection === 'notifications')
