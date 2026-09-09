@@ -1,3 +1,5 @@
+import type { AuctionObjectType, AuctionStatus } from '@/lib/data/schema'
+
 export const SORT_KEYS = ['id', 'title', 'minBidCents', 'bidCount', 'endsAt', 'createdAt'] as const
 
 export type SortKey = (typeof SORT_KEYS)[number]
@@ -11,7 +13,55 @@ export interface SortableAuctionRow {
   createdAt: string
 }
 
-const DEFAULT_SORT = '-createdAt'
+const DEFAULT_SORT = '-id'
+
+/**
+ * Lots reach the archive from these terminal-ish statuses only; the
+ * immutable status list in the schema is the source of the values.
+ */
+export const ARCHIVABLE_STATUSES = ['ended', 'unsold', 'completed'] as const
+
+export function isArchivable(status: AuctionStatus): boolean {
+  return (ARCHIVABLE_STATUSES as readonly string[]).includes(status)
+}
+
+export interface ListTab {
+  id: string
+  label: string
+  objectTypes: readonly AuctionObjectType[] | null
+  quickOnly: boolean
+}
+
+/**
+ * Kiiroksjonid is cross-type: it selects every lot with isQuickAuction,
+ * regardless of object type. Other tabs narrow by object type; a null list
+ * means all types and an empty list is an empty bucket.
+ */
+export function matchesListTab(
+  doc: { objectType: AuctionObjectType; isQuickAuction: boolean },
+  tab: ListTab,
+): boolean {
+  if (tab.quickOnly) return doc.isQuickAuction
+  return tab.objectTypes === null || tab.objectTypes.includes(doc.objectType)
+}
+
+/**
+ * Combined lot-size cell ("12,4 ha / 980 m³"); each measure renders alone
+ * when only one exists, null renders as a dash in the table.
+ */
+export function areaVolumeLabel(
+  areaHa: number | null,
+  volumeM3: number | null,
+): string | null {
+  const parts: string[] = []
+  if (areaHa !== null) parts.push(`${formatMeasure(areaHa)} ha`)
+  if (volumeM3 !== null) parts.push(`${formatMeasure(volumeM3)} m³`)
+  return parts.length > 0 ? parts.join(' / ') : null
+}
+
+function formatMeasure(value: number): string {
+  return value.toLocaleString('et-EE', { maximumFractionDigits: 2 })
+}
 
 /**
  * User-facing strings stay in Estonian, matching the admin list UI.
@@ -41,7 +91,7 @@ export function initials(name: string | null | undefined): string {
 
 /**
  * Exactly one 'active' status in the filter sorts by imminent end;
- * every other filter combination falls back to newest first.
+ * every other filter combination falls back to newest id first.
  */
 export function defaultSortFor(statusFilter: readonly string[]): string {
   return statusFilter.length === 1 && statusFilter[0] === 'active' ? 'endsAt' : DEFAULT_SORT

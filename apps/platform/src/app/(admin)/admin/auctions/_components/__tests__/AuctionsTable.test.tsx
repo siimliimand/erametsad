@@ -126,12 +126,32 @@ describe('AuctionsTable Veerud column chooser', () => {
       'Tüüp',
       'Olek',
       'Maakond',
+      'ha / m³',
       'Alghind',
       'Pakkumisi',
       'Lõpp',
+      'Uuendatud',
       'Spetsialist',
       'Tegevused',
     ])
+  })
+
+  it('renders the fixed ha / m³ column from the row label', async () => {
+    await mountTable({
+      rows: [
+        makeTableRow(),
+        makeTableRow({ id: 'a1b2c3d4-0000-0000-0000-000000000002', areaVolumeLabel: null }),
+      ],
+    })
+    const cells = [...container.querySelectorAll<HTMLTableCellElement>('tbody tr')].map(
+      (tr) => tr.querySelectorAll('td')[6]?.textContent,
+    )
+    expect(cells).toEqual(['12,4 ha / 980 m³', '—'])
+  })
+
+  it('renders the Uuendatud cell server-side', async () => {
+    await mountTable()
+    expect(bodyText()).toContain('1.01.2026 12:00')
   })
 
   it('hides header and cells of an unchecked column and persists the ordered choice', async () => {
@@ -144,7 +164,8 @@ describe('AuctionsTable Veerud column chooser', () => {
     if (trigger === null) throw new Error('chooser trigger not found')
     await click(trigger)
 
-    // Chooser order: Tüüp, Maakond, Alghind, Pakkumisi, Lõpp, Spetsialist.
+    // Chooser order: Tüüp, Maakond, Alghind, Pakkumisi, Lõpp, Uuendatud,
+    // Spetsialist.
     await click(chooserCheckbox(1))
 
     expect(headerLabels()).not.toContain('Maakond')
@@ -155,9 +176,23 @@ describe('AuctionsTable Veerud column chooser', () => {
         'minBidCents',
         'bidCount',
         'endsAt',
+        'updatedAt',
         'specialistName',
       ]),
     )
+  })
+
+  it('hides the toggleable Uuendatud column on request', async () => {
+    await mountTable()
+    const trigger = container.querySelector<HTMLButtonElement>(
+      '[aria-haspopup="dialog"]',
+    )
+    if (trigger === null) throw new Error('chooser trigger not found')
+    await click(trigger)
+    await click(chooserCheckbox(5))
+
+    expect(headerLabels()).not.toContain('Uuendatud')
+    expect(bodyText()).not.toContain('1.01.2026 12:00')
   })
 
   it('restores the persisted choice after a remount', async () => {
@@ -223,9 +258,12 @@ describe('AuctionsTable bulk export links', () => {
         'tbody input[type="checkbox"]',
       ),
     ]
-    if (checkboxes.length !== 2) throw new Error('row checkboxes not found')
-    await click(checkboxes[0] as HTMLInputElement)
-    await click(checkboxes[1] as HTMLInputElement)
+    const [firstCheckbox, secondCheckbox] = checkboxes
+    if (firstCheckbox === undefined || secondCheckbox === undefined) {
+      throw new Error('row checkboxes not found')
+    }
+    await click(firstCheckbox)
+    await click(secondCheckbox)
 
     expect(bulkBarLink('Ekspordi valitud').getAttribute('href')).toBe(
       '/api/v1/admin/auctions/export?ids=a1b2c3d4-0000-0000-0000-000000000001%2Ca1b2c3d4-0000-0000-0000-000000000002',

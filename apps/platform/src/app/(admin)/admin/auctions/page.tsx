@@ -6,10 +6,14 @@ import {
   type AuctionTableRow,
 } from './_components/AuctionsTable'
 import {
+  areaVolumeLabel,
   countdownText,
   defaultSortFor,
   initials,
+  isArchivable,
+  matchesListTab,
   sortAuctionRows,
+  type ListTab,
   type SortKey,
 } from './_lib/list-view'
 import {
@@ -42,25 +46,32 @@ import {
 import { auctionScope, can, type StaffRole } from '../../_lib/permissions'
 
 import type { WhereClause } from '@/lib/data/repositories'
-import type { AuctionObjectType, AuctionStatus } from '@/lib/data/schema'
+import type { AuctionStatus } from '@/lib/data/schema'
 import { auctionObjectTypes } from '@/lib/data/schema'
 
 /**
- * Admin list tabs mirror the portal tabs (portal ListingTabs): Kiiroksjonid
- * map to objectType 'kiire'; Põllumaad stay an empty bucket until the
- * schema gains the object type.
+ * Admin list tabs mirror the portal tabs (portal ListingTabs). Kiiroksjonid
+ * is cross-type: it selects every lot with isQuickAuction regardless of
+ * object type. Põllumaad stay an empty bucket until the schema gains the
+ * object type.
  */
-const LIST_TABS: readonly {
-  id: string
-  label: string
-  objectTypes: readonly AuctionObjectType[] | null
-}[] = [
-  { id: 'koik', label: 'Kõik', objectTypes: null },
-  { id: 'raieoigused', label: 'Raieõigused', objectTypes: ['raieoigus'] },
-  { id: 'metskinnistud', label: 'Metskinnistud', objectTypes: ['kinnistu'] },
-  { id: 'polumaad', label: 'Põllumaad', objectTypes: [] },
-  { id: 'paketid', label: 'Paketid', objectTypes: ['pakett'] },
-  { id: 'kiiroksjonid', label: 'Kiiroksjonid', objectTypes: ['kiire'] },
+const LIST_TABS: readonly ListTab[] = [
+  { id: 'koik', label: 'Kõik', objectTypes: null, quickOnly: false },
+  {
+    id: 'raieoigused',
+    label: 'Raieõigused',
+    objectTypes: ['raieoigus'],
+    quickOnly: false,
+  },
+  {
+    id: 'metskinnistud',
+    label: 'Metskinnistud',
+    objectTypes: ['kinnistu'],
+    quickOnly: false,
+  },
+  { id: 'polumaad', label: 'Põllumaad', objectTypes: [], quickOnly: false },
+  { id: 'paketid', label: 'Paketid', objectTypes: ['pakett'], quickOnly: false },
+  { id: 'kiiroksjonid', label: 'Kiiroksjonid', objectTypes: null, quickOnly: true },
 ]
 
 const PAGE_SIZE = 25
@@ -216,7 +227,7 @@ export default async function AdminAuctionsPage({
     ...(whereParts.length > 0
       ? { where: { and: whereParts } satisfies WhereClause }
       : {}),
-    sort: '-createdAt',
+    sort: '-id',
     pagination: false,
     limit: 5000,
   })
@@ -230,17 +241,10 @@ export default async function AdminAuctionsPage({
 
   const tabCounts: Record<string, number> = {}
   for (const entry of LIST_TABS) {
-    const tabTypes = entry.objectTypes
-    tabCounts[entry.id] =
-      tabTypes === null
-        ? preTab.length
-        : preTab.filter((doc) => tabTypes.includes(doc.objectType)).length
+    tabCounts[entry.id] = preTab.filter((doc) => matchesListTab(doc, entry)).length
   }
 
-  const tabFiltered =
-    tabObjectTypes === null
-      ? preTab
-      : preTab.filter((doc) => tabObjectTypes.includes(doc.objectType))
+  const tabFiltered = preTab.filter((doc) => matchesListTab(doc, tab))
 
   const searchable = tabFiltered.map((doc) => ({
     doc,
@@ -356,6 +360,7 @@ export default async function AdminAuctionsPage({
     countyName: doc.countyId ? (countyNames.get(doc.countyId) ?? null) : null,
     minBidCents: doc.minBidCents,
     minBidLabel: formatEur(doc.minBidCents),
+    areaVolumeLabel: areaVolumeLabel(doc.areaHa, doc.volumeM3),
     endsAt: doc.endsAt,
     endsLabel:
       doc.endsAt === null
@@ -363,6 +368,7 @@ export default async function AdminAuctionsPage({
         : doc.status === 'active'
           ? countdownText(doc.endsAt, now)
           : formatDateTime(doc.endsAt),
+    updatedAtLabel: formatDateTime(doc.updatedAt),
     bidCount: bidCounts.get(doc.id) ?? 0,
     pendingCount: pendingCounts.get(doc.id) ?? 0,
     specialistName: doc.specialistId
@@ -374,8 +380,7 @@ export default async function AdminAuctionsPage({
     portalHref: `/oksjon/${doc.id}`,
     editHref: `/admin/auctions/${doc.id}/edit`,
     canEnd: roleCanEndManual && doc.status === 'active',
-    canArchive:
-      roleCanArchive && (doc.status === 'unsold' || doc.status === 'completed'),
+    canArchive: roleCanArchive && isArchivable(doc.status),
     canRelist:
       roleCanWrite && (doc.status === 'ended' || doc.status === 'unsold'),
   }))

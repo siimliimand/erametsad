@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  ARCHIVABLE_STATUSES,
+  areaVolumeLabel,
   countdownText,
   defaultSortFor,
   initials,
+  isArchivable,
+  matchesListTab,
   sortAuctionRows,
+  type ListTab,
   type SortableAuctionRow,
 } from './list-view'
 
@@ -83,16 +88,16 @@ describe('defaultSortFor', () => {
     expect(defaultSortFor(['active'])).toBe('endsAt')
   })
 
-  it('returns -createdAt for another single status', () => {
-    expect(defaultSortFor(['ended'])).toBe('-createdAt')
+  it('returns -id for another single status', () => {
+    expect(defaultSortFor(['ended'])).toBe('-id')
   })
 
-  it('returns -createdAt for no status filter', () => {
-    expect(defaultSortFor([])).toBe('-createdAt')
+  it('returns -id for no status filter', () => {
+    expect(defaultSortFor([])).toBe('-id')
   })
 
-  it('returns -createdAt when active is combined with other statuses', () => {
-    expect(defaultSortFor(['active', 'ended'])).toBe('-createdAt')
+  it('returns -id when active is combined with other statuses', () => {
+    expect(defaultSortFor(['active', 'ended'])).toBe('-id')
   })
 })
 
@@ -210,16 +215,16 @@ describe('sortAuctionRows', () => {
     expect(sorted).not.toBe(rows)
   })
 
-  it('falls back to -createdAt on an unknown sort key', () => {
+  it('falls back to -id on an unknown sort key', () => {
     const rows = [
       row({ id: '1', createdAt: '2026-01-01T00:00:00Z' }),
       row({ id: '2', createdAt: '2026-03-01T00:00:00Z' }),
       row({ id: '3', createdAt: '2026-02-01T00:00:00Z' }),
     ]
-    expect(sortAuctionRows(rows, 'bogus').map((r) => r.id)).toEqual(['2', '3', '1'])
+    expect(sortAuctionRows(rows, 'bogus').map((r) => r.id)).toEqual(['3', '2', '1'])
   })
 
-  it('falls back to -createdAt on an unknown descending sort key', () => {
+  it('falls back to -id on an unknown descending sort key', () => {
     const rows = [row({ id: '1', createdAt: '2026-01-01T00:00:00Z' }), row({ id: '2', createdAt: '2026-02-01T00:00:00Z' })]
     expect(sortAuctionRows(rows, '-bogus').map((r) => r.id)).toEqual(['2', '1'])
   })
@@ -229,8 +234,98 @@ describe('sortAuctionRows', () => {
     expect(sortAuctionRows(rows, 'bogus', 'title').map((r) => r.id)).toEqual(['2', '1'])
   })
 
-  it('falls back to -createdAt for an empty sort string', () => {
+  it('falls back to -id for an empty sort string', () => {
     const rows = [row({ id: '1', createdAt: '2026-01-01T00:00:00Z' }), row({ id: '2', createdAt: '2026-02-01T00:00:00Z' })]
     expect(sortAuctionRows(rows, '').map((r) => r.id)).toEqual(['2', '1'])
+  })
+})
+
+describe('areaVolumeLabel', () => {
+  it('joins both measures with a slash', () => {
+    expect(areaVolumeLabel(12.4, 980)).toBe('12,4 ha / 980 m³')
+  })
+
+  it('formats the Estonian decimal comma', () => {
+    expect(areaVolumeLabel(3.5, null)).toBe('3,5 ha')
+  })
+
+  it('renders area alone when volume is missing', () => {
+    expect(areaVolumeLabel(7, null)).toBe('7 ha')
+  })
+
+  it('renders volume alone when area is missing', () => {
+    expect(areaVolumeLabel(null, 250.5)).toBe('250,5 m³')
+  })
+
+  it('returns null when both measures are missing', () => {
+    expect(areaVolumeLabel(null, null)).toBeNull()
+  })
+
+  it('rounds to two fraction digits', () => {
+    expect(areaVolumeLabel(1.239, 1.004)).toBe('1,24 ha / 1 m³')
+  })
+})
+
+describe('matchesListTab', () => {
+  const tab = (overrides: Partial<ListTab> = {}): ListTab => ({
+    id: 'x',
+    label: 'X',
+    objectTypes: null,
+    quickOnly: false,
+    ...overrides,
+  })
+  const doc = (overrides: Partial<{ objectType: 'raieoigus' | 'kinnistu' | 'kiire' | 'pakett'; isQuickAuction: boolean }> = {}) => ({
+    objectType: 'raieoigus' as const,
+    isQuickAuction: false,
+    ...overrides,
+  })
+
+  it('matches every lot on the Kõik tab', () => {
+    expect(matchesListTab(doc(), tab({ id: 'koik' }))).toBe(true)
+  })
+
+  it('matches by object type on type tabs', () => {
+    const tab_ = tab({ objectTypes: ['kinnistu'] })
+    expect(matchesListTab(doc({ objectType: 'kinnistu' }), tab_)).toBe(true)
+    expect(matchesListTab(doc({ objectType: 'raieoigus' }), tab_)).toBe(false)
+  })
+
+  it('keeps an empty object-type list empty', () => {
+    const tab_ = tab({ objectTypes: [] })
+    expect(matchesListTab(doc({ objectType: 'kinnistu' }), tab_)).toBe(false)
+  })
+
+  it('selects quick auctions across object types', () => {
+    const kiiroksjonid = tab({ id: 'kiiroksjonid', quickOnly: true })
+    expect(
+      matchesListTab(doc({ objectType: 'raieoigus', isQuickAuction: true }), kiiroksjonid),
+    ).toBe(true)
+    expect(
+      matchesListTab(doc({ objectType: 'pakett', isQuickAuction: true }), kiiroksjonid),
+    ).toBe(true)
+    expect(
+      matchesListTab(doc({ objectType: 'kiire', isQuickAuction: false }), kiiroksjonid),
+    ).toBe(false)
+  })
+})
+
+describe('isArchivable', () => {
+  it('allows ended, unsold, and completed lots', () => {
+    expect(isArchivable('ended')).toBe(true)
+    expect(isArchivable('unsold')).toBe(true)
+    expect(isArchivable('completed')).toBe(true)
+  })
+
+  it('rejects every other status', () => {
+    expect(isArchivable('draft')).toBe(false)
+    expect(isArchivable('scheduled')).toBe(false)
+    expect(isArchivable('active')).toBe(false)
+    expect(isArchivable('appraised')).toBe(false)
+    expect(isArchivable('contract')).toBe(false)
+    expect(isArchivable('archived')).toBe(false)
+  })
+
+  it('lists exactly ended, unsold, completed', () => {
+    expect([...ARCHIVABLE_STATUSES]).toEqual(['ended', 'unsold', 'completed'])
   })
 })

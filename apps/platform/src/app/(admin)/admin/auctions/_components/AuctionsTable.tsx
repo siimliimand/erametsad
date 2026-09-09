@@ -60,6 +60,11 @@ export interface AuctionTableRow {
   countyName: string | null
   minBidCents: number
   minBidLabel: string
+  /**
+   * Combined lot-size cell ("12,4 ha / 980 m³") from the real area/volume
+   * columns; null when the lot carries neither measure.
+   */
+  areaVolumeLabel: string | null
   endsAt: string | null
   /**
    * Initial cell text for the Lõpp column, precomputed server-side:
@@ -67,6 +72,8 @@ export interface AuctionTableRow {
    * when endsAt is null. Precomputing keeps SSR and hydration identical.
    */
   endsLabel: string | null
+  /** Initial cell text for the Uuendatud column, formatted server-side. */
+  updatedAtLabel: string
   bidCount: number
   pendingCount: number
   specialistName: string | null
@@ -123,8 +130,8 @@ const bulkCancelBtnClass =
   'inline-flex items-center gap-1 rounded-[8px] px-2 py-1.5 text-label text-white/75 transition-colors duration-hover ease-hover hover:text-white'
 
 // Veerud column chooser: optional columns persist per browser in
-// localStorage; fixed columns (selection, id, title, status, actions) always
-// render.
+// localStorage; fixed columns (selection, id, title, status, areaVolume,
+// actions) always render.
 const COLUMNS_STORAGE_KEY = 'erametsad.admin.auctions.columns'
 
 // The export route keeps the `auctions:export` gate and scope enforcement
@@ -138,6 +145,7 @@ const OPTIONAL_COLUMN_KEYS = [
   'minBidCents',
   'bidCount',
   'endsAt',
+  'updatedAt',
   'specialistName',
 ] as const
 
@@ -149,6 +157,7 @@ const OPTIONAL_COLUMN_LABELS: Record<OptionalColumnKey, string> = {
   minBidCents: 'Alghind',
   bidCount: 'Pakkumisi',
   endsAt: 'Lõpp',
+  updatedAt: 'Uuendatud',
   specialistName: 'Spetsialist',
 }
 
@@ -424,6 +433,13 @@ export function AuctionsTable({
       render: (row) => row.countyName ?? '—',
     },
     {
+      key: 'areaVolume',
+      label: 'ha / m³',
+      render: (row) => (
+        <span className="tabular-nums">{row.areaVolumeLabel ?? '—'}</span>
+      ),
+    },
+    {
       key: 'minBidCents',
       label: OPTIONAL_COLUMN_LABELS.minBidCents,
       sort: sorts.minBidCents,
@@ -462,6 +478,13 @@ export function AuctionsTable({
         }
         return row.endsLabel ?? '—'
       },
+    },
+    {
+      key: 'updatedAt',
+      label: OPTIONAL_COLUMN_LABELS.updatedAt,
+      render: (row) => (
+        <span className="whitespace-nowrap">{row.updatedAtLabel}</span>
+      ),
     },
     {
       key: 'specialistName',
