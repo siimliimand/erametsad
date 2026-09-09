@@ -28,8 +28,10 @@ import { Switch } from '../../../_components/ui/Switch'
 import { formatDateTime } from '../../../_lib/labels'
 import type {
   BoardMembershipCheck,
+  RegistryNameDiscrepancy,
   RegistrySnapshot,
 } from '../../leads/_components/registry-snapshot'
+import { detectNameDiscrepancy } from '../../leads/_components/registry-snapshot'
 
 import type { CompanyAccessRequest, CompanyAccessRequestStatus } from '@/lib/data/schema'
 
@@ -105,6 +107,11 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
   const companyName = request.companyName ?? 'Ettevõte puudub'
   const blocked = snapshot.status === 'KUSTUTATUD'
   const uncheckedRegistry = !snapshot.verified
+  const nameDiscrepancy: RegistryNameDiscrepancy | null = detectNameDiscrepancy(
+    request.companyName,
+    snapshot.legalName,
+    snapshot.verified,
+  )
 
   const [approveOpen, setApproveOpen] = useState(false)
   const [rejectOpen, setRejectOpen] = useState(false)
@@ -171,6 +178,14 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
                 <dd className="m-0 font-mono text-ink">{request.regCode}</dd>
               </div>
               <div className={dataRowClass}>
+                <dt className="text-ink-muted">Asukoht</dt>
+                <dd className="m-0 min-w-0 break-words text-ink">{snapshot.address ?? '—'}</dd>
+              </div>
+              <div className={dataRowClass}>
+                <dt className="text-ink-muted">KMKR nr</dt>
+                <dd className="m-0 font-mono text-ink">{snapshot.kmkrNr ?? '—'}</dd>
+              </div>
+              <div className={dataRowClass}>
                 <dt className="text-ink-muted">Õiguslik vorm</dt>
                 <dd className="m-0 min-w-0 break-words text-ink">{snapshot.legalForm ?? '—'}</dd>
               </div>
@@ -213,6 +228,29 @@ export function RequestCard({ data, canWrite }: { data: RequestCardData; canWrit
                 </dd>
               </div>
             </dl>
+            {nameDiscrepancy ? (
+              <div className={`${warnAmberClass} mt-2`}>
+                <TriangleAlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <strong>Nime erinevus.</strong> Taotleja sisestatud nimi ei kattu äriregistri
+                  nimega.
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="rounded-input border border-border bg-bgPage px-2.5 py-1.5">
+                      <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.06em] text-ink-muted">
+                        Taotleja sisestus
+                      </span>
+                      <span className="break-words font-medium">{nameDiscrepancy.applicantName}</span>
+                    </div>
+                    <div className="rounded-input border border-border bg-bgPage px-2.5 py-1.5">
+                      <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.06em] text-ink-muted">
+                        Äriregister
+                      </span>
+                      <span className="break-words font-medium">{nameDiscrepancy.registryName}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {boardCheck.level !== 'strong' && members.length > 0 ? (
               <p className="mb-0 mt-2 text-bodySm text-ink-muted">
                 Registri juhatus:{' '}

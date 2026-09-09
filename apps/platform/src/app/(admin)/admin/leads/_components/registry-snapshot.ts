@@ -19,6 +19,10 @@ export interface RegistrySnapshot {
   status: RegistryEntryStatus | null
   legalName: string | null
   legalForm: string | null
+  /** Registry seat address (asukoht). The fixture stand-in carries none yet. */
+  address: string | null
+  /** VAT number (KMKR nr). The fixture stand-in carries none yet. */
+  kmkrNr: string | null
   boardMembers: RegistryBoardMember[]
   /** When the lookup data was cached for this request. */
   fetchedAt: string | null
@@ -71,6 +75,10 @@ export function resolveRegistrySnapshot(
       status: deleted ? 'KUSTUTATUD' : 'REGISTREERITUD',
       legalName,
       legalForm: deriveLegalForm(legalName),
+      // The fixture payload has no address or VAT fields; the live
+      // Äriregister integration fills them in.
+      address: null,
+      kmkrNr: null,
       boardMembers: (fixture?.boardMembers ?? []).map((member) => ({
         name: member.name,
         role: member.role,
@@ -83,6 +91,8 @@ export function resolveRegistrySnapshot(
     status: null,
     legalName: submittedName ?? null,
     legalForm: deriveLegalForm(submittedName),
+    address: null,
+    kmkrNr: null,
     boardMembers: [],
     fetchedAt: null,
     verified: false,
@@ -93,6 +103,27 @@ export interface BoardMembershipCheck {
   /** strong = isikukood match, weak = exact name match, none = no match. */
   level: 'strong' | 'weak' | 'none'
   matchedName: string | null
+}
+
+export interface RegistryNameDiscrepancy {
+  applicantName: string
+  registryName: string
+}
+
+/**
+ * Amber-block condition for the company approval card: the verified
+ * registry legal name differs from the name the applicant entered
+ * (case- and whitespace-insensitive compare). Unverified lookups carry the
+ * submitted name back, so they can never disagree with themselves.
+ */
+export function detectNameDiscrepancy(
+  applicantName: string | null | undefined,
+  registryName: string | null | undefined,
+  verified: boolean,
+): RegistryNameDiscrepancy | null {
+  if (!verified || !applicantName || !registryName) return null
+  if (normalizeName(applicantName) === normalizeName(registryName)) return null
+  return { applicantName, registryName }
 }
 
 function normalizeName(value: string): string {

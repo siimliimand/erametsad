@@ -28,6 +28,8 @@ export function makeSnapshot(overrides: Partial<RegistrySnapshot> = {}): Registr
     status: 'REGISTREERITUD',
     legalName: 'Mari Mets OÜ',
     legalForm: 'Osaühing',
+    address: 'Pärnu mnt 12, Tartu',
+    kmkrNr: 'EE101234567',
     boardMembers: [{ name: 'Mari Maasikas', role: 'Juhatuse liige' }],
     fetchedAt: '2026-08-01T09:00:00.000Z',
     verified: true,

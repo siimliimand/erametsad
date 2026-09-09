@@ -198,6 +198,59 @@ describe('RequestCard wait badge', () => {
   })
 })
 
+describe('RequestCard registry panel fields', () => {
+  it('shows the asukoht and KMKR nr values from the snapshot', async () => {
+    await mountCard(makeRequestCardData())
+    expect(container.textContent).toContain('Asukoht')
+    expect(container.textContent).toContain('Pärnu mnt 12, Tartu')
+    expect(container.textContent).toContain('KMKR nr')
+    expect(container.textContent).toContain('EE101234567')
+  })
+
+  it('renders a dash for both fields when the snapshot carries none', async () => {
+    await mountCard(
+      makeRequestCardData({ snapshot: makeSnapshot({ address: null, kmkrNr: null }) }),
+    )
+    const dl = container.querySelector('dl')
+    expect(dl?.textContent).toContain('Asukoht')
+    expect(dl?.textContent).toContain('KMKR nr')
+    const rows = [...(dl?.querySelectorAll('div') ?? [])]
+    const addressRow = rows.find((row) => row.textContent.startsWith('Asukoht'))
+    const kmkrRow = rows.find((row) => row.textContent.startsWith('KMKR nr'))
+    expect(addressRow?.textContent).toContain('—')
+    expect(kmkrRow?.textContent).toContain('—')
+  })
+})
+
+describe('RequestCard name discrepancy block', () => {
+  it('shows an amber side-by-side comparison when the names differ', async () => {
+    await mountCard(
+      makeRequestCardData({
+        snapshot: makeSnapshot({ legalName: 'Metsatark OÜ' }),
+      }),
+    )
+    expect(container.textContent).toContain('Nime erinevus')
+    expect(container.textContent).toContain('Taotleja sisestus')
+    expect(container.textContent).toContain('Äriregister')
+    expect(container.textContent).toContain('Mari Mets OÜ')
+    expect(container.textContent).toContain('Metsatark OÜ')
+  })
+
+  it('shows no discrepancy block when the names match', async () => {
+    await mountCard(makeRequestCardData())
+    expect(container.textContent).not.toContain('Nime erinevus')
+  })
+
+  it('shows no discrepancy block for an unverified lookup', async () => {
+    await mountCard(
+      makeRequestCardData({
+        snapshot: makeSnapshot({ legalName: 'Metsatark OÜ', verified: false }),
+      }),
+    )
+    expect(container.textContent).not.toContain('Nime erinevus')
+  })
+})
+
 describe('RequestCard rights modal capture', () => {
   it('defaults the rights selection to raieoigus and kinnistu', async () => {
     await mountCard(makeRequestCardData())
