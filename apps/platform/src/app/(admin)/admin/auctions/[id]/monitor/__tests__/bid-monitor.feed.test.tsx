@@ -86,6 +86,11 @@ function baseProps(rows: MonitorBidRow[]): MonitorProps {
     initialExtensions: [],
     canEndManually: false,
     canFlagAnomalies: false,
+    canExportBids: false,
+    canViewUsers: false,
+    canViewCeremony: false,
+    canDecideUnderbids: false,
+    underbids: [],
   }
 }
 

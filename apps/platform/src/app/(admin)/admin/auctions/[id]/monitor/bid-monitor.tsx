@@ -2,6 +2,7 @@
 
 import {
   ArrowLeftRight,
+  CheckCircle2,
   ChevronDown,
   Eye,
   SearchCheck,
@@ -10,6 +11,7 @@ import {
   TriangleAlert,
   UserPlus,
 } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type UIEvent } from 'react'
 
@@ -21,7 +23,13 @@ import {
   RAPID_OVERTAKE_WINDOW_MINUTES,
   type DetectedAnomaly,
 } from './_lib/anomalies'
-import { endAuctionManuallyAction, revealBidderIdentityAction, type BidderIdentityView } from '../../../../_actions/auctions'
+import {
+  approveUnderbidAction,
+  endAuctionManuallyAction,
+  rejectUnderbidAction,
+  revealBidderIdentityAction,
+  type BidderIdentityView,
+} from '../../../../_actions/auctions'
 import {
   bidSourceLabels,
   bidStatusLabels,
@@ -53,6 +61,23 @@ export interface MonitorExtensionEntry {
   windowMinutes: number | null
   bidId: string | null
   live: boolean
+}
+
+export interface MonitorUnderbidRow {
+  key: string
+  bidId: string
+  bidderId: string
+  bidderAlias: number | null
+  /** null on sealed lots: the amount stays in the envelope until opening. */
+  amountEur: number | null
+  submittedAt: string
+  /**
+   * What the leading amount becomes when this alapakkumine is accepted:
+   * approveAlapakkumine promotes the bid itself, so this is the bid's own
+   * amount — provided only when no strictly higher leader blocks it.
+   */
+  resultingLeadingEur: number | null
+  canBecomeLeading: boolean
 }
 
 type ConnectionState = 'connecting' | 'live' | 'offline'
@@ -189,6 +214,7 @@ function formatClock(iso: string): string {
  * the page props; anonymity rules allow amounts and times only.
  */
 function MonitorHeadStrip({
+  auctionId,
   isSealed,
   sealedCount,
   ended,
@@ -201,8 +227,10 @@ function MonitorHeadStrip({
   currentPriceEur,
   bidStepEur,
   canEndManually,
+  canExportBids,
   onEndManually,
 }: {
+  auctionId: string
   isSealed: boolean
   sealedCount: number | null
   ended: boolean
@@ -215,6 +243,7 @@ function MonitorHeadStrip({
   currentPriceEur: number
   bidStepEur: number | null
   canEndManually: boolean
+  canExportBids: boolean
   onEndManually: () => void
 }) {
   return (
@@ -275,15 +304,25 @@ function MonitorHeadStrip({
         )}
       </p>
 
-      {canEndManually && !ended ? (
+      {canEndManually || canExportBids ? (
         <div className="ml-auto flex gap-2">
-          <button
-            type="button"
-            onClick={onEndManually}
-            className="inline-flex h-7 items-center rounded-button border border-danger bg-transparent px-3 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light"
-          >
-            Lõpeta käsitsi
-          </button>
+          {canExportBids ? (
+            <a
+              href={`/api/v1/admin/bids/export?auction=${encodeURIComponent(auctionId)}`}
+              className="inline-flex h-7 items-center rounded-button border border-border bg-transparent px-3 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary"
+            >
+              Ekspordi pakkumiste logi
+            </a>
+          ) : null}
+          {canEndManually && !ended ? (
+            <button
+              type="button"
+              onClick={onEndManually}
+              className="inline-flex h-7 items-center rounded-button border border-danger bg-transparent px-3 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light"
+            >
+              Lõpeta käsitsi
+            </button>
+          ) : null}
         </div>
       ) : null}
     </section>
@@ -341,30 +380,42 @@ function AnomaliesPanel({
     >
       <div className="flex flex-wrap items-center justify-between gap-sm">
         <h2 className="text-label font-semibold text-ink-muted">Anomaaliad &amp; shill-hoiatused</h2>
-        <span className="inline-flex items-center gap-1 text-label font-semibold text-danger">
-          <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
-          {String(anomalies.length)} anomaaliat tuvastatud
-        </span>
+        {anomalies.length > 0 ? (
+          <span className="inline-flex items-center gap-1 text-label font-semibold text-danger">
+            <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+            {String(anomalies.length)} anomaaliat tuvastatud
+          </span>
+        ) : null}
       </div>
-      <ul className="mt-sm flex flex-col gap-xs">
-        {anomalies.map((anomaly) => {
-          const view = anomalyCardView(anomaly)
-          const Icon = view.icon
-          return (
-            <li
-              key={`${anomaly.kind}-${anomaly.kind === 'new-account-burst' ? anomaly.bidderId : `${anomaly.bidderIdA}-${anomaly.bidderIdB}`}`}
-              className="flex gap-2.5 rounded-input border border-l-4 border-border border-l-danger bg-danger-light px-sm py-xs"
-            >
-              <Icon className="mt-0.5 h-4 w-4 flex-none text-danger" aria-hidden="true" />
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-bodySm font-semibold text-ink">{view.title}</span>
-                <span className="text-label text-ink-muted">{view.description}</span>
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-      {canFlag ? (
+      {anomalies.length === 0 ? (
+        <p
+          role="status"
+          className="mt-sm inline-flex items-center gap-1.5 rounded-input border border-l-4 border-border border-l-primary bg-primary-light px-sm py-xs text-bodySm font-semibold text-primaryDark"
+        >
+          <CheckCircle2 className="h-4 w-4 flex-none" aria-hidden="true" />
+          Anomaaliaid ei tuvastatud
+        </p>
+      ) : (
+        <ul className="mt-sm flex flex-col gap-xs">
+          {anomalies.map((anomaly) => {
+            const view = anomalyCardView(anomaly)
+            const Icon = view.icon
+            return (
+              <li
+                key={`${anomaly.kind}-${anomaly.kind === 'new-account-burst' ? anomaly.bidderId : `${anomaly.bidderIdA}-${anomaly.bidderIdB}`}`}
+                className="flex gap-2.5 rounded-input border border-l-4 border-border border-l-danger bg-danger-light px-sm py-xs"
+              >
+                <Icon className="mt-0.5 h-4 w-4 flex-none text-danger" aria-hidden="true" />
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-bodySm font-semibold text-ink">{view.title}</span>
+                  <span className="text-label text-ink-muted">{view.description}</span>
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {canFlag && anomalies.length > 0 ? (
         <div className="mt-sm border-t border-border pt-sm">
           {flagged ? (
             <span
@@ -406,27 +457,215 @@ function AnomaliesPanel({
 }
 
 /**
+ * Alapakkumised block (demo 04-bids-monitoring): this auction's pending
+ * under-bids with the "Vaata kõik" link into the global queue. Accept runs
+ * through a confirm modal naming the resulting leading amount — approving
+ * promotes the alapakkumine itself (approveAlapakkumine), so the confirmed
+ * amount is the bid's own, and only when no strictly higher leader blocks
+ * the promotion. Reject keeps the typed ≥5-character reason rule; both
+ * decisions reuse the shared audited actions and land back on the monitor.
+ */
+function UnderbidsPanel({
+  auctionId,
+  rows,
+  canDecide,
+  nowMs,
+}: {
+  auctionId: string
+  rows: readonly MonitorUnderbidRow[]
+  canDecide: boolean
+  nowMs: number
+}) {
+  const [confirmingBidId, setConfirmingBidId] = useState<string | null>(null)
+  const monitorPath = `/admin/auctions/${encodeURIComponent(auctionId)}/monitor`
+
+  return (
+    <section
+      aria-label="Alapakkumised"
+      className="mb-md rounded-card border border-border bg-bgPage px-md py-sm shadow-card"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-sm">
+        <h2 className="text-label font-semibold text-ink-muted">
+          Alapakkumised ({String(rows.length)} ootel)
+        </h2>
+        <Link
+          href="/admin/bids"
+          className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
+        >
+          Vaata kõik
+        </Link>
+      </div>
+      {rows.length === 0 ? (
+        <p className="mt-sm text-bodySm text-ink-muted">Ootel alapakkumisi ei ole.</p>
+      ) : (
+        <ul className="mt-sm flex flex-col gap-xs">
+          {rows.map((row) => (
+            <li
+              key={row.key}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-input border border-border bg-bg-mist px-sm py-xs"
+            >
+              <span className="text-bodySm font-semibold tabular-nums text-ink">
+                {row.amountEur === null ? '—' : formatEurAmount(row.amountEur)}
+              </span>
+              <span className="text-bodySm text-ink-muted">
+                {row.bidderAlias === null ? 'Pakkuja' : `Pakkuja #${String(row.bidderAlias)}`}
+              </span>
+              <time
+                dateTime={row.submittedAt}
+                title={formatDateTime(row.submittedAt)}
+                className="text-label text-ink-muted"
+              >
+                {formatRelativeTime(row.submittedAt, nowMs)}
+              </time>
+              {row.amountEur !== null && !row.canBecomeLeading ? (
+                <span className="text-label text-ink-muted">
+                  Kõrgem pakkuja on juba juhtiv
+                </span>
+              ) : null}
+              {canDecide ? (
+                <span className="ml-auto flex flex-wrap items-center gap-sm">
+                  {row.amountEur !== null && row.canBecomeLeading ? (
+                    <form action={approveUnderbidAction}>
+                      <input type="hidden" name="auctionId" value={auctionId} />
+                      <input type="hidden" name="bidId" value={row.bidId} />
+                      <input type="hidden" name="redirectTo" value={monitorPath} />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmingBidId(row.bidId)
+                        }}
+                        className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
+                      >
+                        Nõustu
+                      </button>
+                      {confirmingBidId === row.bidId ? (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-md">
+                          <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby={`underbid-confirm-${row.key}`}
+                            className="w-full max-w-md rounded-card border border-border bg-bgPage p-md"
+                          >
+                            <h3
+                              id={`underbid-confirm-${row.key}`}
+                              className="font-heading text-h4 font-bold text-ink"
+                            >
+                              Kinnita alapakkumine
+                            </h3>
+                            <p className="mt-xs text-bodySm text-ink">
+                              Alapakkumine{' '}
+                              <strong className="font-mono font-medium">
+                                {formatEurAmount(row.resultingLeadingEur)}
+                              </strong>{' '}
+                              muutub juhtivaks pakkumiseks. Pakkuja teavitatakse kohe.
+                            </p>
+                            <div className="mt-md flex justify-end gap-sm">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setConfirmingBidId(null)
+                                }}
+                                className="inline-flex h-10 items-center rounded-button border border-border bg-bgPage px-4 text-label font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary"
+                              >
+                                Tühista
+                              </button>
+                              <button
+                                type="submit"
+                                className="inline-flex h-10 items-center rounded-button bg-primary px-4 text-label font-semibold text-ink-inverse transition-opacity duration-hover ease-hover hover:opacity-90"
+                              >
+                                Kinnita
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </form>
+                  ) : null}
+                  <details className="relative">
+                    <summary className="cursor-pointer text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:text-danger/80">
+                      Keeldu põhjusega
+                    </summary>
+                    <form
+                      action={rejectUnderbidAction}
+                      className="mt-xs flex w-72 flex-col gap-xs rounded-card border border-border bg-bgPage p-sm shadow-md"
+                    >
+                      <input type="hidden" name="auctionId" value={auctionId} />
+                      <input type="hidden" name="bidId" value={row.bidId} />
+                      <input type="hidden" name="redirectTo" value={monitorPath} />
+                      <label className="flex flex-col gap-xs text-label text-ink-muted">
+                        Keeldumise põhjus (kohustuslik, min 5 tähemärki)
+                        <textarea
+                          name="reason"
+                          required
+                          minLength={5}
+                          rows={2}
+                          className="rounded-input border border-border bg-bgPage px-2 py-1 text-bodySm text-ink"
+                          placeholder="Sisesta põhjus, mis edastatakse pakkujale"
+                        />
+                      </label>
+                      <button
+                        type="submit"
+                        className="rounded-button border border-danger px-3 py-1 text-label font-semibold text-danger transition-colors duration-hover ease-hover hover:bg-danger-light"
+                      >
+                        Lükka tagasi
+                      </button>
+                    </form>
+                  </details>
+                </span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+/**
  * Audited bidder reveal chip (demo 04-bids-monitoring "Pakkuja #N"). The
  * masked chip is the only client path to an identity: clicking calls the
  * shared `revealBidderIdentityAction`, which writes the `user.identity_view`
  * audit entry BEFORE the identity value reaches the client. On success the
  * chip unmounts to the revealed name with an explicit audit marker; the
- * server action's error text renders on failure.
+ * server action's error text renders on failure. With `users:read` the
+ * revealed name links into the bidder's Kasutajad detail view.
  */
-function BidderRevealChip({ bidId, alias }: { bidId: string | null; alias: number }) {
+function BidderRevealChip({
+  bidId,
+  bidderId,
+  alias,
+  canViewUsers,
+}: {
+  bidId: string | null
+  bidderId: string | null
+  alias: number
+  canViewUsers: boolean
+}) {
   const [identity, setIdentity] = useState<BidderIdentityView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
   if (identity !== null) {
+    const name = (
+      <>
+        {identity.name ?? identity.email}
+        {identity.name !== null ? (
+          <span className="ml-1 font-normal text-ink-muted">({identity.email})</span>
+        ) : null}
+      </>
+    )
     return (
       <span className="inline-flex flex-wrap items-center gap-x-1">
-        <span className="text-label font-semibold text-ink">
-          {identity.name ?? identity.email}
-          {identity.name !== null ? (
-            <span className="ml-1 font-normal text-ink-muted">({identity.email})</span>
-          ) : null}
-        </span>
+        {canViewUsers && bidderId !== null ? (
+          <Link
+            href={`/admin/users/${encodeURIComponent(bidderId)}`}
+            className="text-label font-semibold text-ink underline-offset-2 transition-colors duration-hover ease-hover hover:text-primary hover:underline"
+          >
+            {name}
+          </Link>
+        ) : (
+          <span className="text-label font-semibold text-ink">{name}</span>
+        )}
         <span className="rounded-pill bg-primary-light px-2 py-0.5 text-label font-semibold text-primaryDark">
           paljastatud — logitud auditisse
         </span>
@@ -473,10 +712,12 @@ function BidderRevealChip({ bidId, alias }: { bidId: string | null; alias: numbe
 function FeedBidRow({
   row,
   nowMs,
+  canViewUsers,
   indented = false,
 }: {
   row: MonitorBidRow
   nowMs: number
+  canViewUsers: boolean
   indented?: boolean
 }) {
   return (
@@ -497,7 +738,12 @@ function FeedBidRow({
         {row.bidderAlias === null ? (
           <span className="text-bodySm text-ink-muted">—</span>
         ) : (
-          <BidderRevealChip bidId={row.bidId} alias={row.bidderAlias} />
+          <BidderRevealChip
+            bidId={row.bidId}
+            bidderId={row.bidderId}
+            alias={row.bidderAlias}
+            canViewUsers={canViewUsers}
+          />
         )}
       </td>
       <td className="h-10 px-3 text-bodySm font-semibold text-ink">{formatEurAmount(row.amountEur)}</td>
@@ -526,11 +772,13 @@ function FeedBidRow({
 function FeedBurstRow({
   entry,
   nowMs,
+  canViewUsers,
   open,
   onToggle,
 }: {
   entry: Extract<FeedEntry, { kind: 'burst' }>
   nowMs: number
+  canViewUsers: boolean
   open: boolean
   onToggle: () => void
 }) {
@@ -557,7 +805,9 @@ function FeedBurstRow({
         </td>
       </tr>
       {open
-        ? entry.rows.map((row) => <FeedBidRow key={row.key} row={row} nowMs={nowMs} indented />)
+        ? entry.rows.map((row) => (
+            <FeedBidRow key={row.key} row={row} nowMs={nowMs} canViewUsers={canViewUsers} indented />
+          ))
         : null}
     </>
   )
@@ -589,6 +839,11 @@ export function BidMonitor({
   initialExtensions,
   canEndManually,
   canFlagAnomalies,
+  canExportBids,
+  canViewUsers,
+  canViewCeremony,
+  canDecideUnderbids,
+  underbids,
 }: {
   auctionId: string
   title: string
@@ -606,6 +861,11 @@ export function BidMonitor({
   initialExtensions: MonitorExtensionEntry[]
   canEndManually: boolean
   canFlagAnomalies: boolean
+  canExportBids: boolean
+  canViewUsers: boolean
+  canViewCeremony: boolean
+  canDecideUnderbids: boolean
+  underbids: MonitorUnderbidRow[]
 }) {
   const router = useRouter()
   const [rows, setRows] = useState<MonitorBidRow[]>(initialRows)
@@ -875,6 +1135,7 @@ export function BidMonitor({
   return (
     <div>
       <MonitorHeadStrip
+        auctionId={auctionId}
         isSealed={isSealed}
         sealedCount={sealedCount}
         ended={ended}
@@ -887,6 +1148,7 @@ export function BidMonitor({
         currentPriceEur={currentPriceEur}
         bidStepEur={bidStepEur}
         canEndManually={canEndManually}
+        canExportBids={canExportBids}
         onEndManually={() => {
           setEndModalOpen(true)
         }}
@@ -896,9 +1158,19 @@ export function BidMonitor({
         {isSealed ? (
           <div className="flex flex-col gap-1 rounded-card border border-border bg-bgPage px-md py-sm">
             <span className="text-label font-semibold text-ink-muted">Suletud pakkumised</span>
-            <span className="font-heading text-h3 font-bold text-ink">
-              {sealedCount === null ? '—' : String(sealedCount)}
-            </span>
+            {canViewCeremony ? (
+              <Link
+                href={`/admin/auctions/${encodeURIComponent(auctionId)}/ceremony`}
+                title="Ava avamistseremoonia"
+                className="w-fit font-heading text-h3 font-bold text-ink transition-colors duration-hover ease-hover hover:text-primary"
+              >
+                {sealedCount === null ? '—' : String(sealedCount)}
+              </Link>
+            ) : (
+              <span className="font-heading text-h3 font-bold text-ink">
+                {sealedCount === null ? '—' : String(sealedCount)}
+              </span>
+            )}
             <span className="text-bodySm text-ink-muted">Summad krüptitud kuni avamiseni</span>
           </div>
         ) : (
@@ -1112,12 +1384,18 @@ export function BidMonitor({
                 ) : (
                   feedEntries.map((entry) =>
                     entry.kind === 'row' ? (
-                      <FeedBidRow key={entry.row.key} row={entry.row} nowMs={Date.now() - skewRef.current} />
+                      <FeedBidRow
+                        key={entry.row.key}
+                        row={entry.row}
+                        nowMs={Date.now() - skewRef.current}
+                        canViewUsers={canViewUsers}
+                      />
                     ) : (
                       <FeedBurstRow
                         key={entry.key}
                         entry={entry}
                         nowMs={Date.now() - skewRef.current}
+                        canViewUsers={canViewUsers}
                         open={expandedBursts.has(entry.key)}
                         onToggle={() => {
                           setExpandedBursts((current) => {
@@ -1149,9 +1427,14 @@ export function BidMonitor({
         </p>
       )}
 
-      {anomalies.length > 0 ? (
-        <AnomaliesPanel auctionId={auctionId} anomalies={anomalies} canFlag={canFlagAnomalies} />
-      ) : null}
+      <UnderbidsPanel
+        auctionId={auctionId}
+        rows={underbids}
+        canDecide={canDecideUnderbids && !ended}
+        nowMs={Date.now() - skewRef.current}
+      />
+
+      <AnomaliesPanel auctionId={auctionId} anomalies={anomalies} canFlag={canFlagAnomalies} />
 
       {extensions.length > 0 ? (
         <section className="mt-md rounded-card border border-border bg-bgPage px-md py-sm">

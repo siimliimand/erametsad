@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useTransition } from 'react'
 
 import {
@@ -16,8 +17,19 @@ type RevealState =
  * a real identity. The server action writes the `user.identity_view` audit
  * entry before the identity value ever reaches this component, and enforces
  * the per-role rules (seller: alapakkumine rows on its own lots only).
+ * With `users:read` (admin roles) the revealed name links into the bidder's
+ * Kasutajad detail view; other roles keep the plain revealed text, since
+ * their user-detail access is denied anyway.
  */
-export function IdentityRevealChip({ bidId }: { bidId: string }) {
+export function IdentityRevealChip({
+  bidId,
+  bidderId = null,
+  canViewUsers = false,
+}: {
+  bidId: string
+  bidderId?: string | null
+  canViewUsers?: boolean
+}) {
   const [state, setState] = useState<RevealState | null>(null)
   const [pending, startTransition] = useTransition()
 
@@ -25,12 +37,26 @@ export function IdentityRevealChip({ bidId }: { bidId: string }) {
     if (!state.ok) {
       return <span className="text-label font-semibold text-danger">{state.error}</span>
     }
-    return (
-      <span className="text-label font-semibold text-ink">
+    const name = (
+      <>
         {state.identity.name ?? state.identity.email}
         {state.identity.name !== null ? (
           <span className="ml-1 font-normal text-ink-muted">({state.identity.email})</span>
         ) : null}
+      </>
+    )
+    return (
+      <span className="text-label font-semibold text-ink">
+        {canViewUsers && bidderId !== null && bidderId !== '' ? (
+          <Link
+            href={`/admin/users/${encodeURIComponent(bidderId)}`}
+            className="underline-offset-2 transition-colors duration-hover ease-hover hover:text-primary hover:underline"
+          >
+            {name}
+          </Link>
+        ) : (
+          name
+        )}
       </span>
     )
   }

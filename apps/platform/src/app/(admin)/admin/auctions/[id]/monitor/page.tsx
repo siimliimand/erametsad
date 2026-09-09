@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 
-import { BidMonitor, type MonitorBidRow, type MonitorExtensionEntry } from './bid-monitor'
+import { BidMonitor, type MonitorBidRow, type MonitorExtensionEntry, type MonitorUnderbidRow } from './bid-monitor'
 import { ErrorNotice } from '../../../../_components/ErrorNotice'
 import { PageHeader } from '../../../../_components/PageHeader'
 import { requireAdminRepositories } from '../../../../_lib/admin'
@@ -169,6 +169,31 @@ export default async function AuctionMonitorPage({
   )
   const ended = !['draft', 'scheduled', 'active'].includes(auction.status)
 
+  // Pending alapakkumised for this lot (oldest first). Accepting promotes
+  // the alapakkumine itself to leading (approveAlapakkumine), so the
+  // resulting leading amount is the bid's own amount — offered only when
+  // no strictly higher leader blocks the promotion. Sealed rows keep the
+  // amount hidden until the opening ceremony, so they carry no accept
+  // affordance here.
+  const pendingUnderbids = bidsResult.docs
+    .filter((bid) => bid.status === 'pending_approval')
+    .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0))
+  const underbids: MonitorUnderbidRow[] = pendingUnderbids.map((bid) => {
+    const canBecomeLeading =
+      !isSealed && (leadingBid === null || leadingBid.amountCents <= bid.amountCents)
+    const amountEur = isSealed ? null : centsToEuros(bid.amountCents)
+    return {
+      key: `underbid-${bid.id}`,
+      bidId: bid.id,
+      bidderId: bid.userId,
+      bidderAlias: aliasById.get(bid.userId) ?? null,
+      amountEur,
+      submittedAt: bid.createdAt,
+      resultingLeadingEur: canBecomeLeading ? amountEur : null,
+      canBecomeLeading,
+    }
+  })
+
   return (
     <div>
       {viga ? <ErrorNotice message={viga} /> : null}
@@ -205,6 +230,13 @@ export default async function AuctionMonitorPage({
         // audit-entry create is admin-only (guards.ts) — the same role set
         // that holds audit:read, so it gates the internal-review flag.
         canFlagAnomalies={can(session.role, 'audit:read')}
+        // bids:write denies sellers, so the ip_hash-carrying export and its
+        // affordance stay with admin/superadmin/specialist.
+        canExportBids={can(session.role, 'bids:write')}
+        canViewUsers={can(session.role, 'users:read')}
+        canViewCeremony={can(session.role, 'sealed:read')}
+        canDecideUnderbids={auction.status === 'active'}
+        underbids={underbids}
       />
       {isSealed ? (
         <p className="mt-md rounded-input border border-info bg-info-light px-md py-sm text-bodySm text-info">
