@@ -3,7 +3,7 @@
 > **In brief:** All auctions in one list, with filters and status actions.
 | Area | admin |
 |---|---|
-| **Route** | `/oksjonid` (tabs: Kõik / Raieõigus / Kinnistud / Põllumaad / Paketid / Kiiroksjonid) |
+| **Route** | `/admin/auctions` (tabs: Kõik / Raieõigused / Metskinnistud / Põllumaad / Paketid / Kiiroksjonid) |
 | **Access** | admin, superadmin (full); specialist (own lots, no manual-end); seller (own lots read-only) |
 | **In nav** | sidebar "Oksjonid" |
 
@@ -13,7 +13,7 @@ Operational control room for all lots: find any lot fast, check status/countdown
 ## Wireframe (desktop)
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ Oksjonid   [Kõik 4823][Raieõigus 2401][Kinnistud 1902][Põllumaa 68]...    │
+│ Oksjonid   [Kõik 4823][Raieõigus 2401][Kinnistud 1902][Põllumaa 0]...    │
 │ + Uus oksjon (⌘N)                                    [Ekspordi CSV] [⚙]  │
 ├──────────────────────────────────────────────────────────────────────────┤
 │ Filtrid: [Olek ▾][Tüüp ▾][Spetsialist ▾][Maakond ▾][Lõpp: alates—kuni]   │
@@ -31,10 +31,10 @@ Selection ≥1 → bulk bar: [Ajasta avaldamine…][Ekspordi valitud]
 ```
 
 ## Block-by-block spec
-1. **Tabs** — object types with counts (matching portal tabs); "Kiiroksjonid" = `isQuickAuction=true` cross-type; "Kõik". Tab selection is a filter, not a page.
+1. **Tabs** — Kõik, Raieõigused, Metskinnistud, Põllumaad, Paketid, Kiiroksjonid, each with a count (matching the portal tabs); "Kiiroksjonid" = `isQuickAuction=true` cross-type; "Kõik". Tab selection is a filter, not a page. Otsus (D-2): the object model is `raieoigus / kinnistu / kiire / pakett` — a `kiire` lot is always a quick auction, and there is no põllumaa object type, so the Põllumaad tab renders as an empty bucket until the schema gains the type. Otsus (D-1): the list lives at `/admin/auctions`; earlier draft routes (`/oksjonid`) are retired.
 2. **Toolbar** — `+ Uus oksjon` → wizard 03. Export: current filter → CSV (all visible columns + cadastres, finalPrice).
 3. **Filter panel** —
-   - Olek: draft / scheduled / active / ended / unsold / contract / completed / archived (multi).
+   - Olek: draft / scheduled / active / ended / appraised (Hinnatud) / unsold / contract / completed / archived (multi). Otsus (D-3): the code adds the `appraised` (Hinnatud) status — a lot goes ended → appraised when the leading bid is declared the winner (manual end or sealed ceremony) and appraised → contract; appraised lots are not archivable.
    - Tüüp: objectType × auctionType matrix chips (Raieõigus-avatud, Raieõigus-suletud, …).
    - Spetsialist (specialist: fixed to self, hidden).
    - Maakond (15 ref).
@@ -65,13 +65,14 @@ Selection ≥1 → bulk bar: [Ajasta avaldamine…][Ekspordi valitud]
    - **Ekspordi valitud** CSV. No bulk destructive actions (deliberate).
 
 ## Status color map (matches portal `StatusPill`)
-draft `#6B7570` grey · scheduled `#2D6FA8` info blue · active `#2E9E5B` green (pulse dot if ending <1h) · ended `#F2A93B` amber · unsold `#B3261E` outline red · contract `#58B368` light green · completed/archived `#6B7570` grey.
+draft `#6B7570` grey · scheduled `#2D6FA8` info blue · active `#2E9E5B` green (pulse dot if ending <1h) · ended `#F2A93B` amber · appraised grey (shares the archived pill) · unsold `#B3261E` outline red · contract `#58B368` light green · completed/archived `#6B7570` grey.
 
 ## Interactions & edge cases
 - Keyboard: ↑/↓ row focus, Enter=Vaata, E=Muuda, X=Lõpeta (opens confirm), ⌘A select page.
 - Countdown <5min → row left-border amber; anti-snipe extension event flashes row.
 - Specialist sees only `specialist_id=me` (filter locked); seller `seller_profile_id=me`, actions disabled.
 - Manual end during final minute: modal shows "Anti-snipe võib lõppu pikendada — kinnita lõplik aeg" re-check before submit.
+- Otsus (D-14): the anti-snipe default is 5 minutes (the Settings 13 default `anti_snipe_duration_minutes = 5`, bounds 1–30, per-lot override).
 - Pagination server-side (25/page); filter+sort preserved.
 
 ## Data & API

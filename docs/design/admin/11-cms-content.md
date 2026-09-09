@@ -28,7 +28,7 @@ Manage every marketing-site collection (erametsad.ee): build pages from blocks, 
 ```
 
 ## Block-by-block spec
-1. **Collections sidebar** — Leheküljed, Artiklid, KKK, Spetsialistid, Tagasiside (testimonials), Toetuste programmid (Phase 5 single-source), Õigusdokumendid (legal), Meedia, Suunamised (redirects), Menüüd. Counts per collection. Selection drives list view (DataTable: pealkiri, olek (mustand/avaldatud/plaanitud), uuendatud, autor).
+1. **Collections sidebar** — Leheküljed, Artiklid, KKK, Spetsialistid, Tagasiside (testimonials), Toetuste programmid (Phase 5 single-source), Õigusdokumendid (legal), Meedia, Suunamised (redirects), Menüüd. Counts per collection. Selection drives list view (DataTable: pealkiri, olek (mustand/avaldatud/plaanitud), uuendatud, autor). Otsus (D-15): the Menüüd and Toetused collections are deferred to a later phase and are not part of the launch sidebar.
 2. **Page block-builder**:
    - Block types ▾: Hero (H1, intro, 2 CTA'd, taustapilt+focal), Tekst (rich text + ankur), Kaardid (up to 3: pealkiri, ikoon, tekst, link), Akordeon (section title + items[] question/answer), Vorm (vali vorm: põhivorm/kava/hooldusraie/istutamine + pealkiri), Oksjonite ticker (objectType filter, kaartide arv), Statistika (numbriks + allikas: live/ Staatiline), CTA (pealkiri+nupp), Tagasiside (vali testimonial-id'd).
    - List: drag reorder (⠿), per-block collapse, ✎ opens field form in drawer, ✕ remove (confirm). Per-block "Näita ainult: [kõik/mobiil/desktop]" advanced toggle.
@@ -39,8 +39,8 @@ Manage every marketing-site collection (erametsad.ee): build pages from blocks, 
 4. **KKK manager** — categories list (name, slug, order, aktiivne) → items table per category: küsimus, lühitekst, täistekst (rich, "Loe edasi…" expander), järjekord (drag), aktiivne. Ordering persists to portal chip-nav order.
 5. **Media library** — grid thumbnails; upload (drag-drop multi); detail: focal point picker (crops 16:10/1:1/350×175 thumb auto), **alt text required** (publish gate), credits, kasutuskohad (which pages reference), replace-file (keeps id, new rendition). Search by name/alt.
 6. **Redirect manager** — table: Siit (path) → Sinna (path/URL), tüüp 301/302, aktiivne, tabamusi (hit count from redirect middleware), loodud. Create validates loops & chains (max 2 hops warn). Import bulk CSV.
-7. **Menu builder** — trees for header dropdowns + footer columns; nodes: label, link (internal page/article picker or URL), alammenüü nested drag; aktiivne toggle. Publishing a menu is instant (no draft).
-8. **Õigusdokumendid / Spetsialistid / Testimonials / Toetused** — standard collection forms: legal docs (title, kehtiv alates, PDF media, näita privaatuspõhimõttes link), specialists (nimi, amet, foto, telefon, e-post, bio, aktiivne — feeds portal lot specialist cards), testimonials (klient, tekst, rating?, foto, avaldatud), subsidy programs (nimi, tähtaeg, määrad tabel, tingimused rich, dokumendid, kanal e-PORIA/ühisavaldus).
+7. **Menu builder** (deferred, D-15) — trees for header dropdowns + footer columns; nodes: label, link (internal page/article picker or URL), alammenüü nested drag; aktiivne toggle. Publishing a menu is instant (no draft).
+8. **Õigusdokumendid / Spetsialistid / Testimonials / Toetused** — standard collection forms: legal docs (title, kehtiv alates, PDF media, näita privaatuspõhimõttes link), specialists (nimi, amet, foto, telefon, e-post, bio, aktiivne — feeds portal lot specialist cards), testimonials (klient, tekst, rating?, foto, avaldatud), subsidy programs (nimi, tähtaeg, määrad tabel, tingimused rich, dokumendid, kanal e-PORIA/ühisavaldus; deferred, D-15).
 
 ## Interactions & edge cases
 - Publish gate: missing alt texts, empty required blocks (hero), broken internal links block with summary.
@@ -97,11 +97,11 @@ Block reorder via Alt+arrows (keyboard parity with drag); alt-text gate improves
 | KKK | (per category) küsimus, järjekord, aktiivne, uuendatud |
 | Spetsialistid | nimi, amet, aktiivne, oksjoneid (lots referencing) |
 | Tagasiside | klient, hinnang, avaldatud |
-| Toetused | nimi, tähtaeg, avaldatud |
+| Toetused (deferred, D-15) | nimi, tähtaeg, avaldatud |
 | Õigusdokumendid | pealkiri, kehtiv alates, tüüp |
 | Meedia | grid; filter: kasutamata (orphan-cleanup tool) |
 | Suunamised | siit, sinna, tüüp, tabamuid, aktiivne |
-| Menüüd | nimi, asukoht (header/footer), uuendatud |
+| Menüüd (deferred, D-15) | nimi, asukoht (header/footer), uuendatud |
 
 ## States (full)
 - New collection: "Lisa esimene {üksus}" with per-collection hint.
@@ -111,5 +111,5 @@ Block reorder via Alt+arrows (keyboard parity with drag); alt-text gate improves
 
 ## Open questions
 - Workflow approval (editor proposes → admin publishes) needed at launch or single-role editing suffices?
-- Subsidy programs collection frozen until Phase 5 or seeded now?
+- Subsidy programs: deferred to a later phase (D-15), so not seeded now.
 - Long-tail SEO landing pages (plan §4.1, ~20) — same Page builder + dedicated SEO template preset?

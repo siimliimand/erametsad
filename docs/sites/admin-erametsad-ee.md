@@ -29,7 +29,9 @@ Everything a staff member does here that touches users, bids, contracts, or sett
 
 ## 4. The 14 modules
 
-### 4.1 Töölaud (Dashboard, `/`)
+Otsus (D-1): every module route lives under `/admin/*` (earlier drafts used short paths such as `/oksjonid` or `/seaded`); the headings below show the implemented routes.
+
+### 4.1 Töölaud (Dashboard, `/admin`)
 
 The daily control room.
 
@@ -39,28 +41,28 @@ The daily control room.
 - **Kiire tegevus:** three action queues with counts (company requests, alapakkumised, contracts) that deep-link into the right module.
 - **Viimased juhtlõimed:** the 8 newest leads with source and assignment state.
 
-### 4.2 Oksjonid (Auctions list, `/oksjonid`)
+### 4.2 Oksjonid (Auctions list, `/admin/auctions`)
 
-- Tabs by type with counters (Kõik, Raieõigus, Kinnistud, Põllumaad, Paketid, Kiiroksjonid ⚡).
+- Tabs with counters (Kõik, Raieõigused, Metskinnistud, Põllumaad, Paketid, Kiiroksjonid ⚡). Otsus (D-2): the object types are raieõigus / kinnistu / kiire / pakett; Kiiroksjonid selects every `isQuickAuction` lot across types, and Põllumaad stays an empty bucket because no põllumaa object type exists.
 - Filter chips: status, type, county, specialist, date range, free text over name / cadastre / ID / e-mail alias. Filters live in the URL, so views are shareable.
 - Data table (25 per page) with 11 columns, including a live countdown column and bid counts (amber "(p)" marks pending alapakkumised).
 - Row actions on hover: Vaata (opens the portal lot), Muuda (wizard), Dupl. (clone as draft), Lõpeta käsitsi (admin+, active auctions only), Arhiivi / Avalda uuesti.
 - Bulk bar for selections: schedule publishing together, export selected to CSV.
 - **"Lõpeta käsitsi" modal:** red guarded flow. Shows the current leading bid, asks for an outcome (declare the current bid the winner, or mark unsold), requires a written reason, and confirms with a red button.
 
-### 4.3 Oksjoni koostamine (Auction editor, `/oksjonid/uus`)
+### 4.3 Oksjoni koostamine (Auction editor, `/admin/auctions/new`)
 
 A 7-step wizard with autosave and per-step validation marks:
 
-1. **Tüüp ja mehaanika.** Pick one of 4 object types. Property, field, and package lock the mechanic to sealed bid with an explanation. Kiiroksjon toggle (48 h, €1 start). Anti-sniping toggle with minutes. Start and end times in Europe/Tallinn. Minimum duration 1 hour.
+1. **Tüüp ja mehaanika.** Pick one of 4 object types (Raieõigus, Kinnistu, Kiire oksjon, Pakett). Kinnistu and Pakett lock the mechanic to sealed bid with an explanation; Kiire oksjon is its own type whose lots are always quick auctions. Kiiroksjon toggle (24–72 h, 48 h suggested, €1 start, secret reserve). Anti-sniping toggle with minutes, default 5. Start and end times in Europe/Tallinn. Minimum duration 1 hour.
 2. **Asukoht.** County → parish cascade, address, an interactive map pin picker (Maa-amet orthophoto), coordinate fields, and automatic links to the cadastral map and the forest portal.
-3. **Maa ja mets.** Area (ha), volume (m³), cadastral number repeater with format validation and a live state-registry check, registry numbers, 24 tree-species codes, logging types, compartments, forest notification numbers, logging and removal deadlines, storage and road approvals, rental agreement fields.
+3. **Maa ja mets.** Area (ha), volume (m³), cadastral number repeater with format validation and a live state-registry check, registry numbers, 26 tree-species codes (the spec draft said 24 while listing 26; D-13), logging types, compartments, forest notification numbers, logging and removal deadlines, storage and road approvals, rental agreement fields.
 4. **Hinnad.** Start price. Bid step (open auctions only). The secret reserve price (piirhind) for sealed and kiiroksjon lots, masked after save and never shown to sellers or specialists. Fee override for admins only (empty = system default 3%).
 5. **Sisu ja meedia.** Title, auto-generated anonymized contact alias (for example `mt27082601@oksjonid.erametsad.ee`), responsible specialist, two rich-text blocks, hero image plus gallery with drag ordering, focal point, and **mandatory alt text**, PDF uploads with labels.
 6. **Pakett** (package lots only): property count plus a table editor (cadastre, registry part, county, area, start price) with CSV paste.
 7. **Ülevaade ja avaldamine.** Summary with "Muuda" jumps. A two-column diff view when editing a published lot. Validation gates (required fields, alt text, deadline logic). Actions: save draft, schedule publishing, publish now, guest preview with a token.
 
-### 4.4 Pakkumiste jälgimine (Bid monitoring, `/pakkumised`, per-lot variant)
+### 4.4 Pakkumiste jälgimine (Bid monitoring, `/admin/bids`, per-lot monitor `/admin/auctions/:id/monitor`)
 
 - Header with a live ticking countdown, leading bid, and step size. Buttons for manual end and CSV export.
 - **Live SSE bid feed** (newest first): time, anonymized bidder label, amount, source chip (Käsitsi / Automaatpakkuja), status (leading / outbid / pending). Rapid autobidder exchanges collapse into one "duel" row that expands.
@@ -69,7 +71,7 @@ A 7-step wizard with autosave and per-step validation marks:
 - **Anomaly flags (heuristics):** same-IP clusters, bursts from new accounts, and sub-5-second flip patterns. A card can be marked for internal investigation.
 - **Anti-snipe log:** every extension with its trigger bid.
 
-### 4.5 Suletud pakkumiste avamine (Sealed opening ceremony, `/oksjonid/:id/avamine`)
+### 4.5 Suletud pakkumiste avamine (Sealed opening ceremony, `/admin/sealed-opening`, ceremony `/admin/auctions/:id/ceremony`)
 
 The highest-security screen. Until the ceremony, staff see only the number of sealed bids.
 
@@ -77,32 +79,32 @@ The highest-security screen. Until the ceremony, staff see only the number of se
 2. **Two-person rule:** an opener signs with the typed keyword "AVAN". A separate superadmin session approves. Both sessions bind to the ceremony. Signatures expire after 30 minutes.
 3. **Reveal:** one action decrypts all bids at once into a ranked table (amount, bidder with masked ID code, submission time, validity, gap to next). Ties resolve to the earlier submission. Invalid bids grey out.
 4. **Outcome:** the system compares the top bid with the secret reserve.
-   - Reserve met: "Kinnita võitja ja avalda lõpphind" → publishes the final price, generates the winner's contract, notifies losers neutrally.
+   - Reserve met: "Kinnita võitja ja avalda lõpphind" → the lot moves to the Hinnatud (appraised) status (D-3) and keeps it until the contract is signed; publishes the final price, generates the winner's contract, notifies losers neutrally.
    - Reserve not met: mark unsold, or (kiiroksjon) start the house backup purchase workflow.
    - A void path exists with a reason.
 5. Every step writes to the audit log in real time.
 
-### 4.6 Kasutajad ja õigused (Users, `/kasutajad`)
+### 4.6 Kasutajad ja õigused (Users, `/admin/users`)
 
 - Search by name, isikukood, e-mail, or registry code. Filters by profile, status, rights, county.
-- Isikukood is masked (`3870516*****`). The reveal icon logs a `user.identity_view` audit event each time.
+- Isikukood is masked to the last four digits (`••••••0516`). The reveal icon logs a `user.identity_view` audit event each time. Otsus (D-16): the spec draft showed the first digits visible (`3870516*****`); the implementation keeps the last-4 mask and the docs follow the code — the leading digits encode the birth date.
 - Detail drawer with 7 tabs: identity (with session management and remote logout), profiles, **rights matrix** (grant/revoke per object type with a mandatory reason and automatic notification), contracts, full bid history, notification settings, GDPR tools (export ZIP, delete/anonymize honoring the 7-year accounting retention).
 - Critical actions: impersonate for support (reason required, writes blocked), suspend (24 h / 7 days / indefinite + reason), ban (permanent, at the identity level).
 
-### 4.7 Ettevõtte taotlused (Company approvals, `/ettevotted`)
+### 4.7 Ettevõtte taotlused (Company approvals, `/admin/companies`)
 
 - Pending cards with waiting age, an auto-fetched Äriregister panel (name, status, address, board members), and the applicant's profile with their reason.
 - Automatic **board-member cross-check** against the applicant's name and identity code. A deleted company status blocks approval.
 - **Duplicate warning** when the registry code already exists under another user, with a link to the existing profile.
 - Actions: approve (optionally granting default bidding rights, auto e-mail), reject (mandatory reason), hold with an internal note. A history tab lists all past decisions.
 
-### 4.8 Lepingud ja mallid (Contracts, `/lepingud`)
+### 4.8 Lepingud ja mallid (Contracts, `/admin/contracts`)
 
 - **Contracts table:** number, type (Raamleping / Oksjonileping), user, company, auction, template version, status (Valmistatud → Saadetud → Allkirjastatud / Tühistatud), signing date. Stuck contracts show amber badges.
 - Row actions: view PDF, download the signature container (ASiC-E, with the download logged), resend an expired invitation, void with a reason.
 - **Templates tab:** DOCX upload with automatic `{{...}}` placeholder detection. A placeholder catalog (bidder, lot, transaction fields). Test render with sample data. Version history with one active version per type.
 
-### 4.9 Juhtlõimed (Leads CRM, `/juhtloid`)
+### 4.9 Juhtlõimed (Leads CRM, `/admin/leads`)
 
 - Two views: a **Kanban board** and a table. Five columns: Uus → Võetud ühendust → Kvalifitseeritud → Leping → Mittekvalifitseeritud (requires a reason).
 - **SLA badges:** amber after 24 h untouched, red after 48 h.
@@ -110,28 +112,29 @@ The highest-security screen. Until the ceremony, staff see only the number of se
 - **Detail drawer:** click-to-call and mailto links, source form and page, cadastre with a map link, consent record with timestamp, specialist assignment (with a round-robin suggestion), next-action reminder, and a chronological notes timeline mixing staff notes and system events.
 - Filters by source, county, specialist. Manual lead creation (for example from a phone call). CSV export for admins.
 
-### 4.10 Päringute suunamine (Service requests, `/paringud`)
+### 4.10 Päringute suunamine (Service requests, `/admin/inquiries`)
 
 - Table of incoming päringud (management plan, tending cut, planting) with client, county, cadastre, forwarding state, and partner count.
 - **Routing panel:** lists matching partner companies by service and county with their free capacity, pre-selects the top 3, and forwards with a **minimized payload** (name, phone, e-mail, cadastre only, no internal notes) plus 14-day signed links. A forwarding log tracks each partner and reply state.
 - **Partner directory tab:** companies, contacts, services, covered counties, request limits, active toggle.
 
-### 4.11 Sisuhaldus (CMS, `/sisu`)
+### 4.11 Sisuhaldus (CMS, `/admin/content`)
 
 - Left collection menu: pages, articles, FAQ, specialists, testimonials, subsidy programs, legal documents, media, redirects, menus.
+- Otsus (D-15): the Menüüd (menus) and Toetused (subsidy programs) admin sections are deferred to a later phase; the list above is the target model, not the launch scope.
 - **Block builder** for pages: drag-and-drop blocks (hero, text, cards, process accordion, form, auction ticker, stats, CTA, testimonials) with a per-block settings drawer and a live preview with a desktop/mobile toggle.
 - **Article editor:** rich text plus an SEO panel with a Google SERP preview, an Open Graph card preview, and character counters (title ≤ 60, description ≤ 160).
 - **Media library:** upload with automatic renditions, focal point picker, and a hard gate: no image publishes without alt text.
 - Prototype note: the plan accepts Payload's native admin for CMS collections at first. The custom block builder is post-prototype scope.
 
-### 4.12 Statistika (Statistics, `/statistika`)
+### 4.12 Statistika (Statistics, `/admin/statistics`)
 
 - Filter bar with period, object type, and county. CSV and multi-sheet XLSX export.
 - **KPI cards:** auctions, sold and sell-through rate, total turnover, average €/ha and €/m³, fee revenue.
 - **Monthly stacked chart** (sold / unsold / cancelled), a **choropleth map** of average prices by county (click for species-level detail, table alternative for accessibility), and a **lead funnel** (requests → contacted → qualified → contract) with average days to deal.
 - **Public statistics curator:** toggles that decide which aggregate numbers appear on the public portal statistics page.
 
-### 4.13 Seaded (Settings, `/seaded`)
+### 4.13 Seaded (Settings, `/admin/settings`)
 
 Superadmin writes. Admin sees most sections read-only. Every save requires a written reason and is audit-logged.
 
@@ -144,7 +147,7 @@ Superadmin writes. Admin sees most sections read-only. Every save requires a wri
 - **Hooldusaken:** maintenance windows with a **conflict checker** that blocks saving if an auction ends inside the window.
 - **Lipud:** feature flags (sealed_bids, sms_notifications, map_view, quick_auction).
 
-### 4.14 Auditlogi (Audit log, `/audit`)
+### 4.14 Auditlogi (Audit log, `/admin/audit`)
 
 - Append-only and immutable. Deletion is technically blocked. Records are kept 7 years. A Merkle-chain integrity check runs nightly and shows a green indicator.
 - Filters: staff member, action group (users/rights, auctions, sealed opening, contracts, settings), entity, date range, ID search.
@@ -198,4 +201,4 @@ Superadmin writes. Admin sees most sections read-only. Every save requires a wri
 2. Settings ships as a subset (general, fees, auction rules, flags) first. Templates and the full matrix follow.
 3. Anomaly/shill heuristics, GDPR job tooling, impersonation, and audit exports are later-scope items.
 4. CMS: custom block builder, menu builder, and redirect manager are post-prototype scope. Payload's native admin covers the first release.
-5. Anti-snipe default (5 vs 13 minutes) needs one decision in Settings.
+5. Otsus (D-14): the anti-snipe default is 5 minutes (Settings default `anti_snipe_duration_minutes = 5`, bounds 1–30, per-auction override); the earlier 5-vs-13 open question is closed.
