@@ -18,6 +18,8 @@ export type BlockFieldDescriptor =
       label: string
       required: boolean
       multiline: boolean
+      /** Long-form copy fields (text body, accordion content) use the shared rich text editor. */
+      rich: boolean
       maxLength?: number
     }
   | {
@@ -84,6 +86,14 @@ const fieldLabels: Record<string, string> = {
 
 const multilineMinLength = 500
 
+/**
+ * Builder paths whose string values carry sanitized HTML from the shared
+ * rich text editor (spec R-1: text blocks; the accordion per-item content).
+ * Keyed by "<block type>:<builder path>"; array items are indexed at render
+ * time in BlockSettingsFields, the descriptor keeps the item-relative path.
+ */
+const richTextStringPaths = new Set(['text:body', 'accordion:items.content'])
+
 interface ArrayLabels {
   section: string
   item: string
@@ -130,6 +140,7 @@ function stringDescriptor(
     label: labelFor(type, path, key),
     required,
     multiline: (maxLength ?? 0) >= multilineMinLength,
+    rich: richTextStringPaths.has(`${type}:${path}`),
     ...(maxLength !== undefined ? { maxLength } : {}),
   }
 }
@@ -276,7 +287,9 @@ export function updateDraftValue(
   const segments = path.split('.')
   const key = segments[segments.length - 1]
   if (key === undefined) return next
-  const parent = resolveAt(next, segments.slice(0, -1).join('.'))
+  // Top-level paths have no parent segment; the draft root is the parent.
+  const parentPath = segments.slice(0, -1).join('.')
+  const parent = parentPath === '' ? next : resolveAt(next, parentPath)
   if (Array.isArray(parent)) {
     parent[Number(key)] = value
   } else if (parent !== null && typeof parent === 'object') {

@@ -1,12 +1,12 @@
 import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
+import { RichTextFormValue } from './RichTextFormValue'
 import { redirectPathsForSlugChange, utcIsoToTallinnInputValue } from './scheduled-publish'
 import { saveLegalDocumentAction } from '../../../_actions/content'
 import {
   FormField,
   FormSelectField,
-  FormTextareaField,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../../../_components/FormField'
@@ -51,13 +51,11 @@ export function LegalDocumentForm({ document }: { document?: LegalDocument }) {
         options={typeOptions}
         defaultValue={document?.type ?? ''}
       />
-      <FormTextareaField
-        label="Sisu"
+      <RichTextFormValue
         name="content"
-        rows={10}
-        required
-        hint="HTML sisu."
+        label="Sisu"
         defaultValue={document?.content ?? ''}
+        hint="Vormindatud sisu; salvestub HTML-ina."
       />
       <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
         <FormField label="Versioon" name="version" defaultValue={document?.version ?? ''} />

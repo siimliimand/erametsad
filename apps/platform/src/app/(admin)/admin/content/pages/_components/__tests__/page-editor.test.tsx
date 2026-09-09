@@ -157,6 +157,41 @@ async function setTextarea(value: string): Promise<void> {
   })
 }
 
+function openDrawer(): HTMLElement {
+  const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')
+  if (dialog === null) throw new Error('settings drawer not opened')
+  return dialog
+}
+
+function drawerButton(dialog: HTMLElement, label: string): HTMLButtonElement {
+  const button = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(
+    (candidate) => candidate.textContent === label,
+  )
+  if (button === undefined) throw new Error(`drawer button ${label} not found`)
+  return button
+}
+
+async function typeIntoInput(input: HTMLInputElement, value: string): Promise<void> {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      input,
+      value,
+    )
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await Promise.resolve()
+  })
+}
+
+async function typeEditorHtml(dialog: HTMLElement, html: string): Promise<void> {
+  const editor = dialog.querySelector<HTMLElement>('[role="textbox"]')
+  if (editor === null) throw new Error('rich text editor not found in drawer')
+  await act(async () => {
+    editor.innerHTML = html
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+    await Promise.resolve()
+  })
+}
+
 describe('PageEditor publish branches', () => {
   it('saves a draft through the mustand branch', async () => {
     await mountEditor()
@@ -262,6 +297,56 @@ describe('PageEditor block builder wiring', () => {
     await submit(blocksForm())
 
     expect(storedBlocks()).toEqual([{ type: 'ticker', config: { limit: 4 } }])
+  })
+})
+
+describe('PageEditor rich text block fields', () => {
+  it('edits the text block body in the rich text editor and stores sanitized HTML', async () => {
+    await mountEditor()
+
+    const muudaButtons = [...container.querySelectorAll<HTMLButtonElement>('button')].filter(
+      (candidate) => candidate.textContent === 'Muuda',
+    )
+    const textBlockEdit = muudaButtons[1]
+    if (textBlockEdit === undefined) throw new Error('text block Muuda button not found')
+    await click(textBlockEdit)
+
+    const dialog = openDrawer()
+    expect(dialog.querySelector('[role="toolbar"]')).not.toBeNull()
+    await typeEditorHtml(dialog, '<p>Uus sisu</p><script>alert(1)</script><b>rasvane</b>')
+    await click(drawerButton(dialog, 'Salvesta'))
+
+    await submit(blocksForm())
+    const stored = storedBlocks().find((entry) => entry.type === 'text')
+    expect(stored?.config.body).toBe('<p>Uus sisu</p><strong>rasvane</strong>')
+  })
+
+  it('binds accordion item fields to indexed draft paths with the rich text editor', async () => {
+    await mountEditor()
+
+    await click(button('Lisa blokk'))
+    await click(buttonWithText('Akordion'))
+
+    const muudaButtons = [...container.querySelectorAll<HTMLButtonElement>('button')].filter(
+      (candidate) => candidate.textContent === 'Muuda',
+    )
+    const accordionEdit = muudaButtons.at(-1)
+    if (accordionEdit === undefined) throw new Error('accordion Muuda button not found')
+    await click(accordionEdit)
+
+    const dialog = openDrawer()
+    await click(drawerButton(dialog, 'Lisa rida'))
+
+    const title = document.getElementById('block-field-items.0.title') as HTMLInputElement | null
+    if (title === null) throw new Error('indexed accordion title field not found')
+    await typeIntoInput(title, 'Esimene')
+
+    await typeEditorHtml(dialog, '<p>Klapp</p>')
+    await click(drawerButton(dialog, 'Salvesta'))
+
+    await submit(blocksForm())
+    const stored = storedBlocks().find((entry) => entry.type === 'accordion')
+    expect(stored?.config.items).toEqual([{ title: 'Esimene', content: '<p>Klapp</p>' }])
   })
 })
 

@@ -4,8 +4,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AuctionWizard } from '../AuctionWizard'
-import { serializeWizardDraft, wizardDraftKey } from '../wizard-model'
-import type { AuctionWizardOptions } from '../wizard-model'
+import { emptyPackageRow, serializeWizardDraft, wizardDraftKey } from '../wizard-model'
+import type { AuctionWizardInitial, AuctionWizardOptions } from '../wizard-model'
 import { baseWizardState, createWizardInitial } from './fixtures'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -26,7 +26,9 @@ const submitAction = vi.fn((): Promise<void> => Promise.resolve())
 let container: HTMLDivElement
 let root: Root
 
-async function mountWizard(): Promise<void> {
+async function mountWizard(
+  initial: AuctionWizardInitial = createWizardInitial,
+): Promise<void> {
   await act(async () => {
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -37,7 +39,7 @@ async function mountWizard(): Promise<void> {
         submitLabel: 'Salvesta',
         cancelHref: '/admin/auctions',
         options: wizardOptions,
-        initial: createWizardInitial,
+        initial,
       }),
     )
     await Promise.resolve()
@@ -123,6 +125,41 @@ async function clickDialogButton(label: string): Promise<void> {
   })
 }
 
+async function clickElement(element: HTMLElement): Promise<void> {
+  await act(async () => {
+    element.click()
+    await Promise.resolve()
+  })
+}
+
+function railStepButton(label: string): HTMLButtonElement {
+  const nav = container.querySelector<HTMLElement>('nav[aria-label="Koostamise sammud"]')
+  if (nav === null) throw new Error('wizard rail not found')
+  const row = [...nav.querySelectorAll<HTMLButtonElement>('button')].find(
+    (candidate) => candidate.textContent.includes(label),
+  )
+  if (row === undefined) throw new Error(`rail step ${label} not found`)
+  return row
+}
+
+async function typeEditorHtml(label: string, html: string): Promise<void> {
+  const editor = container.querySelector<HTMLElement>(
+    `[role="textbox"][aria-label="${label}"]`,
+  )
+  if (editor === null) throw new Error(`editor ${label} not found`)
+  await act(async () => {
+    editor.innerHTML = html
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+    await Promise.resolve()
+  })
+}
+
+function storedDraftState(): Record<string, unknown> {
+  const raw = draftRaw()
+  if (raw === null) throw new Error('draft was not written')
+  return (JSON.parse(raw) as { state: Record<string, unknown> }).state
+}
+
 describe('AuctionWizard draft autosave', () => {
   it('starts idle and writes nothing to storage on mount', async () => {
     await mountWizard()
@@ -201,5 +238,55 @@ describe('AuctionWizard restore prompt', () => {
     expect(wizardDialog()).toBeNull()
     expect(statusText()).toContain('Pole veel salvestatud')
     expect(draftRaw()).toBe(identical)
+  })
+})
+
+describe('AuctionWizard rich text adoption', () => {
+  it('edits the Sisu copy blocks in the rich text editor and autosaves sanitized HTML', async () => {
+    await mountWizard()
+
+    await clickElement(railStepButton('Sisu'))
+    const publicEditor = container.querySelector<HTMLElement>(
+      '[role="textbox"][aria-label="Avalik info"]',
+    )
+    if (publicEditor === null) throw new Error('Avalik info editor not found')
+    expect(publicEditor.textContent).toContain('Avalik info')
+
+    await typeEditorHtml(
+      'Avalik info',
+      '<p>Rikas <strong>sisu</strong></p><script>alert(1)</script>',
+    )
+    await act(async () => {
+      await sleep(950)
+    })
+
+    const state = storedDraftState()
+    expect(state.descriptionPublic).toBe('<p>Rikas <strong>sisu</strong></p>')
+    expect(state.descriptionSecondary).toBe('Täiendav info')
+  })
+
+  it('edits the pakett description in the rich text editor for package lots', async () => {
+    await mountWizard({
+      ...createWizardInitial,
+      state: {
+        ...baseWizardState,
+        objectType: 'pakett',
+        propertyCount: 2,
+        packageRows: [{ ...emptyPackageRow(), cadastre: '34801:001:0217' }],
+      },
+    })
+
+    await clickElement(railStepButton('Pakett'))
+    const headerEditor = container.querySelector<HTMLElement>(
+      '[role="textbox"][aria-label="Paketi kirjeldus"]',
+    )
+    if (headerEditor === null) throw new Error('Paketi kirjeldus editor not found')
+
+    await typeEditorHtml('Paketi kirjeldus', '<p>Paketi info</p>')
+    await act(async () => {
+      await sleep(950)
+    })
+
+    expect(storedDraftState().packageHeader).toBe('<p>Paketi info</p>')
   })
 })

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
+import { RichTextFormValue } from './RichTextFormValue'
 import {
   contentPublicPath,
   redirectPathsForSlugChange,
@@ -121,12 +122,11 @@ export async function ArticleForm({ article }: { article?: ArticleDoc }) {
         rows={2}
         defaultValue={article?.excerpt ?? ''}
       />
-      <FormTextareaField
-        label="Sisu"
+      <RichTextFormValue
         name="content"
-        rows={10}
-        hint="HTML sisu."
+        label="Sisu"
         defaultValue={article?.content ?? ''}
+        hint="Vormindatud sisu; salvestub HTML-ina."
       />
       <FormField
         label="Autor (vaba tekst)"

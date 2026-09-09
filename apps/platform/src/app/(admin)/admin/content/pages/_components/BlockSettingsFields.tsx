@@ -11,11 +11,14 @@ import {
   type BlockFieldDescriptor,
 } from './block-fields'
 import { inputClass } from '../../../../_components/FormField'
+import { RichTextEditor } from '../../../../_components/rich-text/RichTextEditor'
 
 /**
  * Renders the descriptor list produced from a block's zod schema into
  * controlled inputs bound to a draft config. Paths address nested values
- * ("primaryCta.label", "items.0.title") inside the JSON draft.
+ * ("primaryCta.label", "items.0.title") inside the JSON draft. Rich text
+ * fields (text body, accordion content) render the shared editor whose
+ * sanitized HTML flows into the draft like any other string value.
  */
 
 interface BlockFieldContext {
@@ -163,7 +166,17 @@ function LeafField({ field, draft, errors, onDraftChange }: BlockFieldProps) {
     }
     return (
       <FieldShell id={id} label={field.label} required={field.required} error={error}>
-        {field.multiline ? (
+        {field.rich ? (
+          <div className={error ? 'rounded-card ring-1 ring-danger' : undefined}>
+            <RichTextEditor
+              value={typeof value === 'string' ? value : ''}
+              onChange={(html) => {
+                setValue(html)
+              }}
+              ariaLabel={field.label}
+            />
+          </div>
+        ) : field.multiline ? (
           <textarea {...common} rows={4} className={`${inputClass} h-auto py-2`} />
         ) : (
           <input {...common} type="text" className={inputClass} />
@@ -173,6 +186,21 @@ function LeafField({ field, draft, errors, onDraftChange }: BlockFieldProps) {
   }
 
   return null
+}
+
+/**
+ * Item descriptors carry the item-relative path ("items.title"); binding to
+ * a concrete row needs the index ("items.0.title"), or the draft lookup and
+ * write both miss the array element.
+ */
+function withItemIndex(
+  child: BlockFieldDescriptor,
+  arrayPath: string,
+  index: number,
+): BlockFieldDescriptor {
+  const prefix = `${arrayPath}.`
+  if (!child.path.startsWith(prefix)) return child
+  return { ...child, path: `${arrayPath}.${String(index)}.${child.path.slice(prefix.length)}` }
 }
 
 function ArrayField({
@@ -211,9 +239,18 @@ function ArrayField({
               Eemalda
             </button>
           </div>
-          {field.fields.map((child) => (
-            <BlockField key={child.path} field={child} draft={draft} errors={errors} onDraftChange={onDraftChange} />
-          ))}
+          {field.fields.map((child) => {
+            const indexed = withItemIndex(child, field.path, index)
+            return (
+              <BlockField
+                key={indexed.path}
+                field={indexed}
+                draft={draft}
+                errors={errors}
+                onDraftChange={onDraftChange}
+              />
+            )
+          })}
         </div>
       ))}
       {canAdd ? (

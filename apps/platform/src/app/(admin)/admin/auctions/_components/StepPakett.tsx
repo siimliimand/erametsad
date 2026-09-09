@@ -12,6 +12,7 @@ import {
 import type { PackageRowState, WizardStepContext } from './wizard-model'
 import { FieldError, FieldHint, FieldLabel, WarningNote } from './wizard-ui'
 import { inputClass, secondaryButtonClass } from '../../../_components/FormField'
+import { RichTextEditor } from '../../../_components/rich-text/RichTextEditor'
 import { CADASTRE_PATTERN } from '../_lib/auction-schema'
 
 /**
@@ -132,16 +133,16 @@ export function StepPakett({ state, patch, errors }: WizardStepContext) {
       </div>
 
       <div className="flex flex-col gap-1">
-        <FieldLabel htmlFor={`${id}-packageHeader`}>Paketi kirjeldus</FieldLabel>
-        <textarea
-          id={`${id}-packageHeader`}
-          rows={5}
-          value={state.packageHeader}
-          onChange={(event) => {
-            patch({ packageHeader: event.target.value })
-          }}
-          className={`${inputClass} h-auto py-2 ${errors.packageHeader !== undefined ? 'border-danger' : ''}`}
-        />
+        <span className="text-label font-semibold text-ink">Paketi kirjeldus</span>
+        <div className={errors.packageHeader !== undefined ? 'rounded-card ring-1 ring-danger' : undefined}>
+          <RichTextEditor
+            value={state.packageHeader}
+            onChange={(html) => {
+              patch({ packageHeader: html })
+            }}
+            ariaLabel="Paketi kirjeldus"
+          />
+        </div>
         <FieldHint> Kuvatakse portaalis paketi tabeli juures.</FieldHint>
         <FieldError message={errors.packageHeader} />
       </div>

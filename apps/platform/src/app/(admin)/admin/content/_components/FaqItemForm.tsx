@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
+import { RichTextFormValue } from './RichTextFormValue'
 import { saveFaqItemAction } from '../../../_actions/content'
 import {
   FormField,
@@ -33,13 +34,11 @@ export function FaqItemForm({
         hint="Lühike vastus kuvatakse loendis; täisvastus avaneb „Loe edasi…“ taga."
         defaultValue={item?.shortAnswer ?? ''}
       />
-      <FormTextareaField
-        label="Täisvastus"
+      <RichTextFormValue
         name="answer"
-        rows={6}
-        hint="HTML sisu."
-        required
+        label="Täisvastus"
         defaultValue={item?.answer ?? ''}
+        hint="Vormindatud vastus; salvestub HTML-ina."
       />
       <FormSelectField
         label="Kategooria"
