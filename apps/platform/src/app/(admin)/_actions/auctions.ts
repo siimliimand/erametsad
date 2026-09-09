@@ -5,11 +5,12 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { requireAdminRepositories } from '../_lib/admin'
-import { auctionStatusLabels } from '../_lib/labels'
+import { auctionStatusLabels, maskIsikukood } from '../_lib/labels'
 import {
   assertCan,
   auctionInScope,
   auctionScope,
+  can,
   PermissionDeniedError,
   type StaffRole,
 } from '../_lib/permissions'
@@ -33,6 +34,7 @@ import {
   type ApproveDecision,
   type RejectDecision,
 } from '@/lib/bidding/alapakkumine'
+import { clampAntiSnipeMinutes } from '@/lib/bidding/anti-snipe'
 import {
   decryptSealedBids,
   getSealedBidsForAuction,
@@ -531,6 +533,50 @@ async function cloneAuctionDraft(
 }
 
 /**
+ * Anti-snipe re-check for the manual end: while the newest bid sits inside
+ * the current per-auction anti-snipe window, the end time must be allowed
+ * to extend first, so the manual end is refused and the operator retries
+ * after the extension. Sealed lots never anti-snipe (checkAntiSnipe), and
+ * lots with the toggle off end freely. Returns the Estonian block message
+ * or null when the end may go through.
+ */
+async function antiSnipeManualEndBlock(
+  repositories: CoreRepositories,
+  auction: AuctionDoc,
+): Promise<string | null> {
+  if (auction.type === 'sealed') return null
+  const deadlines =
+    auction.deadlines !== null && typeof auction.deadlines === 'object'
+      ? (auction.deadlines as Record<string, unknown>)
+      : null
+  if (deadlines?.antiSnipeEnabled !== true) return null
+
+  const endsAtMs = typeof auction.endsAt === 'string' ? Date.parse(auction.endsAt) : Number.NaN
+  if (!Number.isFinite(endsAtMs)) return null
+
+  const rawMinutes = deadlines.antiSnipeMinutes
+  const minutes = clampAntiSnipeMinutes(typeof rawMinutes === 'number' ? rawMinutes : undefined)
+  const windowStartMs = endsAtMs - minutes * 60_000
+  if (Date.now() < windowStartMs) return null
+
+  const newest = await repositories.find({
+    collection: 'bids',
+    where: { and: [{ auction: { equals: auction.id } }] },
+    sort: '-createdAt',
+    limit: 1,
+  })
+  const newestCreatedAt = newest.docs[0]?.createdAt
+  const newestMs =
+    typeof newestCreatedAt === 'string' ? Date.parse(newestCreatedAt) : Number.NaN
+  if (!Number.isFinite(newestMs) || newestMs < windowStartMs) return null
+
+  return (
+    `Antissnipe: oksjonile tuli pakkumine viimase ${String(minutes)} minuti jooksul ` +
+    'ja lõpuaeg pikeneb. Proovi lõpetamist pärast pikendust uuesti.'
+  )
+}
+
+/**
  * Manual end for an active auction (docs/design/admin/02): typed reason of
  * at least 5 characters plus an outcome — declare the leading bid the
  * winner, or mark the lot unsold. Statuses walk the immutable chain one
@@ -561,6 +607,9 @@ export async function endAuctionManuallyAction(formData: FormData): Promise<void
   if (outcome !== 'winner' && outcome !== 'unsold') {
     redirectWithError(feedbackPath, 'Vali lõpetamise tulemus: võitja kuulutamine või müümata märkimine.')
   }
+
+  const antiSnipeBlock = await antiSnipeManualEndBlock(repositories, auction)
+  if (antiSnipeBlock !== null) redirectWithError(feedbackPath, antiSnipeBlock)
 
   const leading = await repositories.find({
     collection: 'bids',
@@ -1086,6 +1135,18 @@ export async function generateContractAction(formData: FormData): Promise<void> 
   )
 }
 
+export interface RevealedBidderIdentity {
+  name: string | null
+  email: string | null
+  /** Isikukood või registrikood maskeeritult (D-16: viimased 4 märki nähtavad). */
+  maskedCode: string | null
+  /** Company chip shows for registrikood bidders. */
+  isCompany: boolean
+  userId: string | null
+  /** User detail link; set server-side only for roles holding users:read. */
+  userHref: string | null
+}
+
 export interface RevealedBidView {
   id: string
   amount: number
@@ -1097,6 +1158,13 @@ export interface RevealedBidView {
   rank: number | null
   /** Viik — varasem esitus võidab (top two amounts equal). */
   tie: boolean
+  /** Marginaal: hälvik järgmise kehtiva pakkumise suhtes (eurot); viimasel null. */
+  marginToNext?: number | null
+  /**
+   * Identity travels only on the ceremony's post-reveal read model, never
+   * on live bids; null when the snapshot is missing or undecryptable.
+   */
+  bidder?: RevealedBidderIdentity | null
 }
 
 export interface CeremonyState {
@@ -1412,15 +1480,19 @@ function rankedViews(decrypted: DecryptedBid[]): RevealedBidView[] {
       if (b.amount !== a.amount) return b.amount - a.amount
       return Date.parse(a.createdAt) - Date.parse(b.createdAt)
     })
-  const views: RevealedBidView[] = valid.map((bid, index) => ({
-    id: bid.id,
-    amount: bid.amount,
-    createdAt: bid.createdAt,
-    valid: true,
-    invalidReason: null,
-    rank: index + 1,
-    tie: false,
-  }))
+  const views: RevealedBidView[] = valid.map((bid, index) => {
+    const next = valid[index + 1]
+    return {
+      id: bid.id,
+      amount: bid.amount,
+      createdAt: bid.createdAt,
+      valid: true,
+      invalidReason: null,
+      rank: index + 1,
+      tie: false,
+      marginToNext: next !== undefined ? bid.amount - next.amount : null,
+    }
+  })
   const top = views[0]
   const second = views[1]
   if (second !== undefined && top?.amount === second.amount) {
@@ -1435,9 +1507,48 @@ function rankedViews(decrypted: DecryptedBid[]): RevealedBidView[] {
       invalidReason: INVALID_BID_REASON,
       rank: null,
       tie: false,
+      marginToNext: null,
     })
   }
   return views
+}
+
+/**
+ * Identity view for the post-reveal record: built ONLY from the decrypted
+ * sealed-bid payload after the one-shot reveal, never from live bids. The
+ * code is masked server-side (D-16, last 4 visible) and the user detail
+ * link is included only for roles holding users:read.
+ */
+function bidderIdentityView(
+  bid: DecryptedBid | undefined,
+  canViewUsers: boolean,
+): RevealedBidderIdentity | null {
+  if (bid === undefined) return null
+  const rawSnapshot = bid.identitySnapshot
+  if (typeof rawSnapshot !== 'string' || rawSnapshot === '') return null
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(rawSnapshot) as Record<string, unknown>
+  } catch {
+    return null
+  }
+  const text = (key: string): string | null => {
+    const value = parsed[key]
+    return typeof value === 'string' && value.trim() !== '' ? value : null
+  }
+  const registrikood = text('registrikood')
+  const isikukood = text('isikukood')
+  const code = registrikood ?? isikukood
+  const userId = bid.user !== '' ? bid.user : null
+  return {
+    name: text('name'),
+    email: text('email'),
+    maskedCode: code !== null ? maskIsikukood(code) : null,
+    isCompany: registrikood !== null,
+    userId,
+    userHref:
+      canViewUsers && userId !== null ? `/admin/users/${encodeURIComponent(userId)}` : null,
+  }
 }
 
 export interface SealedCeremonyChecklist {
@@ -1562,7 +1673,15 @@ export async function sealedCeremonyStateAction(auctionId: string): Promise<Seal
   let topMeetsReserve: boolean | null = null
   if (revealEntry !== null) {
     const decrypted = decryptSealedBids(await getSealedBidsForAuction(auctionId))
-    bids = rankedViews(decrypted)
+    // Identity is ceremony-scoped and post-reveal only: this replay runs
+    // behind the sealed:read gate and after the one-shot sealed.reveal
+    // entry. The users link rides along only for users:read roles.
+    const canViewUsers = can(session.role, 'users:read')
+    const decryptedById = new Map(decrypted.map((bid) => [bid.id, bid]))
+    bids = rankedViews(decrypted).map((bid) => ({
+      ...bid,
+      bidder: bidderIdentityView(decryptedById.get(bid.id), canViewUsers),
+    }))
     const topValid = bids.find((bid) => bid.valid)
     if (topValid && typeof auction.reservePriceCents === 'number') {
       topMeetsReserve = eurosToCents(topValid.amount) >= auction.reservePriceCents

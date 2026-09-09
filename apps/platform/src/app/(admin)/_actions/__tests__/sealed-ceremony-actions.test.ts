@@ -275,6 +275,26 @@ const sealedRow = (
   valid,
 })
 
+/** Sealed-bid identity snapshot payload (private bidder, wire shape). */
+const privateIdentity = (name: string): Record<string, unknown> => ({
+  name,
+  aadress: 'Puiestee 1, Tartu',
+  email: `${name.toLowerCase().replace(/\s+/g, '.')}@iid.ee`,
+  telefon: '51234567',
+  isikukood: '38705160516',
+})
+
+const identityRow = (
+  id: string,
+  user: string,
+  amount: number,
+  createdAt: string,
+  identity: Record<string, unknown>,
+): Record<string, unknown> => ({
+  ...sealedRow(id, user, amount, createdAt),
+  identitySnapshot: JSON.stringify(identity),
+})
+
 async function signOpenerAndApprover(_repos: Repos): Promise<void> {
   state.cookies.access_token = 'token-opener'
   const opener = await signSealedOpenerAction(actionState('checklist'), form({ auctionId, keyword: 'AVAN' }))
@@ -525,6 +545,16 @@ describe('sealedCeremonyStateAction (ranked read model)', () => {
     decryptMock.mockImplementation((bids) => bids as unknown as DecryptedBid[])
   })
 
+  const revealedRepos = (): Repos =>
+    makeRepos(
+      cleanFixture({
+        auditEntries: {
+          auction_ended: [{ id: 'worker-1', createdAt: minutesAgo(10) }],
+          'sealed.reveal': [{ id: 'reveal-1', createdAt: minutesAgo(5) }],
+        },
+      }),
+    )
+
   it('denies a role without sealed:read', async () => {
     state.session = { userId: 'specialist-1', role: 'specialist' }
     useRepos(makeRepos(cleanFixture()))
@@ -630,6 +660,84 @@ describe('sealedCeremonyStateAction (ranked read model)', () => {
 
     expect(context.bids).toHaveLength(1)
     expect(context.topMeetsReserve).toBe(false)
+  })
+
+  it('keeps the ranking empty and identity-free before the one-shot reveal', async () => {
+    useRepos(makeRepos(cleanFixture()))
+    getSealedBidsMock.mockResolvedValue([
+      identityRow('bid-1', 'user-a', 150_000, minutesAgo(31), privateIdentity('Kalle Tamm')),
+    ] as never)
+
+    const context = await sealedCeremonyStateAction(auctionId)
+
+    expect(context.revealed).toBe(false)
+    expect(context.bids).toEqual([])
+    expect(getSealedBidsMock).not.toHaveBeenCalled()
+  })
+
+  it('attaches post-reveal identity with the masked code, company flag and users link', async () => {
+    useRepos(revealedRepos())
+    getSealedBidsMock.mockResolvedValue([
+      identityRow('bid-1', 'user-a', 150_000, minutesAgo(31), privateIdentity('Kalle Tamm')),
+      identityRow('bid-2', 'user-b', 120_000, minutesAgo(29), {
+        name: 'Mets OÜ',
+        aadress: 'Talu tee 2',
+        email: 'info@metsou.ee',
+        telefon: '51234568',
+        registrikood: '12345678',
+      }),
+      sealedRow('bid-3', 'user-c', 100_000, minutesAgo(28)),
+    ] as never)
+
+    const context = await sealedCeremonyStateAction(auctionId)
+
+    expect(context.bids[0]?.bidder).toEqual({
+      name: 'Kalle Tamm',
+      email: 'kalle.tamm@iid.ee',
+      maskedCode: '••••••0516',
+      isCompany: false,
+      userId: 'user-a',
+      userHref: '/admin/users/user-a',
+    })
+    expect(context.bids[1]?.bidder).toEqual({
+      name: 'Mets OÜ',
+      email: 'info@metsou.ee',
+      maskedCode: '••••••5678',
+      isCompany: true,
+      userId: 'user-b',
+      userHref: '/admin/users/user-b',
+    })
+    // No snapshot (or an undecryptable one): identity stays null, never partial.
+    expect(context.bids[2]?.bidder).toBeNull()
+  })
+
+  it('computes the marginaal to the next ranked bid, null on the tail and invalid rows', async () => {
+    useRepos(revealedRepos())
+    getSealedBidsMock.mockResolvedValue([
+      identityRow('bid-1', 'user-a', 150_000, minutesAgo(31), privateIdentity('Kalle Tamm')),
+      identityRow('bid-2', 'user-b', 120_000, minutesAgo(29), privateIdentity('Mari Mets')),
+      sealedRow('bid-3', 'user-c', 100_000, minutesAgo(28)),
+      sealedRow('bid-bad', 'user-d', 999_000, minutesAgo(27), false),
+    ] as never)
+
+    const context = await sealedCeremonyStateAction(auctionId)
+
+    expect(context.bids.map((bid) => bid.marginToNext)).toEqual([30_000, 20_000, null, null])
+  })
+
+  it('returns a null identity when the snapshot is not valid JSON', async () => {
+    useRepos(revealedRepos())
+    getSealedBidsMock.mockResolvedValue([
+      {
+        ...sealedRow('bid-1', 'user-a', 150_000, minutesAgo(31)),
+        identitySnapshot: 'not-json{',
+      },
+    ] as never)
+
+    const context = await sealedCeremonyStateAction(auctionId)
+
+    expect(context.bids[0]?.bidder).toBeNull()
+    expect(context.bids[0]?.marginToNext).toBeNull()
   })
 })
 

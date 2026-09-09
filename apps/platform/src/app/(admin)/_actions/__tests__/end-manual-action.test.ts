@@ -126,6 +126,15 @@ const activeAuction = {
   sellerId: 'seller-1',
 }
 
+/** Open active lot inside the final anti-snipe window by default. */
+const activeAntiSnipeAuction = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  ...activeAuction,
+  type: 'open',
+  endsAt: new Date(Date.now() + 2 * 60_000).toISOString(),
+  deadlines: { antiSnipeEnabled: true, antiSnipeMinutes: 5 },
+  ...overrides,
+})
+
 const leadingBid = {
   id: 'bid-1',
   auctionId: 'auction-1',
@@ -325,5 +334,109 @@ describe('endAuctionManuallyAction', () => {
       endAuctionManuallyAction(form({ id: 'auction-1', reason: 'müük tühistati', outcome: 'unsold' })),
     )
     expect(url.searchParams.get('viga')).toBe('Käsitsi lõpetamine ebaõnnestus: db down')
+  })
+
+  describe('anti-snipe re-check', () => {
+    /** Routes the leading-bid query and the newest-bid re-check separately. */
+    const withBids = (
+      repos: Repos,
+      newestBid: Record<string, unknown> | null,
+    ): void => {
+      repos.find.mockImplementation((args: FindArgs) => {
+        if (args.collection !== 'bids') return Promise.resolve({ docs: [] })
+        const whereText = JSON.stringify(args.where ?? {})
+        if (whereText.includes('"leading"')) {
+          return Promise.resolve({ docs: [leadingBid] })
+        }
+        return Promise.resolve({ docs: newestBid === null ? [] : [newestBid] })
+      })
+    }
+
+    const recentBid = (minutesAgoValue: number): Record<string, unknown> => ({
+      id: 'bid-recent',
+      auctionId: 'auction-1',
+      amountCents: 90_000,
+      status: 'leading',
+      createdAt: new Date(Date.now() - minutesAgoValue * 60_000).toISOString(),
+    })
+
+    it('blocks the manual end while the newest bid sits inside the anti-snipe window', async () => {
+      const repos = makeRepos(() => undefined)
+      withBids(repos, recentBid(1))
+      withAuction(activeAntiSnipeAuction(), repos)
+      useRepos(repos)
+      const url = await redirectOf(() =>
+        endAuctionManuallyAction(form({ id: 'auction-1', reason: 'müük tühistati', outcome: 'winner' })),
+      )
+      expect(url.searchParams.get('viga')).toBe(
+        'Antissnipe: oksjonile tuli pakkumine viimase 5 minuti jooksul ja lõpuaeg pikeneb. Proovi lõpetamist pärast pikendust uuesti.',
+      )
+      expect(repos.updates).toEqual([])
+      expect(repos.creates).toEqual([])
+    })
+
+    it('allows the manual end once the newest bid is older than the window', async () => {
+      const repos = makeRepos(() => undefined)
+      withBids(repos, recentBid(10))
+      withAuction(activeAntiSnipeAuction(), repos)
+      useRepos(repos)
+      const url = await redirectOf(() =>
+        endAuctionManuallyAction(form({ id: 'auction-1', reason: 'oksjon lõpetati enne tähtaega', outcome: 'winner' })),
+      )
+      expect(url.searchParams.get('teade')).toBe('Oksjon lõpetatud; juhtiv pakkumus kuulutatud võitjaks.')
+      expect(repos.updates.map((update) => update.data)).toContainEqual({
+        status: 'appraised',
+        winningBid: 'bid-1',
+        finalPriceCents: 80_000,
+      })
+    })
+
+    it('skips the re-check when anti-snipe is disabled for the auction', async () => {
+      const repos = makeRepos(() => undefined)
+      withBids(repos, recentBid(1))
+      withAuction(
+        activeAntiSnipeAuction({ deadlines: { antiSnipeEnabled: false, antiSnipeMinutes: 5 } }),
+        repos,
+      )
+      useRepos(repos)
+      const url = await redirectOf(() =>
+        endAuctionManuallyAction(form({ id: 'auction-1', reason: 'müük tühistati', outcome: 'unsold' })),
+      )
+      expect(url.searchParams.get('teade')).toBe('Oksjon lõpetatud ja märgitud müümata.')
+    })
+
+    it('honors the per-auction anti-snipe minutes', async () => {
+      const tightWindow = async (minutes: number): Promise<URL> => {
+        const repos = makeRepos(() => undefined)
+        withBids(repos, recentBid(1.5))
+        withAuction(
+          activeAntiSnipeAuction({
+            endsAt: new Date(Date.now() + 60_000).toISOString(),
+            deadlines: { antiSnipeEnabled: true, antiSnipeMinutes: minutes },
+          }),
+          repos,
+        )
+        useRepos(repos)
+        return redirectOf(() =>
+          endAuctionManuallyAction(form({ id: 'auction-1', reason: 'müük tühistati', outcome: 'unsold' })),
+        )
+      }
+      // 90 s old bid: outside a 2-minute end window, inside a 5-minute one.
+      const allowed = await tightWindow(2)
+      expect(allowed.searchParams.get('teade')).toBe('Oksjon lõpetatud ja märgitud müümata.')
+      const blocked = await tightWindow(5)
+      expect(blocked.searchParams.get('viga')).toContain('Antissnipe')
+    })
+
+    it('skips the re-check for sealed lots where anti-snipe never applies', async () => {
+      const repos = makeRepos(() => undefined)
+      withBids(repos, recentBid(1))
+      withAuction(activeAntiSnipeAuction({ type: 'sealed' }), repos)
+      useRepos(repos)
+      const url = await redirectOf(() =>
+        endAuctionManuallyAction(form({ id: 'auction-1', reason: 'müük tühistati', outcome: 'unsold' })),
+      )
+      expect(url.searchParams.get('teade')).toBe('Oksjon lõpetatud ja märgitud müümata.')
+    })
   })
 })
