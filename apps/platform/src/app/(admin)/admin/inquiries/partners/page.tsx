@@ -11,6 +11,7 @@ import { DataTable } from '../../../_components/DataTable'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import {
   FormField,
+  FormTextareaField,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../../../_components/FormField'
@@ -18,6 +19,7 @@ import { PageHeader } from '../../../_components/PageHeader'
 import { requireAdminRepositories } from '../../../_lib/admin'
 import { formatDateTime } from '../../../_lib/labels'
 import { can } from '../../../_lib/permissions'
+import { resolveRegistrySnapshot } from '../../leads/_components/registry-snapshot'
 
 import type { AuditEntryDoc, PartnerDoc } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
@@ -41,10 +43,45 @@ function countyChips(partner: PartnerDoc): string {
     .join(', ')
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
+}
+
+/**
+ * Registrikood, kontaktisik and märkus have no partners-table columns; they
+ * persist in the audited create/update record (task 8.6). The latest entry
+ * per partner wins.
+ */
+interface PartnerRecordExtras {
+  regCode: string | null
+  contactPerson: string | null
+  note: string | null
+}
+
+function resolvePartnerExtras(
+  audits: readonly (AuditEntryDoc & { entityId?: string | null })[],
+): Map<string, PartnerRecordExtras> {
+  const byPartner = new Map<string, PartnerRecordExtras>()
+  for (const entry of audits) {
+    if (entry.action !== 'partner.create' && entry.action !== 'partner.update') continue
+    if (!entry.entityId) continue
+    const after = asRecord(entry.after)
+    byPartner.set(entry.entityId, {
+      regCode: typeof after.regCode === 'string' ? after.regCode : null,
+      contactPerson: typeof after.contactPerson === 'string' ? after.contactPerson : null,
+      note: typeof after.note === 'string' ? after.note : null,
+    })
+  }
+  return byPartner
+}
+
 interface PartnerFormDefaults {
   name: string
+  regCode: string
   contactEmail: string
   contactPhone: string
+  contactPerson: string
+  note: string
   serviceTypes: string[]
   counties: string[]
   capacity: string
@@ -53,8 +90,11 @@ interface PartnerFormDefaults {
 
 const EMPTY_FORM: PartnerFormDefaults = {
   name: '',
+  regCode: '',
   contactEmail: '',
   contactPhone: '',
+  contactPerson: '',
+  note: '',
   serviceTypes: [],
   counties: [],
   capacity: '5',
@@ -78,6 +118,13 @@ function PartnerForm({
       <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
         <FormField label="Ettevõtte nimi" name="name" defaultValue={defaults.name} required />
         <FormField
+          label="Registrikood"
+          name="regCode"
+          defaultValue={defaults.regCode}
+          inputMode="numeric"
+          hint="8 numbrit; täitke Äriregistri eeltäidiseks ja sisestage käsitsi."
+        />
+        <FormField
           label="Suunamise e-post"
           name="contactEmail"
           type="email"
@@ -85,6 +132,7 @@ function PartnerForm({
           required
         />
         <FormField label="Telefon" name="contactPhone" defaultValue={defaults.contactPhone} />
+        <FormField label="Kontaktisik" name="contactPerson" defaultValue={defaults.contactPerson} />
         <FormField
           label="Mahtude limiit (avatud päringud)"
           name="capacity"
@@ -94,6 +142,7 @@ function PartnerForm({
           required
         />
       </div>
+      <FormTextareaField label="Märkus" name="note" rows={2} defaultValue={defaults.note} />
 
       <fieldset>
         <legend className="mb-xs text-label font-semibold text-ink">Teenused</legend>
@@ -153,9 +202,9 @@ function PartnerForm({
 export default async function PartnersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ viga?: string; teade?: string; muuda?: string; lisa?: string }>
+  searchParams: Promise<{ viga?: string; teade?: string; muuda?: string; lisa?: string; reg?: string }>
 }) {
-  const { viga, teade, muuda, lisa } = await searchParams
+  const { viga, teade, muuda, lisa, reg } = await searchParams
   const { session } = await requireAdminRepositories()
   if (!can(session.role, 'inquiries:read')) {
     return (
@@ -174,6 +223,15 @@ export default async function PartnersPage({
     sort: 'name',
     pagination: false,
   })
+  const { docs: partnerAudits } = await repositories.find({
+    collection: 'audit-entry',
+    where: { entityType: { equals: 'partner' } },
+    sort: '-createdAt',
+    pagination: false,
+  })
+  const extrasByPartner = resolvePartnerExtras(
+    partnerAudits as (AuditEntryDoc & { entityId?: string | null })[],
+  )
   const { docs: forwardAudits } = await repositories.find({
     collection: 'audit-entry',
     where: {
@@ -185,6 +243,13 @@ export default async function PartnersPage({
     sort: '-createdAt',
     pagination: false,
   })
+
+  // Äriregister prefill (task 8.6): no live fetch action exists yet, so the
+  // fixture-backed registry snapshot resolves the structure read-only from
+  // the ?reg= query and prefills the create form when the code is known.
+  const registryLookup = reg
+    ? resolveRegistrySnapshot(reg.trim(), null, null)
+    : null
 
   const lastForwardedAt = new Map<string, string>()
   for (const entry of forwardAudits as (AuditEntryDoc & { entityId?: string | null })[]) {
@@ -198,29 +263,38 @@ export default async function PartnersPage({
     }
   }
 
-  const rows = partners.map((partner) => ({
-    id: partner.id,
-    name: partner.name,
-    contactEmail: partner.contactEmail,
-    contactPhone: partner.contactPhone,
-    services: (Array.isArray(partner.serviceTypes)
-      ? partner.serviceTypes.filter((type): type is ServiceRequestType =>
-          serviceRequestTypes.includes(type as ServiceRequestType),
-        )
-      : []
-    ).map((type) => typeLabels[type]),
-    counties: countyChips(partner),
-    capacity: partner.capacity,
-    active: partner.active,
-    lastForwardedAt: lastForwardedAt.get(partner.id) ?? null,
-  }))
+  const rows = partners.map((partner) => {
+    const extras = extrasByPartner.get(partner.id)
+    return {
+      id: partner.id,
+      name: partner.name,
+      regCode: extras?.regCode ?? null,
+      contactEmail: partner.contactEmail,
+      contactPhone: partner.contactPhone,
+      contactPerson: extras?.contactPerson ?? null,
+      note: extras?.note ?? null,
+      services: (Array.isArray(partner.serviceTypes)
+        ? partner.serviceTypes.filter((type): type is ServiceRequestType =>
+            serviceRequestTypes.includes(type as ServiceRequestType),
+          )
+        : []
+      ).map((type) => typeLabels[type]),
+      counties: countyChips(partner),
+      capacity: partner.capacity,
+      active: partner.active,
+      lastForwardedAt: lastForwardedAt.get(partner.id) ?? null,
+    }
+  })
 
   const editing = muuda ? (partners.find((partner) => partner.id === muuda) ?? null) : null
   const editingDefaults: PartnerFormDefaults | null = editing
     ? {
         name: editing.name,
+        regCode: extrasByPartner.get(editing.id)?.regCode ?? '',
         contactEmail: editing.contactEmail ?? '',
         contactPhone: editing.contactPhone ?? '',
+        contactPerson: extrasByPartner.get(editing.id)?.contactPerson ?? '',
+        note: extrasByPartner.get(editing.id)?.note ?? '',
         serviceTypes: Array.isArray(editing.serviceTypes)
           ? editing.serviceTypes.filter((type): type is string => typeof type === 'string')
           : [],
@@ -231,6 +305,15 @@ export default async function PartnersPage({
         active: editing.active,
       }
     : null
+  const createDefaults: PartnerFormDefaults = {
+    ...EMPTY_FORM,
+    // Äriregister prefill: only a verified legal name fills the form; the
+    // typed registrikood stays in its field for the round-trip.
+    ...(registryLookup?.status === 'REGISTREERITUD' && registryLookup.legalName
+      ? { name: registryLookup.legalName }
+      : {}),
+    ...(reg && /^\d{8}$/.test(reg.trim()) ? { regCode: reg.trim() } : {}),
+  }
 
   return (
     <div>
@@ -256,10 +339,37 @@ export default async function PartnersPage({
       </div>
 
       {lisa ? (
-        <div className="mb-md">
+        <div className="mb-md space-y-sm">
+          <form
+            method="get"
+            action="/admin/inquiries/partners"
+            className="flex flex-wrap items-end gap-xs rounded-card border border-border bg-bg-mist p-sm"
+          >
+            <input type="hidden" name="lisa" value="1" />
+            <FormField label="Registrikood (Äriregister)" name="reg" defaultValue={reg ?? ''} />
+            <button
+              type="submit"
+              className="inline-flex h-10 items-center rounded-button border border-border bg-bgPage px-4 text-label font-semibold text-ink hover:border-primary hover:text-primary"
+            >
+              Laadi andmed
+            </button>
+            {registryLookup ? (
+              <span
+                className={`rounded-pill px-2 py-0.5 text-label font-semibold ${
+                  registryLookup.status === 'REGISTREERITUD'
+                    ? 'bg-primary-light text-primaryDark'
+                    : 'bg-bg-mist text-ink-muted'
+                }`}
+              >
+                {registryLookup.status === 'REGISTREERITUD'
+                  ? `Äriregister: ${registryLookup.legalName ?? ''}`
+                  : 'Äriregister: kinnitamata — sisestage andmed käsitsi'}
+              </span>
+            ) : null}
+          </form>
           <PartnerForm
             action={createPartnerAction}
-            defaults={EMPTY_FORM}
+            defaults={createDefaults}
             submitLabel="Loo partner"
           />
         </div>
@@ -282,8 +392,15 @@ export default async function PartnersPage({
       <DataTable
         columns={[
           { key: 'name', label: 'Ettevõte' },
+          { key: 'regCode', label: 'Registrikood', render: (row) => row.regCode ?? '—' },
           { key: 'contactEmail', label: 'E-post', render: (row) => row.contactEmail ?? '—' },
           { key: 'contactPhone', label: 'Telefon', render: (row) => row.contactPhone ?? '—' },
+          { key: 'contactPerson', label: 'Kontaktisik', render: (row) => row.contactPerson ?? '—' },
+          {
+            key: 'note',
+            label: 'Märkus',
+            render: (row) => (row.note ? <span title={row.note}>{row.note}</span> : '—'),
+          },
           {
             key: 'services',
             label: 'Teenused',
@@ -321,13 +438,31 @@ export default async function PartnersPage({
                 >
                   Muuda
                 </Link>
-                <form action={setPartnerActiveAction}>
-                  <input type="hidden" name="id" value={row.id} />
-                  <input type="hidden" name="active" value={row.active ? 'off' : 'on'} />
-                  <button type="submit" className="text-label font-semibold text-ink-muted hover:text-primary">
-                    {row.active ? 'Deaktiveeri' : 'Aktiveeri'}
-                  </button>
-                </form>
+                {row.active ? (
+                  <form action={setPartnerActiveAction} className="flex items-center gap-xs">
+                    <input type="hidden" name="id" value={row.id} />
+                    <input type="hidden" name="active" value="off" />
+                    <input
+                      type="text"
+                      name="reason"
+                      aria-label="Deaktiveerimise põhjus"
+                      placeholder="Põhjus"
+                      required
+                      className="h-8 w-32 rounded-input border border-border bg-bgPage px-2 text-bodySm text-ink outline-none focus:border-primary"
+                    />
+                    <button type="submit" className="text-label font-semibold text-ink-muted hover:text-danger">
+                      Deaktiveeri
+                    </button>
+                  </form>
+                ) : (
+                  <form action={setPartnerActiveAction}>
+                    <input type="hidden" name="id" value={row.id} />
+                    <input type="hidden" name="active" value="on" />
+                    <button type="submit" className="text-label font-semibold text-ink-muted hover:text-primary">
+                      Aktiveeri
+                    </button>
+                  </form>
+                )}
                 <form action={deletePartnerAction}>
                   <input type="hidden" name="id" value={row.id} />
                   <button type="submit" className="text-label font-semibold text-danger hover:text-danger">

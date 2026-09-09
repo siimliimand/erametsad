@@ -36,6 +36,7 @@ function makeLead(overrides: Partial<Lead>): Lead {
 const emptyContext: LeadExportContext = {
   consentWithdrawnAtByIpHash: new Map(),
   specialistNames: new Map(),
+  countyNames: new Map(),
   nextActionAtByLeadId: new Map(),
   noteCountsByLeadId: new Map(),
 }
@@ -109,6 +110,7 @@ describe('buildLeadExportRows', () => {
         'phone',
         'email',
         'cadastr',
+        'county',
         'source',
         'status',
         'specialist',
@@ -117,6 +119,19 @@ describe('buildLeadExportRows', () => {
         'noteCount',
       ].sort(),
     )
+  })
+
+  it('maps the county name from the counties map (task 8.2)', () => {
+    const rows = buildLeadExportRows(
+      [makeLead({ countyId: 'county-hh' }), makeLead({ id: 'lead-x', countyId: 'county-404' }), makeLead({ id: 'lead-y', countyId: null })],
+      {
+        ...emptyContext,
+        countyNames: new Map([['county-hh', 'Harju']]),
+      },
+    )
+    expect(rows[0]?.county).toBe('Harju')
+    expect(rows[1]?.county).toBe('—')
+    expect(rows[2]?.county).toBe('—')
   })
 
   it('maps status, specialist, next action and note count', () => {
@@ -159,6 +174,7 @@ describe('buildLeadsCsv', () => {
         phone: '+372 500 100',
         email: 'jaan@tamm.ee',
         cadastr: '34801:001:0217',
+        county: 'Harju',
         source: 'hindamisakt · teenused/metsa-hindamine',
         status: 'Uus',
         specialist: 'määramata',
@@ -175,6 +191,7 @@ describe('buildLeadsCsv', () => {
       '+372 500 100',
       'jaan@tamm.ee',
       '34801:001:0217',
+      'Harju',
       'hindamisakt · teenused/metsa-hindamine',
       'Uus',
       'määramata',
@@ -194,6 +211,7 @@ describe('buildLeadsCsv', () => {
         phone: '',
         email: '',
         cadastr: '',
+        county: '',
         source: 'märkus\nteisel real',
         status: 'Uus',
         specialist: 'määramata',

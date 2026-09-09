@@ -165,7 +165,7 @@ describe('createLeadAction county derivation (task 8.1)', () => {
         form({ contactName: 'Mari Maasikas', phone: '+37251110000', consent: 'on' }),
       ),
     )
-    expect(repos.finds).toHaveLength(0)
+    expect(repos.finds.some((entry) => entry.collection === 'counties')).toBe(false)
 
     repos.findDocsByCollection.counties = []
     await redirectOf(() =>

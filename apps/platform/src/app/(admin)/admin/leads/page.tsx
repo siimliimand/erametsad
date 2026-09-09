@@ -1,8 +1,8 @@
 import Link from 'next/link'
 
 import { LeadsKanban, type KanbanCardView } from './_components/LeadsKanban'
-import { findDuplicateLead, leadSlaBadge } from './_components/lead-flow'
-import { createLeadAction } from '../../_actions/ops'
+import { findDuplicateLead, leadSlaBadge, resolveLeadLifecycleFlags, type LeadLifecycleFlags } from './_components/lead-flow'
+import { createLeadAction, mergeLeadAction } from '../../_actions/ops'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import {
@@ -98,6 +98,7 @@ export default async function AdminLeadsPage({
   })
   const nextActionByLead = new Map<string, NextActionView>()
   const noteCounts = new Map<string, number>()
+  const auditsByLead = new Map<string, (AuditEntryDoc & { entityId?: string | null })[]>()
   for (const entry of leadAudits as (AuditEntryDoc & { entityId?: string | null })[]) {
     if (!entry.entityId) continue
     if (entry.action === 'lead.next_action') {
@@ -112,6 +113,15 @@ export default async function AdminLeadsPage({
     if (entry.action === 'lead.note') {
       noteCounts.set(entry.entityId, (noteCounts.get(entry.entityId) ?? 0) + 1)
     }
+    const list = auditsByLead.get(entry.entityId) ?? []
+    list.push(entry)
+    auditsByLead.set(entry.entityId, list)
+  }
+  // Soft-deleted and merged-away leads leave the list; the detail view keeps
+  // rendering them with a banner (task 8.2).
+  const lifecycleByLead = new Map<string, LeadLifecycleFlags>()
+  for (const [leadId, entries] of auditsByLead) {
+    lifecycleByLead.set(leadId, resolveLeadLifecycleFlags(entries))
   }
 
   const filteredLeads = scopedLeads.filter((lead) => {
@@ -122,6 +132,8 @@ export default async function AdminLeadsPage({
     }
     if (sla === '1' && !leadSlaBadge(lead.createdAt, lead.status)) return false
     if (maakond && lead.countyId !== maakond) return false
+    const lifecycle = lifecycleByLead.get(lead.id)
+    if (lifecycle?.deleted || lifecycle?.mergedIntoId) return false
     return true
   })
 
@@ -364,12 +376,24 @@ export default async function AdminLeadsPage({
               label: 'Duplikaat',
               render: (row) =>
                 row.duplicateOfId ? (
-                  <Link
-                    href={`/admin/leads/${row.duplicateOfId}`}
-                    className="text-info underline"
-                  >
-                    võimalik duplikaat
-                  </Link>
+                  <div className="flex flex-col items-start gap-1">
+                    <Link
+                      href={`/admin/leads/${row.duplicateOfId}`}
+                      className="text-info underline"
+                    >
+                      võimalik duplikaat
+                    </Link>
+                    <form action={mergeLeadAction}>
+                      <input type="hidden" name="id" value={row.id} />
+                      <input type="hidden" name="targetId" value={row.duplicateOfId} />
+                      <button
+                        type="submit"
+                        className="text-label font-semibold text-primary hover:text-primaryHover"
+                      >
+                        Ühenda
+                      </button>
+                    </form>
+                  </div>
                 ) : (
                   '—'
                 ),

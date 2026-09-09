@@ -7,6 +7,7 @@ import {
   moveLeadStatusFormAction,
   setLeadCountyAction,
   setLeadNextActionAction,
+  softDeleteLeadAction,
 } from '../../../_actions/ops'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import {
@@ -19,7 +20,7 @@ import { PageHeader } from '../../../_components/PageHeader'
 import { requireAdminRepositories } from '../../../_lib/admin'
 import { formatDateTime, leadStatusLabels, LeadStatusPill } from '../../../_lib/labels'
 import { can, leadInScope, leadScope } from '../../../_lib/permissions'
-import { roundRobinSuggestion } from '../_components/lead-flow'
+import { resolveLeadLifecycleFlags, roundRobinSuggestion } from '../_components/lead-flow'
 import { leadAttachmentUrl, resolveLeadSubmission } from '../_components/lead-submission'
 
 import { getRepositories } from '@/lib/data/runtime'
@@ -170,6 +171,13 @@ export default async function LeadDetailPage({
   // creation audit entry; the section renders when either exists.
   const submission = resolveLeadSubmission(leadAudits)
 
+  // Task 8.2: soft-delete tombstone and duplicate-merge cross-links live in
+  // the append-only audit trail.
+  const lifecycle = resolveLeadLifecycleFlags(leadAudits)
+  const lifecycleTargetShortId = lifecycle.mergedIntoId
+    ? `#${lifecycle.mergedIntoId.slice(0, 8)}`
+    : null
+
   // Round-robin suggestion: active specialists, fewest open-pipeline leads first.
   const openCounts = new Map<string, number>()
   for (const specialist of specialists) {
@@ -226,6 +234,22 @@ export default async function LeadDetailPage({
         </div>
       ) : null}
 
+      {lifecycle.mergedIntoId && lifecycleTargetShortId ? (
+        <div className="mb-md rounded-input border border-info bg-info-light px-md py-sm text-bodySm text-info">
+          See juhtlõige on ühendatud juhtlõimega{' '}
+          <Link href={`/admin/leads/${lifecycle.mergedIntoId}`} className="underline">
+            {lifecycleTargetShortId}
+          </Link>
+          .
+        </div>
+      ) : null}
+      {lifecycle.deleted ? (
+        <div className="mb-md rounded-input border border-danger bg-danger-light px-md py-sm text-bodySm text-danger">
+          Arhiveeritud (pehme kustutamine)
+          {lifecycle.deleteReason ? ` — põhjus: ${lifecycle.deleteReason}` : ''}.
+        </div>
+      ) : null}
+
       <div className="mb-sm grid max-w-container-sm grid-cols-1 gap-sm rounded-card border border-border bg-bgPage p-md sm:grid-cols-2">
         <Field label="Allikavorm">{lead.formName}</Field>
         <Field label="Lehekülg">{lead.pageSlug ?? '—'}</Field>
@@ -278,7 +302,7 @@ export default async function LeadDetailPage({
         </Field>
       </div>
 
-      {can(session.role, 'leads:write') ? (
+      {can(session.role, 'leads:write') && !lifecycle.deleted ? (
         <div className="mb-sm grid max-w-container-sm grid-cols-1 gap-sm">
           <form
             action={moveLeadStatusFormAction}
@@ -287,12 +311,17 @@ export default async function LeadDetailPage({
             <input type="hidden" name="id" value={lead.id} />
             <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
               <FormSelectField label="Oleku muutus" name="status" options={statusOptions} defaultValue={lead.status} />
+              <FormField
+                label="Oksjoni/lepingu viide"
+                name="reference"
+                hint="Nõutav Lepingu olekus, kui märkus puudub."
+              />
             </div>
             <FormTextareaField
               label="Märkus / põhjus"
               name="note"
               rows={2}
-              hint="Kohustuslik kvalifitseerimisel ja mittekvalifitseerimisel (vähemalt 5 tähemärki)."
+              hint="Kohustuslik esimesel ühenduse võtmisel, kvalifitseerimisel ja mittekvalifitseerimisel (vähemalt 5 tähemärki). Lepingu puhul piisab oksjoni/lepingu viitest."
             />
             <button type="submit" className={primaryButtonClass}>
               Muuda olekut
@@ -373,6 +402,28 @@ export default async function LeadDetailPage({
               Salvesta märkus
             </button>
           </form>
+
+          {session.role === 'superadmin' ? (
+            <form
+              action={softDeleteLeadAction}
+              className="space-y-sm rounded-card border border-danger bg-danger-light p-md"
+            >
+              <input type="hidden" name="id" value={lead.id} />
+              <p className="text-bodySm text-danger">
+                Pehme kustutamine arhiveerib juhtlõime koos tüüpitud põhjusega; rida jääb
+                andmebaasi ja sissekanne läheb auditilogisse.
+              </p>
+              <FormTextareaField
+                label="Kustutamise põhjus (kohustuslik)"
+                name="reason"
+                rows={2}
+                required
+              />
+              <button type="submit" className={primaryButtonClass}>
+                Kustuta (pehme)
+              </button>
+            </form>
+          ) : null}
         </div>
       ) : null}
 

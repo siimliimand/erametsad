@@ -529,3 +529,161 @@ describe('requests list role gating', () => {
     expect(container.querySelector('table')).toBeNull()
   })
 })
+
+function forwardLogSection(): HTMLElement {
+  const heading = [...container.querySelectorAll('h3')].find(
+    (candidate) => candidate.textContent === 'Edastamise log',
+  )
+  if (heading === undefined) throw new Error('forward log section not found')
+  const section = heading.parentElement
+  if (section === null) throw new Error('forward log body not found')
+  return section
+}
+
+function forwardLogRows(): HTMLTableRowElement[] {
+  const body = forwardLogSection().querySelector('tbody')
+  if (body === null) throw new Error('forward log table not found')
+  return [...body.querySelectorAll<HTMLTableRowElement>('tr')]
+}
+
+function forwardLogRow(index: number): HTMLTableRowElement {
+  const row = forwardLogRows()[index]
+  if (row === undefined) throw new Error(`forward log row ${String(index)} not found`)
+  return row
+}
+
+function forwardLogCell(rowIndex: number, cellIndex: number): HTMLElement {
+  const cell = forwardLogRow(rowIndex).querySelectorAll('td')[cellIndex]
+  if (cell === undefined) throw new Error(`forward log cell ${String(cellIndex)} not found`)
+  return cell
+}
+
+describe('forwarding log Vastanud/Märkus/järjekorras columns (task 8.6)', () => {
+  it('renders the real response time and the partner note', async () => {
+    useDocs({
+      'service-requests': [
+        makeRequest({
+          id: 'req-answered',
+          contactName: 'Mati Tamm',
+          status: 'routed',
+          routedTo: ['p1'],
+          updatedAt: daysAgoAt(2),
+        }),
+      ],
+      partners,
+      'audit-entry': [
+        makeAudit('a1', 'request.forward', 'req-answered', 2, {
+          partnerId: 'p1',
+          partnerName: 'Metsapartner OÜ',
+          recipient: 'partner@meil.ee',
+          emailResult: { success: true },
+        }),
+        makeAudit('a4', 'request.mark_responded', 'req-answered', 1, {
+          partnerId: 'p1',
+          partnerName: 'Metsapartner OÜ',
+          note: 'Hindame ja vastame esmaspäevaks',
+        }),
+      ],
+    })
+    await mountPage({ detail: 'req-answered' })
+
+    const headers = [...forwardLogSection().querySelectorAll('th')].map((th) => th.textContent)
+    expect(headers).toContain('Vastanud')
+    expect(headers).toContain('Märkus')
+
+    const forwardRow = forwardLogRow(0)
+    expect(forwardRow.textContent).not.toContain('järjekorras')
+    // The Vastanud cell holds a formatted timestamp instead of a dash.
+    const vastanudCell = forwardLogCell(0, 3)
+    expect(vastanudCell.textContent).not.toBe('—')
+    expect(vastanudCell.textContent).toMatch(/\d/)
+
+    expect(forwardLogCell(0, 4).textContent).toBe('Hindame ja vastame esmaspäevaks')
+  })
+
+  it('marks delivered but unanswered forwards as järjekorras', async () => {
+    await mountPage({ detail: 'req-expired' })
+
+    const row = forwardLogRow(0)
+    expect(row.textContent).toContain('järjekorras')
+    expect(forwardLogCell(0, 3).textContent).toContain('järjekorras')
+    expect(forwardLogCell(0, 4).textContent).toBe('—')
+  })
+
+  it('offers a märkus input with the Märgi vastatuks action', async () => {
+    await mountPage({ detail: 'req-expired' })
+
+    const noteInput = forwardLogSection().querySelector<HTMLInputElement>(
+      'input[name="note"][aria-label="Märkus"]',
+    )
+    expect(noteInput).not.toBeNull()
+    expect(forwardLogSection().textContent).toContain('Märgi vastatuks')
+  })
+})
+
+describe('preselect count from Seaded (task 8.6)', () => {
+  it('preselects fewer partners when the reserved settings key lowers the count', async () => {
+    useDocs({
+      'service-requests': [
+        makeRequest({ id: 'req-new', contactName: 'Eve Lind', updatedAt: daysAgoAt(1) }),
+      ],
+      partners,
+      'audit-entry': [],
+      settings: [{ id: 'settings-1', featureFlags: { inquiryRouting: { preselectCount: 1 } } }],
+    })
+    await mountPage({ detail: 'req-new' })
+
+    const checked = [
+      ...container.querySelectorAll<HTMLInputElement>('input[name="partnerIds"]:checked'),
+    ]
+    const all = [...container.querySelectorAll<HTMLInputElement>('input[name="partnerIds"]')]
+    expect(all).toHaveLength(2)
+    expect(checked).toHaveLength(1)
+  })
+
+  it('keeps the default preselect of 3 without a settings row', async () => {
+    await mountPage({ detail: 'req-new' })
+
+    const all = [...container.querySelectorAll<HTMLInputElement>('input[name="partnerIds"]')]
+    const checked = all.filter((input) => input.checked)
+    expect(all).toHaveLength(2)
+    expect(checked).toHaveLength(2)
+  })
+})
+
+describe('manual e-mail copy fallback (task 8.6)', () => {
+  it('offers the rendered e-mail text for copying when no partner matches', async () => {
+    useDocs({
+      'service-requests': [
+        makeRequest({
+          id: 'req-new',
+          contactName: 'Eve Lind',
+          payload: {
+            contact: { name: 'Eve Lind', phone: '+37251110000', email: 'eve@meil.ee' },
+            county: 'HH',
+            cadastres: ['78402:003:0210'],
+          },
+        }),
+      ],
+      partners: [],
+      'audit-entry': [],
+    })
+    await mountPage({ detail: 'req-new' })
+
+    expect(container.textContent).toContain('Käsitsi saatmine')
+    const copyButton = [...container.querySelectorAll('button')].find(
+      (candidate) => candidate.textContent === 'Kopeeri e-kirja tekst',
+    )
+    expect(copyButton).toBeDefined()
+    const textarea = container.querySelector<HTMLTextAreaElement>('textarea[aria-label="E-kirja tekst"]')
+    expect(textarea?.value).toContain('Erametsa päring: kava')
+    expect(textarea?.value).toContain('Kontakt:')
+    expect(textarea?.value).toContain('Katastritunnused: 78402:003:0210')
+  })
+
+  it('hides the fallback when a partner matches', async () => {
+    await mountPage({ detail: 'req-new' })
+
+    expect(container.textContent).not.toContain('Kopeeri e-kirja tekst')
+  })
+})

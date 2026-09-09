@@ -5,12 +5,15 @@ import type { ReactNode } from 'react'
 
 import {
   RESPONSE_WINDOW_DAYS,
+  buildManualForwardEmail,
+  preselectCountFromFlags,
   rankRoutingCandidates,
   responseDeadlineState,
   type ResponseDeadlineState,
   type RoutingPartnerInput,
 } from './_components/routing'
 import { maskClientName, sisuPreview } from './_components/display'
+import { CopyEmailFallback } from './_components/CopyEmailFallback'
 import { ForwardConfirm } from './_components/ForwardConfirm'
 import {
   closeRequestAction,
@@ -79,6 +82,10 @@ interface ForwardLogRow {
   recipient: string | null
   delivered: boolean
   retry: boolean
+  respondedAt: string | null
+  note: string | null
+  /** Delivered but still waiting for the partner response. */
+  queued: boolean
 }
 
 interface ResponseTrackingRow {
@@ -189,6 +196,11 @@ export default async function ServiceRequestsPage({
     pagination: false,
   })
 
+  const { docs: settingsRows } = await repositories.find({ collection: 'settings', limit: 1 })
+  // Preselect count from Seaded (task 8.6): reserved featureFlags key with a
+  // documented design default of 3.
+  const preselectCount = preselectCountFromFlags(settingsRows[0]?.featureFlags)
+
   const auditsByRequest = new Map<string, (AuditEntryDoc & { entityId?: string | null })[]>()
   for (const entry of requestAudits as (AuditEntryDoc & { entityId?: string | null })[]) {
     if (!entry.entityId) continue
@@ -197,15 +209,22 @@ export default async function ServiceRequestsPage({
     auditsByRequest.set(entry.entityId, list)
   }
 
-  const respondedByPartner = new Map<string, Map<string, string>>()
+  interface PartnerResponse {
+    at: string
+    note: string | null
+  }
+  const respondedByPartner = new Map<string, Map<string, PartnerResponse>>()
   for (const [requestId, entries] of auditsByRequest) {
     for (const entry of entries) {
       if (entry.action !== 'request.mark_responded') continue
       const after = asRecord(entry.after)
       if (typeof after.partnerId !== 'string') continue
-      const perRequest = respondedByPartner.get(requestId) ?? new Map<string, string>()
+      const perRequest = respondedByPartner.get(requestId) ?? new Map<string, PartnerResponse>()
       if (!perRequest.has(after.partnerId)) {
-        perRequest.set(after.partnerId, entry.createdAt)
+        perRequest.set(after.partnerId, {
+          at: entry.createdAt,
+          note: typeof after.note === 'string' && after.note !== '' ? after.note : null,
+        })
       }
       respondedByPartner.set(requestId, perRequest)
     }
@@ -252,9 +271,9 @@ export default async function ServiceRequestsPage({
     const respondedCount = responded ? responded.size : 0
     let firstRespondedAt: string | null = null
     if (responded) {
-      for (const respondedAt of responded.values()) {
-        if (firstRespondedAt === null || respondedAt < firstRespondedAt) {
-          firstRespondedAt = respondedAt
+      for (const response of responded.values()) {
+        if (firstRespondedAt === null || response.at < firstRespondedAt) {
+          firstRespondedAt = response.at
         }
       }
     }
@@ -303,7 +322,7 @@ export default async function ServiceRequestsPage({
             : null,
           openCounts: sentButOpenCounts,
           sentPartnerIds: new Set(asStringArray(detailRequest.routedTo)),
-          preselectCount: 3,
+          preselectCount,
         },
       )
     : []
@@ -313,20 +332,29 @@ export default async function ServiceRequestsPage({
         .filter((entry) => entry.action === 'request.forward' || entry.action === 'request.mark_responded')
         .map((entry) => {
           const after = asRecord(entry.after)
+          const partnerId = typeof after.partnerId === 'string' ? after.partnerId : null
+          const response =
+            entry.action === 'request.mark_responded'
+              ? { at: entry.createdAt, note: typeof after.note === 'string' && after.note !== '' ? after.note : null }
+              : (partnerId ? (respondedByPartner.get(detailRequest.id)?.get(partnerId) ?? null) : null)
+          const delivered =
+            entry.action === 'request.mark_responded' ||
+            asRecord(after.emailResult).success === true
           return {
             entryId: entry.id,
             action: entry.action,
             createdAt: entry.createdAt,
-            partnerId: typeof after.partnerId === 'string' ? after.partnerId : null,
+            partnerId,
             partnerName:
               typeof after.partnerName === 'string'
                 ? after.partnerName
                 : (partners.find((partner) => partner.id === after.partnerId)?.name ?? '—'),
             recipient: typeof after.recipient === 'string' ? after.recipient : null,
-            delivered:
-              entry.action === 'request.mark_responded' ||
-              asRecord(after.emailResult).success === true,
+            delivered,
             retry: after.retry === true,
+            respondedAt: response?.at ?? null,
+            note: response?.note ?? null,
+            queued: entry.action === 'request.forward' && delivered && response === null,
           }
         })
     : []
@@ -348,7 +376,8 @@ export default async function ServiceRequestsPage({
 
   const responseTracking: ResponseTrackingRow[] = detailRequest
     ? asStringArray(detailRequest.routedTo).map((partnerId) => {
-        const respondedAt = respondedByPartner.get(detailRequest.id)?.get(partnerId) ?? null
+        const response = respondedByPartner.get(detailRequest.id)?.get(partnerId) ?? null
+        const respondedAt = response?.at ?? null
         const sentAt =
           sentAtByPartner.get(partnerId) ??
           (detailRequest.status === 'routed' ? detailRequest.updatedAt : null)
@@ -608,7 +637,9 @@ export default async function ServiceRequestsPage({
         (() => {
           const payload = asRecord(detailRequest.payload)
           const attachments = asStringArray(detailRequest.attachments)
-          const responded = respondedByPartner.get(detailRequest.id) ?? new Map<string, string>()
+          const responded =
+            respondedByPartner.get(detailRequest.id) ??
+            new Map<string, { at: string; note: string | null }>()
           return (
             <section className="mt-md space-y-sm rounded-card border border-border bg-bgPage p-md">
               <header className="flex flex-wrap items-center justify-between gap-sm">
@@ -667,7 +698,7 @@ export default async function ServiceRequestsPage({
                     </li>
                   ) : null}
                   {routingCandidates.map((candidate) => {
-                    const respondedAt = responded.get(candidate.partner.id)
+                    const respondedAt = responded.get(candidate.partner.id)?.at
                     return (
                       <li key={candidate.partner.id} className="text-bodySm text-ink">
                         <label className="flex flex-wrap items-center gap-xs">
@@ -707,6 +738,27 @@ export default async function ServiceRequestsPage({
                     atCapacity: candidate.atCapacity,
                   }))}
                 />
+                {routingCandidates.length === 0 ? (
+                  (() => {
+                    const email = buildManualForwardEmail({
+                      type: detailRequest.type,
+                      payload,
+                      attachments,
+                    })
+                    return (
+                      <div className="mt-sm rounded-input border border-border bg-bgPage p-sm">
+                        <h4 className="mb-xs text-label font-semibold text-ink">
+                          Käsitsi saatmine (e-posti varuvariant)
+                        </h4>
+                        <p className="mb-xs text-bodySm text-ink-muted">
+                          Ühtegi partnerit ei vasta sellele teenusele — kopeerige e-kirja tekst
+                          ja saatke see partnerile ise.
+                        </p>
+                        <CopyEmailFallback subject={email.subject} body={email.body} />
+                      </div>
+                    )
+                  })()
+                ) : null}
               </form>
 
               <div className="rounded-input border border-border bg-bg-mist p-sm">
@@ -764,6 +816,7 @@ export default async function ServiceRequestsPage({
                           <th scope="col" className="h-8 px-2 text-label font-semibold text-ink-muted">Partner</th>
                           <th scope="col" className="h-8 px-2 text-label font-semibold text-ink-muted">Kande olek</th>
                           <th scope="col" className="h-8 px-2 text-label font-semibold text-ink-muted">Vastanud</th>
+                          <th scope="col" className="h-8 px-2 text-label font-semibold text-ink-muted">Märkus</th>
                           <th scope="col" className="h-8 px-2 text-label font-semibold text-ink-muted">Tegevused</th>
                         </tr>
                       </thead>
@@ -785,13 +838,33 @@ export default async function ServiceRequestsPage({
                                 <span className="text-danger">nurjus</span>
                               )}
                             </td>
-                            <td className="h-8 px-2 text-bodySm text-ink">—</td>
+                            <td className="h-8 px-2 text-bodySm">
+                              {row.respondedAt ? (
+                                formatDateTime(row.respondedAt)
+                              ) : row.queued ? (
+                                <span className="rounded-pill bg-bg-mist px-2 py-0.5 text-label font-semibold text-ink-muted">
+                                  järjekorras
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td className="h-8 px-2 text-bodySm text-ink">
+                              {row.note ?? '—'}
+                            </td>
                             <td className="h-8 px-2">
                               {row.action === 'request.forward' && row.partnerId ? (
-                                <div className="flex items-center gap-xs">
-                                  <form action={markRequestRespondedAction}>
+                                <div className="flex flex-wrap items-center gap-xs">
+                                  <form action={markRequestRespondedAction} className="flex items-center gap-xs">
                                     <input type="hidden" name="id" value={detailRequest.id} />
                                     <input type="hidden" name="partnerId" value={row.partnerId} />
+                                    <input
+                                      type="text"
+                                      name="note"
+                                      aria-label="Märkus"
+                                      placeholder="Märkus"
+                                      className="h-8 w-36 rounded-input border border-border bg-bgPage px-2 text-bodySm text-ink outline-none focus:border-primary"
+                                    />
                                     <button
                                       type="submit"
                                       className="text-label font-semibold text-primary hover:text-primaryHover"

@@ -18,7 +18,7 @@ import {
   matchesCompanyHistoryFilters,
   parseCompanyHistoryFilters,
 } from '../admin/companies/_components/history-view'
-import { evaluateLeadExitGuard } from '../admin/leads/_components/lead-flow'
+import { evaluateLeadExitGuard, countyRoundRobinPick, leadAutoAssignSettings, resolveLeadLifecycleFlags } from '../admin/leads/_components/lead-flow'
 import {
   crossCheckBoardMembership,
   resolveRegistrySnapshot,
@@ -87,16 +87,26 @@ function readRedirectTo(formData: FormData, fallback: string): string {
   return value.startsWith('/admin') ? value : fallback
 }
 
+/**
+ * Paths may already carry a query (?detail=, ?muuda=); merge the feedback
+ * param into it instead of stacking a second '?' that swallows the value.
+ */
+function appendQueryParam(path: string, key: string, value: string): string {
+  const [basePath, existingQuery = ''] = path.split('?')
+  const encoded = `${key}=${encodeURIComponent(value)}`
+  return existingQuery ? `${basePath}?${existingQuery}&${encoded}` : `${basePath}?${encoded}`
+}
+
 function redirectWithError(path: string, message: string): never {
-  redirect(`${path}?viga=${encodeURIComponent(message)}`)
+  redirect(appendQueryParam(path, 'viga', message))
 }
 
 function redirectWithNotice(path: string, message: string): never {
-  redirect(`${path}?teade=${encodeURIComponent(message)}`)
+  redirect(appendQueryParam(path, 'teade', message))
 }
 
-function hasMinReason(value: string): boolean {
-  return value.length >= REASON_MIN_LENGTH
+function hasMinReason(value: string | null): boolean {
+  return (value ?? '').length >= REASON_MIN_LENGTH
 }
 
 async function requirePermission(
@@ -703,6 +713,25 @@ async function loadLeadInScope(
   return { ok: true, lead }
 }
 
+/** Audit entries for one lead, newest first (merge/soft-delete flags live here). */
+async function leadAuditsFor(
+  repositories: CoreRepositories,
+  leadId: string,
+): Promise<(AuditEntryDoc & { entityId?: string | null })[]> {
+  const { docs } = await repositories.find({
+    collection: 'audit-entry',
+    where: {
+      and: [
+        { entityType: { equals: 'lead' } },
+        { entityId: { equals: leadId } },
+      ],
+    },
+    sort: '-createdAt',
+    pagination: false,
+  })
+  return docs as (AuditEntryDoc & { entityId?: string | null })[]
+}
+
 /**
  * Kanban move. Exit guards run here before the status persists; the board
  * reverts its optimistic move when this returns ok:false.
@@ -711,6 +740,7 @@ export async function moveLeadStatusAction(input: {
   leadId: string
   status: string
   note?: string
+  reference?: string
 }): Promise<LeadActionResult> {
   const { session } = await requireAdminRepositories()
   if (!can(session.role, 'leads:write')) {
@@ -731,6 +761,7 @@ export async function moveLeadStatusAction(input: {
     to: input.status,
     assignedSpecialistId: lead.assignedSpecialistId,
     note: input.note ?? '',
+    reference: input.reference ?? '',
   })
   if (!guard.ok) return { ok: false, error: guard.error }
 
@@ -746,7 +777,11 @@ export async function moveLeadStatusAction(input: {
       entityType: 'lead',
       entityId: lead.id,
       before: { status: lead.status },
-      after: { status: input.status, ...(input.note ? { note: input.note } : {}) },
+      after: {
+        status: input.status,
+        ...(input.note ? { note: input.note } : {}),
+        ...(input.reference ? { reference: input.reference } : {}),
+      },
     })
     if (input.note) {
       await audit(repositories, {
@@ -777,6 +812,7 @@ export async function moveLeadStatusFormAction(formData: FormData): Promise<void
   const id = readText(formData, 'id')
   const status = readText(formData, 'status')
   const note = readOptionalText(formData, 'note')
+  const reference = readOptionalText(formData, 'reference')
   if (!id) redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
   const detailPath = `/admin/leads/${id}`
   if (!isLeadStatus(status)) redirectWithError(detailPath, 'Tundmatu olek.')
@@ -791,6 +827,7 @@ export async function moveLeadStatusFormAction(formData: FormData): Promise<void
     to: status,
     assignedSpecialistId: lead.assignedSpecialistId,
     note: note ?? '',
+    reference: reference ?? '',
   })
   if (!guard.ok) redirectWithError(detailPath, guard.error)
 
@@ -807,7 +844,11 @@ export async function moveLeadStatusFormAction(formData: FormData): Promise<void
       entityType: 'lead',
       entityId: id,
       before: { status: lead.status },
-      after: { status, ...(note ? { note } : {}) },
+      after: {
+        status,
+        ...(note ? { note } : {}),
+        ...(reference ? { reference } : {}),
+      },
     })
     if (note) {
       await audit(repositories, {
@@ -1016,6 +1057,48 @@ export async function createLeadAction(formData: FormData): Promise<void> {
       repositories,
       deriveCountyCodeFromCadastre(cadastr),
     )
+
+    // Settings-driven auto-assignment (task 8.2): the flag rides the
+    // featureFlags TEXT-JSON under the reserved leadAutoAssign key and the
+    // pick is a county round-robin over active specialists. A specialist's
+    // own creation stays self-assigned — the manual choice always wins.
+    let assignedSpecialistId = session.role === 'specialist' ? session.userId : null
+    let assignment: 'manual' | 'auto' | 'none' = session.role === 'specialist' ? 'manual' : 'none'
+    if (!assignedSpecialistId) {
+      const { docs: settingsRows } = await repositories.find({ collection: 'settings', limit: 1 })
+      if (leadAutoAssignSettings(settingsRows[0]?.featureFlags).enabled) {
+        const { docs: specialists } = await repositories.find({
+          collection: 'specialists',
+          sort: 'name',
+          pagination: false,
+        })
+        const { docs: countyLeads } = await repositories.find({
+          collection: 'leads',
+          ...(countyId ? { where: { countyId: { equals: countyId } } } : {}),
+          pagination: false,
+        })
+        const countsBySpecialist = new Map<string, number>()
+        for (const row of countyLeads) {
+          if (!row.assignedSpecialistId) continue
+          countsBySpecialist.set(
+            row.assignedSpecialistId,
+            (countsBySpecialist.get(row.assignedSpecialistId) ?? 0) + 1,
+          )
+        }
+        const pick = countyRoundRobinPick(
+          specialists.map((specialist) => ({
+            id: specialist.id,
+            active: specialist.active,
+            countyLeadCount: countsBySpecialist.get(specialist.id) ?? 0,
+          })),
+        )
+        if (pick) {
+          assignedSpecialistId = pick.id
+          assignment = 'auto'
+        }
+      }
+    }
+
     const created = await repositories.create({
       collection: 'leads',
       data: {
@@ -1029,7 +1112,7 @@ export async function createLeadAction(formData: FormData): Promise<void> {
         consentAt: nowIso,
         source: readOptionalText(formData, 'source') ?? 'käsitsi',
         status: 'new',
-        assignedSpecialistId: session.role === 'specialist' ? session.userId : null,
+        assignedSpecialistId,
         internalComment: readOptionalText(formData, 'internalComment'),
       },
     })
@@ -1039,7 +1122,7 @@ export async function createLeadAction(formData: FormData): Promise<void> {
       action: 'lead.create_manual',
       entityType: 'lead',
       entityId: created.id,
-      after: { contactName, source: 'käsitsi' },
+      after: { contactName, source: 'käsitsi', assignedSpecialistId, assignment },
     })
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
@@ -1050,6 +1133,142 @@ export async function createLeadAction(formData: FormData): Promise<void> {
 
   revalidatePath(LEADS_PATH)
   redirectWithNotice(`/admin/leads/${leadId}`, 'Juhtlõige loodud.')
+}
+
+/**
+ * Duplicate merge (task 8.2): folds a duplicate lead into the kept target.
+ * Notes are append-only audit rows keyed by lead id and cannot be re-parented,
+ * so the cross-linking merge entries record how many notes ride along and
+ * both timelines stay readable. Missing target fields (county, contacts)
+ * are filled from the duplicate; the target's own values always win.
+ */
+export async function mergeLeadAction(formData: FormData): Promise<void> {
+  const session = await requirePermission('leads:write', LEADS_PATH)
+  const repositories = await getRepositories()
+
+  const id = readText(formData, 'id')
+  const targetId = readText(formData, 'targetId')
+  if (!id || !targetId) {
+    redirectWithError(LEADS_PATH, 'Juhtlõime või sihtjuhtlõime identifikaator puudub.')
+  }
+  if (id === targetId) redirectWithError(LEADS_PATH, 'Juhtlõiget ei saa endaga ühendada.')
+
+  const loaded = await loadLeadInScope(repositories, session, id)
+  if (!loaded.ok) redirectWithError(LEADS_PATH, loaded.error)
+  const duplicate = loaded.lead
+  const targetLoaded = await loadLeadInScope(repositories, session, targetId)
+  if (!targetLoaded.ok) redirectWithError(LEADS_PATH, targetLoaded.error)
+  const target = targetLoaded.lead
+
+  const duplicateAudits = await leadAuditsFor(repositories, id)
+  const duplicateLifecycle = resolveLeadLifecycleFlags(duplicateAudits)
+  if (duplicateLifecycle.mergedIntoId) {
+    redirectWithError(LEADS_PATH, 'See juhtlõige on juba ühendatud.')
+  }
+  if (duplicateLifecycle.deleted) {
+    redirectWithError(LEADS_PATH, 'Kustutatud juhtlõiget ei saa ühendada.')
+  }
+  const targetLifecycle = resolveLeadLifecycleFlags(await leadAuditsFor(repositories, targetId))
+  if (targetLifecycle.deleted) {
+    redirectWithError(LEADS_PATH, 'Sihtjuhtlõige on kustutatud.')
+  }
+
+  const mergedData: Record<string, unknown> = {}
+  const taken: string[] = []
+  if (!target.countyId && duplicate.countyId) {
+    mergedData.countyId = duplicate.countyId
+    taken.push('countyId')
+  }
+  for (const field of ['phone', 'email', 'cadastr', 'internalComment'] as const) {
+    const value = duplicate[field]
+    if (value && !target[field]) {
+      mergedData[field] = value
+      taken.push(field)
+    }
+  }
+  const noteCount = duplicateAudits.filter((entry) => entry.action === 'lead.note').length
+
+  let failure: string | null = null
+  try {
+    if (Object.keys(mergedData).length > 0) {
+      await repositories.update({ collection: 'leads', id: target.id, data: mergedData })
+    }
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'lead.merge',
+      entityType: 'lead',
+      entityId: duplicate.id,
+      after: {
+        mergedInto: target.id,
+        mergedContactName: duplicate.contactName,
+        taken,
+        noteCount,
+      },
+    })
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'lead.merge_target',
+      entityType: 'lead',
+      entityId: target.id,
+      after: { mergedFrom: duplicate.id, taken, noteCount },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    redirectWithError(LEADS_PATH, `Juhtlõimede ühendamine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath(LEADS_PATH)
+  revalidatePath(`/admin/leads/${target.id}`)
+  redirectWithNotice(`/admin/leads/${target.id}`, 'Duplikaat ühendatud.')
+}
+
+/**
+ * Superadmin soft delete (task 8.2): the lead row stays in place and the
+ * tombstone lives in the append-only audit log (lead.delete with the typed
+ * reason); every list resolves that entry and hides the row.
+ */
+export async function softDeleteLeadAction(formData: FormData): Promise<void> {
+  const session = await requirePermission('leads:write', LEADS_PATH)
+  const repositories = await getRepositories()
+
+  const id = readText(formData, 'id')
+  const reason = readText(formData, 'reason')
+  if (!id) redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
+  const detailPath = `/admin/leads/${id}`
+  if (session.role !== 'superadmin') {
+    redirectWithError(detailPath, 'Ainult peakasutaja saab juhtlõiget kustutada.')
+  }
+  if (!hasMinReason(reason)) {
+    redirectWithError(detailPath, 'Kustutamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+  }
+
+  const loaded = await loadLeadInScope(repositories, session, id)
+  if (!loaded.ok) redirectWithError(LEADS_PATH, loaded.error)
+
+  const lifecycle = resolveLeadLifecycleFlags(await leadAuditsFor(repositories, id))
+  if (lifecycle.deleted) redirectWithNotice(detailPath, 'Juhtlõige on juba kustutatud.')
+
+  let failure: string | null = null
+  try {
+    await audit(repositories, {
+      actorId: session.userId,
+      action: 'lead.delete',
+      entityType: 'lead',
+      entityId: id,
+      after: { deleted: true, reason },
+    })
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error)
+  }
+  if (failure) {
+    redirectWithError(detailPath, `Pehme kustutamine ebaõnnestus: ${failure}`)
+  }
+
+  revalidatePath(LEADS_PATH)
+  revalidatePath(detailPath)
+  redirectWithNotice(detailPath, 'Juhtlõige pehmelt kustutatud.')
 }
 
 // ---------------------------------------------------------------------------
@@ -1086,6 +1305,11 @@ export async function loadLeadExportData(): Promise<LeadExportResult> {
   })
   const { docs: specialists } = await repositories.find({
     collection: 'specialists',
+    sort: 'name',
+    pagination: false,
+  })
+  const { docs: counties } = await repositories.find({
+    collection: 'counties',
     sort: 'name',
     pagination: false,
   })
@@ -1132,6 +1356,7 @@ export async function loadLeadExportData(): Promise<LeadExportResult> {
   const rows = buildLeadExportRows(leads, {
     consentWithdrawnAtByIpHash,
     specialistNames: new Map(specialists.map((specialist) => [specialist.id, specialist.name])),
+    countyNames: new Map(counties.map((county) => [county.id, county.name])),
     nextActionAtByLeadId,
     noteCountsByLeadId,
   })
@@ -1386,6 +1611,7 @@ export async function markRequestRespondedAction(formData: FormData): Promise<vo
 
   const id = readText(formData, 'id')
   const partnerId = readText(formData, 'partnerId')
+  const note = readOptionalText(formData, 'note')
   if (!id || !partnerId) {
     redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu või partneri identifikaator puudub.')
   }
@@ -1403,7 +1629,11 @@ export async function markRequestRespondedAction(formData: FormData): Promise<vo
       action: 'request.mark_responded',
       entityType: 'service-request',
       entityId: id,
-      after: { partnerId, partnerName: partner.name },
+      after: {
+        partnerId,
+        partnerName: partner.name,
+        ...(note ? { note } : {}),
+      },
     })
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
@@ -1580,6 +1810,11 @@ function readPartnerForm(formData: FormData): {
   counties: string[] | null
   capacity: number
   active: boolean
+  /** Registry code, contact person and note ride the audit record: the
+   * partners table has no columns for them and the schema is frozen. */
+  regCode: string | null
+  contactPerson: string | null
+  note: string | null
 } {
   const name = readText(formData, 'name')
   const contactEmail = readOptionalText(formData, 'contactEmail')
@@ -1604,6 +1839,18 @@ function readPartnerForm(formData: FormData): {
     counties,
     capacity,
     active: readCheckbox(formData, 'active'),
+    regCode: readOptionalText(formData, 'regCode'),
+    contactPerson: readOptionalText(formData, 'contactPerson'),
+    note: readOptionalText(formData, 'note'),
+  }
+}
+
+/** Partner fields that persist only in the audited create/update record. */
+function partnerRecordExtras(data: ReturnType<typeof readPartnerForm>): Record<string, unknown> {
+  return {
+    ...(data.regCode ? { regCode: data.regCode } : {}),
+    ...(data.contactPerson ? { contactPerson: data.contactPerson } : {}),
+    ...(data.note ? { note: data.note } : {}),
   }
 }
 
@@ -1615,6 +1862,9 @@ function validatePartnerForm(data: ReturnType<typeof readPartnerForm>): string |
   if (data.serviceTypes.length === 0) return 'Valige vähemalt üks teenus.'
   if (data.counties !== null && data.counties.length === 0) {
     return 'Valige maakonnad või "Kogu Eesti".'
+  }
+  if (data.regCode && !/^\d{8}$/.test(data.regCode)) {
+    return 'Registrikood peab koosnema 8 numbrist.'
   }
   return null
 }
@@ -1648,7 +1898,7 @@ export async function createPartnerAction(formData: FormData): Promise<void> {
       action: 'partner.create',
       entityType: 'partner',
       entityId: created.id,
-      after: data,
+      after: { ...data, ...partnerRecordExtras(data) },
     })
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
@@ -1705,7 +1955,7 @@ export async function updatePartnerAction(formData: FormData): Promise<void> {
         contactPhone: existing.contactPhone,
         active: existing.active,
       },
-      after: data,
+      after: { ...data, ...partnerRecordExtras(data) },
     })
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
@@ -1732,6 +1982,10 @@ export async function setPartnerActiveAction(formData: FormData): Promise<void> 
   if (!existing) redirectWithError(PARTNERS_PATH, 'Partnerit ei leitud.')
   if (existing.active === active) {
     redirectWithNotice(PARTNERS_PATH, 'Partneri olek on juba selline.')
+  }
+  // Task 8.6: deactivating needs a typed reason; reactivating does not.
+  if (!active && !hasMinReason(reason)) {
+    redirectWithError(PARTNERS_PATH, 'Deaktiveerimise põhjus on kohustuslik (vähemalt 5 tähemärki).')
   }
 
   let failure: string | null = null

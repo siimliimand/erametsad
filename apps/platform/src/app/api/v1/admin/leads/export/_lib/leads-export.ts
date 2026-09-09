@@ -47,6 +47,7 @@ export function resolveConsentWithdrawnAt(
 export interface LeadExportContext {
   consentWithdrawnAtByIpHash: ReadonlyMap<string, string>
   specialistNames: ReadonlyMap<string, string>
+  countyNames: ReadonlyMap<string, string>
   nextActionAtByLeadId: ReadonlyMap<string, string>
   noteCountsByLeadId: ReadonlyMap<string, number>
 }
@@ -58,6 +59,7 @@ export interface LeadExportRow {
   phone: string
   email: string
   cadastr: string
+  county: string
   source: string
   status: string
   specialist: string
@@ -73,6 +75,7 @@ export const LEAD_CSV_HEADERS = [
   'Telefon',
   'E-post',
   'Katastrid',
+  'Maakond',
   'Allikas',
   'Olek',
   'Spetsialist',
@@ -105,6 +108,9 @@ export function buildLeadExportRows(
       phone: withdrawnAt ? '' : (lead.phone ?? ''),
       email: withdrawnAt ? '' : (lead.email ?? ''),
       cadastr: lead.cadastr ?? '',
+      county: lead.countyId
+        ? (context.countyNames.get(lead.countyId) ?? '—')
+        : '—',
       source: `${lead.formName}${lead.pageSlug ? ` · ${lead.pageSlug}` : ''}`,
       status: leadStatusLabels[lead.status],
       specialist: lead.assignedSpecialistId
@@ -130,6 +136,7 @@ export function buildLeadsCsv(rows: readonly LeadExportRow[]): string {
         row.phone,
         row.email,
         row.cadastr,
+        row.county,
         row.source,
         row.status,
         row.specialist,
