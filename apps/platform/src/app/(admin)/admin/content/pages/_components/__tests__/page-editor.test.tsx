@@ -24,7 +24,11 @@ vi.mock('../../../../../_actions/content', () => ({
 const heroBlock: BuilderBlock = {
   id: 'block-hero',
   type: 'hero',
-  config: { heading: 'Müü metsa', primaryCta: { label: 'Alusta', href: '/oksjonid' } },
+  config: {
+    heading: 'Müü metsa',
+    overlayStrength: 80,
+    primaryCta: { label: 'Alusta', href: '/oksjonid' },
+  },
 }
 
 const textBlock: BuilderBlock = {
@@ -267,7 +271,7 @@ describe('PageEditor block builder wiring', () => {
     await submit(blocksForm())
 
     expect(storedBlocks().map((entry) => entry.type)).toEqual(['hero', 'text', 'ticker'])
-    expect(storedBlocks()[2]?.config).toEqual({ limit: 4 })
+    expect(storedBlocks()[2]?.config).toEqual({ limit: 4, objectType: 'koik', autoRefreshSeconds: 0 })
   })
 
   it('keeps the JSON textarea behind the Kuva JSON disclosure', async () => {
@@ -296,7 +300,9 @@ describe('PageEditor block builder wiring', () => {
     await click(button('Rakenda JSON'))
     await submit(blocksForm())
 
-    expect(storedBlocks()).toEqual([{ type: 'ticker', config: { limit: 4 } }])
+    expect(storedBlocks()).toEqual([
+      { type: 'ticker', config: { limit: 4, objectType: 'koik', autoRefreshSeconds: 0 } },
+    ])
   })
 })
 

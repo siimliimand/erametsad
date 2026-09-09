@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+
 import type { HeroBlockConfig } from './types'
 
 const primaryCtaClass =
@@ -5,9 +7,32 @@ const primaryCtaClass =
 const secondaryCtaClass =
   'inline-flex h-12 items-center justify-center gap-2 rounded-button border border-white/70 px-6 font-label font-semibold text-white transition-colors duration-hover hover:bg-white/10'
 
+const OVERLAY_RGB = '22, 56, 42'
+
+/**
+ * Overlay strength (0–80) scales the green gradient: the leading edge uses
+ * the strength as its alpha, the trailing edge keeps 55% of it so the
+ * default (80) stays close to the original fixed gradient.
+ */
+function overlayStyle(overlayStrength: number | undefined): CSSProperties {
+  const alpha = (overlayStrength ?? 80) / 100
+  return {
+    backgroundImage:
+      'linear-gradient(90deg, rgba(' +
+      OVERLAY_RGB +
+      ', ' +
+      alpha.toFixed(2) +
+      '), rgba(' +
+      OVERLAY_RGB +
+      ', ' +
+      (alpha * 0.55).toFixed(2) +
+      '))',
+  }
+}
+
 export function BlockHero({ config }: { config: HeroBlockConfig }) {
   return (
-    <section className="bg-[linear-gradient(90deg,rgba(22,56,42,0.92),rgba(22,56,42,0.55))]">
+    <section style={overlayStyle(config.overlayStrength)}>
       <div className="mx-auto grid max-w-container-xl gap-lg px-md py-xl md:px-lg lg:grid-cols-2 lg:items-center">
         <div>
           {config.kicker !== undefined && (

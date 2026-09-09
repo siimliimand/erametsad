@@ -13,6 +13,8 @@ export interface LotCardProps {
   area: number
   endsAt: string
   status: StatusKey
+  /** Machine object type (raieoigus, kinnistu, kiire, pakett) for ticker filtering. */
+  objectType?: string
   /** Object type shown as a badge overlay, e.g. "Raieõigus". */
   typeLabel?: string
   /** Parish; rendered with county as "parish vald, county" in the metadata grid. */

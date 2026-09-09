@@ -13,10 +13,14 @@ interface AccordionProps {
   variant: 'single' | 'multi'
   items: AccordionItem[]
   className?: string
+  /** Rows open on first paint ("avatud vaikimisi"); ids must match items. */
+  defaultOpenIds?: readonly string[]
 }
 
-export function Accordion({ variant, items, className }: AccordionProps) {
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set())
+export function Accordion({ variant, items, className, defaultOpenIds }: AccordionProps) {
+  const [openIds, setOpenIds] = useState<Set<string>>(
+    () => new Set(defaultOpenIds ?? []),
+  )
 
   const toggle = useCallback(
     (id: string) => {

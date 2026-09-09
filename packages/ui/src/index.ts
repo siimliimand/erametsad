@@ -65,4 +65,5 @@ export type {
   PageBlocksProps,
   PageBlockView,
   ResolvedBlockConfig,
+  TestimonialItemConfig,
 } from './components/content/page-blocks/types';

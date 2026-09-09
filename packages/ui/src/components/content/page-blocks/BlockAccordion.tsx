@@ -20,6 +20,9 @@ export function BlockAccordion({
           className={`rounded-card border border-border bg-bgPage shadow-card ${
             config.heading !== undefined ? 'mt-md' : ''
           }`}
+          defaultOpenIds={config.items.flatMap((item, index) =>
+            item.defaultOpen === true ? [`${id}-${String(index)}`] : [],
+          )}
           items={config.items.map((item, index) => ({
             id: `${id}-${index}`,
             title: item.title,

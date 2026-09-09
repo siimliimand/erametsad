@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import { LegacyPageLayout } from './_components/LegacyPageLayout'
 import {
   loadPageBlockViews,
+  loadPageTestimonials,
   loadPublishedPage,
   loadTickerLots,
 } from './_lib/page-content'
@@ -66,9 +67,18 @@ export default async function CmsPage({ params }: CmsPageRouteProps) {
   const hasTicker = blocks.some((block) => block.type === 'ticker')
   const tickerLots = hasTicker ? await loadTickerLots() : []
 
+  // Testimonials blocks read the published collection the same way: the
+  // caller loads, each block slices its own limit.
+  const hasTestimonials = blocks.some((block) => block.type === 'testimonials')
+  const testimonials = hasTestimonials ? await loadPageTestimonials() : []
+
   return (
     <main className="pb-2xl">
-      <PageBlocks blocks={blocks} tickerLots={tickerLots} />
+      <PageBlocks
+        blocks={blocks}
+        tickerLots={tickerLots}
+        testimonials={testimonials}
+      />
     </main>
   )
 }

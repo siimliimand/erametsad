@@ -36,6 +36,20 @@ function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value : undefined
 }
 
+/** Keeps only values from the given set; anything else is dropped. */
+function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : undefined
+}
+
+/** Non-negative integer clamped to a cap; undefined for anything else. */
+function boundedInt(value: unknown, max: number, min = 0): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min
+    ? Math.min(value, max)
+    : undefined
+}
+
 function requiredText(value: unknown): string | null {
   return text(value) ?? null
 }
@@ -53,6 +67,10 @@ function items<T>(value: unknown, parse: (entry: unknown) => T | null): T[] {
   return value.map(parse).filter((entry): entry is T => entry !== null)
 }
 
+const CARD_ICONS = ['trees', 'axe', 'sprout', 'map', 'shield', 'clock', 'coins', 'file-text'] as const
+
+const TICKER_OBJECT_TYPES = ['koik', 'raieoigus', 'kinnistu', 'kiire', 'pakett'] as const
+
 function heroConfig(raw: unknown): HeroBlockConfig | null {
   if (!isRecord(raw)) return null
   const heading = requiredText(raw.heading)
@@ -62,11 +80,13 @@ function heroConfig(raw: unknown): HeroBlockConfig | null {
   const body = text(raw.body)
   const image = text(raw.image)
   const secondaryCta = link(raw.secondaryCta)
+  const overlayStrength = boundedInt(raw.overlayStrength, 80)
   return {
     heading,
     primaryCta,
     ...(kicker !== undefined ? { kicker } : {}),
     ...(body !== undefined ? { body } : {}),
+    ...(overlayStrength !== undefined ? { overlayStrength } : {}),
     ...(image !== undefined ? { image } : {}),
     ...(secondaryCta !== null ? { secondaryCta } : {}),
   }
@@ -89,8 +109,10 @@ function cardItem(raw: unknown): CardItemConfig | null {
   if (title === null) return null
   const description = text(raw.description)
   const href = text(raw.href)
+  const icon = oneOf(raw.icon, CARD_ICONS)
   return {
     title,
+    ...(icon !== undefined ? { icon } : {}),
     ...(description !== undefined ? { description } : {}),
     ...(href !== undefined ? { href } : {}),
   }
@@ -114,7 +136,12 @@ function accordionItem(raw: unknown): AccordionItemConfig | null {
   if (!isRecord(raw)) return null
   const title = requiredText(raw.title)
   const content = requiredText(raw.content)
-  return title !== null && content !== null ? { title, content } : null
+  if (title === null || content === null) return null
+  return {
+    title,
+    content,
+    ...(raw.defaultOpen === true ? { defaultOpen: true } : {}),
+  }
 }
 
 function accordionConfig(raw: unknown): AccordionBlockConfig | null {
@@ -134,10 +161,14 @@ function formConfig(raw: unknown): FormBlockConfig | null {
   if (slug === null) return null
   const heading = text(raw.heading)
   const description = text(raw.description)
+  const type = oneOf(raw.type, ['pohivorm', 'kava', 'hooldusraie', 'istutamine'] as const)
+  const paigutus = oneOf(raw.paigutus, ['kaardil', 'heledal'] as const)
   return {
     slug,
     ...(heading !== undefined ? { heading } : {}),
     ...(description !== undefined ? { description } : {}),
+    ...(type !== undefined ? { type } : {}),
+    ...(paigutus !== undefined ? { paigutus } : {}),
   }
 }
 
@@ -150,11 +181,17 @@ function tickerConfig(raw: unknown): TickerBlockConfig {
     typeof raw.limit === 'number' && Number.isInteger(raw.limit) && raw.limit >= 1
       ? Math.min(raw.limit, 10)
       : 4
+  const objectType = oneOf(raw.objectType, TICKER_OBJECT_TYPES)
+  const autoRefreshSeconds = boundedInt(raw.autoRefreshSeconds, 3600)
   return {
     limit,
     ...(heading !== undefined ? { heading } : {}),
     ...(linkLabel !== undefined ? { linkLabel } : {}),
     ...(linkHref !== undefined ? { linkHref } : {}),
+    ...(objectType !== undefined && objectType !== 'koik' ? { objectType } : {}),
+    ...(autoRefreshSeconds !== undefined && autoRefreshSeconds > 0
+      ? { autoRefreshSeconds }
+      : {}),
   }
 }
 
@@ -162,7 +199,15 @@ function statItem(raw: unknown): StatItemConfig | null {
   if (!isRecord(raw)) return null
   const value = requiredText(raw.value)
   const label = requiredText(raw.label)
-  return value !== null && label !== null ? { value, label } : null
+  if (value === null || label === null) return null
+  const suffix = oneOf(raw.suffix, ['+', '%', '€'] as const)
+  const source = oneOf(raw.source, ['staatiline', 'live'] as const)
+  return {
+    value,
+    label,
+    ...(suffix !== undefined ? { suffix } : {}),
+    ...(source !== undefined ? { source } : {}),
+  }
 }
 
 function statsConfig(raw: unknown): StatsBlockConfig | null {
@@ -182,14 +227,17 @@ function ctaConfig(raw: unknown): CtaBlockConfig | null {
   const cta = link(raw.cta)
   if (heading === null || cta === null) return null
   const body = text(raw.body)
+  const style = oneOf(raw.style, ['amber', 'green'] as const)
   return {
     heading,
     cta,
     ...(body !== undefined ? { body } : {}),
+    ...(style !== undefined ? { style } : {}),
   }
 }
 
-function testimonialItem(raw: unknown): TestimonialItemConfig | null {
+/** Kept exported: PageBlocks applies it to caller-supplied testimonial items. */
+export function testimonialItem(raw: unknown): TestimonialItemConfig | null {
   if (!isRecord(raw)) return null
   const quote = requiredText(raw.quote)
   const author = requiredText(raw.author)
@@ -206,12 +254,11 @@ function testimonialItem(raw: unknown): TestimonialItemConfig | null {
 
 function testimonialsConfig(raw: unknown): TestimonialsBlockConfig | null {
   if (!isRecord(raw)) return null
-  const parsed = items(raw.items, testimonialItem)
-  if (parsed.length === 0) return null
   const heading = text(raw.heading)
+  const limit = boundedInt(raw.limit, 12, 1)
   return {
-    items: parsed,
     ...(heading !== undefined ? { heading } : {}),
+    ...(limit !== undefined ? { limit } : {}),
   }
 }
 

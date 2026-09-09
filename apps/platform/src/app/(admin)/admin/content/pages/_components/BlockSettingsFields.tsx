@@ -105,6 +105,22 @@ function LeafField({ field, draft, errors, onDraftChange }: BlockFieldProps) {
     onDraftChange(updateDraftValue(draft, field.path, next))
   }
 
+  if (field.kind === 'boolean') {
+    return (
+      <FieldShell id={id} label={field.label} required={field.required} error={error}>
+        <input
+          id={id}
+          type="checkbox"
+          checked={value === true}
+          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+            setValue(event.target.checked)
+          }}
+          className="h-4 w-4 accent-primary"
+        />
+      </FieldShell>
+    )
+  }
+
   if (field.kind === 'select') {
     const rawValue = typeof value === 'string' || typeof value === 'number' ? value : ''
     return (

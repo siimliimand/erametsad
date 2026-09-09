@@ -1,4 +1,4 @@
-import { PageBlocks, type LotCardProps, type PageBlockView } from '@erametsad/ui'
+import { PageBlocks, type LotCardProps, type PageBlockView, type TestimonialItemConfig } from '@erametsad/ui'
 import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
@@ -19,27 +19,31 @@ const validConfigs: Record<PageBlockType, unknown> = {
   cards: {
     heading: 'Kuidas müük käib',
     intro: 'Kolm lihtsat sammu.',
-    items: [{ title: 'Raieõigus', description: 'Esita pakkumus\nJälgige oksjonit', href: '/oksjonid' }],
+    items: [{ title: 'Raieõigus', icon: 'axe', description: 'Esita pakkumus\nJälgige oksjonit', href: '/oksjonid' }],
   },
   accordion: {
     heading: 'Protsess',
-    items: [{ title: 'Kuidas müük käib?', content: 'Vali objekt ja esita pakkumus.' }],
+    items: [
+      { title: 'Kuidas müük käib?', content: 'Vali objekt ja esita pakkumus.', defaultOpen: true },
+    ],
   },
   form: { heading: 'Küsi hinnapakkumist', description: 'Vastame kahe tööpäeva jooksul.', slug: 'metsa-hindamine' },
   ticker: { heading: 'Aktiivsed oksjonid', linkLabel: 'Kõik oksjonid', linkHref: '/oksjonid', limit: 3 },
-  stats: { heading: 'Usaldus arvudes', items: [{ value: '350+', label: 'müüdud objekti' }] },
+  stats: { heading: 'Usaldus arvudes', items: [{ value: '350', label: 'müüdud objekti', suffix: '+' }] },
   cta: { heading: 'Valmis müüma?', body: 'Võtke täna ühendust.', cta: ctaLink },
-  testimonials: {
-    heading: 'Kliendilood',
-    items: [{ quote: 'Müük läks sujuvalt.', author: 'Mari Maasikas', role: 'Metsaomanik' }],
-  },
+  testimonials: { heading: 'Kliendilood', limit: 3 },
   faq: {
     heading: 'Korduma kippuvad küsimused',
     items: [{ question: 'Kas raie on lubatud?', answer: 'Jah, vastavalt majandusplaanile.' }],
   },
 }
 
-const lot = (title: string): LotCardProps => ({
+const collectionTestimonials: TestimonialItemConfig[] = [
+  { quote: 'Müük läks sujuvalt.', author: 'Mari Maasikas', role: 'Metsaomanik' },
+  { quote: 'Kiire ja läbipaistev.', author: 'Mati Mets' },
+]
+
+const lot = (title: string, overrides: Partial<LotCardProps> = {}): LotCardProps => ({
   image: { src: '/uploads/lot.jpg', alt: title },
   title,
   alghind: 12500,
@@ -47,14 +51,21 @@ const lot = (title: string): LotCardProps => ({
   area: 12.5,
   endsAt: '2026-12-01T12:00:00Z',
   status: 'active',
+  ...overrides,
 })
 
 function view(type: PageBlockType, config: unknown, id: string): PageBlockView {
   return { id, type, config }
 }
 
-function renderHtml(blocks: readonly PageBlockView[], tickerLots: readonly LotCardProps[] = []): string {
-  return renderToString(<PageBlocks blocks={blocks} tickerLots={tickerLots} />)
+function renderHtml(
+  blocks: readonly PageBlockView[],
+  tickerLots: readonly LotCardProps[] = [],
+  testimonials: readonly TestimonialItemConfig[] = [],
+): string {
+  return renderToString(
+    <PageBlocks blocks={blocks} tickerLots={tickerLots} testimonials={testimonials} />,
+  )
 }
 
 function parsedView(type: PageBlockType, id: string): PageBlockView {
@@ -95,13 +106,41 @@ describe('PageBlocks per-type rendering', () => {
     expect(html).toContain('<li>Jälgige oksjonit</li>')
   })
 
-  it('renders accordion items with their hidden content in the markup', () => {
+  it('renders the card ikoon select value as a lucide icon', () => {
+    const html = renderHtml([parsedView('cards', 'cards-icon-1')])
+
+    expect(html).toContain('lucide-axe')
+    const withoutIcon = renderHtml([
+      view(
+        'cards',
+        parseBlockConfig('cards', { heading: 'Kaardid', items: [{ title: 'Ilma ikoonita' }] }),
+        'cards-icon-2',
+      ),
+    ])
+    expect(withoutIcon).not.toContain('lucide-')
+  })
+
+  it('renders accordion items with their hidden content and default-open flag', () => {
     const html = renderHtml([parsedView('accordion', 'accordion-1')])
 
     expect(html).toContain('Protsess')
     expect(html).toContain('Kuidas müük käib?')
     expect(html).toContain('Vali objekt ja esita pakkumus.')
-    expect(html).toContain('aria-expanded="false"')
+    expect(html).toContain('aria-expanded="true"')
+  })
+
+  it('renders the hero gradient from the overlay strength setting', () => {
+    const strong = renderHtml([
+      view('hero', parseBlockConfig('hero', { ...(validConfigs.hero as Record<string, unknown>), overlayStrength: 80 }), 'h-1'),
+    ])
+    expect(strong).toContain('rgba(22, 56, 42, 0.80)')
+    expect(strong).toContain('rgba(22, 56, 42, 0.44)')
+
+    const weak = renderHtml([
+      view('hero', parseBlockConfig('hero', { ...(validConfigs.hero as Record<string, unknown>), overlayStrength: 10 }), 'h-2'),
+    ])
+    expect(weak).toContain('rgba(22, 56, 42, 0.10)')
+    expect(weak).not.toContain('rgba(22, 56, 42, 0.80)')
   })
 
   it('renders a form block with the lead form fields', () => {
@@ -124,22 +163,55 @@ describe('PageBlocks per-type rendering', () => {
   })
 
   it('slices ticker lots to the block limit', () => {
-    const config = parseBlockConfig('ticker', { heading: 'Aktiivsed oksjonid', limit: 1 })
+    const config = parseBlockConfig('ticker', { heading: 'Aktiivsed oksjonid', limit: 2 })
     const html = renderHtml(
       [view('ticker', config, 'ticker-1')],
-      [lot('Raieõigus Tartumaal'), lot('Metskinnistu Võrumaal')],
+      [lot('Raieõigus Tartumaal'), lot('Metskinnistu Võrumaal'), lot('Kolmas oksjon')],
     )
 
     expect(html).toContain('Raieõigus Tartumaal')
-    expect(html).not.toContain('Metskinnistu Võrumaal')
+    expect(html).toContain('Metskinnistu Võrumaal')
+    expect(html).not.toContain('Kolmas oksjon')
   })
 
-  it('renders stats items as value and label pairs', () => {
-    const html = renderHtml([parsedView('stats', 'stats-1')])
+  it('filters ticker lots by the objectType setting', () => {
+    const config = parseBlockConfig('ticker', {
+      heading: 'Raieõigused',
+      limit: 4,
+      objectType: 'raieoigus',
+    })
+    const html = renderHtml(
+      [view('ticker', config, 'ticker-filter-1')],
+      [
+        lot('Raie oksjon', { objectType: 'raieoigus' }),
+        lot('Kinnistu oksjon', { objectType: 'kinnistu' }),
+        lot('Kiire oksjon', { objectType: 'kiire' }),
+      ],
+    )
 
-    expect(html).toContain('Usaldus arvudes')
-    expect(html).toContain('350+')
-    expect(html).toContain('müüdud objekti')
+    expect(html).toContain('Raie oksjon')
+    expect(html).not.toContain('Kinnistu oksjon')
+    expect(html).not.toContain('Kiire oksjon')
+  })
+
+  it('renders stats values with their per-item suffix', () => {
+    const plain = renderHtml([parsedView('stats', 'stats-1')])
+    expect(plain).toContain('350')
+    expect(plain).toContain('+')
+    expect(plain).toContain('müüdud objekti')
+
+    const euro = renderHtml([
+      view(
+        'stats',
+        parseBlockConfig('stats', {
+          heading: 'Usaldus arvudes',
+          items: [{ value: '12 500', label: 'kliendi raha', suffix: '€' }],
+        }),
+        'stats-2',
+      ),
+    ])
+    expect(euro).toContain('12 500')
+    expect(euro).toContain('€')
   })
 
   it('renders a CTA band with body and action link', () => {
@@ -151,13 +223,55 @@ describe('PageBlocks per-type rendering', () => {
     expect(html).toContain('Vaata oksjoneid')
   })
 
-  it('renders testimonials with quote, author and role', () => {
-    const html = renderHtml([parsedView('testimonials', 'testimonials-1')])
+  it('renders the CTA stiil select with amber and green bands', () => {
+    const green = renderHtml([parsedView('cta', 'cta-green-1')])
+    expect(green).toContain('bg-primary"')
+
+    const amber = renderHtml([
+      view('cta', parseBlockConfig('cta', { ...(validConfigs.cta as Record<string, unknown>), style: 'amber' }), 'cta-amber-1'),
+    ])
+    expect(amber).toContain('bg-cta"')
+  })
+
+  it('renders the form paigutus select with both placements', () => {
+    const card = renderHtml([parsedView('form', 'form-kaardil')])
+    expect(card).toContain('bg-bgMist')
+
+    const light = renderHtml([
+      view(
+        'form',
+        parseBlockConfig('form', { ...(validConfigs.form as Record<string, unknown>), paigutus: 'heledal' }),
+        'form-heledal',
+      ),
+    ])
+    expect(light).not.toContain('bg-bgMist')
+    expect(light).toContain('data-form-type="pohivorm"')
+  })
+
+  it('renders testimonials from the collection items with the block limit', () => {
+    const html = renderHtml(
+      [parsedView('testimonials', 'testimonials-1')],
+      [],
+      collectionTestimonials,
+    )
 
     expect(html).toContain('Kliendilood')
     expect(html).toContain('Müük läks sujuvalt.')
     expect(html).toContain('Mari Maasikas')
     expect(html).toContain('Metsaomanik')
+    expect(html).toContain('Kiire ja läbipaistev.')
+  })
+
+  it('slices collection testimonials to the block limit', () => {
+    const config = parseBlockConfig('testimonials', { heading: 'Kliendilood', limit: 1 })
+    const html = renderHtml([view('testimonials', config, 'testimonials-2')], [], collectionTestimonials)
+
+    expect(html).toContain('Mari Maasikas')
+    expect(html).not.toContain('Mati Mets')
+  })
+
+  it('renders nothing for a testimonials block without collection items', () => {
+    expect(renderHtml([parsedView('testimonials', 'testimonials-3')])).toBe('')
   })
 
   it('renders FAQ items as accordion entries', () => {
@@ -201,8 +315,18 @@ describe('PageBlocks degradation', () => {
 
 describe('registry and renderer contract', () => {
   it.each([...pageBlockTypes])('renders a valid %s config from the registry', (type) => {
-    const html = renderHtml([parsedView(type, `leping-${type}`)])
+    const html = renderHtml(
+      [parsedView(type, `leping-${type}`)],
+      [],
+      collectionTestimonials,
+    )
 
-    expect(html.length).toBeGreaterThan(0)
+    // Live-data blocks (ticker, testimonials) render empty states or nothing
+    // without caller data; everything else must produce markup.
+    if (type === 'testimonials') {
+      expect(html).toContain('Mari Maasikas')
+    } else {
+      expect(html.length).toBeGreaterThan(0)
+    }
   })
 })

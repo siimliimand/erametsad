@@ -45,6 +45,7 @@ describe('applyBlocksJson', () => {
     expect(result.blocks[0]?.id).toBe('keep-1')
     expect(result.blocks[0]?.config).toEqual({
       heading: 'Uus',
+      overlayStrength: 80,
       primaryCta: { label: 'Alusta', href: '/' },
     })
   })
@@ -54,7 +55,7 @@ describe('applyBlocksJson', () => {
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.blocks[0]?.config).toEqual({ limit: 4 })
+    expect(result.blocks[0]?.config).toEqual({ limit: 4, objectType: 'koik', autoRefreshSeconds: 0 })
   })
 
   it('rejects malformed JSON, non-lists and unknown types', () => {
@@ -76,10 +77,10 @@ describe('applyBlocksJson', () => {
 })
 
 describe('createBlock', () => {
-  it('starts a ticker with the registry default limit', () => {
+  it('starts a ticker with the registry default limit and filters', () => {
     const created = createBlock('ticker')
 
-    expect(created.config).toEqual({ limit: 4 })
+    expect(created.config).toEqual({ limit: 4, objectType: 'koik', autoRefreshSeconds: 0 })
     expect(safeParseBlockConfig('ticker', created.config).success).toBe(true)
     expect(created.id).not.toBe('')
   })
