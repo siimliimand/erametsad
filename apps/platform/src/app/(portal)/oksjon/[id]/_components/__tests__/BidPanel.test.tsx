@@ -60,15 +60,22 @@ function expectAmount(html: string, amount: number, currency: boolean): void {
   expect(plain(html)).toContain(plain(formatted))
 }
 
+// Mirrors BidPanel's inputAmount so expectations match the et-EE rendering
+// regardless of ICU data on the machine.
+function inputAmount(value: number): string {
+  return value.toLocaleString('et-EE', { maximumFractionDigits: 2 })
+}
+
 describe('BidPanel states', () => {
-  it('renders the guest panel with the login CTA', () => {
+  it('renders the guest panel with the login hint and the gate form', () => {
     const html = render(baseProps({ viewer: null }))
     expect(html).toContain('Pakkumine')
     expect(html).toContain('Logi sisse pakkumise tegemiseks.')
     expect(html).toContain('/login?next=%2Foksjon%2Fa1')
     expect(html).toContain('>Logi sisse</a>')
-    expect(html).not.toContain('<form')
-    expect(html).not.toContain('Esita pakkumine')
+    // The demo gate keeps the amount form visible; the modal opens on submit.
+    expect(html).toContain('<form')
+    expect(html).toContain('Esita pakkumine')
   })
 
   it('renders the scheduled panel with the start time and no form', () => {
@@ -124,18 +131,40 @@ describe('BidPanel states', () => {
 })
 
 describe('BidPanel active state', () => {
-  it('shows the start price when no bids exist yet', () => {
+  it('shows the start price as Hetke hind when no bids exist yet', () => {
     const html = render(baseProps())
-    expect(html).toContain('Alghind')
+    expect(html).toContain('Hetke hind')
     expectAmount(html, 1000, true)
     expect(html).toContain('Pakkumisi veel pole. Esita esimene pakkumine.')
   })
 
-  it('shows the leading bid and the current+step minimum', () => {
+  it('shows the leading price and the demo next-bid box', () => {
     const html = render(baseProps({ leadingBidAmount: 1000 }))
-    expect(html).toContain('Juhtiv pakkumine')
+    expect(html).toContain('Hetke hind')
     expectAmount(html, 1000, true)
-    expect(plain(html)).toContain('Vähim lubatud pakkumine: 1050 €')
+    expect(plain(html)).toContain('Järgmine lubatud pakkumine')
+    expect(plain(html)).toContain(`${inputAmount(1050)} €`)
+  })
+
+  it('shows the demo info chips and the absolute end line', () => {
+    const html = plain(render(baseProps({ bidStep: 250, bidCount: 14 })))
+    expect(html).toContain('Samm:')
+    expectAmount(html, 250, true)
+    expect(html).toContain('Anonüümsed pakkujad')
+    // The count sits in its own span, so the raw string splits label and value.
+    expect(html).toContain('Pakkumisi:')
+    expect(html).toContain('>14</span>')
+    expect(html).toContain('Oksjon lõppeb')
+    expect(html).toContain('kell')
+  })
+
+  it('renders the snipe banner only when an extension notice is live', () => {
+    const withNotice = plain(
+      render(baseProps({ extendedNotice: true, antiSnipeMinutes: 5 })),
+    )
+    expect(withNotice).toContain('Oksjoni lõppu pikendati 5 minuti võrra.')
+    const withoutNotice = render(baseProps({ extendedNotice: false }))
+    expect(withoutNotice).not.toContain('Oksjoni lõppu pikendati')
   })
 
   it('renders the bid form with label, step buttons and submit', () => {

@@ -95,6 +95,11 @@ export function AutobidderControl({
   const floor =
     current !== null ? Math.max(minimumNext, current.maxAmount + 0.01) : minimumNext
 
+  // The demo switch only opens/closes the limit editor; saving and removing
+  // stay explicit API actions, so toggling visibility never mutates the
+  // caller's active autobidder row.
+  const [editorOpen, setEditorOpen] = useState(() => existing !== null || hasAutobidder)
+
   async function handleSave(): Promise<void> {
     if (isBusy) return
     const value = parseAmount(maxStr)
@@ -178,64 +183,100 @@ export function AutobidderControl({
   }
 
   return (
-    <section className="flex flex-col gap-2xs rounded-card border border-border p-xs">
-      <p className="text-label font-semibold text-ink">Automaatpakkuja</p>
-      <p className="text-bodySm text-inkMuted">
-        {current !== null
-          ? `Süsteem pakub sinu eest automaatselt kuni ${eur(current.maxAmount)} summani, kui keegi pakub üle.`
-          : 'Süsteem teeb sinu eest automaatselt pakkumisi kuni määratud maksimaalse summani, kui keegi pakub üle.'}
-      </p>
-      <label htmlFor="autobidder-max" className="text-label font-semibold text-ink">
-        Maksimaalne summa (€)
-      </label>
-      <div className="flex flex-wrap items-center gap-xs">
-        <input
-          id="autobidder-max"
-          inputMode="decimal"
-          autoComplete="off"
-          value={maxStr}
-          onChange={(event) => {
-            setMaxStr(event.target.value)
-            setError(null)
-          }}
-          aria-invalid={error !== null}
-          className="h-10 w-32 min-w-0 rounded-input border border-border bg-bgPage px-3 text-bodySm text-ink outline-none transition-colors aria-[invalid=true]:border-danger focus:border-primary focus:ring-2 focus:ring-primary/20"
-        />
-        <Btn
-          size="sm"
-          isLoading={isBusy}
+    <section className="flex flex-col gap-2xs">
+      <div className="flex items-center justify-between gap-xs rounded-input bg-bgMist px-3.5 py-3">
+        <div>
+          <span className="block text-bodySm font-semibold text-ink">
+            Automaatpakkuja
+          </span>
+          <span className="block text-bodySm text-inkMuted">
+            Pakub sinu eest kuni maksimaalse limiidini.
+          </span>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={editorOpen}
+          aria-label="Automaatpakkuja"
+          disabled={isBusy}
           onClick={() => {
-            void handleSave()
+            setEditorOpen(!editorOpen)
           }}
+          className="flex h-6 w-11 shrink-0 items-center rounded-pill border px-0.5 transition-colors duration-hover ease-hover motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {current !== null || hasAutobidder ? 'Uuenda' : 'Määra'}
-        </Btn>
+          <span
+            aria-hidden="true"
+            className={`flex h-full w-full items-center rounded-pill px-0.5 transition-colors duration-hover ease-hover motion-reduce:transition-none ${
+              editorOpen ? 'justify-end bg-primary' : 'justify-start bg-border'
+            }`}
+          >
+            <span className="block h-4 w-4 rounded-pill bg-bgPage shadow-sm transition-transform duration-hover ease-hover motion-reduce:transition-none" />
+          </span>
+        </button>
+      </div>
+      <div
+        hidden={!editorOpen}
+        className="flex flex-col gap-2xs rounded-card border border-border p-xs"
+      >
         {current !== null && (
+          <p className="text-bodySm text-inkMuted">
+            Süsteem pakub sinu eest automaatselt kuni {eur(current.maxAmount)}{' '}
+            summani, kui keegi pakub üle.
+          </p>
+        )}
+        <label htmlFor="autobidder-max" className="text-label font-semibold text-ink">
+          Automaatpakkuja limiit (€)
+        </label>
+        <div className="flex flex-wrap items-center gap-xs">
+          <input
+            id="autobidder-max"
+            inputMode="decimal"
+            autoComplete="off"
+            value={maxStr}
+            onChange={(event) => {
+              setMaxStr(event.target.value)
+              setError(null)
+            }}
+            aria-invalid={error !== null}
+            className="h-10 w-32 min-w-0 rounded-input border border-border bg-bgPage px-3 font-mono text-bodySm text-ink outline-none transition-colors aria-[invalid=true]:border-danger focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
           <Btn
             size="sm"
-            variant="outline"
-            disabled={isBusy}
+            isLoading={isBusy}
             onClick={() => {
-              void handleRemove()
+              void handleSave()
             }}
           >
-            Eemalda
+            {current !== null || hasAutobidder ? 'Uuenda' : 'Määra'}
           </Btn>
+          {current !== null && (
+            <Btn
+              size="sm"
+              variant="outline"
+              disabled={isBusy}
+              onClick={() => {
+                void handleRemove()
+              }}
+            >
+              Eemalda
+            </Btn>
+          )}
+        </div>
+        <p className="text-bodySm text-inkMuted">
+          Pakume automaatselt kuni limiidini. Teised pakkujad sinu maksimumi ei
+          näe. Vähim lubatud: {inputAmount(floor)} €
+        </p>
+        {error !== null && (
+          <p role="alert" className="text-bodySm text-danger">
+            {error}
+          </p>
+        )}
+        {success !== null && (
+          <p role="status" className="text-bodySm text-inkMuted">
+            {success}
+          </p>
         )}
       </div>
-      <p className="text-bodySm text-inkMuted">
-        Vähim lubatud: {inputAmount(floor)} €
-      </p>
-      {error !== null && (
-        <p role="alert" className="text-bodySm text-danger">
-          {error}
-        </p>
-      )}
-      {success !== null && (
-        <p role="status" className="text-bodySm text-inkMuted">
-          {success}
-        </p>
-      )}
     </section>
   )
 }

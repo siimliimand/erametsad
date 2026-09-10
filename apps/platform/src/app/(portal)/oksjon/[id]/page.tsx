@@ -1030,6 +1030,7 @@ export default async function AuctionPage({
                   finalPrice={auction.finalPrice}
                   antiSnipeMinutes={antiSnipeMinutes}
                   allowUnderStart={allowUnderStart}
+                  bidCount={auction.bidCount}
                   viewer={
                     auth === null
                       ? null

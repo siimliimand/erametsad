@@ -1,6 +1,7 @@
 'use client'
 
 import { Btn } from '@erametsad/ui'
+import { ArrowRight, Clock, EyeOff, History, Hourglass, Info } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, type KeyboardEvent, type SyntheticEvent } from 'react'
@@ -8,14 +9,15 @@ import { useEffect, useState, type KeyboardEvent, type SyntheticEvent } from 're
 import { AlapakkumineToggle } from './AlapakkumineToggle'
 import { AutobidderControl } from './AutobidderControl'
 import { BidConfirmModal } from './BidConfirmModal'
+import { GuestGateModal } from './GuestGateModal'
 
 import { apiFetch } from '@/lib/api/client'
 import type { AuctionObjectType, AuctionStatus } from '@/lib/data/schema'
 
 // ── Public props contract ───────────────────────────────────────────────
-// The dossier page (task 4.4) mounts <BidPanel> into the
-// data-bid-panel-placeholder slot and feeds it fields straight from
-// getAuctionDossier. Every prop is serializable; no callbacks are required.
+// The dossier page mounts <BidPanel> into the sticky side rail and feeds it
+// fields straight from getAuctionDossier. Every prop is serializable; no
+// callbacks are required.
 
 /** Per-viewer flags the dossier can derive server-side. `null` viewer = guest. */
 export interface BidPanelViewerFlags {
@@ -92,6 +94,16 @@ export interface BidPanelProps {
   /** `null` renders the guest panel. */
   viewer: BidPanelViewerFlags | null
   /**
+   * Disclosed bid count for the "Pakkumisi" row; `null`/undefined collapses
+   * the count. LiveBidPanel keeps it fresh from the bid:created stream.
+   */
+  bidCount?: number | null
+  /**
+   * True while a live anti-snipe extension is being announced (demo snipe
+   * banner). LiveBidPanel raises it on auction:extended and clears it.
+   */
+  extendedNotice?: boolean
+  /**
    * Settings-level alapakkumineEnabled flag. `true` renders the under-start
    * toggle; a toggled-on submission below minBid then pends for the seller
    * (API outcome `pending_approval`).
@@ -161,6 +173,17 @@ function fmtDateTime(iso: string): string | null {
   const time = Date.parse(iso)
   if (Number.isNaN(time)) return null
   return new Date(time).toLocaleString('et-EE', { dateStyle: 'long', timeStyle: 'short' })
+}
+
+/** Demo D.M.YYYY kell HH:MM end line (02-lot-detail-open.html .ends-at). */
+function fmtEndLine(iso: string): string | null {
+  const time = Date.parse(iso)
+  if (Number.isNaN(time)) return null
+  const date = new Date(time)
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${String(date.getDate())}.${String(date.getMonth() + 1)}.${String(
+    date.getFullYear(),
+  )} kell ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 // The raamleping flow page (task 6.6) renders ?message= above its form.
@@ -267,6 +290,10 @@ const ENDED_STATUSES: readonly AuctionStatus[] = [
 const PANEL_CLASSES =
   'flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card'
 
+// Demo .info-chip (02-lot-detail-open.html .chip-row).
+const CHIP_CLASSES =
+  'inline-flex items-center gap-1.5 rounded-pill border border-border bg-bgMist px-3 py-1 text-xs font-semibold text-ink'
+
 /** Chip for a bid accepted below the start price while the seller has not confirmed it. */
 export function PendingApprovalChip() {
   return (
@@ -288,6 +315,8 @@ export function BidPanel({
   finalPrice,
   antiSnipeMinutes,
   viewer,
+  bidCount = null,
+  extendedNotice = false,
   allowUnderStart = false,
   onSubmitBid,
 }: BidPanelProps) {
@@ -307,6 +336,7 @@ export function BidPanel({
   const [gateNotice, setGateNotice] = useState(false)
   const [fetchedRights, setFetchedRights] = useState<boolean | null>(null)
   const [underbidRequested, setUnderbidRequested] = useState(false)
+  const [gateOpen, setGateOpen] = useState(false)
 
   const step = bidStep ?? 0
   const minimumNext = minimumNextAmount(minBid, bidStep, localLeading)
@@ -340,22 +370,57 @@ export function BidPanel({
     }
   }, [rightsUnknown, objectType])
 
-  // ── Panel states: guest ───────────────────────────────────────────────
+  // ── Shared demo fragments ─────────────────────────────────────────────
 
-  if (viewer === null) {
-    return (
-      <section className={PANEL_CLASSES}>
-        <h2 className="font-heading text-h4 text-ink">Pakkumine</h2>
-        <p className="text-body text-inkMuted">Logi sisse pakkumise tegemiseks.</p>
-        <Link
-          href={`/login?next=${encodeURIComponent(`/oksjon/${auctionId}`)}`}
-          className="inline-flex h-10 items-center justify-center rounded-button bg-primary px-4 font-label font-semibold text-inkInverse transition-colors hover:bg-primaryHover md:w-auto"
-        >
-          Logi sisse
-        </Link>
-      </section>
-    )
-  }
+  // Demo .ends-at line; guests see the rail exactly like bidders.
+  const endLine =
+    endsAt !== null && status === 'active' ? fmtEndLine(endsAt) : null
+  const displayPrice = localLeading ?? minBid
+
+  const priceBlock = (
+    <>
+      {endLine !== null && (
+        <p className="flex items-center gap-2 text-xs text-inkMuted">
+          <Clock className="h-3.5 w-3.5 flex-none" aria-hidden="true" />
+          <span>
+            Oksjon lõppeb{' '}
+            <span className="font-mono">{endLine}</span>
+          </span>
+        </p>
+      )}
+      <div className="flex flex-wrap items-end justify-between gap-xs">
+        <div>
+          <span className="block text-xs font-semibold uppercase tracking-[0.03em] text-inkMuted">
+            Hetke hind
+          </span>
+          <span className="block font-mono text-[2rem] font-semibold leading-[1.15] text-primaryDark">
+            {eur(displayPrice)}
+          </span>
+        </div>
+        {bidCount !== null && (
+          <span className="text-bodySm text-inkMuted">
+            Pakkumisi: <span className="font-mono">{String(bidCount)}</span>
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {bidStep !== null && (
+          <span className={CHIP_CLASSES}>
+            {'Samm: '}
+            <span className="font-mono">{eur(bidStep)}</span>
+          </span>
+        )}
+        <span className={CHIP_CLASSES}>
+          <EyeOff className="h-3 w-3 text-primary" aria-hidden="true" />
+          Anonüümsed pakkujad
+        </span>
+      </div>
+      <p className="m-0 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-button bg-primaryLight px-4 py-3 text-bodySm font-semibold text-primaryHover">
+        <span>Järgmine lubatud pakkumine</span>
+        <span className="font-mono text-lg">{inputAmount(minimumNext)} €</span>
+      </p>
+    </>
+  )
 
   // ── Panel states: unsold / ended ──────────────────────────────────────
 
@@ -395,6 +460,98 @@ export function BidPanel({
     )
   }
 
+  // ── Panel states: guest (demo gate modal on submit) ───────────────────
+
+  if (viewer === null) {
+    function openGuestGate(event: SyntheticEvent): void {
+      event.preventDefault()
+      setError(null)
+      const validation = validateBidAmount(amountStr, minBid, minimumNext, false, false)
+      if (!validation.ok) {
+        setError(validation.message)
+        return
+      }
+      setGateOpen(true)
+    }
+
+    return (
+      <section className={PANEL_CLASSES}>
+        <h2 className="font-heading text-h4 text-ink">Pakkumine</h2>
+        <p className="text-body text-inkMuted">
+          Logi sisse pakkumise tegemiseks.{' '}
+          <Link
+            href={`/login?next=${encodeURIComponent(`/oksjon/${auctionId}`)}`}
+            className="font-semibold text-primary hover:text-primaryHover"
+          >
+            Logi sisse
+          </Link>
+        </p>
+        {priceBlock}
+        <form onSubmit={openGuestGate} className="flex flex-col gap-xs">
+          <label htmlFor="bid-amount" className="text-label font-semibold text-ink">
+            Sinu pakkumine (€)
+          </label>
+          <div className="flex items-stretch gap-xs">
+            <button
+              type="button"
+              aria-label="Vähenda pakkumist sammu võrra"
+              disabled={step <= 0}
+              onClick={() => {
+                const current = parseAmount(amountStr)
+                setAmountStr(inputAmount(current === null ? minimumNext : current - step))
+              }}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-input border border-border bg-bgMist text-body text-ink transition-colors hover:bg-primaryLight disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              −
+            </button>
+            <input
+              id="bid-amount"
+              name="amount"
+              inputMode="decimal"
+              autoComplete="off"
+              value={amountStr}
+              onChange={(event) => {
+                setAmountStr(event.target.value)
+                setError(null)
+              }}
+              aria-invalid={error !== null}
+              className="h-12 w-full min-w-0 rounded-input border border-border bg-bgPage px-4 font-mono text-lg text-ink outline-none transition-colors aria-[invalid=true]:border-danger focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+            <button
+              type="button"
+              aria-label="Suurenda pakkumist sammu võrra"
+              disabled={step <= 0}
+              onClick={() => {
+                const current = parseAmount(amountStr)
+                setAmountStr(inputAmount(current === null ? minimumNext : current + step))
+              }}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-input border border-border bg-bgMist text-body text-ink transition-colors hover:bg-primaryLight disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              +
+            </button>
+          </div>
+          {error !== null && (
+            <p role="alert" className="text-bodySm text-danger">
+              {error}
+            </p>
+          )}
+          <div className="[&>button]:w-full">
+            <Btn type="submit" variant="cta">
+              Esita pakkumine
+            </Btn>
+          </div>
+        </form>
+        <GuestGateModal
+          isOpen={gateOpen}
+          onClose={() => {
+            setGateOpen(false)
+          }}
+          auctionId={auctionId}
+        />
+      </section>
+    )
+  }
+
   // ── Panel states: logged in without bidding rights ────────────────────
 
   const hasRights = viewer.hasRights ?? fetchedRights
@@ -416,7 +573,6 @@ export function BidPanel({
 
   const isLeadingBidder = localParticipation?.isLeading ?? viewer.isLeading
   const hasOwnBid = localParticipation?.hasBid ?? viewer.hasBid
-  const endsAtLabel = endsAt !== null ? fmtDateTime(endsAt) : null
   const existingAutobidder =
     typeof viewer.autobidderId === 'string' &&
     typeof viewer.autobidderMaxAmount === 'number'
@@ -508,37 +664,33 @@ export function BidPanel({
 
   return (
     <section className={PANEL_CLASSES}>
-      <h2 className="font-heading text-h4 text-ink">Pakkumine</h2>
-
-      {localLeading !== null ? (
-        <div className="flex flex-wrap items-baseline justify-between gap-xs">
-          <div>
-            <p className="text-label text-inkMuted">Juhtiv pakkumine</p>
-            <p className="font-heading text-h3 text-ink">{eur(localLeading)}</p>
-          </div>
-          {isLeadingBidder ? (
-            <span className="inline-flex items-center rounded-pill bg-primaryLight px-2 py-0.5 text-xs font-medium text-primaryDark">
-              Sinu pakkumine on juhtiv
-            </span>
-          ) : hasOwnBid ? (
-            <span className="inline-flex items-center rounded-pill bg-bgMist px-2 py-0.5 text-xs font-medium text-inkMuted">
-              Oled pakkumise esitanud
-            </span>
-          ) : null}
-        </div>
-      ) : (
-        <div>
-          <p className="text-label text-inkMuted">Alghind</p>
-          <p className="font-heading text-h3 text-ink">{eur(minBid)}</p>
-          <p className="text-bodySm text-inkMuted">
-            Pakkumisi veel pole. Esita esimene pakkumine.
-          </p>
-        </div>
+      {extendedNotice && (
+        <p
+          role="status"
+          className="m-0 flex items-start gap-2 rounded-button bg-infoLight px-3.5 py-2.5 text-bodySm font-medium text-info"
+        >
+          <History className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" />
+          Oksjoni lõppu pikendati {String(antiSnipeMinutes ?? 5)} minuti võrra.
+        </p>
       )}
 
-      {endsAtLabel !== null && (
-        <p className="text-bodySm text-inkMuted">Oksjon lõpeb: {endsAtLabel}</p>
+      {priceBlock}
+
+      {localLeading === null && (
+        <p className="text-bodySm text-inkMuted">
+          Pakkumisi veel pole. Esita esimene pakkumine.
+        </p>
       )}
+
+      {isLeadingBidder ? (
+        <span className="inline-flex items-center self-start rounded-pill bg-primaryLight px-2 py-0.5 text-xs font-medium text-primaryDark">
+          Sinu pakkumine on juhtiv
+        </span>
+      ) : hasOwnBid ? (
+        <span className="inline-flex items-center self-start rounded-pill bg-bgMist px-2 py-0.5 text-xs font-medium text-inkMuted">
+          Oled pakkumise esitanud
+        </span>
+      ) : null}
 
       {hasPendingBid && <PendingApprovalChip />}
 
@@ -570,7 +722,7 @@ export function BidPanel({
             }}
             onKeyDown={handleAmountKeyDown}
             aria-invalid={error !== null}
-            className="h-12 w-full min-w-0 rounded-input border border-border bg-bgPage px-4 text-body text-ink outline-none transition-colors aria-[invalid=true]:border-danger focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="h-12 w-full min-w-0 rounded-input border border-border bg-bgPage px-4 font-mono text-lg text-ink outline-none transition-colors aria-[invalid=true]:border-danger focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
           <button
             type="button"
@@ -584,9 +736,6 @@ export function BidPanel({
             +
           </button>
         </div>
-        <p className="text-bodySm text-inkMuted">
-          Vähim lubatud pakkumine: {inputAmount(minimumNext)} €
-        </p>
         {allowUnderStart && (
           <AlapakkumineToggle
             checked={underbidRequested}
@@ -629,9 +778,11 @@ export function BidPanel({
             </Link>
           </p>
         )}
-        <Btn type="submit" isLoading={isSubmitting}>
-          Esita pakkumine
-        </Btn>
+        <div className="[&>button]:w-full">
+          <Btn type="submit" variant="cta" isLoading={isSubmitting}>
+            Esita pakkumine
+          </Btn>
+        </div>
       </form>
 
       <AutobidderControl
@@ -643,20 +794,34 @@ export function BidPanel({
         hasAutobidder={hasAutobidder}
       />
 
-      <div className="flex flex-col gap-2xs rounded-card bg-bgMist p-xs">
-        <p className="text-bodySm text-inkMuted">
-          Teenustasu rakendub vaid oksjoni võitmise korral
+      {antiSnipeMinutes !== null && antiSnipeMinutes > 0 && (
+        <p className="m-0 flex items-start gap-2 text-xs text-inkMuted">
+          <Hourglass className="mt-0.5 h-3 w-3 flex-none text-info" aria-hidden="true" />
+          Uus pakkumine pikendab oksjoni lõpuaega {String(antiSnipeMinutes)} minuti
+          võrra.
         </p>
-        {antiSnipeMinutes !== null && antiSnipeMinutes > 0 && (
-          <p className="text-bodySm text-inkMuted">
-            Viimase {String(antiSnipeMinutes)} minuti jooksul tehtud pakkumine
-            pikendab oksjoni lõpuaega {String(antiSnipeMinutes)} minuti võrra.
-          </p>
-        )}
-        {viewer.hasRaamleping === false && (
-          <p className="text-bodySm text-statusEndingSoon">{RAAMLEPING_GATE_MESSAGE}</p>
-        )}
-      </div>
+      )}
+
+      {viewer.hasRaamleping === false && (
+        <p className="text-bodySm text-statusEndingSoon">{RAAMLEPING_GATE_MESSAGE}</p>
+      )}
+
+      {/* Fee display follows the active-auction rule: no amounts until won. */}
+      <p className="m-0 flex items-start gap-2 border-t border-dashed border-border pt-3 text-xs text-inkMuted">
+        <Info className="mt-0.5 h-3 w-3 flex-none" aria-hidden="true" />
+        Teenustasu rakendub vaid oksjoni võitmise korral
+      </p>
+
+      <Link
+        href="/tingimused"
+        className="group inline-flex items-center gap-1.5 text-bodySm font-semibold text-primary transition-colors hover:text-primaryHover"
+      >
+        Oksjoni reeglid ja tingimused
+        <ArrowRight
+          className="h-3 w-3 transition-transform duration-hover group-hover:translate-x-0.5"
+          aria-hidden="true"
+        />
+      </Link>
 
       <BidConfirmModal
         isOpen={modalAmount !== null}

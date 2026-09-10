@@ -71,10 +71,14 @@ function baseProps(overrides: Partial<LiveBidPanelProps> = {}): LiveBidPanelProp
   }
 }
 
-// Mirrors BidPanel's fmtDateTime so expectations match the et-EE rendering
-// regardless of ICU data on the machine.
-function fmtDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('et-EE', { dateStyle: 'long', timeStyle: 'short' })
+// Mirrors BidPanel's demo end-line formatter so expectations match the
+// et-EE rendering regardless of ICU data on the machine.
+function fmtEndLine(iso: string): string {
+  const date = new Date(iso)
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${String(date.getDate())}.${String(date.getMonth() + 1)}.${String(
+    date.getFullYear(),
+  )} kell ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 function plain(value: string): string {
@@ -112,6 +116,16 @@ function emit(event: 'auction:extended' | 'auction:ended', payload: object): Pro
   })
 }
 
+function emitBidCreated(payload: { auctionId: string }): Promise<void> {
+  return act(async () => {
+    stream.emit('bid:created', {
+      placedAt: new Date().toISOString(),
+      ...payload,
+    })
+    await Promise.resolve()
+  })
+}
+
 function text(): string {
   return container.textContent
 }
@@ -130,7 +144,9 @@ describe('LiveBidPanel', () => {
   it('renders the active bid form with the server deadline', async () => {
     await mount(baseProps())
     expect(text()).toContain('Esita pakkumine')
-    expect(text()).toContain(`Oksjon lõpeb: ${plain(fmtDateTime('2026-09-30T12:00:00.000Z'))}`)
+    expect(plain(text())).toContain(
+      `Oksjon lõppeb ${plain(fmtEndLine('2026-09-30T12:00:00.000Z'))}`,
+    )
   })
 
   it('moves the panel deadline in place on auction:extended without a refresh', async () => {
@@ -142,8 +158,30 @@ describe('LiveBidPanel', () => {
       endsAt: '2026-10-05T09:30:00.000Z',
     })
 
-    expect(text()).toContain(`Oksjon lõpeb: ${plain(fmtDateTime('2026-10-05T09:30:00.000Z'))}`)
-    expect(text()).not.toContain(plain(fmtDateTime('2026-09-30T12:00:00.000Z')))
+    expect(plain(text())).toContain(
+      `Oksjon lõppeb ${plain(fmtEndLine('2026-10-05T09:30:00.000Z'))}`,
+    )
+    expect(text()).not.toContain(fmtEndLine('2026-09-30T12:00:00.000Z'))
+    // The demo snipe banner announces the extension, then clears.
+    expect(text()).toContain('Oksjoni lõppu pikendati 5 minuti võrra.')
+    expect(nav.refresh).not.toHaveBeenCalled()
+  })
+
+  it('updates the price row count on bid:created via the server refresh', async () => {
+    await mount(baseProps({ bidCount: 3 }))
+
+    await emitBidCreated({ auctionId: 'a1' })
+
+    expect(text()).toContain('Pakkumisi: 4')
+    expect(nav.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores bid:created frames for another auction', async () => {
+    await mount(baseProps({ bidCount: 3 }))
+
+    await emitBidCreated({ auctionId: 'other' })
+
+    expect(text()).toContain('Pakkumisi: 3')
     expect(nav.refresh).not.toHaveBeenCalled()
   })
 
