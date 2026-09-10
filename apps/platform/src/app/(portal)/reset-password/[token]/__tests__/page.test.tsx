@@ -42,6 +42,15 @@ describe('reset-password token page', () => {
     const props = form.props as Record<string, unknown>
     expect(props.endpoint).toBe('/api/v1/auth/reset-password')
     expect(props.resetToken).toBe('tok-abc')
+    expect(props.withRepeatPassword).toBe(true)
+    expect(props.submitLabel).toBe('Määra parool')
+    expect(props.successTitle).toBe('Parool on lähtestatud')
+    expect(renderToString(props.successNote as ReactElement)).toContain(
+      'suleti kõik teised sessioonid',
+    )
+    expect(renderToString(props.errorFooter as ReactElement)).toContain(
+      'Taotle uus lähtestamislink',
+    )
     // No function props may cross the server/client boundary.
     expect(Object.values(props).every((value) => typeof value !== 'function')).toBe(true)
   })

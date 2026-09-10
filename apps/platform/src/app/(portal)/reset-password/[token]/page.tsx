@@ -15,18 +15,21 @@ export default async function ResetPasswordTokenPage({
   const { token } = await params
 
   return (
-    <div className="mx-auto w-full max-w-container-sm">
-      <div className="rounded-card border border-border bg-bgPage p-md shadow-card md:p-lg">
-        <h1 className="font-heading text-h2 text-ink">Määra uus parool</h1>
-        <p className="mt-2xs font-body text-body text-inkMuted">
+    <div className="flex w-full justify-center">
+      <div className="w-full max-w-[480px] rounded-card border border-border bg-bgPage p-md shadow-card md:p-lg">
+        <h1 className="font-heading text-[2rem] font-extrabold leading-tight text-ink">
+          Määra uus parool
+        </h1>
+        <p className="mt-1.5 font-body text-bodySm text-inkMuted">
           Vali uus parool. Parooli lähtestamisel suletakse kõik teised
           sessioonid.
         </p>
 
-        <div className="mt-md">
+        <div className="mt-6">
           <PasswordForm
             endpoint="/api/v1/auth/reset-password"
             resetToken={token}
+            withRepeatPassword
             submitLabel="Määra parool"
             fallbackError="Parooli lähtestamine ei õnnestunud. Proovi uuesti."
             errorFooter={
@@ -43,16 +46,23 @@ export default async function ResetPasswordTokenPage({
             }
             successTitle="Parool on lähtestatud"
             successNote={
-              <p className="font-body text-body text-inkMuted">
-                Turvakaalutlustel suleti kõik teised sessioonid.{' '}
+              <div className="mt-1 flex w-full flex-col gap-2">
+                <p className="font-body text-bodySm text-inkMuted">
+                  Turvakaalutlustel suleti kõik teised sessioonid.
+                </p>
                 <Link
                   href="/login"
-                  className="text-primary underline-offset-2 hover:underline"
+                  className="inline-flex h-12 w-full items-center justify-center rounded-button bg-primary font-label font-semibold text-ink-inverse transition-colors duration-hover ease-hover hover:bg-primary-hover motion-reduce:transition-none"
                 >
                   Logi sisse uue parooliga
                 </Link>
-                .
-              </p>
+                <Link
+                  href="/"
+                  className="inline-flex h-12 w-full items-center justify-center rounded-button border border-primary bg-transparent font-label font-semibold text-primary transition-colors duration-hover ease-hover hover:bg-primary-light motion-reduce:transition-none"
+                >
+                  Avalehele
+                </Link>
+              </div>
             }
           />
         </div>
