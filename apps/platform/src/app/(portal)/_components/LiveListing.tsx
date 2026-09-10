@@ -1,6 +1,6 @@
 'use client'
 
-import { LotCard, type LotCardProps } from '@erametsad/ui'
+import { SearchX } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import {
   useCallback,
@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 
-import { speciesNames } from '../_lib/species'
+import { PortalLotCard } from './PortalLotCard'
 import {
   useAuctionStream,
   type AuctionStreamPublishedPayload,
@@ -18,7 +18,6 @@ import {
 
 import { apiFetch } from '@/lib/api/client'
 import type { AuctionListResult, AuctionSummary } from '@/lib/auction/queries'
-import type { AuctionObjectType } from '@/lib/data/schema'
 
 /**
  * Drop-in client wrapper for the portal listing grid. Integration is a
@@ -40,29 +39,11 @@ import type { AuctionObjectType } from '@/lib/data/schema'
  *   router.refresh().
  * - renderLot — optional custom card renderer; receives the updated lot
  *   and { highlighted: boolean } (true briefly after a live prepend).
- *   When omitted, the default renderer draws the same LotCard markup as
- *   the page grid (lotCardProps mapping duplicated here because page.tsx
- *   is a server module).
+ *   When omitted, the default renderer draws PortalLotCard with the demo
+ *   card anatomy inside the demo auto-fill grid.
  */
 
-// CSP allows only 'self' data: blob: for images, so lots without media get
-// an inline SVG placeholder instead of an external image host. Mirrors the
-// fallback in (portal)/page.tsx.
-const LOT_IMAGE_FALLBACK = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" role="img" aria-label="Erametsad"><rect width="640" height="400" fill="#2E6B4F"/><text x="320" y="208" fill="#FFFFFF" font-family="sans-serif" font-size="28" text-anchor="middle">Erametsad</text></svg>',
-)}`
-
 const HIGHLIGHT_MS = 6_000
-
-// Singular card badge labels; ListingTabs only exports the plural tab
-// labels, so the badge forms live here. A new AuctionObjectType fails
-// typecheck here until it gets a label.
-const OBJECT_TYPE_LABELS: Record<AuctionObjectType, string> = {
-  raieoigus: 'Raieõigus',
-  kinnistu: 'Metskinnistu',
-  pakett: 'Pakett',
-  kiire: 'Kiiroksjon',
-}
 
 export interface LiveLotState {
   /** True briefly after the lot was prepended by a live publish event. */
@@ -73,38 +54,6 @@ export interface LiveListingProps {
   lots: AuctionSummary[]
   query?: string
   renderLot?: (lot: AuctionSummary, state: LiveLotState) => ReactNode
-}
-
-function lotCardProps(lot: AuctionSummary): LotCardProps {
-  const ended = lot.status === 'ended'
-  // Optional props are spread conditionally: with exactOptionalPropertyTypes
-  // an explicit undefined would not satisfy `prop?: T`, and any one of these
-  // flips LotCard into its enhanced presentation.
-  const species = speciesNames(lot.species)
-  return {
-    image: { src: lot.image ?? LOT_IMAGE_FALLBACK, alt: lot.title },
-    title: lot.title,
-    typeLabel: OBJECT_TYPE_LABELS[lot.objectType],
-    ...(lot.parish !== null ? { parish: lot.parish.name } : {}),
-    ...(lot.volume !== null ? { volumeM3: lot.volume } : {}),
-    ...(species.length > 0 ? { speciesNames: species } : {}),
-    alghind: lot.minBid,
-    county: lot.county?.name ?? lot.address ?? 'Eesti',
-    area: lot.area ?? 0,
-    endsAt: lot.endsAt ?? new Date().toISOString(),
-    status: ended ? 'ended' : 'active',
-    href: `/oksjon/${lot.id}`,
-    // Ended flip: with a completion year the card switches to its archive
-    // presentation; without one the pill flips and Countdown shows
-    // "Lõppenud" on its own.
-    ...(ended && lot.endYear !== null
-      ? {
-          archive: true,
-          endYear: lot.endYear,
-          ...(lot.finalPrice !== null ? { finalPrice: lot.finalPrice } : {}),
-        }
-      : {}),
-  }
 }
 
 export function LiveListing({ lots, query, renderLot }: LiveListingProps) {
@@ -240,23 +189,36 @@ export function LiveListing({ lots, query, renderLot }: LiveListingProps) {
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
-      <div className="grid gap-md sm:grid-cols-2">
-        {view.map((lot) => {
-          const highlighted = highlightedIds.has(lot.id)
-          const content =
-            renderLot?.(lot, { highlighted }) ?? <LotCard {...lotCardProps(lot)} />
-          return (
-            <div
-              key={lot.id}
-              className={`rounded-card transition-all duration-1000 ease-out ${
-                highlighted ? 'bg-primary/5 ring-2 ring-primary' : ''
-              }`}
-            >
-              {content}
-            </div>
-          )
-        })}
-      </div>
+      {view.length === 0 ? (
+        <div className="flex flex-col items-center gap-2.5 rounded-card bg-primaryLight px-7 py-12 text-center">
+          <SearchX size={32} className="text-primary" aria-hidden />
+          <h2 className="m-0 font-heading text-[22px] font-bold text-ink">
+            Oksjoneid ei leitud
+          </h2>
+          <p className="m-0 max-w-[34em] font-body text-body text-inkMuted">
+            Valitud filtritele ei vasta hetkel ükski aktiivne oksjon. Muuda või
+            tühjenda filtreid ja proovi uuesti.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-gutter">
+          {view.map((lot) => {
+            const highlighted = highlightedIds.has(lot.id)
+            const content =
+              renderLot?.(lot, { highlighted }) ?? <PortalLotCard lot={lot} />
+            return (
+              <div
+                key={lot.id}
+                className={`rounded-card transition-all duration-1000 ease-out ${
+                  highlighted ? 'bg-primary/5 ring-2 ring-primary' : ''
+                }`}
+              >
+                {content}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
