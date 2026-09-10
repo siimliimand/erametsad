@@ -53,14 +53,23 @@ export function PasswordModal({ isOpen, onClose }: PasswordModalProps) {
       })
       setDone(true)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Parooli vahetamine ebaõnnestus.')
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Parooli vahetamine ebaõnnestus.',
+      )
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Muuda parooli" size="sm">
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Muuda parooli"
+      size="sm"
+    >
       {done ? (
         <div className="flex flex-col gap-sm">
           <p className="text-bodySm text-ink">
@@ -125,7 +134,12 @@ export function PasswordModal({ isOpen, onClose }: PasswordModalProps) {
             </p>
           )}
           <div className="mt-2xs flex flex-col gap-xs sm:flex-row">
-            <Btn variant="outline" type="button" onClick={handleClose} disabled={busy}>
+            <Btn
+              variant="outline"
+              type="button"
+              onClick={handleClose}
+              disabled={busy}
+            >
               Katkesta
             </Btn>
             <Btn type="submit" isLoading={busy}>

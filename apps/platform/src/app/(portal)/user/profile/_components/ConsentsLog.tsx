@@ -24,13 +24,18 @@ export function ConsentsLog({ profile, onChanged }: ConsentsLogProps) {
     setBusy(true)
     setError(null)
     try {
-      const data = await requestJson<{ profiles: ProfileView[] }>('/api/v1/profiles', {
-        method: 'PATCH',
-        body: JSON.stringify({ marketingConsent: next }),
-      })
+      const data = await requestJson<{ profiles: ProfileView[] }>(
+        '/api/v1/profiles',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ marketingConsent: next }),
+        },
+      )
       onChanged(data.profiles)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nõusoleku muutmine ebaõnnestus.')
+      setError(
+        err instanceof Error ? err.message : 'Nõusoleku muutmine ebaõnnestus.',
+      )
     } finally {
       setBusy(false)
     }
@@ -38,27 +43,37 @@ export function ConsentsLog({ profile, onChanged }: ConsentsLogProps) {
 
   const rows = [
     { label: 'Kasutustingimused', at: profile.termsConsentAt, optional: false },
-    { label: 'Privaatsuspoliitika', at: profile.privacyConsentAt, optional: false },
-    { label: 'Turundusteavitused', at: profile.marketingConsentAt, optional: true },
+    {
+      label: 'Privaatsuspoliitika',
+      at: profile.privacyConsentAt,
+      optional: false,
+    },
+    {
+      label: 'Turundusteavitused',
+      at: profile.marketingConsentAt,
+      optional: true,
+    },
   ]
 
   return (
-    <section aria-labelledby="consents-heading" className="flex flex-col gap-sm">
-      <h2 id="consents-heading" className="font-heading text-h4 text-ink">
+    <div className="mt-sm border-t border-border pt-sm">
+      <h3 className="mb-2 font-heading text-[17px] font-bold text-ink">
         Nõusolekud
-      </h2>
-      <div className="flex flex-col rounded-card border border-border bg-bgPage p-md shadow-card">
+      </h3>
+      <div className="flex flex-col">
         {rows.map((row) => (
           <div
             key={row.label}
             className="flex items-center justify-between gap-sm border-b border-border py-xs first:pt-0 last:border-b-0 last:pb-0"
           >
             <div>
-              <p className="text-bodySm font-semibold text-ink">
+              <p className="m-0 text-bodySm font-semibold text-ink">
                 {row.label}
-                {!row.optional && <span className="text-inkMuted"> (kohustuslik)</span>}
+                {!row.optional && (
+                  <span className="text-inkMuted"> (kohustuslik)</span>
+                )}
               </p>
-              <p className="text-bodySm text-inkMuted">
+              <p className="m-0 text-bodySm text-inkMuted">
                 {row.at ? `Antud: ${formatDateTime(row.at)}` : 'Pole antud'}
               </p>
             </div>
@@ -78,15 +93,16 @@ export function ConsentsLog({ profile, onChanged }: ConsentsLogProps) {
           </div>
         ))}
       </div>
-      <p className="text-bodySm text-inkMuted">
-        Kasutustingimuste ja privaatsuspoliitika nõusolek on konto kasutamiseks kohustuslik.
-        Turundusteavitused on vabatahtlikud ja võid need igal ajal keelata.
+      <p className="mt-2 text-bodySm text-inkMuted">
+        Kasutustingimuste ja privaatsuspoliitika nõusolek on konto kasutamiseks
+        kohustuslik. Turundusteavitused on vabatahtlikud ja võid need igal ajal
+        keelata.
       </p>
-      {error && (
+      {error !== null && (
         <p role="alert" className="text-bodySm text-danger">
           {error}
         </p>
       )}
-    </section>
+    </div>
   )
 }
