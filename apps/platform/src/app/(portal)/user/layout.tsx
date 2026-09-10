@@ -2,9 +2,6 @@ import type { Metadata } from 'next'
 
 import { requirePortalSession } from '../_lib/session'
 import { MyStreamProvider } from '../_lib/use-my-stream'
-import { BottomTabBar } from './_components/BottomTabBar'
-import { ShellHeader } from './_components/ShellHeader'
-import { Sidebar } from './_components/Sidebar'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,24 +12,20 @@ export const metadata: Metadata = {
   },
 }
 
-export default async function UserLayout({ children }: { children: React.ReactNode }) {
-  const { profile } = await requirePortalSession()
+export default async function UserLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  // Session guard: every /user/* route stays behind the portal login. The
+  // demo-styled header with the user menu comes from the (portal) layout now
+  // (design D9), so the removed user shell no longer renders here.
+  await requirePortalSession()
 
-  // Mirrors profileDisplayName in ../_lib/session.ts; only a serializable
-  // name crosses into the client Shell.
-  const profileName =
-    profile?.type === 'company'
-      ? profile.companyName ?? profile.displayName ?? null
-      : profile?.displayName ?? profile?.companyName ?? null
-
-  return (
-    <MyStreamProvider>
-      <ShellHeader profileName={profileName} />
-      <div className="mt-md flex items-start gap-md pb-3xl md:pb-md">
-        <Sidebar />
-        <div className="min-w-0 flex-1">{children}</div>
-      </div>
-      <BottomTabBar />
-    </MyStreamProvider>
-  )
+  // MyStreamProvider keeps the user area's own live features working (bid
+  // card updates, notification inbox toasts). The portal header's unread
+  // badge sits above this provider and polls GET /api/v1/my/notifications on
+  // mount; it cannot subscribe to this stream, so header badge increments
+  // stay poll-based until the provider moves portal-wide.
+  return <MyStreamProvider>{children}</MyStreamProvider>
 }
