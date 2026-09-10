@@ -28,63 +28,91 @@ function renderWithQuery(tab: string, query: string): string {
   return render(tab)
 }
 
-describe('ListingFilters subscription entry', () => {
-  it('offers the Telli teavitus action', () => {
-    const html = render('mets')
-    expect(html).toContain('Telli teavitus')
-  })
-
-  it('renders the filter panel content and closed subscription dialog', () => {
+describe('ListingFilters demo structure', () => {
+  it('renders the demo filter set without a Maht range or sort select', () => {
     const html = render('mets')
     expect(html).toContain('Filtrid')
     expect(html).toContain('Maakond')
-    // The dialog mounts closed: no modal content leaks into the panel.
+    expect(html).toContain('Puuliigid')
+    expect(html).toContain('Raieliigid')
+    expect(html).toContain('Pindala (ha)')
+    expect(html).toContain('Hind (€)')
+    expect(html).toContain('Raietähtaeg (aasta)')
+    // Maht (m³) is dropped and sorting lives in the results bar.
+    expect(html).not.toContain('Maht')
+    expect(html).not.toContain('Sorteeri')
+  })
+
+  it('renders the Vald cascade disabled with the demo hint', () => {
+    const html = render('mets')
+    expect(html).toContain('Vali kõigepealt maakond.')
+    expect(html).toMatch(/<select[^>]*name="parish"[^>]*disabled/)
+  })
+
+  it('renders the demo species chip codes MA KU KS HB LM SA', () => {
+    const html = render('mets')
+    for (const code of ['MA', 'KU', 'KS', 'HB', 'LM', 'SA']) {
+      expect(html).toContain(`>${code}</button>`)
+    }
+    // Accessible names read "CODE Name" per the listing spec.
+    expect(html).toContain('aria-label="MA Mänd"')
+    expect(html).toContain('aria-label="HB Haab"')
+    expect(html).toContain('title="Lehis"')
+  })
+
+  it('renders the demo cut chip codes VR HR SR LR RD', () => {
+    const html = render('mets')
+    for (const code of ['VR', 'HR', 'SR', 'LR', 'RD']) {
+      expect(html).toContain(`>${code}</button>`)
+    }
+    expect(html).toContain('title="Harvendusraie"')
+    expect(html).toContain('title="Rekonstruktsiooniraie"')
+  })
+
+  it('renders the cut-deadline year select over the current-year window', () => {
+    const html = render('mets')
+    const year = new Date().getFullYear()
+    expect(html).toContain(`>${String(year)}</option>`)
+    expect(html).toContain(`>${String(year + 2)}</option>`)
+  })
+
+  it('keeps the count badge out of the URL-free render', () => {
+    const html = render('mets')
+    expect(html).not.toMatch(/rounded-pill bg-primary[^>]*>\d+</)
+  })
+})
+
+describe('ListingFilters Telli teavitus entry', () => {
+  it('offers the demo action and the collapsed inline guest sub-form', () => {
+    const html = render('mets')
+    expect(html).toContain('Telli teavitus')
+    expect(html).toContain('aria-controls="subForm"')
+    // The sub-form mounts hidden; the dialog stays closed.
+    expect(html).toMatch(/id="subForm"[^>]*hidden/)
     expect(html).not.toContain('Salvestame teie aktiivsed filtrid')
   })
 
-  it('collapses the panel by default and keeps no inline sort select', () => {
+  it('renders the demo guest sub-form fields', () => {
     const html = render('mets')
-    // Sort options moved to ListingResultsBar; the panel only toggles via Filtrid.
-    expect(html).not.toContain('Sorteeri')
-    expect(html).toContain('aria-expanded="false"')
-    expect(html).toContain('aria-controls=')
+    expect(html).toContain('E-post')
+    expect(html).toContain('sinu@email.ee')
+    expect(html).toContain(
+      'Nõustun, et Erametsad töötleb mu isikuandmeid sobivate oksjonite teavitamiseks.',
+    )
+    expect(html).toContain('type="checkbox"')
   })
-})
-
-describe('ListingFilters mobile disclosure', () => {
-  it('points the toggle at the collapsible panel id', () => {
-    const html = render('mets')
-    const controls = /aria-controls="([^"]+)"/.exec(html)
-    expect(controls).not.toBeNull()
-    const panelId = controls?.[1] ?? ''
-    const panel = new RegExp(`<div id="${panelId}" class="([^"]+)"`).exec(html)
-    expect(panel).not.toBeNull()
-    // Hidden below lg until toggled open; always open from lg up.
-    expect(panel?.[1]).toContain('hidden')
-    expect(panel?.[1]).toContain('lg:flex')
-  })
-
-  it('keeps the toggle mobile-only and the static heading desktop-only', () => {
-    const html = render('mets')
-    expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*class="[^"]*lg:hidden/)
-    expect(html).toMatch(/class="hidden [^"]*lg:flex"/)
-  })
-
-  // Clicking the toggle cannot be exercised here: this suite renders with
-  // renderToString and has no DOM runner, so the opened state stays a
-  // browser check for now.
 })
 
 describe('ListingFilters quick search (q)', () => {
-  it('counts the q term in the active badge and shows Tühjenda', () => {
+  it('counts the q term in the active badge', () => {
     const html = renderWithQuery('mets', 'q=metskits')
-    expect(html).toContain('Tühjenda')
     expect(html).toMatch(/rounded-pill bg-primary[^>]*>1</)
   })
 
-  it('keeps the badge empty and Tühjenda hidden without q', () => {
+  it('always offers Tühjenda and hides the badge without filters', () => {
     const html = renderWithQuery('mets', '')
-    expect(html).not.toContain('Tühjenda')
+    // Demo renders both actions unconditionally.
+    expect(html).toContain('Tühjenda')
     expect(html).not.toMatch(/rounded-pill bg-primary[^>]*>\d+</)
   })
 
@@ -98,5 +126,15 @@ describe('ListingFilters quick search (q)', () => {
   it('drops q when the state clears back to defaults', () => {
     expect(serializeListingFilters({ ...DEFAULT_LISTING_FILTERS }, 'mets')).not.toContain('q=')
     expect(countActiveFilters({ ...DEFAULT_LISTING_FILTERS })).toBe(0)
+  })
+})
+
+describe('ListingFilters legacy URL state', () => {
+  it('keeps legacy volume bounds out of the badge but in the round-trip', () => {
+    const state = parseListingFilters(new URLSearchParams('volumeMin=100&volumeMax=500'))
+    expect(countActiveFilters(state)).toBe(0)
+    const query = serializeListingFilters(state, 'mets')
+    expect(query).toContain('volumeMin=100')
+    expect(query).toContain('volumeMax=500')
   })
 })
