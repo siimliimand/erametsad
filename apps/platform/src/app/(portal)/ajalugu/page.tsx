@@ -1,8 +1,8 @@
 import { Card } from '@erametsad/ui'
+import { ChevronLeft, ChevronRight, FilterX, Info, RotateCcw } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-import { ArchiveCard } from '../_components/ArchiveCard'
 import {
   LISTING_TAB_IDS,
   listingTabDef,
@@ -12,19 +12,21 @@ import {
 import {
   parseListingFilters,
   type ListingFilterState,
+  type ListingSortDirection,
+  type ListingSortField,
 } from '../_lib/filter-params'
 import { formatEstonianInteger, type ListingTabId } from '../_lib/summary'
 
 import {
-  ARCHIVE_SORT_OPTIONS,
   archivedStatsByObjectType,
   listArchivedAuctions,
   type ArchivedAuctionTypeStats,
   type AuctionListResult,
+  type AuctionSummary,
 } from '@/lib/auction/queries'
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
-import type { AuctionObjectType } from '@/lib/data/schema'
+import type { AuctionObjectType, AuctionStatus } from '@/lib/data/schema'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,24 +40,49 @@ const EMPTY_RESULT: AuctionListResult = {
   totalPages: 1,
 }
 
-// Mirrors the ListingFilters option tables; this panel is server-rendered
-// so the client component's lists cannot be imported.
-const SPECIES_OPTIONS = [
-  { value: 'ma', label: 'Mänd (MA)' },
-  { value: 'ku', label: 'Kuusk (KU)' },
-  { value: 'ks', label: 'Kask (KS)' },
-  { value: 'ha', label: 'Haab (HA)' },
-  { value: 'sa', label: 'Sanglepp (SA)' },
-  { value: 'ta', label: 'Tamm (TA)' },
+// Demo Tüüp chips (04-ajalugu). Põllumaa has no objectType in the schema
+// yet (same gap as the Põllumaad tab), so its selection reduces to an empty
+// result set until the data layer adopts the type.
+const ARCHIVE_TYPE_OPTIONS = [
+  { value: 'raieoigus', label: 'Raieõigus' },
+  { value: 'kinnistu', label: 'Kinnistu' },
+  { value: 'pollumaa', label: 'Põllumaa' },
+  { value: 'pakett', label: 'Pakett' },
 ] as const
 
-const LOGGING_TYPE_OPTIONS = [
-  { value: 'u', label: 'Uuendusraie (U)' },
-  { value: 'h', label: 'Hooldusraie (H)' },
-  { value: 't', label: 'Taastusraie (T)' },
-  { value: 'l', label: 'Langu- ja kahjustuspuude raie (L)' },
-  { value: 'r', label: 'Sanitaarraie (R)' },
+const CHIP_TYPES: readonly AuctionObjectType[] = ['raieoigus', 'kinnistu', 'pakett']
+
+/** Demo type-chip colors: raie green, kinnistu blue, pollumaa amber, rest muted. */
+const TYPE_CHIPS: Record<AuctionObjectType, { label: string; className: string }> = {
+  raieoigus: { label: 'Raieõigus', className: 'bg-primaryLight text-primaryHover' },
+  kinnistu: { label: 'Kinnistu', className: 'bg-infoLight text-info' },
+  pakett: { label: 'Pakett', className: 'bg-[#EDEFEA] text-inkMuted' },
+  kiire: { label: 'Kiiroksjon', className: 'bg-[#EDEFEA] text-inkMuted' },
+}
+
+// Demo Olek chips mapped onto archived statuses: "Lõppenud" lists only lots
+// with a published result, "Müümata" the unsold/appraised branch. The
+// transient `ended` state renders in the unfiltered view only, where the
+// row still shows the Müümata pill (finalPrice null).
+const OLEK_OPTIONS = [
+  { value: 'loppenud', label: 'Lõppenud' },
+  { value: 'muumata', label: 'Müümata' },
 ] as const
+
+const OLEK_STATUSES: Record<string, readonly AuctionStatus[]> = {
+  loppenud: ['contract', 'completed', 'archived'],
+  muumata: ['unsold', 'appraised'],
+}
+
+/** Demo toolbar sort labels; the single `sort` param encodes desc as `-field`. */
+const ARCHIVE_TOOLBAR_SORTS = [
+  { value: '-endTime', label: 'Uuemad eespool' },
+  { value: 'endTime', label: 'Vanemad eespool' },
+  { value: '-endPrice', label: 'Lõpphind kahanevalt' },
+  { value: 'endPrice', label: 'Lõpphind kasvavalt' },
+] as const
+
+const PRIVACY_NOTE = 'Avalikustame ainult lõpphinda — võitja andmeid ei avaldata.'
 
 function rawPage(raw: string | string[] | undefined): number {
   const value = Number(Array.isArray(raw) ? raw[0] : raw)
@@ -109,15 +136,26 @@ function archiveHref(
   return qs === '' ? '/ajalugu' : `/ajalugu?${qs}`
 }
 
+/**
+ * The archive keeps the listing parser but flips the no-param default to
+ * the demo "Uuemad eespool" (endTime desc); the listing defaults to
+ * lõpuaeg asc.
+ */
 function archiveFilterState(params: RawSearchParams): ListingFilterState {
   const state = parseListingFilters(paramBag(params))
-  // The shared parser defaults to the live listing's lõpuaeg asc; the
-  // archive defaults to lõpphind desc until the URL carries a sort.
   if (params.sort === undefined && params.order === undefined) {
-    state.sortField = 'endPrice'
+    state.sortField = 'endTime'
     state.sortDirection = 'desc'
   }
   return state
+}
+
+/** Single-param sort token shared by the toolbar select and hidden inputs. */
+function archiveSortToken(
+  field: ListingSortField,
+  direction: ListingSortDirection,
+): string {
+  return direction === 'desc' ? `-${field}` : field
 }
 
 async function loadTabArchive(
@@ -126,11 +164,36 @@ async function loadTabArchive(
   page: number,
   params: RawSearchParams,
 ): Promise<AuctionListResult> {
-  const { allTypes, objectTypes } = listingTabDef(tab)
-  if (!allTypes && objectTypes.length === 0) return EMPTY_RESULT
+  const { allTypes, objectTypes: tabTypes } = listingTabDef(tab)
+  if (!allTypes && tabTypes.length === 0) return EMPTY_RESULT
   const search = new URLSearchParams()
-  if (objectTypes.length > 0) search.set('objectType', objectTypes.join(','))
+
+  // Tüüp chips intersect with the tab's objectTypes; a selection that
+  // reduces to nothing (Põllumaa alone, or a chip outside the tab) has no
+  // archived rows.
+  const typeTokens = csvValues(params, 'type')
+  const chipTypes = typeTokens.filter((value): value is AuctionObjectType =>
+    (CHIP_TYPES as readonly string[]).includes(value),
+  )
+  if (typeTokens.length > 0) {
+    const effective = allTypes
+      ? chipTypes
+      : tabTypes.filter((objectType) => chipTypes.includes(objectType))
+    if (effective.length === 0) return EMPTY_RESULT
+    search.set('objectType', effective.join(','))
+  } else if (tabTypes.length > 0) {
+    search.set('objectType', tabTypes.join(','))
+  }
+
+  const statuses = csvValues(params, 'olek').flatMap(
+    (value) => OLEK_STATUSES[value] ?? [],
+  )
+  if (statuses.length > 0) search.set('auctionStatus', statuses.join(','))
+
   search.set('limit', String(ARCHIVE_PAGE_SIZE))
+  // Legacy URL filters keep working server-side even though the demo
+  // sidebar no longer renders county/parish/species/logging-type/price/
+  // area editors.
   for (const key of [
     'county',
     'parish',
@@ -145,6 +208,11 @@ async function loadTabArchive(
   for (const key of ['areaMin', 'areaMax', 'priceMin', 'priceMax']) {
     const value = params[key]
     if (typeof value === 'string' && value !== '') search.set(key, value)
+  }
+  // Demo default sort "Uuemad eespool"; the shared server default is
+  // lõpphind desc, so the default is passed explicitly.
+  if (params.sort === undefined && params.order === undefined) {
+    search.set('sort', '-endTime')
   }
   if (page > 1) search.set('page', String(page))
   return listArchivedAuctions(repos, search)
@@ -223,8 +291,7 @@ function formatArchiveStatValue(value: number): string {
  * privacy line; zero aggregates collapse their clause instead of faking data.
  */
 function archiveHeadSummary(totals: ArchiveTabTotals): string {
-  const privacy = 'Avalikustame ainult lõpphinda — võitja andmeid ei avaldata.'
-  if (totals.count <= 0) return `Arhiivis ei ole lõppenud oksjoneid. ${privacy}`
+  if (totals.count <= 0) return `Arhiivis ei ole lõppenud oksjoneid. ${PRIVACY_NOTE}`
   const details = [
     totals.areaHa > 0
       ? `kokku ${formatEstonianInteger(totals.areaHa)} ha`
@@ -245,7 +312,7 @@ function archiveHeadSummary(totals: ArchiveTabTotals): string {
     detailsText === ''
       ? `Edukalt lõppenud oksjoneid on ${formatEstonianInteger(totals.count)}.`
       : `Edukalt lõppenud oksjoneid on ${formatEstonianInteger(totals.count)}, ${detailsText}.`
-  return `${sentence} ${privacy}`
+  return `${sentence} ${PRIVACY_NOTE}`
 }
 
 /**
@@ -347,28 +414,6 @@ function ArchiveStatsBand({ totals }: { totals: ArchiveTabTotals }) {
   )
 }
 
-// Mirrors countActiveFilters in _lib/filter-params, but relative to the
-// archive's lõpphind desc default and counting the endYear chips too.
-function countArchiveFilters(
-  tab: ListingTabId,
-  state: ListingFilterState,
-  selectedYears: string[],
-): number {
-  let count = 0
-  if (state.county.length > 0) count += 1
-  if (state.parish.length > 0) count += 1
-  if (state.areaMin !== undefined || state.areaMax !== undefined) count += 1
-  if (state.priceMin !== undefined || state.priceMax !== undefined) count += 1
-  if (selectedYears.length > 0) count += 1
-  if (tab === 'raieoigused') {
-    if (state.species.length > 0) count += 1
-    if (state.loggingTypes.length > 0) count += 1
-  }
-  if (state.sortField !== 'endPrice' || state.sortDirection !== 'desc')
-    count += 1
-  return count
-}
-
 interface ArchiveTabsProps {
   activeTab: ListingTabId
   counts: Record<ListingTabId, number>
@@ -416,193 +461,44 @@ function ArchiveTabs({ activeTab, counts, params }: ArchiveTabsProps) {
   )
 }
 
-interface CountyOption {
-  id: string
-  name: string
-}
-
-interface ParishOption {
-  id: string
-  name: string
-  countyId: string
-}
-
-interface ArchiveRangeFormProps {
-  tab: ListingTabId
-  params: RawSearchParams
-  state: ListingFilterState
-  counties: CountyOption[]
-  parishes: ParishOption[]
-}
-
-// GET form keeps the panel server-rendered; the submit round-trips the
-// whole query string through the URL, same as the chip links around it.
-function ArchiveRangeForm({
-  tab,
-  params,
-  state,
-  counties,
-  parishes,
-}: ArchiveRangeFormProps) {
-  const selectedYears = csvValues(params, 'endYear')
-  const selectedCounty =
-    counties.find((county) => county.name === state.county[0]) ?? null
-  const scopedParishes =
-    selectedCounty === null
-      ? parishes
-      : parishes.filter((parish) => parish.countyId === selectedCounty.id)
-  return (
-    <form method="get" action="/ajalugu" className="flex flex-col gap-md">
-      <input type="hidden" name="tab" value={tab} />
-      {selectedYears.length > 0 && (
-        <input type="hidden" name="endYear" value={selectedYears.join(',')} />
-      )}
-      {state.species.length > 0 && (
-        <input type="hidden" name="species" value={state.species.join(',')} />
-      )}
-      {state.loggingTypes.length > 0 && (
-        <input
-          type="hidden"
-          name="loggingType"
-          value={state.loggingTypes.join(',')}
-        />
-      )}
-      <input type="hidden" name="sort" value={state.sortField} />
-      <input type="hidden" name="order" value={state.sortDirection} />
-
-      <div className="grid gap-sm sm:grid-cols-2">
-        <label className="flex flex-col gap-xs">
-          <span className="font-body text-bodySm font-semibold text-primary">
-            Maakond
-          </span>
-          <select
-            name="county"
-            defaultValue={state.county[0] ?? ''}
-            className="rounded-button border border-border bg-white px-3 py-2 font-body text-body text-ink"
-          >
-            <option value="">Kõik maakonnad</option>
-            {counties.map((county) => (
-              <option key={county.id} value={county.name}>
-                {county.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-xs">
-          <span className="font-body text-bodySm font-semibold text-primary">
-            Vald
-          </span>
-          <select
-            name="parish"
-            defaultValue={state.parish[0] ?? ''}
-            className="rounded-button border border-border bg-white px-3 py-2 font-body text-body text-ink"
-          >
-            <option value="">Kõik vallad</option>
-            {scopedParishes.map((parish) => (
-              <option key={parish.id} value={parish.name}>
-                {parish.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className="grid gap-sm sm:grid-cols-2 lg:grid-cols-4">
-        <label className="flex flex-col gap-xs">
-          <span className="font-body text-bodySm font-semibold text-primary">
-            Lõpphind alates (€)
-          </span>
-          <input
-            type="number"
-            name="priceMin"
-            min={0}
-            step={1}
-            defaultValue={state.priceMin}
-            className="rounded-button border border-border bg-white px-3 py-2 font-mono text-body text-ink"
-          />
-        </label>
-        <label className="flex flex-col gap-xs">
-          <span className="font-body text-bodySm font-semibold text-primary">
-            Lõpphind kuni (€)
-          </span>
-          <input
-            type="number"
-            name="priceMax"
-            min={0}
-            step={1}
-            defaultValue={state.priceMax}
-            className="rounded-button border border-border bg-white px-3 py-2 font-mono text-body text-ink"
-          />
-        </label>
-        <label className="flex flex-col gap-xs">
-          <span className="font-body text-bodySm font-semibold text-primary">
-            Pindala alates (ha)
-          </span>
-          <input
-            type="number"
-            name="areaMin"
-            min={0}
-            step={1}
-            defaultValue={state.areaMin}
-            className="rounded-button border border-border bg-white px-3 py-2 font-mono text-body text-ink"
-          />
-        </label>
-        <label className="flex flex-col gap-xs">
-          <span className="font-body text-bodySm font-semibold text-primary">
-            Pindala kuni (ha)
-          </span>
-          <input
-            type="number"
-            name="areaMax"
-            min={0}
-            step={1}
-            defaultValue={state.areaMax}
-            className="rounded-button border border-border bg-white px-3 py-2 font-mono text-body text-ink"
-          />
-        </label>
-      </div>
-
-      <div className="flex flex-wrap gap-xs">
-        <button
-          type="submit"
-          className="inline-flex items-center justify-center rounded-button bg-primary px-4 py-2 font-body text-bodySm font-semibold text-inkInverse transition-colors duration-hover ease-hover hover:bg-primaryDark"
-        >
-          Rakenda filtrid
-        </button>
-      </div>
-    </form>
-  )
-}
-
 interface ArchiveChipsProps {
   label: string
+  labelId: string
   options: readonly { value: string; label: string }[]
   selected: string[]
   buildHref: (value: string) => string
 }
 
+// Demo .chip anatomy: white base, primary border+text on hover, primary
+// fill when pressed.
 function ArchiveChips({
   label,
+  labelId,
   options,
   selected,
   buildHref,
 }: ArchiveChipsProps) {
   return (
     <div className="flex flex-col gap-xs">
-      <span className="font-body text-bodySm font-semibold text-primary">
+      <span id={labelId} className="font-body text-bodySm font-semibold text-ink">
         {label}
       </span>
-      <div className="flex flex-wrap gap-xs">
+      <div
+        role="group"
+        aria-labelledby={labelId}
+        className="flex flex-wrap gap-xs"
+      >
         {options.map((option) => {
           const isActive = selected.includes(option.value)
           return (
             <Link
               key={option.value}
               href={buildHref(option.value)}
-              className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-pill px-4 py-2 font-body text-bodySm font-semibold transition-colors duration-hover ease-hover motion-reduce:transition-none ${
+              aria-pressed={isActive}
+              className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-pill border px-4 py-2 font-body text-bodySm font-semibold transition-colors duration-hover ease-hover motion-reduce:transition-none ${
                 isActive
-                  ? 'bg-primary text-inkInverse'
-                  : 'border border-border bg-bgMist text-ink hover:bg-primaryLight'
+                  ? 'border-primary bg-primary text-inkInverse'
+                  : 'border-border bg-white text-ink hover:border-primary hover:text-primary'
               }`}
             >
               {option.label}
@@ -614,31 +510,306 @@ function ArchiveChips({
   )
 }
 
-function ArchiveSort({
-  tab,
-  params,
-  state,
-}: {
+const SELECT_CLASS =
+  'w-full min-h-11 rounded-button border border-border bg-white px-3.5 py-2.5 font-body text-body text-ink transition-colors duration-hover ease-hover focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
+
+interface ArchiveFiltersProps {
   tab: ListingTabId
   params: RawSearchParams
-  state: ListingFilterState
-}) {
+  sortState: ListingFilterState
+  years: number[]
+  selectedYear: string
+  selectedTypes: string[]
+  selectedOlek: string[]
+  activeCount: number
+}
+
+// Demo .filters card: Lõppemise aasta select, Tüüp chips, Olek chips with
+// the hint, and Tühjenda. One GET form keeps the panel server-rendered;
+// the selects need the Rakenda submit to apply without client JS.
+function ArchiveFilters({
+  tab,
+  params,
+  sortState,
+  years,
+  selectedYear,
+  selectedTypes,
+  selectedOlek,
+  activeCount,
+}: ArchiveFiltersProps) {
   return (
-    <ArchiveChips
-      label="Sorteeri"
-      options={ARCHIVE_SORT_OPTIONS.map((option) => ({
-        value: `${option.field}:${option.direction}`,
-        label: option.label,
-      }))}
-      selected={[`${state.sortField}:${state.sortDirection}`]}
-      buildHref={(value) => {
-        const [field, direction] = value.split(':')
-        return archiveHref(tab, params, {
-          sort: field ?? 'endPrice',
-          order: direction ?? 'desc',
-        })
-      }}
+    <Card
+      hover={false}
+      className="shadow-card"
+      content={
+        <form method="get" action="/ajalugu" className="flex flex-col gap-md">
+          <input type="hidden" name="tab" value={tab} />
+          {selectedTypes.length > 0 && (
+            <input type="hidden" name="type" value={selectedTypes.join(',')} />
+          )}
+          {selectedOlek.length > 0 && (
+            <input type="hidden" name="olek" value={selectedOlek.join(',')} />
+          )}
+          <input
+            type="hidden"
+            name="sort"
+            value={archiveSortToken(sortState.sortField, sortState.sortDirection)}
+          />
+
+          <div className="flex items-center justify-between">
+            <span className="font-heading text-h4 font-semibold text-ink">
+              Filtrid
+            </span>
+            <span className="rounded-pill bg-primaryLight px-[9px] py-px font-mono text-bodySm font-medium text-primaryHover">
+              ({activeCount})
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="archiveEndYear"
+              className="font-body text-bodySm font-semibold text-ink"
+            >
+              Lõppemise aasta
+            </label>
+            <select
+              id="archiveEndYear"
+              name="endYear"
+              defaultValue={selectedYear}
+              className={SELECT_CLASS}
+            >
+              <option value="">Kõik</option>
+              {years.map((year) => (
+                <option key={year} value={String(year)}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <ArchiveChips
+            label="Tüüp"
+            labelId="archiveTypeLabel"
+            options={ARCHIVE_TYPE_OPTIONS}
+            selected={selectedTypes}
+            buildHref={(value) => {
+              const next = toggleToken(selectedTypes, value)
+              return archiveHref(tab, params, {
+                type: next.length > 0 ? next.join(',') : null,
+              })
+            }}
+          />
+
+          <div className="flex flex-col gap-xs">
+            <ArchiveChips
+              label="Olek"
+              labelId="archiveOlekLabel"
+              options={OLEK_OPTIONS}
+              selected={selectedOlek}
+              buildHref={(value) => {
+                const next = toggleToken(selectedOlek, value)
+                return archiveHref(tab, params, {
+                  olek: next.length > 0 ? next.join(',') : null,
+                })
+              }}
+            />
+            <p className="font-body text-bodySm text-inkMuted">
+              Müümata jäänud oksjonid on arhiivis avalikud.
+            </p>
+          </div>
+
+          <div className="mt-2 flex flex-col gap-2.5 border-t border-border pt-[18px]">
+            <button
+              type="submit"
+              className="inline-flex w-full items-center justify-center rounded-button bg-primary px-4 py-2.5 font-body text-bodySm font-semibold text-inkInverse transition-colors duration-hover ease-hover hover:bg-primaryDark"
+            >
+              Rakenda
+            </button>
+            <Link
+              href={`/ajalugu?tab=${tab}`}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-button border border-primary bg-white px-4 py-2.5 font-body text-bodySm font-semibold text-primary transition-colors duration-hover ease-hover hover:bg-primaryLight hover:text-primaryHover"
+            >
+              <RotateCcw size={15} aria-hidden="true" /> Tühjenda
+            </Link>
+          </div>
+        </form>
+      }
     />
+  )
+}
+
+interface ArchiveToolbarProps {
+  tab: ListingTabId
+  sortState: ListingFilterState
+  selectedYear: string
+  selectedTypes: string[]
+  selectedOlek: string[]
+  total: number
+}
+
+// Demo .toolbar: result count (role="status") on the left, Sorteeri select
+// pushed right. Hidden inputs carry the other filters; the submit button
+// applies the choice without client JS.
+function ArchiveToolbar({
+  tab,
+  sortState,
+  selectedYear,
+  selectedTypes,
+  selectedOlek,
+  total,
+}: ArchiveToolbarProps) {
+  return (
+    <div className="flex flex-wrap items-center gap-3.5">
+      <p
+        role="status"
+        className="m-0 self-center font-body text-[15px] font-semibold text-inkMuted"
+      >
+        {formatEstonianInteger(total)} {total === 1 ? 'oksjon' : 'oksjonit'}
+      </p>
+      <form
+        method="get"
+        action="/ajalugu"
+        className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto"
+      >
+        <input type="hidden" name="tab" value={tab} />
+        {selectedTypes.length > 0 && (
+          <input type="hidden" name="type" value={selectedTypes.join(',')} />
+        )}
+        {selectedOlek.length > 0 && (
+          <input type="hidden" name="olek" value={selectedOlek.join(',')} />
+        )}
+        {selectedYear !== '' && (
+          <input type="hidden" name="endYear" value={selectedYear} />
+        )}
+        <label
+          htmlFor="archiveSort"
+          className="whitespace-nowrap font-body text-bodySm font-semibold text-inkMuted"
+        >
+          Sorteeri
+        </label>
+        <select
+          id="archiveSort"
+          name="sort"
+          defaultValue={archiveSortToken(
+            sortState.sortField,
+            sortState.sortDirection,
+          )}
+          className="min-h-10 rounded-button border border-border bg-white px-3 py-2 font-body text-bodySm font-medium text-ink transition-colors duration-hover ease-hover focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+        >
+          {ARCHIVE_TOOLBAR_SORTS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          aria-label="Rakenda sortimine"
+          className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-button bg-primary text-inkInverse transition-colors duration-hover ease-hover hover:bg-primaryDark"
+        >
+          <RotateCcw size={15} aria-hidden="true" />
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function formatAreaHa(area: number): string {
+  const [whole, decimal = '0'] = area.toFixed(1).split('.')
+  return `${formatEstonianInteger(Number(whole))},${decimal} ha`
+}
+
+function formatEndDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('et-EE')
+}
+
+function ArchiveTypeChip({ objectType }: { objectType: AuctionObjectType }) {
+  const chip = TYPE_CHIPS[objectType]
+  return (
+    <span
+      className={`inline-block whitespace-nowrap rounded-pill px-[11px] py-0.5 text-xs font-semibold ${chip.className}`}
+    >
+      {chip.label}
+    </span>
+  )
+}
+
+// Demo pill-muted Müümata pill (dot + label), shown in the Lõpphind column
+// of rows without a published result.
+function UnsoldPill() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-pill bg-[#EDEFEA] px-3 py-[3px] text-[13px] font-semibold text-inkMuted">
+      <span className="h-[7px] w-[7px] rounded-full bg-current" aria-hidden="true" />
+      Müümata
+    </span>
+  )
+}
+
+const TD_CLASS = 'border-b border-border px-4 py-[13px] align-middle'
+
+function ArchiveRow({ auction }: { auction: AuctionSummary }) {
+  const { finalPrice } = auction
+  const start = auction.minBid
+  const unsold = finalPrice === null
+  const uplift =
+    finalPrice !== null && start > 0 && finalPrice > start
+      ? `+${String(Math.round(((finalPrice - start) / start) * 100))}%`
+      : null
+  return (
+    <tr
+      className={
+        unsold
+          ? 'bg-bgMist text-inkMuted'
+          : 'transition-colors duration-hover ease-hover hover:bg-bgMist'
+      }
+    >
+      <td className={TD_CLASS}>
+        <Link
+          href={`/oksjon/${auction.id}`}
+          className={`font-body text-[15px] font-semibold transition-colors duration-hover ease-hover ${
+            unsold ? 'text-inkMuted hover:text-primary' : 'text-ink hover:text-primary'
+          }`}
+        >
+          {auction.title}
+        </Link>
+        <span className="mt-0.5 block font-mono text-xs text-inkMuted">
+          #{auction.id}
+        </span>
+      </td>
+      <td className={`${TD_CLASS} whitespace-nowrap`}>
+        <ArchiveTypeChip objectType={auction.objectType} />
+      </td>
+      <td className={`${TD_CLASS} whitespace-nowrap`}>
+        {auction.county?.name ?? auction.address ?? 'Eesti'}
+      </td>
+      <td className={`${TD_CLASS} font-mono whitespace-nowrap`}>
+        {auction.area === null ? '—' : formatAreaHa(auction.area)}
+      </td>
+      <td className={`${TD_CLASS} font-mono whitespace-nowrap`}>
+        {auction.endsAt === null ? '—' : formatEndDate(auction.endsAt)}
+      </td>
+      <td className={`${TD_CLASS} whitespace-nowrap`}>
+        {unsold ? (
+          <UnsoldPill />
+        ) : (
+          <span className="font-mono text-[17px] font-medium text-ctaHover">
+            {formatEstonianInteger(finalPrice)} €
+          </span>
+        )}
+      </td>
+      <td className={`${TD_CLASS} font-mono whitespace-nowrap`}>
+        {formatEstonianInteger(start)} €
+      </td>
+      <td className={`${TD_CLASS} whitespace-nowrap`}>
+        {uplift === null ? (
+          '—'
+        ) : (
+          <span className="inline-block rounded-pill bg-[rgba(46,158,91,0.12)] px-2.5 py-px font-mono text-bodySm font-medium text-[#2E9E5B]">
+            {uplift}
+          </span>
+        )}
+      </td>
+    </tr>
   )
 }
 
@@ -661,6 +832,11 @@ function paginationPages(page: number, totalPages: number): (number | '…')[] {
   return pages
 }
 
+const PAGE_BTN_CLASS =
+  'inline-flex h-10 min-w-10 items-center justify-center rounded-button border border-border px-2.5 font-body text-[15px] font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary'
+const PAGE_BTN_DISABLED_CLASS =
+  'inline-flex h-10 min-w-10 items-center justify-center rounded-button border border-border px-2.5 font-body text-[15px] font-semibold text-inkMuted'
+
 function ArchivePagination({
   tab,
   page,
@@ -675,14 +851,27 @@ function ArchivePagination({
   if (totalPages <= 1) return null
   return (
     <nav
-      aria-label="Lehitsemine"
-      className="flex flex-wrap items-center justify-center gap-xs"
+      aria-label="Leheküljed"
+      className="flex flex-wrap items-center justify-center gap-1.5"
     >
+      {page > 1 ? (
+        <Link
+          href={archiveHref(tab, params, undefined, page - 1)}
+          aria-label="Eelmine leht"
+          className={PAGE_BTN_CLASS}
+        >
+          <ChevronLeft size={14} aria-hidden="true" />
+        </Link>
+      ) : (
+        <span aria-hidden="true" className={PAGE_BTN_DISABLED_CLASS}>
+          <ChevronLeft size={14} />
+        </span>
+      )}
       {paginationPages(page, totalPages).map((entry, index) =>
         entry === '…' ? (
           <span
             key={`gap-${String(index)}`}
-            className="px-2 font-body text-bodySm text-inkMuted"
+            className="px-0.5 font-body text-bodySm text-inkMuted"
           >
             …
           </span>
@@ -690,7 +879,7 @@ function ArchivePagination({
           <span
             key={entry}
             aria-current="page"
-            className="flex h-9 min-w-9 items-center justify-center rounded-button bg-primary px-2 font-mono text-bodySm font-semibold text-white"
+            className="inline-flex h-10 min-w-10 items-center justify-center rounded-button border border-primary bg-primary px-2.5 font-body text-[15px] font-semibold text-white"
           >
             {entry}
           </span>
@@ -698,11 +887,24 @@ function ArchivePagination({
           <Link
             key={entry}
             href={archiveHref(tab, params, undefined, entry)}
-            className="flex h-9 min-w-9 items-center justify-center rounded-button border border-border px-2 font-mono text-bodySm font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary"
+            className={PAGE_BTN_CLASS}
           >
             {entry}
           </Link>
         ),
+      )}
+      {page < totalPages ? (
+        <Link
+          href={archiveHref(tab, params, undefined, page + 1)}
+          aria-label="Järgmine leht"
+          className={PAGE_BTN_CLASS}
+        >
+          <ChevronRight size={14} aria-hidden="true" />
+        </Link>
+      ) : (
+        <span aria-hidden="true" className={PAGE_BTN_DISABLED_CLASS}>
+          <ChevronRight size={14} />
+        </span>
       )}
     </nav>
   )
@@ -723,39 +925,28 @@ export default async function AjaluguPage({ searchParams }: ArchivePageProps) {
   const params = await searchParams
   const tab = resolveListingTab(params.tab)
   const page = rawPage(params.page)
-  const state = archiveFilterState(params)
+  const sortState = archiveFilterState(params)
   const selectedYears = csvValues(params, 'endYear')
-  const isForestTab = tab === 'raieoigused'
+  const selectedTypes = csvValues(params, 'type')
+  const selectedOlek = csvValues(params, 'olek')
+  const selectedYear = selectedYears[0] ?? ''
 
   const repos = await getRepositories()
-  const [typeStats, countiesResult, parishesResult, result] = await Promise.all(
-    [
-      archivedStatsByObjectType(repos),
-      repos.find({ collection: 'counties', pagination: false }),
-      repos.find({ collection: 'parishes', pagination: false }),
-      loadTabArchive(repos, tab, page, params),
-    ],
-  )
-  const counties: CountyOption[] = countiesResult.docs.map((county) => ({
-    id: county.id,
-    name: county.name,
-  }))
-  const parishes: ParishOption[] = parishesResult.docs.map((parish) => ({
-    id: parish.id,
-    name: parish.name,
-    countyId: parish.countyId,
-  }))
+  const [typeStats, result] = await Promise.all([
+    archivedStatsByObjectType(repos),
+    loadTabArchive(repos, tab, page, params),
+  ])
 
   const counts = Object.fromEntries(
     LISTING_TAB_IDS.map((id) => [id, archivedCountForTab(id, typeStats)]),
   ) as Record<ListingTabId, number>
 
-  const activeFilterCount = countArchiveFilters(tab, state, selectedYears)
+  const activeFilterCount =
+    (selectedYear !== '' ? 1 : 0) +
+    (selectedTypes.length > 0 ? 1 : 0) +
+    (selectedOlek.length > 0 ? 1 : 0)
 
-  const yearOptions = endYearsForTab(tab, typeStats).map((year) => ({
-    value: String(year),
-    label: String(year),
-  }))
+  const yearOptions = endYearsForTab(tab, typeStats)
 
   const totals = archiveTabTotals('koik', typeStats)
 
@@ -765,118 +956,97 @@ export default async function AjaluguPage({ searchParams }: ArchivePageProps) {
 
       <ArchiveTabs activeTab={tab} counts={counts} params={params} />
 
-      <div className="flex flex-col gap-lg pt-lg">
-        <Card
-          hover={false}
-          content={
-            <div className="flex flex-col gap-md">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-xs font-heading text-h4 font-semibold text-ink">
-                  Filtrid
-                  {activeFilterCount > 0 && (
-                    <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-primary px-1.5 font-mono text-[11px] font-bold text-inkInverse">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </span>
-                {activeFilterCount > 0 && (
-                  <Link
-                    href={`/ajalugu?tab=${tab}`}
-                    className="font-body text-bodySm font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryDark"
-                  >
-                    Tühjenda
-                  </Link>
-                )}
-              </div>
-              <ArchiveRangeForm
-                tab={tab}
-                params={params}
-                state={state}
-                counties={counties}
-                parishes={parishes}
-              />
-              {yearOptions.length > 0 && (
-                <ArchiveChips
-                  label="Lõpuaasta"
-                  options={yearOptions}
-                  selected={selectedYears}
-                  buildHref={(value) => {
-                    const next = toggleToken(selectedYears, value)
-                    return archiveHref(tab, params, {
-                      endYear: next.length > 0 ? next.join(',') : null,
-                    })
-                  }}
-                />
-              )}
-              {isForestTab && (
-                <>
-                  <ArchiveChips
-                    label="Puuliik"
-                    options={SPECIES_OPTIONS}
-                    selected={state.species}
-                    buildHref={(value) => {
-                      const next = toggleToken(state.species, value)
-                      return archiveHref(tab, params, {
-                        species: next.length > 0 ? next.join(',') : null,
-                      })
-                    }}
-                  />
-                  <ArchiveChips
-                    label="Raieliik"
-                    options={LOGGING_TYPE_OPTIONS}
-                    selected={state.loggingTypes}
-                    buildHref={(value) => {
-                      const next = toggleToken(state.loggingTypes, value)
-                      return archiveHref(tab, params, {
-                        loggingType: next.length > 0 ? next.join(',') : null,
-                      })
-                    }}
-                  />
-                </>
-              )}
-              <ArchiveSort tab={tab} params={params} state={state} />
+      {/* Demo .listing-grid: 280px filter column beside the results flow. */}
+      <div className="flex flex-col gap-5 pt-lg lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start lg:gap-8">
+        <aside aria-label="Arhiivi filtrid">
+          <ArchiveFilters
+            tab={tab}
+            params={params}
+            sortState={sortState}
+            years={yearOptions}
+            selectedYear={selectedYear}
+            selectedTypes={selectedTypes}
+            selectedOlek={selectedOlek}
+            activeCount={activeFilterCount}
+          />
+        </aside>
+
+        <div className="flex min-w-0 flex-col gap-5">
+          <ArchiveToolbar
+            tab={tab}
+            sortState={sortState}
+            selectedYear={selectedYear}
+            selectedTypes={selectedTypes}
+            selectedOlek={selectedOlek}
+            total={result.total}
+          />
+
+          {result.auctions.length === 0 ? (
+            <div className="flex flex-col items-center gap-2.5 rounded-card bg-primaryLight px-7 py-12 text-center">
+              <FilterX size={32} aria-hidden="true" className="text-primary" />
+              <h2 className="mt-1 font-heading text-[22px] font-bold text-ink">
+                Filtritele ei vasta ükski lõppenud oksjon
+              </h2>
+              <p className="max-w-[34em] font-body text-body text-inkMuted">
+                Muuda filtreid laiemaks või tühjenda need — kõik lõppenud
+                oksjonid jäävad arhiivi alles.
+              </p>
+              <Link
+                href={`/ajalugu?tab=${tab}`}
+                className="mt-2.5 inline-flex items-center justify-center rounded-button border border-primary bg-white px-4 py-2.5 font-body text-bodySm font-semibold text-primary transition-colors duration-hover ease-hover hover:bg-primaryLight hover:text-primaryHover"
+              >
+                Tühjenda filtrid
+              </Link>
             </div>
-          }
-        />
+          ) : (
+            <div className="overflow-x-auto rounded-card border border-border bg-white shadow-card">
+              <table
+                aria-label="Lõppenud oksjonite tulemused"
+                className="w-full min-w-[880px] border-collapse font-body text-[15px]"
+              >
+                <thead>
+                  <tr className="border-b border-border bg-bgMist">
+                    {[
+                      'Objekt',
+                      'Tüüp',
+                      'Maakond',
+                      'Pindala',
+                      'Lõppkuupäev',
+                      'Lõpphind',
+                      'Alghind',
+                      'Ülepakkumine',
+                    ].map((label) => (
+                      <th
+                        key={label}
+                        scope="col"
+                        className="px-4 py-[13px] text-left text-xs font-semibold uppercase tracking-[0.05em] text-inkMuted whitespace-nowrap"
+                      >
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="[&>tr:last-child>td]:border-b-0">
+                  {result.auctions.map((auction) => (
+                    <ArchiveRow key={auction.id} auction={auction} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-        {result.auctions.length === 0 ? (
-          <div className="rounded-card border border-border bg-white p-lg text-center">
-            <p className="font-body text-body text-inkMuted">
-              Arhiivis ei ole valitud filtritele vastavaid lõppenud oksjoneid.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-md sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {result.auctions.map((auction) => (
-              <ArchiveCard
-                key={auction.id}
-                title={auction.title}
-                href={`/oksjon/${auction.id}`}
-                image={
-                  auction.image === null
-                    ? undefined
-                    : { src: auction.image, alt: auction.title }
-                }
-                finalPrice={auction.finalPrice}
-                endYear={auction.endYear}
-                endedAt={auction.endsAt}
-                county={auction.county?.name ?? auction.address ?? 'Eesti'}
-                area={auction.area}
-              />
-            ))}
-          </div>
-        )}
+          <ArchivePagination
+            tab={tab}
+            page={result.page}
+            totalPages={result.totalPages}
+            params={params}
+          />
 
-        <ArchivePagination
-          tab={tab}
-          page={result.page}
-          totalPages={result.totalPages}
-          params={params}
-        />
-
-        <p className="text-center font-body text-bodySm text-inkMuted">
-          Avalikustatakse ainult lõpphinnad; pakkujate andmeid ei avaldata.
-        </p>
+          <p className="flex items-center justify-center gap-2 text-center font-body text-bodySm text-inkMuted">
+            <Info size={15} aria-hidden="true" className="flex-none" />
+            {PRIVACY_NOTE}
+          </p>
+        </div>
       </div>
     </div>
   )
