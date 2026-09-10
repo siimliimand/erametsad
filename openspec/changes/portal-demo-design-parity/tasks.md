@@ -29,7 +29,7 @@
 ## 5. Ajalugu (/ajalugu)
 
 - [x] 5.1 Page head with 4-card stats band (Edukalt lõppenud oksjonit, Metsa- ja põllumaad kokku, Raiemaht kokku, Kogumaksumus) + summary + pill tabs <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/ajalugu/page.tsx] -->
-- [ ] 5.2 Demo sidebar (Lõppemise aasta select, Tüüp chips, Olek chips + hint, Tühjenda), toolbar with "N oksjonit" count + Sorteeri labels (Uuemad eespool default), results table (Objekt/Tüüp/Maakond/Pindala/Lõppkuupäev/Lõpphind/Alghind/Ülepakkumine) with type chips, amber Lõpphind, +N% uplift pill, muted Müümata rows, privacy footnote, demo pagination <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/(portal)/ajalugu/page.tsx, apps/platform/src/app/(portal)/_components/ArchiveCard.tsx] -->
+- [x] 5.2 Demo sidebar (Lõppemise aasta select, Tüüp chips, Olek chips + hint, Tühjenda), toolbar with "N oksjonit" count + Sorteeri labels (Uuemad eespool default), results table (Objekt/Tüüp/Maakond/Pindala/Lõppkuupäev/Lõpphind/Alghind/Ülepakkumine) with type chips, amber Lõpphind, +N% uplift pill, muted Müümata rows, privacy footnote, demo pagination <!-- agent: fullstack-engineer.build, depends_on: [5.1], touches: [apps/platform/src/app/(portal)/ajalugu/page.tsx, apps/platform/src/app/(portal)/_components/ArchiveCard.tsx] -->
 
 ## 6. Auth pages
 
@@ -42,10 +42,10 @@
 ## 7. User area
 
 - [x] 7.1 User layout: remove ShellHeader/Sidebar/BottomTabBar; add page-head component (Minu keskkond crumbs, H1, summary) + sub-nav tab row (Pakkumised, Objektid, Teavitused, Profiil); keep unread badge feed <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/app/(portal)/user/layout.tsx, apps/platform/src/app/(portal)/user/_components/**] -->
-- [ ] 7.2 Minu pakkumised: bid cards (juhtiv/pime/võitnud/kaotatud variants, autobidder switch + Muuda on card), chips Käimasolevad/Lõppenud/Võidetud/Kaotatud, hint banner, sealed masking + tooltip, SSE toast behaviors <!-- agent: fullstack-engineer.build, depends_on: [7.1, 1.5], touches: [apps/platform/src/app/(portal)/user/bids/**] -->
-- [ ] 7.3 Minu objektid: obj cards (active/signed/unsold/draft, stats Hetke hind-Lõpphind/Pakkumisi/Vaatamisi +Jälgijaid), chips Kõik/Käimasolevad/Lõppenud/Mustandid, "Paku oma objekti" CTA, keep alapakkumine banner + drawer + relist/review actions <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(portal)/user/objects/**] -->
-- [ ] 7.4 Teavitused: stacked panels — inbox (44px icons, category badges, unread mist + amber dot, mark-read, Märgi loetuks, chips, Laadi veel), preference matrix (switch/E-post/SMS + channel note + Saada test-teavitus), Otsingute tellimused panel <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(portal)/user/notifications/**] -->
-- [ ] 7.5 Minu profiil: five stacked cards (Andmed with masked isikukood Näita/Peida + audit, Profiilid, Oksjoniõigused chips, Turve with sessions, Privaatsus ja andmed with export + Kustuta konto modal with 7-year retention note) <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(portal)/user/profile/**] -->
+- [x] 7.2 Minu pakkumised: bid cards (juhtiv/pime/võitnud/kaotatud variants, autobidder switch + Muuda on card), chips Käimasolevad/Lõppenud/Võidetud/Kaotatud, hint banner, sealed masking + tooltip, SSE toast behaviors <!-- agent: fullstack-engineer.build, depends_on: [7.1, 1.5], touches: [apps/platform/src/app/(portal)/user/bids/**] -->
+- [x] 7.3 Minu objektid: obj cards (active/signed/unsold/draft, stats Hetke hind-Lõpphind/Pakkumisi/Vaatamisi +Jälgijaid), chips Kõik/Käimasolevad/Lõppenud/Mustandid, "Paku oma objekti" CTA, keep alapakkumine banner + drawer + relist/review actions <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(portal)/user/objects/**] -->
+- [x] 7.4 Teavitused: stacked panels — inbox (44px icons, category badges, unread mist + amber dot, mark-read, Märgi loetuks, chips, Laadi veel), preference matrix (switch/E-post/SMS + channel note + Saada test-teavitus), Otsingute tellimused panel <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(portal)/user/notifications/**] -->
+- [x] 7.5 Minu profiil: five stacked cards (Andmed with masked isikukood Näita/Peida + audit, Profiilid, Oksjoniõigused chips, Turve with sessions, Privaatsus ja andmed with export + Kustuta konto modal with 7-year retention note) <!-- agent: fullstack-engineer.build, depends_on: [7.1], touches: [apps/platform/src/app/(portal)/user/profile/**] -->
 
 ## 8. Contracts
 
