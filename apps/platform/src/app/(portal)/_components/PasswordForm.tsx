@@ -1,8 +1,16 @@
 'use client'
 
 import { Btn, FormInput } from '@erametsad/ui'
+import { CircleCheck, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
-import { useState, type ReactNode, type SyntheticEvent } from 'react'
+import {
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type SyntheticEvent,
+} from 'react'
 
 import {
   PasswordStrengthMeter,
@@ -34,6 +42,119 @@ function bodyText(
   return typeof value === 'string' && value ? value : null
 }
 
+function capsLockState(event: KeyboardEvent<HTMLInputElement>): boolean {
+  return event.getModifierState('CapsLock')
+}
+
+interface PasswordInputProps {
+  label: string
+  name: string
+  autoComplete: string
+  value: string
+  disabled?: boolean
+  error?: string | null
+  onChange: (value: string) => void
+  onBlur?: () => void
+}
+
+// Demo auth field (.pw-wrap): visible label, trailing show/hide toggle and a
+// live Caps Lock warning.
+function PasswordInput({
+  label,
+  name,
+  autoComplete,
+  value,
+  disabled = false,
+  error,
+  onChange,
+  onBlur,
+}: PasswordInputProps) {
+  const inputId = useId()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [visible, setVisible] = useState(false)
+  const [capsLock, setCapsLock] = useState(false)
+
+  const describedBy =
+    [error ? `${inputId}-error` : null, capsLock ? `${inputId}-caps` : null]
+      .filter(Boolean)
+      .join(' ') || undefined
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label
+        htmlFor={inputId}
+        className="font-body text-bodySm font-semibold text-ink"
+      >
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          id={inputId}
+          name={name}
+          type={visible ? 'text' : 'password'}
+          autoComplete={autoComplete}
+          disabled={disabled}
+          value={value}
+          onChange={(event) => {
+            onChange(event.target.value)
+          }}
+          onKeyDown={(event) => {
+            setCapsLock(capsLockState(event))
+          }}
+          onKeyUp={(event) => {
+            setCapsLock(capsLockState(event))
+          }}
+          onBlur={() => {
+            setCapsLock(false)
+            onBlur?.()
+          }}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          className={`h-12 w-full rounded-button border bg-bgPage px-3.5 pr-12 font-body text-body text-ink outline-none transition-colors duration-hover ease-hover motion-reduce:transition-none ${
+            error
+              ? 'border-danger focus:border-danger focus:ring-2 focus:ring-danger/20'
+              : 'border-border focus:border-primary focus:ring-2 focus:ring-primary/20'
+          }`}
+        />
+        <button
+          type="button"
+          disabled={disabled}
+          aria-pressed={visible}
+          aria-label={visible ? 'Peida parool' : 'Näita parooli'}
+          onClick={() => {
+            setVisible((previous) => !previous)
+            inputRef.current?.focus()
+          }}
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 text-inkMuted transition-colors duration-hover ease-hover hover:text-ink motion-reduce:transition-none"
+        >
+          {visible ? (
+            <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" />
+          ) : (
+            <Eye className="h-[18px] w-[18px]" aria-hidden="true" />
+          )}
+        </button>
+      </div>
+      {error && (
+        <p
+          id={`${inputId}-error`}
+          className="font-body text-bodySm font-medium text-danger"
+        >
+          {error}
+        </p>
+      )}
+      {capsLock && (
+        <p
+          id={`${inputId}-caps`}
+          className="font-body text-bodySm font-semibold text-ctaHover"
+        >
+          Caps Lock on sees.
+        </p>
+      )}
+    </div>
+  )
+}
+
 interface PasswordFormProps {
   endpoint: string
   /**
@@ -44,6 +165,8 @@ interface PasswordFormProps {
   withCurrentPassword?: boolean
   currentPasswordLabel?: string
   newPasswordLabel?: string
+  /** Renders the "Uus parool uuesti" field and gates submit on an exact match. */
+  withRepeatPassword?: boolean
   /** Enables the "≠ isikukood" rule; omit when the code is not known client-side. */
   isikukood?: string | null | undefined
   submitLabel?: string
@@ -63,6 +186,7 @@ export function PasswordForm({
   withCurrentPassword = false,
   currentPasswordLabel = 'Praegune parool',
   newPasswordLabel = 'Uus parool',
+  withRepeatPassword = false,
   isikukood,
   submitLabel = 'Salvesta',
   fallbackError = DEFAULT_FALLBACK_ERROR,
@@ -73,13 +197,26 @@ export function PasswordForm({
 }: PasswordFormProps) {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [repeatPassword, setRepeatPassword] = useState('')
+  const [currentTouched, setCurrentTouched] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const evaluation = evaluatePassword(newPassword, isikukood)
-  const canSubmit = evaluation.valid && !busy
+  const currentMissing =
+    withCurrentPassword && currentTouched && currentPassword.length === 0
+  const repeatMismatch =
+    withRepeatPassword &&
+    repeatPassword.length > 0 &&
+    repeatPassword !== newPassword
+  const canSubmit =
+    evaluation.valid &&
+    (!withCurrentPassword || currentPassword.length > 0) &&
+    (!withRepeatPassword ||
+      (repeatPassword.length > 0 && repeatPassword === newPassword)) &&
+    !busy
 
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -121,8 +258,12 @@ export function PasswordForm({
 
   if (done) {
     return (
-      <div role="status" className="flex flex-col gap-sm">
-        <h2 className="font-heading text-h4 text-ink">
+      <div
+        role="status"
+        className="flex flex-col items-center gap-1.5 text-center"
+      >
+        <CircleCheck className="h-11 w-11 text-accent" aria-hidden="true" />
+        <h2 className="font-heading text-h3 text-ink">
           {successTitle ?? 'Valmis'}
         </h2>
         {successMessage && (
@@ -138,38 +279,46 @@ export function PasswordForm({
       onSubmit={(event) => {
         void handleSubmit(event)
       }}
-      className="flex flex-col gap-sm"
+      className="flex flex-col gap-4"
       noValidate
     >
       {withCurrentPassword && (
-        <FormInput
+        <PasswordInput
           label={currentPasswordLabel}
           name="current-password"
-          type="password"
           autoComplete="current-password"
-          required
-          disabled={busy}
           value={currentPassword}
-          onChange={(event) => {
-            setCurrentPassword(event.target.value)
+          disabled={busy}
+          error={currentMissing ? 'Sisesta praegune parool.' : null}
+          onChange={setCurrentPassword}
+          onBlur={() => {
+            setCurrentTouched(true)
           }}
         />
       )}
 
-      <FormInput
+      <PasswordInput
         label={newPasswordLabel}
         name="new-password"
-        type="password"
         autoComplete="new-password"
-        required
-        disabled={busy}
         value={newPassword}
-        onChange={(event) => {
-          setNewPassword(event.target.value)
-        }}
+        disabled={busy}
+        onChange={setNewPassword}
       />
 
       <PasswordStrengthMeter password={newPassword} isikukood={isikukood} />
+
+      {withRepeatPassword && (
+        <PasswordInput
+          label="Uus parool uuesti"
+          name="repeat-password"
+          autoComplete="new-password"
+          value={repeatPassword}
+          disabled={busy}
+          error={repeatMismatch ? 'Paroolid ei kattu.' : null}
+          onChange={setRepeatPassword}
+        />
+      )}
 
       {error && (
         <p role="alert" className="font-body text-bodySm text-danger">
@@ -178,9 +327,11 @@ export function PasswordForm({
       )}
       {error && errorFooter}
 
-      <Btn type="submit" isLoading={busy} disabled={!canSubmit}>
-        {submitLabel}
-      </Btn>
+      <div className="mt-1 [&_button]:w-full">
+        <Btn type="submit" isLoading={busy} disabled={!canSubmit}>
+          {submitLabel}
+        </Btn>
+      </div>
     </form>
   )
 }

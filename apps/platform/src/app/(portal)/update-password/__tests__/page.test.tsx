@@ -66,9 +66,11 @@ describe('update-password page', () => {
 
     expect(html).toContain('Määra parool')
     expect(html).toContain('Sinu konto on loodud eID kaudu ja parool puudub.')
+    expect(html).toContain('on peamine sisselogimisviis')
     expect(props.endpoint).toBe('/api/v1/auth/change-password')
     expect(props.isikukood).toBe(ISIKUKOOD)
     expect(props.withCurrentPassword).toBe(false)
+    expect(props.withRepeatPassword).toBe(true)
     expect(props.submitLabel).toBe('Määra parool')
     // No function props may cross the server/client boundary.
     expect(Object.values(props).every((value) => typeof value !== 'function')).toBe(true)
@@ -79,10 +81,13 @@ describe('update-password page', () => {
 
     const { html, props } = await formProps({})
 
-    expect(html).toContain('Muuda parool')
+    expect(html).toContain('Parooli muutmine')
     expect(html).not.toContain('Sinu konto on loodud eID kaudu')
+    expect(html).toContain('on peamine sisselogimisviis')
     expect(props.withCurrentPassword).toBe(true)
+    expect(props.withRepeatPassword).toBe(true)
     expect(props.isikukood).toBe(ISIKUKOOD)
+    expect(props.submitLabel).toBe('Salvesta uus salasõna')
     expect(Object.values(props).every((value) => typeof value !== 'function')).toBe(true)
   })
 
