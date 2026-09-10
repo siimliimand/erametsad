@@ -1,0 +1,24 @@
+/* Portal token scope (portal-demo-design-parity, decisions D1/D2). The
+   (portal) layout renders .portal-scope on the layout root; these overrides
+   redefine the shared CSS variables inside that scope only, so marketing and
+   admin keep the :root defaults from packages/ui/src/styles/tokens.css. Values
+   come from the demo prototype (docs/design/demo/portal/index.html) mapped
+   onto the existing var names. Only properties that differ from :root are
+   listed: accent, CTA, danger, info, status colors, radii and shadows stay
+   shared. */
+
+.portal-scope {
+  --color-primary: #2e6b4f;
+  --color-primary-hover: #25573f;
+  --color-primary-light: #e9f0ec;
+  --color-bg-page: #ffffff;
+  --color-bg-mist: #f1f5f2;
+  --color-ink: #1b211d;
+  --color-ink-muted: #6b7570;
+  --color-border: #e3e7e4;
+
+  /* --font-manrope is exposed on the same wrapper by the next/font Manrope
+     loader in (portal)/layout.tsx, so only font-heading consumers (headings,
+     wordmark, card names) switch; body stays Inter, prices stay JetBrains Mono. */
+  --font-heading: var(--font-manrope, 'Manrope'), system-ui, sans-serif;
+}
