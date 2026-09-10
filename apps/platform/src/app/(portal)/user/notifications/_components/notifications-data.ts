@@ -49,6 +49,7 @@ export interface NotificationEventDef {
   value: string
   chipLabel: string
   settingsLabel: string
+  settingsDescription: string
   emailAvailable: boolean
   smsAvailable: boolean
   effectiveEmail: boolean
@@ -64,6 +65,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     value: 'auction.published',
     chipLabel: 'Oksjon avaldatud',
     settingsLabel: 'Uus oksjon on avaldatud',
+    settingsDescription: 'Uus oksjon vastab sinu tellitud otsingutele',
     emailAvailable: true,
     smsAvailable: false,
     effectiveEmail: true,
@@ -73,6 +75,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     value: 'bid.created',
     chipLabel: 'Pakkumus registreeritud',
     settingsLabel: 'Pakkumus registreeritud',
+    settingsDescription: 'Kui keegi pakub sinu müügis oleva objekti eest',
     emailAvailable: true,
     smsAvailable: false,
     effectiveEmail: true,
@@ -82,6 +85,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     value: 'outbid',
     chipLabel: 'Üle pakutud',
     settingsLabel: 'Pakkumus on üle pakutud',
+    settingsDescription: 'Kui sinu pakkumine üle pakutakse',
     emailAvailable: true,
     smsAvailable: false,
     effectiveEmail: true,
@@ -91,6 +95,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     value: 'bid.approved',
     chipLabel: 'Pakkumus kinnitatud',
     settingsLabel: 'Müüja kinnitas pakkumuse',
+    settingsDescription: 'Müüja kinnitas pakkumuse',
     emailAvailable: false,
     smsAvailable: false,
     effectiveEmail: false,
@@ -100,6 +105,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     value: 'bid.rejected',
     chipLabel: 'Pakkumus tagasi lükatud',
     settingsLabel: 'Müüja lükkas pakkumuse tagasi',
+    settingsDescription: 'Müüja lükkas pakkumuse tagasi',
     emailAvailable: false,
     smsAvailable: false,
     effectiveEmail: false,
@@ -109,6 +115,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     value: 'auction.ended',
     chipLabel: 'Oksjon lõppenud',
     settingsLabel: 'Oksjon on lõppenud',
+    settingsDescription: 'Võit või kaotus ja lõpphind',
     emailAvailable: true,
     smsAvailable: false,
     effectiveEmail: true,
@@ -118,6 +125,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     value: 'auction.won',
     chipLabel: 'Oksjon võidetud',
     settingsLabel: 'Te võitsite oksjoni',
+    settingsDescription: 'Võit ja järgmised sammud lepinguni',
     emailAvailable: true,
     smsAvailable: true,
     effectiveEmail: true,
@@ -127,12 +135,70 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     value: 'contract.ready',
     chipLabel: 'Leping valmis',
     settingsLabel: 'Leping on allkirjastamiseks valmis',
+    settingsDescription: 'Oksjonileping on koostatud ja ootab allkirja',
     emailAvailable: true,
     smsAvailable: true,
     effectiveEmail: true,
     effectiveSms: false,
   },
 ]
+
+export type NotificationGroupId = 'bids' | 'auctions' | 'contracts'
+
+// Group chips map to the domain events behind them; the API filters one
+// event per request, so groups merge per-event pages client-side
+// (mergeCategoryPages).
+const GROUP_FILTERS: readonly {
+  id: NotificationGroupId
+  label: string
+  events: readonly string[]
+}[] = [
+  {
+    id: 'bids',
+    label: 'Pakkumised',
+    events: ['bid.created', 'outbid', 'bid.approved', 'bid.rejected'],
+  },
+  { id: 'auctions', label: 'Oksjonid', events: ['auction.published', 'auction.ended', 'auction.won'] },
+  { id: 'contracts', label: 'Lepingud', events: ['contract.ready'] },
+]
+
+export type NotificationFilterId = 'all' | 'unread' | NotificationGroupId
+
+// Demo filter chips (11-user-notifications.html): Kõik, Lugemata,
+// Pakkumised, Oksjonid, Lepingud.
+export const NOTIFICATION_FILTERS: readonly {
+  id: NotificationFilterId
+  label: string
+  events: readonly string[] | null
+}[] = [
+  { id: 'all', label: 'Kõik', events: null },
+  { id: 'unread', label: 'Lugemata', events: null },
+  ...GROUP_FILTERS,
+]
+
+const ALL_FILTER = { id: 'all', label: 'Kõik', events: null } as const
+
+type NotificationFilterDef = (typeof NOTIFICATION_FILTERS)[number]
+
+export function notificationFilter(id: string): NotificationFilterDef {
+  return NOTIFICATION_FILTERS.find((filter) => filter.id === id) ?? ALL_FILTER
+}
+
+export function notificationGroup(event: string): NotificationGroupId | null {
+  const group = GROUP_FILTERS.find((filter) => filter.events.includes(event))
+  return group !== undefined ? group.id : null
+}
+
+const GROUP_BADGE_LABELS: Record<NotificationGroupId, string> = {
+  bids: 'Pakkumine',
+  auctions: 'Oksjon',
+  contracts: 'Leping',
+}
+
+export function notificationBadgeLabel(event: string): string {
+  const group = notificationGroup(event)
+  return group !== null ? GROUP_BADGE_LABELS[group] : 'Teavitus'
+}
 
 // Same values as ListingFilters (which keeps them module-private).
 export const SPECIES_OPTIONS = [
@@ -270,4 +336,43 @@ export function deepLinkFor(payload: unknown): string | null {
 
 export function formatEstonianDateTime(iso: string): string {
   return new Date(iso).toLocaleString('et-EE', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+// Demo meta line (11-user-notifications.html): "2 tundi tagasi", falling
+// back to a D.MM date after a week.
+export function formatRelativeEstonian(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const minutes = Math.floor((now.getTime() - date.getTime()) / 60_000)
+  if (minutes < 1) return 'just nüüd'
+  if (minutes < 60) return minutes === 1 ? '1 minut tagasi' : `${String(minutes)} minutit tagasi`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return hours === 1 ? '1 tund tagasi' : `${String(hours)} tundi tagasi`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'eile'
+  if (days < 7) return `${String(days)} päeva tagasi`
+  return new Intl.DateTimeFormat('et-EE', { day: 'numeric', month: '2-digit' }).format(date)
+}
+
+// Merges per-event pages (each already newest-first) into one demo page of
+// up to pageSize items. A nextCursor exists only while at least one event
+// returned a full page; the server cursor is inclusive (createdAt <= cursor),
+// so the next fetch re-serves the boundary items and deduplication by id
+// removes the overlap.
+export function mergeCategoryPages(
+  pages: readonly NotificationItem[][],
+  pageSize = 25,
+): { items: NotificationItem[]; nextCursor: string | null } {
+  const seen = new Set<string>()
+  const merged: NotificationItem[] = []
+  for (const item of pages.flat().sort((a, b) => b.createdAt.localeCompare(a.createdAt))) {
+    if (seen.has(item.id)) continue
+    seen.add(item.id)
+    merged.push(item)
+  }
+  const hasFullPage = pages.some((page) => page.length >= pageSize)
+  if (!hasFullPage) return { items: merged, nextCursor: null }
+  const items = merged.slice(0, pageSize)
+  const cursorItem = items[items.length - 1]
+  return { items, nextCursor: cursorItem?.createdAt ?? null }
 }

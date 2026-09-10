@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, EmptyState } from '@erametsad/ui'
+import { Bell, BellOff, Check, CheckCheck, Clock, FileText, Gavel, TreePine, TrendingUp, Trophy, X } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -8,28 +8,61 @@ import {
   apiJson,
   deepLinkFor,
   formatEstonianDateTime,
-  NOTIFICATION_EVENTS,
+  formatRelativeEstonian,
+  mergeCategoryPages,
+  NOTIFICATION_FILTERS,
+  notificationBadgeLabel,
   notificationChannelLabel,
+  notificationFilter,
+  notificationGroup,
+  type NotificationFilterId,
+  type NotificationGroupId,
   type NotificationItem,
   type NotificationListResponse,
 } from './notifications-data'
 
-interface ChipProps {
+const EVENT_ICONS: Record<string, typeof Bell> = {
+  'auction.published': TreePine,
+  'auction.ended': Clock,
+  'auction.won': Trophy,
+  'bid.created': Gavel,
+  'bid.approved': Gavel,
+  'bid.rejected': Gavel,
+  outbid: TrendingUp,
+  'contract.ready': FileText,
+}
+
+// Demo type badges (11-user-notifications.html): Pakkumine outlined green,
+// Oksjon outlined info blue, Leping on primary-light.
+const GROUP_BADGE_CLASSES: Record<NotificationGroupId, string> = {
+  bids: 'border border-statusActive bg-bgPage text-statusActive',
+  auctions: 'border border-info bg-bgPage text-info',
+  contracts: 'border border-primaryLight bg-primaryLight text-primaryHover',
+}
+
+interface ToastState {
+  message: string
+  key: number
+}
+
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
   label: string
   active: boolean
   onClick: () => void
-}
-
-function CategoryChip({ label, active, onClick }: ChipProps) {
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-pill px-4 py-2 font-body text-bodySm font-semibold transition-colors duration-hover ease-hover motion-reduce:transition-none ${
+      className={`inline-flex flex-none items-center whitespace-nowrap rounded-pill border px-3 py-1 font-body text-bodySm font-semibold transition-colors duration-hover ease-hover motion-reduce:transition-none ${
         active
-          ? 'bg-primary text-inkInverse'
-          : 'border border-border bg-bgMist text-ink hover:bg-primaryLight'
+          ? 'border-primary bg-primary text-inkInverse'
+          : 'border-border bg-bgPage text-ink hover:border-primary hover:text-primary'
       }`}
     >
       {label}
@@ -42,18 +75,16 @@ interface RowProps {
   onMarkRead: (id: string) => void
 }
 
-function rowClasses(unread: boolean): string {
-  return `block w-full rounded-card border px-md py-sm text-left transition-colors duration-hover ease-hover ${
-    unread
-      ? 'border-border border-l-4 border-l-primary bg-bgMist'
-      : 'border-border bg-bgPage hover:bg-bgMist'
-  }`
-}
-
-function InboxItemRow({ item, onMarkRead }: RowProps) {
+// Exported for tests: the row is rendered directly in renderToString tests.
+export function InboxItemRow({ item, onMarkRead }: RowProps) {
   const unread = item.readAt === null
   const href = deepLinkFor(item.payload)
+  const group = notificationGroup(item.category)
+  const Icon = EVENT_ICONS[item.category] ?? Bell
+  const badgeClass = group !== null ? GROUP_BADGE_CLASSES[group] : 'border border-border bg-bgPage text-inkMuted'
+  const actionLabel = group === 'contracts' ? 'Vaata lepingut' : 'Vaata oksjonit'
   const channelLabel = item.channel !== null ? notificationChannelLabel(item.channel) : null
+  const relative = formatRelativeEstonian(item.createdAt)
 
   const markIfUnread = () => {
     if (unread) onMarkRead(item.id)
@@ -62,51 +93,72 @@ function InboxItemRow({ item, onMarkRead }: RowProps) {
   const inner = (
     <>
       <span className="sr-only">{unread ? 'Lugemata teavitus. ' : ''}</span>
-      <div className="flex items-start justify-between gap-sm">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2xs">
-            {unread && (
-              <span className="h-2 w-2 shrink-0 rounded-pill bg-primary" aria-hidden="true" />
-            )}
-            <span
-              className={`font-body text-bodySm font-semibold ${
-                unread ? 'text-primaryDark' : 'text-inkMuted'
-              }`}
-            >
-              {NOTIFICATION_EVENTS.find((event) => event.value === item.category)?.chipLabel ??
-                item.category}
-            </span>
-            {channelLabel !== null && (
-              <span className="inline-flex shrink-0 items-center rounded-pill border border-border px-2 py-0.5 font-body text-[11px] text-inkMuted">
-                {channelLabel}
-              </span>
-            )}
-          </div>
-          <p className={`mt-2xs font-body text-body ${unread ? 'font-semibold text-ink' : 'text-ink'}`}>
+      <span
+        aria-hidden="true"
+        className={`row-span-3 flex h-11 w-11 flex-none items-center justify-center rounded-pill border max-md:row-span-1 max-md:h-9 max-md:w-9 ${
+          unread ? 'border-primaryLight bg-primaryLight text-primary' : 'border-border bg-bgPage text-primary'
+        }`}
+      >
+        <Icon size={18} />
+      </span>
+      <span className="min-w-0">
+        <span className="flex flex-wrap items-center gap-2.5">
+          <span className="font-heading text-[17px] font-bold leading-tight text-ink">
             {item.title ?? 'Teavitus'}
-          </p>
-          {item.body !== null && item.body !== '' && (
-            <p className="mt-2xs line-clamp-2 font-body text-bodySm text-inkMuted">{item.body}</p>
-          )}
-        </div>
-        <time
-          dateTime={item.createdAt}
-          className="shrink-0 pt-0.5 font-mono text-[11px] text-inkMuted"
-        >
-          {formatEstonianDateTime(item.createdAt)}
-        </time>
-      </div>
+          </span>
+          <span
+            className={`inline-flex items-center rounded-pill px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${badgeClass}`}
+          >
+            {notificationBadgeLabel(item.category)}
+          </span>
+        </span>
+        {item.body !== null && item.body !== '' && (
+          <span className="mt-1 block text-[15px] leading-snug text-ink">{item.body}</span>
+        )}
+        <span className="mt-1 block text-bodySm text-inkMuted">
+          {channelLabel !== null && <>{channelLabel} · </>}
+          <time dateTime={item.createdAt} title={formatEstonianDateTime(item.createdAt)}>
+            {relative}
+          </time>
+        </span>
+      </span>
+      <span className="row-span-3 flex flex-col items-end justify-between gap-2.5 max-md:col-span-full max-md:row-span-1 max-md:flex-row max-md:items-center max-md:justify-between max-md:border-t max-md:border-dashed max-md:border-border max-md:pt-2.5">
+        {href !== null && (
+          <span
+            className={`inline-flex h-8 items-center justify-center whitespace-nowrap rounded-button px-3.5 text-label font-semibold transition-colors duration-hover ease-hover motion-reduce:transition-none ${
+              unread ? 'bg-primary text-inkInverse hover:bg-primaryHover' : 'border border-primary bg-transparent text-primary hover:bg-primaryLight'
+            }`}
+          >
+            {actionLabel}
+          </span>
+        )}
+        {unread ? (
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-ctaHover">
+            <span className="h-2 w-2 flex-none rounded-pill bg-cta" aria-hidden="true" />
+            Lugemata
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-inkMuted">
+            <Check size={11} className="text-statusActive" aria-hidden="true" />
+            Loetud
+          </span>
+        )}
+      </span>
     </>
   )
+
+  const rowClasses = `grid w-full cursor-pointer grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-x-4 gap-y-0.5 border-b border-border px-3 py-4 text-left transition-colors duration-hover ease-hover motion-reduce:transition-none max-md:grid-cols-[36px_minmax(0,1fr)] ${
+    unread ? 'bg-bgMist max-md:hover:bg-bgMist' : 'bg-transparent hover:bg-bgMist'
+  }`
 
   return (
     <li>
       {href !== null ? (
-        <Link href={href} onClick={markIfUnread} className={rowClasses(unread)}>
+        <Link href={href} onClick={markIfUnread} className={rowClasses}>
           {inner}
         </Link>
       ) : (
-        <button type="button" onClick={markIfUnread} className={rowClasses(unread)}>
+        <button type="button" onClick={markIfUnread} className={rowClasses}>
           {inner}
         </button>
       )}
@@ -115,8 +167,7 @@ function InboxItemRow({ item, onMarkRead }: RowProps) {
 }
 
 export function NotificationInbox({ streamEpoch }: { streamEpoch: number }) {
-  const [category, setCategory] = useState('')
-  const [unreadOnly, setUnreadOnly] = useState(false)
+  const [filterId, setFilterId] = useState<NotificationFilterId>('all')
   const [items, setItems] = useState<NotificationItem[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
@@ -124,20 +175,36 @@ export function NotificationInbox({ streamEpoch }: { streamEpoch: number }) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [markingAll, setMarkingAll] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [toast, setToast] = useState<ToastState | null>(null)
   const handledEpochRef = useRef(streamEpoch)
 
-  const fetchPage = useCallback(
-    async (cursor: string | null): Promise<NotificationListResponse> => {
+  const requestPage = useCallback(
+    async (category: string | null, cursor: string | null): Promise<NotificationListResponse> => {
       const search = new URLSearchParams()
-      if (category !== '') search.set('category', category)
-      if (unreadOnly) search.set('unread', '1')
+      if (category !== null) search.set('category', category)
+      if (filterId === 'unread') search.set('unread', '1')
       if (cursor !== null) search.set('cursor', cursor)
       const qs = search.toString()
       return apiJson<NotificationListResponse>(
         qs === '' ? '/api/v1/my/notifications' : `/api/v1/my/notifications?${qs}`,
       )
     },
-    [category, unreadOnly],
+    [filterId],
+  )
+
+  // Group chips (Pakkumised, Oksjonid, Lepingud) merge one request per event;
+  // the API filters a single event per request.
+  const fetchPage = useCallback(
+    async (cursor: string | null): Promise<NotificationListResponse> => {
+      const events = notificationFilter(filterId).events
+      if (events === null || events.length === 1) {
+        return requestPage(events?.[0] ?? null, cursor)
+      }
+      const pages = await Promise.all(events.map((event) => requestPage(event, cursor)))
+      const merged = mergeCategoryPages(pages.map((page) => page.items))
+      return { ...merged, unreadCount: pages[0]?.unreadCount ?? 0 }
+    },
+    [filterId, requestPage],
   )
 
   const loadFirstPage = useCallback(async () => {
@@ -228,6 +295,7 @@ export function NotificationInbox({ streamEpoch }: { streamEpoch: number }) {
         prev.map((item) => (item.readAt === null ? { ...item, readAt } : item)),
       )
       setUnreadCount(0)
+      setToast({ message: 'Kõik teavitused märgitud loetuks.', key: Date.now() })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Märkimine ebaõnnestus')
     } finally {
@@ -235,70 +303,79 @@ export function NotificationInbox({ streamEpoch }: { streamEpoch: number }) {
     }
   }, [])
 
-  const hasFilter = category !== '' || unreadOnly
-
   return (
-    <div className="flex flex-col gap-md">
-      <div className="flex flex-wrap items-center justify-between gap-sm">
-        <p className="font-body text-body text-inkMuted" role="status">
-          {unreadCount > 0 ? `Lugemata teavitusi: ${String(unreadCount)}` : 'Kõik teavitused on loetud'}
-        </p>
-        <Btn
-          variant="outline"
-          size="sm"
+    <section
+      aria-labelledby="notifications-inbox-title"
+      className="rounded-card border border-border bg-white p-6 shadow-card max-md:p-[14px]"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="notifications-inbox-title" className="font-heading text-[22px] font-bold text-ink">
+          Saabunud teavitused
+        </h2>
+        <button
+          type="button"
           onClick={() => void markAllRead()}
-          isLoading={markingAll}
-          disabled={unreadCount === 0}
+          disabled={markingAll || unreadCount === 0}
+          className="inline-flex h-8 items-center justify-center gap-2 rounded-button border border-primary bg-transparent px-3.5 text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:bg-primaryLight motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Märgi kõik loetuks
-        </Btn>
+          <CheckCheck size={14} aria-hidden="true" />
+          Märgi loetuks
+        </button>
       </div>
+      <p className="mt-1.5 text-[15px] text-inkMuted">
+        Viimased sündmused sinu pakkumiste, objektide ja lepingute kohta. Klõps teavitusel märgib
+        selle loetuks.
+      </p>
 
-      <div className="flex flex-wrap gap-xs" role="group" aria-label="Kategooriad">
-        <CategoryChip label="Kõik" active={category === ''} onClick={() => { setCategory(''); }} />
-        {NOTIFICATION_EVENTS.map((event) => (
-          <CategoryChip
-            key={event.value}
-            label={event.chipLabel}
-            active={category === event.value}
-            onClick={() => { setCategory(event.value); }}
-          />
-        ))}
-        <CategoryChip
-          label="Ainult lugemata"
-          active={unreadOnly}
-          onClick={() => { setUnreadOnly((value) => !value); }}
-        />
+      <div className="mt-4 flex flex-wrap items-center gap-2.5" role="group" aria-label="Filtreeri teavitusi">
+        <span className="text-bodySm font-semibold text-ink">Filtreeri:</span>
+        <div className="flex flex-wrap gap-1.5">
+          {NOTIFICATION_FILTERS.map((filter) => (
+            <FilterChip
+              key={filter.id}
+              label={filter.label}
+              active={filterId === filter.id}
+              onClick={() => {
+                setFilterId(filter.id)
+              }}
+            />
+          ))}
+        </div>
       </div>
 
       {error !== null && (
-        <div className="flex flex-wrap items-center justify-between gap-sm rounded-card border border-danger bg-bgMist px-md py-sm">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-card border border-danger bg-bgMist px-6 py-3">
           <p role="alert" className="font-body text-body text-danger">
             {error}
           </p>
-          <Btn variant="outline" size="sm" onClick={() => void loadFirstPage()}>
+          <button
+            type="button"
+            onClick={() => void loadFirstPage()}
+            className="inline-flex h-8 items-center rounded-button border border-primary px-3.5 text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:bg-primaryLight"
+          >
             Proovi uuesti
-          </Btn>
+          </button>
         </div>
       )}
 
       {loading ? (
-        <div className="flex flex-col gap-xs" aria-hidden="true">
+        <ul className="mt-3.5 flex flex-col border-t border-border" aria-hidden="true">
           {[0, 1, 2].map((index) => (
-            <div key={index} className="h-20 animate-pulse rounded-card border border-border bg-bgMist" />
+            <li key={index} className="border-b border-border px-3 py-4">
+              <div className="h-14 animate-pulse rounded-card bg-bgMist" />
+            </li>
           ))}
-        </div>
+        </ul>
       ) : items.length === 0 ? (
-        <EmptyState
-          title="Teavitusi ei ole"
-          description={
-            hasFilter
-              ? 'Valitud filtritega teavitusi ei leitud.'
-              : 'Siia ilmuvad teavitused pakkumuste, oksjonite ja lepingute kohta.'
-          }
-        />
+        <div className="mt-4 flex flex-col items-center gap-2.5 rounded-card bg-primaryLight px-7 py-12 text-center">
+          <BellOff size={32} className="text-primary" aria-hidden="true" />
+          <h3 className="mt-1 font-heading text-[22px] font-bold text-ink">Teavitusi pole</h3>
+          <p className="m-0 max-w-[34em] text-[15px] text-inkMuted">
+            Selle filtriga ei ole hetkel ühtegi teavitust.
+          </p>
+        </div>
       ) : (
-        <ul className="flex flex-col gap-xs">
+        <ul className="mt-3.5 flex flex-col border-t border-border">
           {items.map((item) => (
             <InboxItemRow key={item.id} item={item} onMarkRead={markRead} />
           ))}
@@ -306,12 +383,37 @@ export function NotificationInbox({ streamEpoch }: { streamEpoch: number }) {
       )}
 
       {nextCursor !== null && !loading && (
-        <div className="flex justify-center">
-          <Btn variant="outline" onClick={() => void loadMore()} isLoading={loadingMore}>
-            Koorma rohkem
-          </Btn>
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => void loadMore()}
+            disabled={loadingMore}
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-button border border-primary bg-transparent px-6 text-body font-semibold text-primary transition-colors duration-hover ease-hover hover:bg-primaryLight motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loadingMore ? 'Laadin…' : 'Laadi veel'}
+          </button>
         </div>
       )}
-    </div>
+
+      {toast !== null && (
+        <div
+          key={toast.key}
+          role="alert"
+          className="fixed bottom-4 right-4 z-50 flex max-w-sm items-start gap-3 rounded-button bg-primaryDark px-4 py-3 text-inkInverse shadow-modal"
+        >
+          <p className="text-bodySm font-medium">{toast.message}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setToast(null)
+            }}
+            aria-label="Sulge teavitus"
+            className="ml-auto flex h-6 w-6 flex-none items-center justify-center rounded-pill transition-opacity duration-hover hover:opacity-80"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </section>
   )
 }

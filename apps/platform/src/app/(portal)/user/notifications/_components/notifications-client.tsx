@@ -1,39 +1,28 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { NotificationInbox } from './notification-inbox'
 import { PreferenceMatrix } from './preference-matrix'
 import { SavedSearches } from './saved-searches'
 import { useMyStream } from '../../../_lib/use-my-stream'
-
-export const NOTIFICATION_TABS = [
-  { id: 'inbox', label: 'Postkast' },
-  { id: 'seaded', label: 'Seaded' },
-  { id: 'tellimused', label: 'Otsingute tellimused' },
-] as const
-
-export type NotificationTabId = (typeof NOTIFICATION_TABS)[number]['id']
-
-function tabHref(tab: NotificationTabId): string {
-  return tab === 'inbox' ? '/user/notifications' : `/user/notifications?tab=${tab}`
-}
+import { UserPageHead } from '../../_components/UserPageHead'
 
 interface NotificationsClientProps {
-  initialTab: NotificationTabId
   unsubscribeToken: string | null
 }
 
-export function NotificationsClient({ initialTab, unsubscribeToken }: NotificationsClientProps) {
+// Demo 11-user-notifications.html: three stacked panels under the shared
+// Minu keskkond page head and sub-nav (design D5 keeps the saved-searches
+// panel as a functional deviation below the demo's two).
+export function NotificationsClient({ unsubscribeToken }: NotificationsClientProps) {
   const router = useRouter()
   const stream = useMyStream()
   // Stream notification events bump the inbox: each bump merges a fresh
   // first page into the list and refreshes the unread count.
   const [streamEpoch, setStreamEpoch] = useState(0)
-  const [tab, setTab] = useState<NotificationTabId>(
-    unsubscribeToken !== null ? 'tellimused' : initialTab,
-  )
+  const savedSearchesRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(
     () =>
@@ -43,54 +32,32 @@ export function NotificationsClient({ initialTab, unsubscribeToken }: Notificati
     [stream],
   )
 
-  const selectTab = useCallback(
-    (next: NotificationTabId) => {
-      setTab(next)
-      router.replace(tabHref(next), { scroll: false })
-    },
-    [router],
-  )
+  // Unsubscribe token links land on the saved searches panel (spec).
+  useEffect(() => {
+    if (unsubscribeToken === null) return
+    savedSearchesRef.current?.scrollIntoView({ block: 'start' })
+  }, [unsubscribeToken])
 
   const clearUnsubscribeToken = useCallback(() => {
-    router.replace(tabHref(tab), { scroll: false })
-  }, [router, tab])
+    router.replace('/user/notifications', { scroll: false })
+  }, [router])
 
   return (
-    <div className="flex flex-col gap-lg">
-      <h1 className="font-heading text-h2 text-ink">Teavitused</h1>
-
-      <nav aria-label="Teavituste vaated" className="overflow-x-auto border-b border-border">
-        <ul className="flex min-w-max">
-          {NOTIFICATION_TABS.map((entry) => {
-            const active = entry.id === tab
-            return (
-              <li key={entry.id}>
-                <button
-                  type="button"
-                  onClick={() => { selectTab(entry.id); }}
-                  aria-current={active ? 'page' : undefined}
-                  className={`relative px-4 py-3 text-label font-semibold whitespace-nowrap transition-colors duration-hover ease-hover ${
-                    active
-                      ? 'border-b-2 border-primary text-primary'
-                      : 'border-b-2 border-transparent text-inkMuted hover:border-primary hover:text-primary'
-                  }`}
-                >
-                  {entry.label}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
-
-      {tab === 'inbox' && <NotificationInbox streamEpoch={streamEpoch} />}
-      {tab === 'seaded' && <PreferenceMatrix />}
-      {tab === 'tellimused' && (
-        <SavedSearches
-          unsubscribeToken={unsubscribeToken}
-          onTokenHandled={clearUnsubscribeToken}
-        />
-      )}
-    </div>
+    <>
+      <UserPageHead
+        title="Teavitused"
+        summary="Kõik platvormi sõnumid ühes kohas — pakkumiste sündmused, oksjonite tähtajad ja lepingud. Allpool saad valida, mis ja millistel kanalitel sinuni jõuab."
+      />
+      <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-6 pt-[32px]">
+        <NotificationInbox streamEpoch={streamEpoch} />
+        <PreferenceMatrix />
+        <div ref={savedSearchesRef} className="scroll-mt-24">
+          <SavedSearches
+            unsubscribeToken={unsubscribeToken}
+            onTokenHandled={clearUnsubscribeToken}
+          />
+        </div>
+      </div>
+    </>
   )
 }
