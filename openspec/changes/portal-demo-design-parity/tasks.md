@@ -33,9 +33,9 @@
 
 ## 6. Auth pages
 
-- [ ] 6.1 Login: 440px card, eID buttons with hints, või divider, fallback form + "Unustasid salasõna?", control-code pending view, success state, privacy line + Tagasi oksjonitele, suspended banner restyle <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/login/**] -->
-- [ ] 6.2 Register: demo mist section + step-bar visual on the existing 4-step wizard, eid-cards with Soovitatav marker, honeypot, demo validation messages, success view "Konto loodud!" <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/register/**] -->
-- [ ] 6.3 Select-profile: mist head, radio profile cards (type chip, AKTIIVNE/Ülevaatamisel pill, rights check list, dashed pending card), Lisa ettevõtte profiil ghost, Jätka/Jäta vahele, arrow-key selection <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/select-profile/**] -->
+- [x] 6.1 Login: 440px card, eID buttons with hints, või divider, fallback form + "Unustasid salasõna?", control-code pending view, success state, privacy line + Tagasi oksjonitele, suspended banner restyle <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/login/**] -->
+- [x] 6.2 Register: demo mist section + step-bar visual on the existing 4-step wizard, eid-cards with Soovitatav marker, honeypot, demo validation messages, success view "Konto loodud!" <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/register/**] -->
+- [x] 6.3 Select-profile: mist head, radio profile cards (type chip, AKTIIVNE/Ülevaatamisel pill, rights check list, dashed pending card), Lisa ettevõtte profiil ghost, Jätka/Jäta vahele, arrow-key selection <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/select-profile/**] -->
 - [x] 6.4 Update-password: 480px card, eye toggles, caps-lock warnings, 5-segment strength meter (Nõrk/Keskmine/Tugev), rules checklist with green ticks, gated submit, success view; restyle PasswordForm/PasswordStrengthMeter <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/update-password/page.tsx, apps/platform/src/app/(portal)/_components/PasswordForm.tsx, apps/platform/src/app/(portal)/_components/PasswordStrengthMeter.tsx] -->
 - [x] 6.5 Reset-password request + token pages restyled to the auth card language <!-- agent: fullstack-engineer.fast, depends_on: [6.4], touches: [apps/platform/src/app/(portal)/reset-password/**] -->
 
@@ -49,8 +49,8 @@
 
 ## 8. Contracts
 
-- [ ] 8.1 /lepingud list: raamleping status card (allkirjastatud/allkirjastamata) + contract table with ContractPill tones (Koostatud/Saadetud/Allkirjastatud/Tühistatud) + Jätka/Vaata actions <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/lepingud/page.tsx] -->
-- [ ] 8.2 Signing flows to demo 13 layout: steps card + status rail, deadline banner + chip, Andmed context card with Hinna kokkuvõte (3% + km breakdown), document viewer with agree checkbox, eID column buttons + PIN2 control-code waiting state, success card + Mis edasi card; keep resume/timeline/version short-circuit <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/lepingud/_components/**, apps/platform/src/app/(portal)/lepingud/raamleping/**, apps/platform/src/app/(portal)/lepingud/oksjonileping/**] -->
+- [x] 8.1 /lepingud list: raamleping status card (allkirjastatud/allkirjastamata) + contract table with ContractPill tones (Koostatud/Saadetud/Allkirjastatud/Tühistatud) + Jätka/Vaata actions <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/lepingud/page.tsx] -->
+- [x] 8.2 Signing flows to demo 13 layout: steps card + status rail, deadline banner + chip, Andmed context card with Hinna kokkuvõte (3% + km breakdown), document viewer with agree checkbox, eID column buttons + PIN2 control-code waiting state, success card + Mis edasi card; keep resume/timeline/version short-circuit <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/lepingud/_components/**, apps/platform/src/app/(portal)/lepingud/raamleping/**, apps/platform/src/app/(portal)/lepingud/oksjonileping/**] -->
 
 ## 9. Verification and docs
 
