@@ -102,6 +102,25 @@ interface ListingPaginationProps {
   params: RawSearchParams
 }
 
+/**
+ * Demo .page-head band: full-width mist strip holding the active tab's H1 and
+ * summary. Negative margins cancel the (portal) layout main padding
+ * (px-md py-lg md:px-lg) so the band runs edge to edge at container widths.
+ */
+function ListingPageHead({ heading, summary }: { heading: string; summary: string }) {
+  return (
+    <section
+      aria-labelledby="page-title"
+      className="-mx-md -mt-lg bg-bgMist px-md pb-[28px] pt-[32px] md:-mx-lg md:px-lg md:pb-[40px] md:pt-[48px]"
+    >
+      <h1 id="page-title" className="mb-[10px] font-heading text-h1 font-extrabold text-ink">
+        {heading}
+      </h1>
+      <p className="max-w-[52em] font-body text-body text-inkMuted md:text-[18px]">{summary}</p>
+    </section>
+  )
+}
+
 function ListingPagination({ tab, page, totalPages, params }: ListingPaginationProps) {
   if (totalPages <= 1) return null
   return (
@@ -171,18 +190,16 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
 
   return (
     <AuctionStreamProvider>
-      <div className="grid grid-cols-12 gap-lg">
+      <ListingPageHead heading={tabDef.heading} summary={summary} />
+
+      <ListingTabs activeTab={tab} counts={counts} params={params} />
+
+      <div className="grid grid-cols-12 gap-lg pt-lg">
         <aside className="col-span-12 lg:col-span-3">
           <ListingFilters tab={tab} />
         </aside>
 
         <div className="col-span-12 flex flex-col gap-lg lg:col-span-9">
-          <h1 className="font-heading text-h2 text-ink">{tabDef.heading}</h1>
-
-          <ListingTabs activeTab={tab} counts={counts} params={params} />
-
-          <p className="font-body text-body text-inkMuted">{summary}</p>
-
           <ListingMap lots={mapPoints} />
 
           <ListingResultsBar tab={tab} total={result.total} />

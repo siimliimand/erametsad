@@ -76,30 +76,36 @@ interface ListingTabsProps {
 
 export function ListingTabs({ activeTab, counts, params }: ListingTabsProps) {
   return (
-    <nav aria-label="Oksjonite tüübid" className="overflow-x-auto border-b border-border">
-      <ul className="flex min-w-max">
+    // Full-width strip under the page-head band: the negative margins cancel
+    // the (portal) layout main padding (px-md md:px-lg), mirroring the demo
+    // .tabs-wrap that spans the viewport with .container-aligned content.
+    <div className="-mx-md border-b border-border bg-white px-md md:-mx-lg md:px-lg">
+      <nav aria-label="Oksjonite tüübid" className="flex gap-2 overflow-x-auto py-4">
         {LISTING_TABS.map((tab) => {
           const isActive = tab.id === activeTab
           return (
-            <li key={tab.id}>
-              <Link
-                href={buildListingHref(tab.id, params)}
-                aria-current={isActive ? 'page' : undefined}
-                className={`relative flex items-center gap-2 px-4 py-3 text-label font-semibold whitespace-nowrap transition-colors duration-hover ease-hover ${
-                  isActive
-                    ? 'border-b-2 border-primary text-primary'
-                    : 'border-b-2 border-transparent text-inkMuted hover:border-primary hover:text-primary'
+            <Link
+              key={tab.id}
+              href={buildListingHref(tab.id, params)}
+              aria-current={isActive ? 'page' : undefined}
+              className={`inline-flex flex-none items-center gap-2 rounded-pill border px-4 py-[9px] text-[15px] font-semibold whitespace-nowrap transition-colors duration-hover ease-hover ${
+                isActive
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-border bg-white text-ink hover:border-primary hover:text-primary'
+              }`}
+            >
+              {tab.label}
+              <span
+                className={`rounded-pill px-[9px] py-px font-mono text-xs font-medium ${
+                  isActive ? 'bg-white/20 text-white' : 'bg-bgMist text-inkMuted'
                 }`}
               >
-                {tab.label}
-                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-primaryLight px-1.5 text-[11px] font-semibold text-primaryDark">
-                  {counts[tab.id]}
-                </span>
-              </Link>
-            </li>
+                {counts[tab.id]}
+              </span>
+            </Link>
           )
         })}
-      </ul>
-    </nav>
+      </nav>
+    </div>
   )
 }
