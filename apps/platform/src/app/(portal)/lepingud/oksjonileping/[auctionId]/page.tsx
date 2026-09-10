@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { loadContractSnapshot } from '../../_components/contract-state'
-import { SigningFlow } from '../../_components/signing-flow'
+import { loadAuctionSigningContext } from '../../_components/signing-context'
+import { SigningFlow, type IdentityPrefill } from '../../_components/signing-flow'
 import { SigningShell } from '../../_components/signing-shell'
 
 import { requirePortalSession } from '@/app/(portal)/_lib/session'
@@ -38,11 +39,16 @@ function signingDeadline(deadlines: unknown): string | null {
 export default async function OksjonilepingPage({ params }: OksjonilepingPageProps) {
   const { auctionId } = await params
   const currentPath = `/lepingud/oksjonileping/${auctionId}`
-  const { session } = await requirePortalSession(currentPath)
+  const { session, profile } = await requirePortalSession(currentPath)
 
   const repos = await getRepositories()
   const auction = await repos.findByID({ collection: 'auctions', id: auctionId })
   if (auction === null) notFound()
+
+  const winningBidId = typeof auction.winningBid === 'string' ? auction.winningBid : null
+  const winningBid = winningBidId !== null
+    ? await repos.findByID({ collection: 'bids', id: winningBidId })
+    : null
 
   const snapshot = await loadContractSnapshot(repos, 'auction', auctionId, session.userId)
 
@@ -51,20 +57,21 @@ export default async function OksjonilepingPage({ params }: OksjonilepingPagePro
   let gate: 'ok' | 'no-winner' | 'not-winner' = 'ok'
   if (snapshot.status !== 'signed') {
     const isAdmin = session.role === 'admin' || session.role === 'superadmin'
-    const winningBidId = typeof auction.winningBid === 'string' ? auction.winningBid : null
     if (winningBidId === null) {
       gate = 'no-winner'
     } else if (!isAdmin) {
-      const bid = await repos.findByID({ collection: 'bids', id: winningBidId })
-      if (bid?.userId !== session.userId) {
+      if (winningBid?.userId !== session.userId) {
         gate = 'not-winner'
       }
     }
   }
 
-  return (
-    <SigningShell>
-      {gate !== 'ok' ? (
+  if (gate !== 'ok') {
+    return (
+      <SigningShell
+        title="Lepingu allkirjastamine"
+        summary="Tutvu võidetud oksjoni lepinguga ja allkirjasta see elektrooniliselt."
+      >
         <div className="rounded-card border border-border bg-white p-lg shadow-card">
           <h1 className="font-heading text-h3 text-ink">Oksjonileping</h1>
           <p className="mt-2xs font-body text-body text-inkMuted">
@@ -81,18 +88,49 @@ export default async function OksjonilepingPage({ params }: OksjonilepingPagePro
             </Link>
           </p>
         </div>
-      ) : (
-        <SigningFlow
-          kind="auction"
-          auctionId={auctionId}
-          auctionTitle={auction.title}
-          templateVersion={snapshot.templateVersion}
-          initial={snapshot}
-          identity={null}
-          nextPath={null}
-          deadlineIso={signingDeadline(auction.deadlines)}
-        />
-      )}
+      </SigningShell>
+    )
+  }
+
+  const userRecord = (await repos.findByID({ collection: 'users', id: session.userId })) as
+    | Record<string, unknown>
+    | null
+
+  const identity: IdentityPrefill = {
+    name:
+      profile?.displayName ??
+      profile?.companyName ??
+      (typeof userRecord?.name === 'string' ? userRecord.name : ''),
+    codeLabel: profile?.type === 'company' ? 'Registrikood' : 'Isikukood',
+    code:
+      profile?.type === 'company'
+        ? (profile.companyRegCode ?? '')
+        : typeof userRecord?.isikukood === 'string'
+          ? userRecord.isikukood
+          : '',
+    address: '',
+    email: typeof userRecord?.email === 'string' ? userRecord.email : '',
+    phone: profile?.phone ?? (typeof userRecord?.phone === 'string' ? userRecord.phone : ''),
+  }
+
+  const context = await loadAuctionSigningContext(repos, auction, winningBid)
+
+  return (
+    <SigningShell
+      title="Lepingu allkirjastamine"
+      summary={`Oksjon ${auction.title} — tutvu võidetud oksjoni lepinguga ja allkirjasta see elektrooniliselt.`}
+    >
+      <SigningFlow
+        kind="auction"
+        auctionId={auctionId}
+        auctionTitle={auction.title}
+        templateVersion={snapshot.templateVersion}
+        initial={snapshot}
+        identity={identity}
+        nextPath={null}
+        deadlineIso={signingDeadline(auction.deadlines)}
+        context={context}
+      />
     </SigningShell>
   )
 }

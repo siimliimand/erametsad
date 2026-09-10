@@ -1,5 +1,6 @@
 'use client'
 
+import { Hourglass } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 function fmtDate(value: string): string | null {
@@ -22,10 +23,12 @@ interface DeadlineChipProps {
 }
 
 /**
- * Winner-contract signing deadline chip. Urgency colors: neutral → amber
- * under 3 days → red under 24 hours; expired shows a static warning.
+ * Winner-contract deadline banner (demo 13): amber band with the bold date
+ * and the consequence sentence, plus the live countdown chip. Urgency
+ * colors: amber under 3 days → red under 24 hours; expired shows a static
+ * warning.
  */
-export function DeadlineChip({ deadlineIso }: DeadlineChipProps) {
+export function DeadlineBanner({ deadlineIso }: DeadlineChipProps) {
   const deadlineMs = Date.parse(deadlineIso)
   const valid = !Number.isNaN(deadlineMs)
   const [, setTick] = useState(0)
@@ -48,29 +51,35 @@ export function DeadlineChip({ deadlineIso }: DeadlineChipProps) {
   const urgent = !expired && hoursLeft < 24
   const warning = !expired && !urgent && hoursLeft < 72
 
-  const toneClass = expired || urgent ? 'border-danger/30 bg-danger/10 text-danger' : warning ? 'border-statusEndingSoon/30 bg-statusEndingSoon/10 text-statusEndingSoon' : 'border-border bg-bgMist text-ink'
+  const bannerClass = expired || urgent ? 'bg-danger/10' : 'bg-statusEndingSoon/10'
+  const accentClass = expired || urgent ? 'text-danger' : 'text-ctaHover'
+  const chipClass = expired || urgent
+    ? 'border-danger/30 text-danger'
+    : warning
+      ? 'border-statusEndingSoon/40 text-ctaHover'
+      : 'border-border bg-white text-ink'
   const { days, hours, minutes } = remainingParts(deadlineMs)
 
   return (
-    <div className={`flex flex-col gap-2xs rounded-card border px-md py-sm ${toneClass}`}>
-      <span className="inline-flex items-center gap-xs font-label font-semibold">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 6v6l4 2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+    <div
+      role="note"
+      className={`flex flex-wrap items-center gap-3.5 rounded-card px-5 py-4 ${bannerClass}`}
+    >
+      <Hourglass aria-hidden="true" size={20} className={`flex-none ${accentClass}`} />
+      <p className="min-w-[260px] flex-1 font-body text-bodySm text-ink">
+        <b className={`font-semibold ${accentClass}`}>Allkirjasta {dateLabel ?? 'tähtajaks'}</b> —
+        vastasel juhul läheb oksjon järgmisele pakkujale.
+      </p>
+      <span
+        className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill border px-3 py-1 font-mono text-[13px] font-medium ${chipClass}`}
+      >
         {expired ? (
           <>Tähtaeg on möödunud</>
         ) : (
           <>
-            Tähtaeg {dateLabel}
-            <span className="font-mono">
-              · jäänud {days}p {hours}h {minutes}m
-            </span>
+            jäänud {days}p {hours}h {minutes}m
           </>
         )}
-      </span>
-      <span className="font-body text-bodySm">
-        Allkirjasta leping {dateLabel ?? 'tähtajaks'} — vastasel juhul läheb oksjon järgmisele pakkujale.
       </span>
     </div>
   )
