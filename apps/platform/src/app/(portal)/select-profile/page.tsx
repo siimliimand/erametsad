@@ -41,6 +41,12 @@ function grantedObjectTypes(rights: AuctionRight[]): (typeof auctionObjectTypes)
   })
 }
 
+// Demo .profile-sub date format (dd.mm.yyyy) from the ISO created_at stamp.
+function formatDate(iso: string): string {
+  const [year, month, day] = iso.slice(0, 10).split('-')
+  return `${day ?? ''}.${month ?? ''}.${year ?? ''}`
+}
+
 function toOption(profile: ProfileDoc, activeProfileId: string | null): ProfileOption {
   const isCompany = profile.type === 'company'
   const name =
@@ -52,13 +58,17 @@ function toOption(profile: ProfileDoc, activeProfileId: string | null): ProfileO
     type: profile.type,
     name,
     regCode: isCompany ? (profile.companyRegCode ?? null) : null,
+    sub: isCompany
+      ? `Reg ${profile.companyRegCode ?? '—'} · Taotlus esitatud ${formatDate(profile.createdAt)}`
+      : 'Isiklik profiil',
     active: profile.id === activeProfileId,
+    pending: isCompany && profile.approvalStatus === 'pending',
     disabled: !selectable,
     note: selectable
       ? null
       : profile.approvalStatus === 'rejected'
         ? 'Ettevõtte taotlus lükati tagasi.'
-        : 'Ettevõtte profiil ootab kinnitust.',
+        : 'Pakkumiste õigused avanevad pärast kinnitamist.',
   }
 }
 
@@ -87,22 +97,32 @@ export default async function SelectProfilePage({
   })
 
   return (
-    <div className="mx-auto w-full max-w-container-sm">
-      <div className="rounded-card border border-border bg-bgPage p-md shadow-card md:p-lg">
-        <h1 className="font-heading text-h2 text-ink">Vali profiil</h1>
-        <p className="mt-2xs font-body text-body text-inkMuted">
-          Vali, millise profiiliga portaalis jätkatakse. Edasised tegevused seotak valitud
-          profiiliga.
+    <>
+      {/* Demo .page-head.profile-head: full-bleed mist band with a centered
+          head; negative margins cancel the (portal) layout main padding, as
+          in the listing and user-area heads. */}
+      <section
+        aria-labelledby="select-profile-title"
+        className="-mx-md -mt-lg bg-bgMist px-md pb-[28px] pt-[32px] text-center md:-mx-lg md:px-lg md:pb-[40px] md:pt-[48px]"
+      >
+        <h1
+          id="select-profile-title"
+          className="mb-[10px] font-heading text-[34px] font-extrabold leading-[1.15] text-ink md:text-h1"
+        >
+          Vali profiil
+        </h1>
+        <p className="mx-auto max-w-[52em] font-body text-body text-inkMuted md:text-[18px]">
+          Pakkumised ja lepingud seotakse valitud profiiliga. Saad hiljem menüüst vahetada.
         </p>
-        <div className="mt-md">
-          <ProfileSelector
-            options={docs.map((profile) => toOption(profile, session.profileId))}
-            activeProfileId={session.profileId}
-            grantedTypes={grantedObjectTypes(rightsResult.docs)}
-            next={next}
-          />
-        </div>
+      </section>
+      <div className="mx-auto flex w-full max-w-[780px] flex-col pb-16 pt-8">
+        <ProfileSelector
+          options={docs.map((profile) => toOption(profile, session.profileId))}
+          activeProfileId={session.profileId}
+          grantedTypes={grantedObjectTypes(rightsResult.docs)}
+          next={next}
+        />
       </div>
-    </div>
+    </>
   )
 }
