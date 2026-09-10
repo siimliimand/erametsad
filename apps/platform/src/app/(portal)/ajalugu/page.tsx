@@ -9,7 +9,10 @@ import {
   resolveListingTab,
   type RawSearchParams,
 } from '../_components/ListingTabs'
-import { parseListingFilters, type ListingFilterState } from '../_lib/filter-params'
+import {
+  parseListingFilters,
+  type ListingFilterState,
+} from '../_lib/filter-params'
 import { formatEstonianInteger, type ListingTabId } from '../_lib/summary'
 
 import {
@@ -33,17 +36,6 @@ const EMPTY_RESULT: AuctionListResult = {
   page: 1,
   limit: ARCHIVE_PAGE_SIZE,
   totalPages: 1,
-}
-
-// Genitive plural forms for "lõppenud {…} oksjonit"; Kõik uses '' so the
-// sentence drops the qualifier entirely ("lõppenud oksjonit").
-const ARCHIVE_TAB_GENITIVE: Record<ListingTabId, string> = {
-  koik: '',
-  raieoigused: 'raieõiguste',
-  metskinnistud: 'metskinnistute',
-  polumaad: 'põllumaade',
-  paketid: 'kinnistute pakettide',
-  kiiroksjonid: 'kiiroksjonide',
 }
 
 // Mirrors the ListingFilters option tables; this panel is server-rendered
@@ -74,7 +66,8 @@ function paramBag(params: RawSearchParams): URLSearchParams {
   const bag = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined) continue
-    for (const entry of Array.isArray(value) ? value : [value]) bag.append(key, entry)
+    for (const entry of Array.isArray(value) ? value : [value])
+      bag.append(key, entry)
   }
   return bag
 }
@@ -89,7 +82,9 @@ function csvValues(params: RawSearchParams, key: string): string[] {
 }
 
 function toggleToken(list: string[], value: string): string[] {
-  return list.includes(value) ? list.filter((token) => token !== value) : [...list, value]
+  return list.includes(value)
+    ? list.filter((token) => token !== value)
+    : [...list, value]
 }
 
 /** Shareable href: switches tab, tweaks params, resets pagination. */
@@ -136,7 +131,15 @@ async function loadTabArchive(
   const search = new URLSearchParams()
   if (objectTypes.length > 0) search.set('objectType', objectTypes.join(','))
   search.set('limit', String(ARCHIVE_PAGE_SIZE))
-  for (const key of ['county', 'parish', 'species', 'loggingType', 'sort', 'order', 'endYear']) {
+  for (const key of [
+    'county',
+    'parish',
+    'species',
+    'loggingType',
+    'sort',
+    'order',
+    'endYear',
+  ]) {
     for (const value of csvValues(params, key)) search.append(key, value)
   }
   for (const key of ['areaMin', 'areaMax', 'priceMin', 'priceMax']) {
@@ -153,14 +156,19 @@ function archiveBucketsForTab(
   stats: Record<AuctionObjectType, ArchivedAuctionTypeStats>,
 ): ArchivedAuctionTypeStats[] {
   const { allTypes, objectTypes } = listingTabDef(tab)
-  return allTypes ? Object.values(stats) : objectTypes.map((objectType) => stats[objectType])
+  return allTypes
+    ? Object.values(stats)
+    : objectTypes.map((objectType) => stats[objectType])
 }
 
 function archivedCountForTab(
   tab: ListingTabId,
   stats: Record<AuctionObjectType, ArchivedAuctionTypeStats>,
 ): number {
-  return archiveBucketsForTab(tab, stats).reduce((sum, bucket) => sum + bucket.count, 0)
+  return archiveBucketsForTab(tab, stats).reduce(
+    (sum, bucket) => sum + bucket.count,
+    0,
+  )
 }
 
 function endYearsForTab(
@@ -172,15 +180,6 @@ function endYearsForTab(
     for (const year of bucket.endYears) years.add(year)
   }
   return [...years].sort((a, b) => b - a)
-}
-
-function archiveSummarySentence(tab: ListingTabId, total: number): string {
-  const genitive = ARCHIVE_TAB_GENITIVE[tab]
-  const qualifier = genitive === '' ? '' : `${genitive} `
-  if (total <= 0) {
-    return `Arhiivis ei ole lõppenud ${qualifier}oksjoneid.`
-  }
-  return `Arhiivis on ${formatEstonianInteger(total)} lõppenud ${qualifier}oksjonit.`
 }
 
 interface ArchiveTabTotals {
@@ -205,33 +204,143 @@ function archiveTabTotals(
   )
 }
 
-// All-time per-tab totals (trust signal, filter-independent). The band
-// hides entirely for an empty tab and zero sums collapse away.
-function ArchiveStatsBand({
-  tab,
-  stats,
+/**
+ * Demo stat formatting (04-ajalugu): a million or more collapses to the
+ * "1,54 mln" pattern with the Estonian decimal comma; smaller totals keep
+ * the full space-grouped integer.
+ */
+function formatArchiveStatValue(value: number): string {
+  if (value < 1_000_000) return formatEstonianInteger(value)
+  const text = (value / 1_000_000)
+    .toFixed(2)
+    .replace(/\.?0+$/, '')
+    .replace('.', ',')
+  return `${text} mln`
+}
+
+/**
+ * Demo page-head summary: all-time archive totals in one sentence plus the
+ * privacy line; zero aggregates collapse their clause instead of faking data.
+ */
+function archiveHeadSummary(totals: ArchiveTabTotals): string {
+  const privacy = 'Avalikustame ainult lõpphinda — võitja andmeid ei avaldata.'
+  if (totals.count <= 0) return `Arhiivis ei ole lõppenud oksjoneid. ${privacy}`
+  const details = [
+    totals.areaHa > 0
+      ? `kokku ${formatEstonianInteger(totals.areaHa)} ha`
+      : null,
+    totals.volumeM3 > 0
+      ? `${formatArchiveStatValue(totals.volumeM3)} m³`
+      : null,
+    totals.finalPriceEur > 0
+      ? `${formatArchiveStatValue(totals.finalPriceEur)} € eest`
+      : null,
+  ].filter((detail): detail is string => detail !== null)
+  const lastDetail = details[details.length - 1] ?? ''
+  const detailsText =
+    details.length <= 1
+      ? details.join('')
+      : `${details.slice(0, -1).join(', ')} ja ${lastDetail}`
+  const sentence =
+    detailsText === ''
+      ? `Edukalt lõppenud oksjoneid on ${formatEstonianInteger(totals.count)}.`
+      : `Edukalt lõppenud oksjoneid on ${formatEstonianInteger(totals.count)}, ${detailsText}.`
+  return `${sentence} ${privacy}`
+}
+
+/**
+ * Demo .page-head band (04-ajalugu): full-width mist strip with the H1, the
+ * all-time summary and the statistics band. Negative margins cancel the
+ * (portal) layout main padding, mirroring ListingPageHead.
+ */
+function ArchivePageHead({
+  summary,
+  totals,
 }: {
-  tab: ListingTabId
-  stats: Record<AuctionObjectType, ArchivedAuctionTypeStats>
+  summary: string
+  totals: ArchiveTabTotals
 }) {
-  const totals = archiveTabTotals(tab, stats)
+  return (
+    <section
+      aria-labelledby="page-title"
+      className="-mx-md -mt-lg bg-bgMist px-md pb-[28px] pt-[32px] md:-mx-lg md:px-lg md:pb-[40px] md:pt-[48px]"
+    >
+      <h1
+        id="page-title"
+        className="mb-[10px] font-heading text-h1 font-extrabold text-ink"
+      >
+        Oksjonite ajalugu
+      </h1>
+      <p className="max-w-[52em] font-body text-body text-inkMuted md:text-[18px]">
+        {summary}
+      </p>
+      <ArchiveStatsBand totals={totals} />
+    </section>
+  )
+}
+
+// All-time archive trust band (D8): every figure is a sum over the archived
+// statistics snapshot, never live data; zero sums collapse their card and
+// an empty archive hides the whole band.
+function ArchiveStatsBand({ totals }: { totals: ArchiveTabTotals }) {
   if (totals.count <= 0) return null
-  const metrics = [
-    { label: 'Lõppenud oksjonit', value: formatEstonianInteger(totals.count) },
-    { label: 'Pindala kokku (ha)', value: formatEstonianInteger(totals.areaHa) },
-    ...(tab === 'raieoigused' && totals.volumeM3 > 0
-      ? [{ label: 'Raiemahu kokku (m³)', value: formatEstonianInteger(totals.volumeM3) }]
+  const cards = [
+    {
+      label: 'Edukalt lõppenud oksjonit',
+      value: formatEstonianInteger(totals.count),
+      unit: null,
+    },
+    ...(totals.areaHa > 0
+      ? [
+          {
+            label: 'Metsa- ja põllumaad kokku',
+            value: formatEstonianInteger(totals.areaHa),
+            unit: 'ha',
+          },
+        ]
+      : []),
+    ...(totals.volumeM3 > 0
+      ? [
+          {
+            label: 'Raiemaht kokku',
+            value: formatArchiveStatValue(totals.volumeM3),
+            unit: 'm³',
+          },
+        ]
       : []),
     ...(totals.finalPriceEur > 0
-      ? [{ label: 'Kogumaksumus (€)', value: formatEstonianInteger(totals.finalPriceEur) }]
+      ? [
+          {
+            label: 'Kogumaksumus kokku',
+            value: formatArchiveStatValue(totals.finalPriceEur),
+            unit: '€',
+          },
+        ]
       : []),
   ]
   return (
-    <dl className="grid gap-sm rounded-card border border-border bg-white p-md sm:grid-cols-2 lg:grid-cols-4">
-      {metrics.map((metric) => (
-        <div key={metric.label} className="flex flex-col gap-xs">
-          <dt className="font-body text-bodySm text-inkMuted">{metric.label}</dt>
-          <dd className="font-mono text-h4 font-bold text-primaryDark">{metric.value}</dd>
+    <dl
+      role="group"
+      aria-label="Statistikalint"
+      className="mt-6 grid grid-cols-2 gap-3 md:mt-8 md:grid-cols-4 md:gap-4"
+    >
+      {cards.map((card) => (
+        <div
+          key={card.label}
+          className="flex flex-col rounded-card border border-border bg-white px-[22px] py-5 shadow-card"
+        >
+          <dd className="order-1 font-mono text-2xl font-medium leading-[1.2] text-primaryDark md:text-[30px]">
+            {card.value}
+            {card.unit !== null && (
+              <span className="text-base font-medium text-inkMuted">
+                {' '}
+                {card.unit}
+              </span>
+            )}
+          </dd>
+          <dt className="order-2 mt-1.5 font-body text-[13px] font-semibold uppercase tracking-[0.03em] text-inkMuted">
+            {card.label}
+          </dt>
         </div>
       ))}
     </dl>
@@ -255,7 +364,8 @@ function countArchiveFilters(
     if (state.species.length > 0) count += 1
     if (state.loggingTypes.length > 0) count += 1
   }
-  if (state.sortField !== 'endPrice' || state.sortDirection !== 'desc') count += 1
+  if (state.sortField !== 'endPrice' || state.sortDirection !== 'desc')
+    count += 1
   return count
 }
 
@@ -267,31 +377,42 @@ interface ArchiveTabsProps {
 
 function ArchiveTabs({ activeTab, counts, params }: ArchiveTabsProps) {
   return (
-    <nav aria-label="Arhiivi oksjonite tüübid" className="overflow-x-auto border-b border-border">
-      <ul className="flex min-w-max">
+    // Demo .tabs-wrap: full-width white strip right under the mist page-head
+    // band; negative margins cancel the (portal) layout main padding, same
+    // pill language as the listing tab bar (ListingTabs).
+    <div className="-mx-md border-b border-border bg-white px-md md:-mx-lg md:px-lg">
+      <nav
+        aria-label="Arhiivi oksjonite tüübid"
+        className="flex gap-2 overflow-x-auto py-4"
+      >
         {LISTING_TAB_IDS.map((tab) => {
           const isActive = tab === activeTab
           return (
-            <li key={tab}>
-              <Link
-                href={archiveHref(tab, params)}
-                aria-current={isActive ? 'page' : undefined}
-                className={`relative flex items-center gap-2 px-4 py-3 text-label font-semibold whitespace-nowrap transition-colors duration-hover ease-hover ${
+            <Link
+              key={tab}
+              href={archiveHref(tab, params)}
+              aria-current={isActive ? 'page' : undefined}
+              className={`inline-flex flex-none items-center gap-2 rounded-pill border px-4 py-[9px] text-[15px] font-semibold whitespace-nowrap transition-colors duration-hover ease-hover ${
+                isActive
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-border bg-white text-ink hover:border-primary hover:text-primary'
+              }`}
+            >
+              {listingTabDef(tab).label}
+              <span
+                className={`rounded-pill px-[9px] py-px font-mono text-xs font-medium ${
                   isActive
-                    ? 'border-b-2 border-primary text-primary'
-                    : 'border-b-2 border-transparent text-inkMuted hover:border-primary hover:text-primary'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-bgMist text-inkMuted'
                 }`}
               >
-                {listingTabDef(tab).label}
-                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-primaryLight px-1.5 text-[11px] font-semibold text-primaryDark">
-                  {counts[tab]}
-                </span>
-              </Link>
-            </li>
+                {counts[tab]}
+              </span>
+            </Link>
           )
         })}
-      </ul>
-    </nav>
+      </nav>
+    </div>
   )
 }
 
@@ -316,9 +437,16 @@ interface ArchiveRangeFormProps {
 
 // GET form keeps the panel server-rendered; the submit round-trips the
 // whole query string through the URL, same as the chip links around it.
-function ArchiveRangeForm({ tab, params, state, counties, parishes }: ArchiveRangeFormProps) {
+function ArchiveRangeForm({
+  tab,
+  params,
+  state,
+  counties,
+  parishes,
+}: ArchiveRangeFormProps) {
   const selectedYears = csvValues(params, 'endYear')
-  const selectedCounty = counties.find((county) => county.name === state.county[0]) ?? null
+  const selectedCounty =
+    counties.find((county) => county.name === state.county[0]) ?? null
   const scopedParishes =
     selectedCounty === null
       ? parishes
@@ -333,14 +461,20 @@ function ArchiveRangeForm({ tab, params, state, counties, parishes }: ArchiveRan
         <input type="hidden" name="species" value={state.species.join(',')} />
       )}
       {state.loggingTypes.length > 0 && (
-        <input type="hidden" name="loggingType" value={state.loggingTypes.join(',')} />
+        <input
+          type="hidden"
+          name="loggingType"
+          value={state.loggingTypes.join(',')}
+        />
       )}
       <input type="hidden" name="sort" value={state.sortField} />
       <input type="hidden" name="order" value={state.sortDirection} />
 
       <div className="grid gap-sm sm:grid-cols-2">
         <label className="flex flex-col gap-xs">
-          <span className="font-body text-bodySm font-semibold text-primary">Maakond</span>
+          <span className="font-body text-bodySm font-semibold text-primary">
+            Maakond
+          </span>
           <select
             name="county"
             defaultValue={state.county[0] ?? ''}
@@ -355,7 +489,9 @@ function ArchiveRangeForm({ tab, params, state, counties, parishes }: ArchiveRan
           </select>
         </label>
         <label className="flex flex-col gap-xs">
-          <span className="font-body text-bodySm font-semibold text-primary">Vald</span>
+          <span className="font-body text-bodySm font-semibold text-primary">
+            Vald
+          </span>
           <select
             name="parish"
             defaultValue={state.parish[0] ?? ''}
@@ -445,10 +581,17 @@ interface ArchiveChipsProps {
   buildHref: (value: string) => string
 }
 
-function ArchiveChips({ label, options, selected, buildHref }: ArchiveChipsProps) {
+function ArchiveChips({
+  label,
+  options,
+  selected,
+  buildHref,
+}: ArchiveChipsProps) {
   return (
     <div className="flex flex-col gap-xs">
-      <span className="font-body text-bodySm font-semibold text-primary">{label}</span>
+      <span className="font-body text-bodySm font-semibold text-primary">
+        {label}
+      </span>
       <div className="flex flex-wrap gap-xs">
         {options.map((option) => {
           const isActive = selected.includes(option.value)
@@ -471,7 +614,11 @@ function ArchiveChips({ label, options, selected, buildHref }: ArchiveChipsProps
   )
 }
 
-function ArchiveSort({ tab, params, state }: {
+function ArchiveSort({
+  tab,
+  params,
+  state,
+}: {
   tab: ListingTabId
   params: RawSearchParams
   state: ListingFilterState
@@ -486,7 +633,10 @@ function ArchiveSort({ tab, params, state }: {
       selected={[`${state.sortField}:${state.sortDirection}`]}
       buildHref={(value) => {
         const [field, direction] = value.split(':')
-        return archiveHref(tab, params, { sort: field ?? 'endPrice', order: direction ?? 'desc' })
+        return archiveHref(tab, params, {
+          sort: field ?? 'endPrice',
+          order: direction ?? 'desc',
+        })
       }}
     />
   )
@@ -511,7 +661,12 @@ function paginationPages(page: number, totalPages: number): (number | '…')[] {
   return pages
 }
 
-function ArchivePagination({ tab, page, totalPages, params }: {
+function ArchivePagination({
+  tab,
+  page,
+  totalPages,
+  params,
+}: {
   tab: ListingTabId
   page: number
   totalPages: number
@@ -519,10 +674,16 @@ function ArchivePagination({ tab, page, totalPages, params }: {
 }) {
   if (totalPages <= 1) return null
   return (
-    <nav aria-label="Lehitsemine" className="flex flex-wrap items-center justify-center gap-xs">
+    <nav
+      aria-label="Lehitsemine"
+      className="flex flex-wrap items-center justify-center gap-xs"
+    >
       {paginationPages(page, totalPages).map((entry, index) =>
         entry === '…' ? (
-          <span key={`gap-${String(index)}`} className="px-2 font-body text-bodySm text-inkMuted">
+          <span
+            key={`gap-${String(index)}`}
+            className="px-2 font-body text-bodySm text-inkMuted"
+          >
             …
           </span>
         ) : entry === page ? (
@@ -551,7 +712,9 @@ interface ArchivePageProps {
   searchParams: Promise<RawSearchParams>
 }
 
-export async function generateMetadata({ searchParams }: ArchivePageProps): Promise<Metadata> {
+export async function generateMetadata({
+  searchParams,
+}: ArchivePageProps): Promise<Metadata> {
   const tab = resolveListingTab((await searchParams).tab)
   return { title: `Ajalugu: ${listingTabDef(tab).label}` }
 }
@@ -565,12 +728,14 @@ export default async function AjaluguPage({ searchParams }: ArchivePageProps) {
   const isForestTab = tab === 'raieoigused'
 
   const repos = await getRepositories()
-  const [typeStats, countiesResult, parishesResult, result] = await Promise.all([
-    archivedStatsByObjectType(repos),
-    repos.find({ collection: 'counties', pagination: false }),
-    repos.find({ collection: 'parishes', pagination: false }),
-    loadTabArchive(repos, tab, page, params),
-  ])
+  const [typeStats, countiesResult, parishesResult, result] = await Promise.all(
+    [
+      archivedStatsByObjectType(repos),
+      repos.find({ collection: 'counties', pagination: false }),
+      repos.find({ collection: 'parishes', pagination: false }),
+      loadTabArchive(repos, tab, page, params),
+    ],
+  )
   const counties: CountyOption[] = countiesResult.docs.map((county) => ({
     id: county.id,
     name: county.name,
@@ -592,118 +757,127 @@ export default async function AjaluguPage({ searchParams }: ArchivePageProps) {
     label: String(year),
   }))
 
+  const totals = archiveTabTotals('koik', typeStats)
+
   return (
-    <div className="flex flex-col gap-lg">
-      <h1 className="font-heading text-h2 text-ink">Oksjonite ajalugu</h1>
+    <div>
+      <ArchivePageHead summary={archiveHeadSummary(totals)} totals={totals} />
 
       <ArchiveTabs activeTab={tab} counts={counts} params={params} />
 
-      <ArchiveStatsBand tab={tab} stats={typeStats} />
-
-      <p className="font-body text-body text-inkMuted">{archiveSummarySentence(tab, result.total)}</p>
-
-      <Card
-        hover={false}
-        content={
-          <div className="flex flex-col gap-md">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-xs font-heading text-h4 font-semibold text-ink">
-                Filtrid
+      <div className="flex flex-col gap-lg pt-lg">
+        <Card
+          hover={false}
+          content={
+            <div className="flex flex-col gap-md">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-xs font-heading text-h4 font-semibold text-ink">
+                  Filtrid
+                  {activeFilterCount > 0 && (
+                    <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-primary px-1.5 font-mono text-[11px] font-bold text-inkInverse">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </span>
                 {activeFilterCount > 0 && (
-                  <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-primary px-1.5 font-mono text-[11px] font-bold text-inkInverse">
-                    {activeFilterCount}
-                  </span>
+                  <Link
+                    href={`/ajalugu?tab=${tab}`}
+                    className="font-body text-bodySm font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryDark"
+                  >
+                    Tühjenda
+                  </Link>
                 )}
-              </span>
-              {activeFilterCount > 0 && (
-                <Link
-                  href={`/ajalugu?tab=${tab}`}
-                  className="font-body text-bodySm font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryDark"
-                >
-                  Tühjenda
-                </Link>
-              )}
-            </div>
-            <ArchiveRangeForm
-              tab={tab}
-              params={params}
-              state={state}
-              counties={counties}
-              parishes={parishes}
-            />
-            {yearOptions.length > 0 && (
-              <ArchiveChips
-                label="Lõpuaasta"
-                options={yearOptions}
-                selected={selectedYears}
-                buildHref={(value) => {
-                  const next = toggleToken(selectedYears, value)
-                  return archiveHref(tab, params, {
-                    endYear: next.length > 0 ? next.join(',') : null,
-                  })
-                }}
+              </div>
+              <ArchiveRangeForm
+                tab={tab}
+                params={params}
+                state={state}
+                counties={counties}
+                parishes={parishes}
               />
-            )}
-            {isForestTab && (
-              <>
+              {yearOptions.length > 0 && (
                 <ArchiveChips
-                  label="Puuliik"
-                  options={SPECIES_OPTIONS}
-                  selected={state.species}
+                  label="Lõpuaasta"
+                  options={yearOptions}
+                  selected={selectedYears}
                   buildHref={(value) => {
-                    const next = toggleToken(state.species, value)
+                    const next = toggleToken(selectedYears, value)
                     return archiveHref(tab, params, {
-                      species: next.length > 0 ? next.join(',') : null,
+                      endYear: next.length > 0 ? next.join(',') : null,
                     })
                   }}
                 />
-                <ArchiveChips
-                  label="Raieliik"
-                  options={LOGGING_TYPE_OPTIONS}
-                  selected={state.loggingTypes}
-                  buildHref={(value) => {
-                    const next = toggleToken(state.loggingTypes, value)
-                    return archiveHref(tab, params, {
-                      loggingType: next.length > 0 ? next.join(',') : null,
-                    })
-                  }}
-                />
-              </>
-            )}
-            <ArchiveSort tab={tab} params={params} state={state} />
+              )}
+              {isForestTab && (
+                <>
+                  <ArchiveChips
+                    label="Puuliik"
+                    options={SPECIES_OPTIONS}
+                    selected={state.species}
+                    buildHref={(value) => {
+                      const next = toggleToken(state.species, value)
+                      return archiveHref(tab, params, {
+                        species: next.length > 0 ? next.join(',') : null,
+                      })
+                    }}
+                  />
+                  <ArchiveChips
+                    label="Raieliik"
+                    options={LOGGING_TYPE_OPTIONS}
+                    selected={state.loggingTypes}
+                    buildHref={(value) => {
+                      const next = toggleToken(state.loggingTypes, value)
+                      return archiveHref(tab, params, {
+                        loggingType: next.length > 0 ? next.join(',') : null,
+                      })
+                    }}
+                  />
+                </>
+              )}
+              <ArchiveSort tab={tab} params={params} state={state} />
+            </div>
+          }
+        />
+
+        {result.auctions.length === 0 ? (
+          <div className="rounded-card border border-border bg-white p-lg text-center">
+            <p className="font-body text-body text-inkMuted">
+              Arhiivis ei ole valitud filtritele vastavaid lõppenud oksjoneid.
+            </p>
           </div>
-        }
-      />
+        ) : (
+          <div className="grid gap-md sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {result.auctions.map((auction) => (
+              <ArchiveCard
+                key={auction.id}
+                title={auction.title}
+                href={`/oksjon/${auction.id}`}
+                image={
+                  auction.image === null
+                    ? undefined
+                    : { src: auction.image, alt: auction.title }
+                }
+                finalPrice={auction.finalPrice}
+                endYear={auction.endYear}
+                endedAt={auction.endsAt}
+                county={auction.county?.name ?? auction.address ?? 'Eesti'}
+                area={auction.area}
+              />
+            ))}
+          </div>
+        )}
 
-      {result.auctions.length === 0 ? (
-        <div className="rounded-card border border-border bg-white p-lg text-center">
-          <p className="font-body text-body text-inkMuted">
-            Arhiivis ei ole valitud filtritele vastavaid lõppenud oksjoneid.
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-md sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {result.auctions.map((auction) => (
-            <ArchiveCard
-              key={auction.id}
-              title={auction.title}
-              href={`/oksjon/${auction.id}`}
-              image={auction.image === null ? undefined : { src: auction.image, alt: auction.title }}
-              finalPrice={auction.finalPrice}
-              endYear={auction.endYear}
-              endedAt={auction.endsAt}
-              county={auction.county?.name ?? auction.address ?? 'Eesti'}
-              area={auction.area}
-            />
-          ))}
-        </div>
-      )}
+        <ArchivePagination
+          tab={tab}
+          page={result.page}
+          totalPages={result.totalPages}
+          params={params}
+        />
 
-      <ArchivePagination tab={tab} page={result.page} totalPages={result.totalPages} params={params} />
-
-      <p className="text-center font-body text-bodySm text-inkMuted">
-        Avalikustatakse ainult lõpphinnad; pakkujate andmeid ei avaldata.
-      </p>
+        <p className="text-center font-body text-bodySm text-inkMuted">
+          Avalikustatakse ainult lõpphinnad; pakkujate andmeid ei avaldata.
+        </p>
+      </div>
     </div>
   )
 }
