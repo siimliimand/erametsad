@@ -162,6 +162,7 @@ export function Countdown({
 
   return (
     <span
+      suppressHydrationWarning
       className={`inline-flex items-center gap-1 font-mono tracking-tight ${animClass} ${sizeClasses[size]} ${colorClass} ${className ?? ''}`}
       style={{ fontFeatureSettings: '"tnum" 1' }}
       aria-live="polite"

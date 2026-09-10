@@ -420,8 +420,11 @@ export function ListingFilters({ tab }: { tab: string }) {
 
           <div
             id="subForm"
-            {...(subFormOpen ? {} : { hidden: true })}
-            className="flex flex-col gap-sm rounded-input border border-border bg-bgMist p-sm"
+            // Tailwind classes, not the hidden attribute: .flex would beat the
+            // UA [hidden] rule and leave the closed form visible.
+            className={`flex-col gap-sm rounded-input border border-border bg-bgMist p-sm ${
+              subFormOpen ? 'flex' : 'hidden'
+            }`}
           >
             <FormInput
               label="E-post"

@@ -35,7 +35,8 @@ export function priceSummaryCents(
   }
 }
 
-/** et-EE currency from integer cents ("60 641,10 €"). */
+/** et-EE currency from integer cents ("60 641,10 €"); fee+VAT math makes
+ * cents meaningful, so both fraction digits always render. */
 export function formatEurCents(cents: number): string {
   return (cents / 100).toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
 }

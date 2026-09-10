@@ -68,7 +68,8 @@ vi.mock('react/jsx-dev-runtime', async (importOriginal) => {
   return { ...actual, jsxDEV: wrap(actual.jsxDEV) }
 })
 
-import { ListingResultsBar, SORT_OPTIONS, isMapView } from '../ListingResultsBar'
+import { isMapView } from '../../_lib/view-param'
+import { ListingResultsBar, SORT_OPTIONS } from '../ListingResultsBar'
 
 function render(total: number, extra: Record<string, unknown> = {}): string {
   return renderToString(

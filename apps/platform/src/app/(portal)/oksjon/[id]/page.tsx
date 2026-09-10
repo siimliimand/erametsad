@@ -44,7 +44,13 @@ export const dynamic = 'force-dynamic'
 // ── Formatting ──────────────────────────────────────────────────────────
 
 function eur(value: number): string {
-  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+  // Demo shows whole euros ("12 000 €"); cents appear only when they exist.
+  return value.toLocaleString('et-EE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
 }
 
 function num(value: number): string {

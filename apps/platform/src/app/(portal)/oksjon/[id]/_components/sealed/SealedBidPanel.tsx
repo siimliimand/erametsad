@@ -86,7 +86,12 @@ interface SealedSubmitOutcome {
 // ── Formatting / parsing (mirrors BidPanel conventions) ─────────────────
 
 function eur(value: number): string {
-  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+  return value.toLocaleString('et-EE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
 }
 
 function inputAmount(value: number): string {
@@ -302,7 +307,9 @@ function DeadlineBox({ endsAt }: { endsAt: string | null }) {
         <span className="text-xs text-inkMuted">
           {hasDeadline && !isEnded ? 'Aega jäänud' : 'Oksjon lõppenud'}
         </span>
-        <span className={`font-mono text-lg font-medium ${timeColor}`}>
+        {/* Ticking text: the server renders a value one tick behind the
+            client, so the seconds can never match during hydration. */}
+        <span suppressHydrationWarning className={`font-mono text-lg font-medium ${timeColor}`}>
           {hasDeadline && !isEnded ? formatRemaining(remaining) : '00:00:00'}
         </span>
       </p>

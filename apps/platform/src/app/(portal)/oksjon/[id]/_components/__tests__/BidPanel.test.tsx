@@ -55,7 +55,7 @@ function plain(value: string): string {
 
 function expectAmount(html: string, amount: number, currency: boolean): void {
   const formatted = currency
-    ? amount.toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+    ? amount.toLocaleString('et-EE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 2 })
     : amount.toLocaleString('et-EE', { maximumFractionDigits: 2 })
   expect(plain(html)).toContain(plain(formatted))
 }

@@ -24,7 +24,12 @@ import type { AuctionBidView } from '@/lib/auction/queries'
 // ── Formatting ──────────────────────────────────────────────────────────
 
 function eur(value: number): string {
-  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+  return value.toLocaleString('et-EE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
 }
 
 /** Estonian relative time ("5 minutit tagasi"); `now` injectable for the ticker. */

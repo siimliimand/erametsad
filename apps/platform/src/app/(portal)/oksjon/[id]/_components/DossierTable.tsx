@@ -1,3 +1,5 @@
+'use client'
+
 import { DataTable, type Column } from '@erametsad/ui'
 import { Fragment } from 'react'
 
@@ -214,19 +216,44 @@ export function PackageSection({
 
   const derived = buildPackageColumns(objectRows)
   // Stored column labels only shape the header when they match what the
-  // rows actually contain; otherwise the derived columns win.
-  const labeled =
-    columns.length === derived.length
-      ? derived.map((column, index) => {
-          const stored = columns[index]
-          return stored !== undefined ? { ...column, label: stored } : column
-        })
-      : derived
+  // rows actually contain: first by normalized label ("Maht" ↔ "Maht (m³)"),
+  // then positionally for what is left. Matching by label first keeps a
+  // stored order that differs from the PACKAGE_KEYS order from swapping
+  // headers onto the wrong data columns.
+  const baseLabel = (label: string): string => normalizeKey(label.replace(/\(.*\)/, ''))
+  const storedByBase = new Map<string, string>()
+  for (const stored of columns) storedByBase.set(baseLabel(stored), stored)
+  const used = new Set<string>()
+  const byBase = derived.map((column) => {
+    const stored = storedByBase.get(baseLabel(column.label))
+    if (stored === undefined || used.has(stored)) return column
+    used.add(stored)
+    return { ...column, label: stored }
+  })
+  const remaining = columns.filter((stored) => !used.has(stored))
+  let nextRemaining = 0
+  const labeled = byBase.map((column, index) => {
+    if (byBase[index] !== derived[index]) return column
+    const stored = remaining[nextRemaining]
+    if (stored === undefined) return column
+    nextRemaining += 1
+    return { ...column, label: stored }
+  })
+  // The stored order is the demo's column order; unlabeled columns keep
+  // their derived positions after the matched ones.
+  const orderOf = (label: string): number => {
+    const at = columns.indexOf(label)
+    return at === -1 ? columns.length : at
+  }
+  const ordered = labeled
+    .map((column, index) => ({ column, index }))
+    .sort((a, b) => orderOf(a.column.label) - orderOf(b.column.label) || a.index - b.index)
+    .map(({ column }) => column)
 
   return (
     <PackageTable
       header={header}
-      columns={labeled}
+      columns={ordered}
       rows={objectRows}
     />
   )

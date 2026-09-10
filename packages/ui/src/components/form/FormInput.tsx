@@ -24,6 +24,7 @@ export function FormInput({
   required,
   className = '',
   id: externalId,
+  placeholder,
   ...rest
 }: FormInputProps) {
   const generatedId = useId();
@@ -61,7 +62,14 @@ export function FormInput({
             setHasValue(!!e.target.value);
             rest.onChange?.(e);
           }}
-          placeholder={float ? '' : typeof label === 'string' ? label : ''}
+          // Floating-label contract: the label element is visually hidden
+          // while unfloated, so the placeholder (caller's or the label text)
+          // is the single in-box text — never a duplicate of the label.
+          placeholder={
+            float
+              ? ''
+              : (placeholder ?? (typeof label === 'string' ? label : ''))
+          }
           className={`peer h-14 w-full rounded-input border bg-bgPage px-4 pt-5 text-body outline-none transition-all duration-hover ease-hover motion-reduce:transition-none ${
             error
               ? 'border-danger focus:border-danger focus:ring-2 focus:ring-danger/20'
@@ -74,7 +82,7 @@ export function FormInput({
           className={`pointer-events-none absolute left-4 transition-all duration-hover ease-hover motion-reduce:transition-none ${
             float
               ? 'top-2 text-label font-semibold text-primary'
-              : 'top-4 text-body text-ink-muted'
+              : 'sr-only'
           } ${error ? 'text-danger' : ''}`}
         >
           {label}

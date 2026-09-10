@@ -4,7 +4,7 @@ import Link from 'next/link'
 
 import { ListingFilters } from './_components/ListingFilters'
 import { ListingMap } from './_components/ListingMap'
-import { ListingResultsBar, isMapView } from './_components/ListingResultsBar'
+import { ListingResultsBar } from './_components/ListingResultsBar'
 import {
   LISTING_TAB_IDS,
   ListingTabs,
@@ -21,6 +21,7 @@ import {
   type ListingTabId,
 } from './_lib/summary'
 import { AuctionStreamProvider } from './_lib/use-auction-stream'
+import { isMapView } from './_lib/view-param'
 
 import {
   DEFAULT_AUCTION_LIST_LIMIT,

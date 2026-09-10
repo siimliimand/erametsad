@@ -45,7 +45,7 @@ vi.mock('@/app/(portal)/_lib/use-my-stream', () => ({
   .IS_REACT_ACT_ENVIRONMENT = true
 
 function eur(value: number): string {
-  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
 
 function makeRow(overrides: {

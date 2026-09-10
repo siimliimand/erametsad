@@ -772,9 +772,13 @@ function ArchiveRow({ auction }: { auction: AuctionSummary }) {
         >
           {auction.title}
         </Link>
-        <span className="mt-0.5 block font-mono text-xs text-inkMuted">
-          #{auction.id}
-        </span>
+        {/* Demo shows a mono lot-number line under the title; the summary
+            carries the cadastral/registry number, never the raw id. */}
+        {auction.registryNumber !== null && (
+          <span className="mt-0.5 block font-mono text-xs text-inkMuted">
+            #{auction.registryNumber}
+          </span>
+        )}
       </td>
       <td className={`${TD_CLASS} whitespace-nowrap`}>
         <ArchiveTypeChip objectType={auction.objectType} />
