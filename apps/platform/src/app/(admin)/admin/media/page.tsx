@@ -1,7 +1,7 @@
-import Link from 'next/link'
 
 import { formatFileSize, allowedMediaMimeTypes } from './_lib/media-upload'
 import { deleteMediaAction, uploadMediaAction } from '../../_actions/media'
+import { AdminLink } from '../../_components/AdminLink'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import { FormField, primaryButtonClass, secondaryButtonClass } from '../../_components/FormField'
@@ -97,12 +97,12 @@ export default async function AdminMediaPage({
             key: 'filename',
             label: 'Failinimi',
             render: (row) => (
-              <Link
-                href={`/admin/media/${row.id}`}
+              <AdminLink
+                href={`/media/${row.id}`}
                 className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {row.filename}
-              </Link>
+              </AdminLink>
             ),
           },
           {

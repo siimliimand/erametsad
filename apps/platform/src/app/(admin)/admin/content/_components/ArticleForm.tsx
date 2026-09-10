@@ -1,4 +1,3 @@
-import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
 import { RichTextFormValue } from './RichTextFormValue'
@@ -8,6 +7,7 @@ import {
   utcIsoToTallinnInputValue,
 } from './scheduled-publish'
 import { saveArticleAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import {
   FormField,
   FormSelectField,
@@ -236,17 +236,17 @@ export async function ArticleForm({ article }: { article?: ArticleDoc }) {
         <button type="submit" className={primaryButtonClass}>
           Salvesta
         </button>
-        <Link href="/admin/content/articles" className={secondaryButtonClass}>
+        <AdminLink href="/content/articles" className={secondaryButtonClass}>
           Tühista
-        </Link>
+        </AdminLink>
         {article?.status === 'published' ? (
-          <Link
+          <AdminLink
             href={contentPublicPath('articles', article.slug)}
             target="_blank"
             className={secondaryButtonClass}
           >
             Vaata avaldatud versiooni
-          </Link>
+          </AdminLink>
         ) : null}
       </div>
     </form>

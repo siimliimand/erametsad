@@ -16,6 +16,7 @@ import {
   type AuctionStreamPublishedPayload,
 } from '../_lib/use-auction-stream'
 
+import { apiFetch } from '@/lib/api/client'
 import type { AuctionListResult, AuctionSummary } from '@/lib/auction/queries'
 import type { AuctionObjectType } from '@/lib/data/schema'
 
@@ -160,7 +161,7 @@ export function LiveListing({ lots, query, renderLot }: LiveListingProps) {
       if (listingQuery === undefined) return null
       const search = new URLSearchParams(listingQuery)
       search.set('auctionStatus', 'active')
-      const response = await fetch(`/api/v1/auctions?${search.toString()}`, {
+      const response = await apiFetch(`/api/v1/auctions?${search.toString()}`, {
         cache: 'no-store',
       })
       if (!response.ok) return null

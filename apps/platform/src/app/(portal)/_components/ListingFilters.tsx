@@ -18,6 +18,8 @@ import {
 } from '../_lib/filter-params'
 import { SPECIES } from '../_lib/species'
 
+import { apiFetch } from '@/lib/api/client'
+
 interface CountyParish {
   id: string
   name: string
@@ -132,7 +134,7 @@ export function ListingFilters({ tab }: { tab: string }) {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/v1/counties')
+    apiFetch('/api/v1/counties')
       .then((response) => {
         if (!response.ok) throw new Error(String(response.status))
         return response.json()

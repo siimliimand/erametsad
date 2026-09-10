@@ -8,6 +8,7 @@ import {
   listUserSessions,
   resolveAccessTokenSession,
   revokeSession,
+  sessionCookieDomainFromHost,
 } from '@/lib/auth/session'
 
 async function authenticate(
@@ -63,7 +64,7 @@ export async function DELETE(request: NextRequest) {
 
   const response = NextResponse.json({ revoked: sessionId })
   if (isCurrent) {
-    clearSessionCookies(response)
+    clearSessionCookies(response, sessionCookieDomainFromHost(request.headers.get('host')))
   }
 
   return response

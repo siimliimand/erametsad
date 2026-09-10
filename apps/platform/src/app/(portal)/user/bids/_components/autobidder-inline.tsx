@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react'
 
 import { formatEur, formatEurInput, parseEurInput } from './format'
 
+import { apiFetch } from '@/lib/api/client'
+
 export interface AutobidderInlineProps {
   auctionId: string
   /** Start price (alghind) in EUR. */
@@ -113,7 +115,7 @@ export function AutobidderInline({
                 body: JSON.stringify({ maxAmount: value }),
               },
             )
-          : await fetch('/api/v1/auto-bidders', {
+          : await apiFetch('/api/v1/auto-bidders', {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
               body: JSON.stringify({ auctionId, maxAmount: value }),

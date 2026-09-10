@@ -9,6 +9,7 @@ import { AlapakkumineToggle } from './AlapakkumineToggle'
 import { AutobidderControl } from './AutobidderControl'
 import { BidConfirmModal } from './BidConfirmModal'
 
+import { apiFetch } from '@/lib/api/client'
 import type { AuctionObjectType, AuctionStatus } from '@/lib/data/schema'
 
 // ── Public props contract ───────────────────────────────────────────────
@@ -194,7 +195,7 @@ function apiErrorToEstonian(message: string): string {
 async function submitBidViaApi(input: BidSubmitInput): Promise<BidSubmitOutcome> {
   let response: Response
   try {
-    response = await fetch('/api/v1/bids/create', {
+    response = await apiFetch('/api/v1/bids/create', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -324,7 +325,7 @@ export function BidPanel({
     const controller = new AbortController()
     void (async () => {
       try {
-        const response = await fetch('/api/v1/my/auction-rights', {
+        const response = await apiFetch('/api/v1/my/auction-rights', {
           signal: controller.signal,
         })
         if (!response.ok) throw new Error('auction-rights fetch failed')

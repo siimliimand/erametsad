@@ -1,8 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import { useState, useTransition } from 'react'
 
+import { AdminLink } from './AdminLink'
 import { BellIcon, CheckIcon } from './icons'
 import { markNotificationReadAction } from '../_actions/notifications'
 import { formatRelativeTime } from '../_lib/labels'
@@ -93,15 +93,15 @@ export function NotificationBell({
             ))
           )}
           <div className="mt-2xs border-t border-border pt-2xs">
-            <Link
-              href="/admin/notifications"
+            <AdminLink
+              href="/notifications"
               onClick={() => {
                 setOpen(false)
               }}
               className="block px-sm py-xs text-bodySm font-semibold text-primary transition-colors duration-hover hover:text-primaryHover"
             >
               Kõik teavitused
-            </Link>
+            </AdminLink>
           </div>
         </div>
       )}

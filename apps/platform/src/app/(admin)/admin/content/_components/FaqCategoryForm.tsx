@@ -1,7 +1,7 @@
-import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
 import { saveFaqCategoryAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import {
   FormField,
   primaryButtonClass,
@@ -43,9 +43,9 @@ export function FaqCategoryForm({ category }: { category?: FaqCategory }) {
         <button type="submit" className={primaryButtonClass}>
           Salvesta
         </button>
-        <Link href="/admin/content/faq/categories" className={secondaryButtonClass}>
+        <AdminLink href="/content/faq/categories" className={secondaryButtonClass}>
           Tühista
-        </Link>
+        </AdminLink>
       </div>
     </form>
   )

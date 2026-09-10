@@ -191,7 +191,7 @@ describe('LiveListing auction:published', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/auctions?tab=koik&auctionStatus=active',
-      { cache: 'no-store' },
+      { cache: 'no-store', credentials: 'include' },
     )
     expect(cardIds()).toEqual(['new-1', 'lot-1', 'lot-2'])
     expect(lotNode('new-1')?.textContent).toContain('Uus raieõigus | active')

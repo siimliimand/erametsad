@@ -1,5 +1,6 @@
 export type EidMethod = 'smartid' | 'mobileid' | 'idcard'
 
+import { apiFetch } from '@/lib/api/client'
 export interface ContractFlowSnapshot {
   status: 'none' | 'prepared' | 'sent' | 'signed' | 'voided'
   contractId: string | null
@@ -58,7 +59,7 @@ export async function prepareContract(
   const path = kind === 'framework' ? 'framework-contract' : 'contract'
   let response: Response
   try {
-    response = await fetch(`/api/v1/bids/${path}/prepare`, {
+    response = await apiFetch(`/api/v1/bids/${path}/prepare`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ auctionId }),
@@ -89,7 +90,7 @@ export async function completeContract(
   const path = kind === 'framework' ? 'framework-contract' : 'contract'
   let response: Response
   try {
-    response = await fetch(`/api/v1/bids/${path}/complete`, {
+    response = await apiFetch(`/api/v1/bids/${path}/complete`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ contractId }),

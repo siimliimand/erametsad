@@ -55,8 +55,19 @@ default host, preserving path and query. `/metsateatise-juhend` SHALL 301
 to `/metsateatis`. Sessions SHALL work on both hostnames with host-only
 cookies. No additional Worker SHALL be created; the mapping lives in
 application middleware plus a Workers route or custom domain on the zone.
-The `api.` and `admin.` hostnames SHALL use the same mapping table when
-introduced.
+The admin hostname `admin.erametsad.ww0.dev` SHALL use the same mapping
+table with a prefix-free URL space: the admin UI SHALL render at `/` and
+at root paths (for example `/auctions`) through an internal rewrite into
+the `/admin` route space, any `/admin`-prefixed URL SHALL 308 to the
+clean form, the login and password flows SHALL stay same-host, and portal
+and marketing paths SHALL 308 to their hosts. The `api.` hostname SHALL
+serve only `/api` routes on the same Worker and SHALL 308 every other path
+to the default host. Browser API calls SHALL target the api. hostname: the
+deploy build SHALL set `NEXT_PUBLIC_API_ORIGIN`, the middleware SHALL
+answer credentialed CORS only for origins under the allowlisted domain
+suffixes, and the Worker SHALL carry `SESSION_COOKIE_DOMAIN` so session
+cookies set by the API host reach the page hosts. Hosts outside the
+suffix SHALL keep host-only cookies.
 
 #### Scenario: Marketing hostname serves the homepage
 
@@ -87,6 +98,38 @@ introduced.
 
 - **WHEN** a browser requests `https://oksjonid.erametsad.ww0.dev/`
 - **THEN** the listing renders from the portal route group as before
+
+#### Scenario: Admin hostname lands on the admin UI
+
+- **WHEN** a browser requests `https://admin.erametsad.ww0.dev/`
+- **THEN** the workspace renders through an internal rewrite to
+  `/admin` and the URL stays `/`
+
+#### Scenario: Admin hostname keeps URLs prefix-free
+
+- **WHEN** a browser requests `https://admin.erametsad.ww0.dev/admin/auctions`
+- **THEN** the middleware responds with a 308 to `/auctions` on the same
+  hostname, preserving the query
+
+#### Scenario: Admin hostname keeps the login flow same-host
+
+- **WHEN** an operator requests `/login` on the admin hostname
+- **THEN** the middleware serves it without redirecting, so the session
+  cookie is set on that hostname
+
+#### Scenario: API host serves only the API
+
+- **WHEN** a browser requests `https://api.erametsad.ww0.dev/admin`
+- **THEN** the middleware responds with a 308 to
+  `https://erametsad.ww0.dev/admin`
+
+#### Scenario: API host answers credentialed CORS for same-site origins
+
+- **WHEN** the admin page origin calls the api. host with credentials
+- **THEN** the response carries the caller's origin in
+  `Access-Control-Allow-Origin` with
+  `Access-Control-Allow-Credentials: true`, and a foreign origin receives
+  no CORS headers
 
 ### Requirement: Deploy CI
 CI SHALL deploy a preview via `wrangler` on pull requests. CI SHALL deploy

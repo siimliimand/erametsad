@@ -4,6 +4,7 @@ import { Btn, FormInput } from '@erametsad/ui'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
+
 import { PendingCompanyBanner, SuspendedBanner } from './Banners'
 import { ControlCodeScreen } from './ControlCodeScreen'
 import { EidMethodCards, METHOD_LABELS } from './EidMethodCards'
@@ -16,6 +17,9 @@ import {
   startEid,
   type EidMethod,
 } from './eid-client'
+
+import { isStaffRole } from '@/app/(admin)/_lib/permissions'
+import { adminRootForHost } from '@/lib/routing/admin-base'
 
 const POLL_INTERVAL_MS = 2000
 const POLL_MAX_MS = 120000
@@ -59,10 +63,16 @@ export function LoginForm({ next }: LoginFormProps) {
   }
 
   // Post-login routing: cookies are already set, so a full navigation keeps
-  // server components in sync with the new session.
+  // server components in sync with the new session. Staff roles skip the
+  // buyer profile-selection step and land on the admin workspace.
   async function routeAfterAuth() {
     const target = next ?? '/'
-    const profiles = await fetchMyProfiles()
+    const mine = await fetchMyProfiles()
+    if (mine?.role !== null && mine?.role !== undefined && isStaffRole(mine.role)) {
+      window.location.assign(adminRootForHost(window.location.hostname))
+      return
+    }
+    const profiles = mine?.profiles ?? null
     if (profiles && profiles.length > 1) {
       window.location.assign(`/select-profile?next=${encodeURIComponent(target)}`)
       return

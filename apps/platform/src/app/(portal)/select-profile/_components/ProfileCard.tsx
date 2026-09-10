@@ -4,6 +4,7 @@ import { Btn } from '@erametsad/ui'
 import Link from 'next/link'
 import { useState, type ReactNode, type SVGProps } from 'react'
 
+import { apiFetch } from '@/lib/api/client'
 import type { AuctionObjectType } from '@/lib/data/schema'
 
 // apps/platform does not declare lucide-react as a direct dependency, so the
@@ -184,7 +185,7 @@ export function ProfileSelector({
     setBusy(true)
     setError(null)
     try {
-      const response = await fetch(`/api/v1/profiles/${selectedId}/select`, {
+      const response = await apiFetch(`/api/v1/profiles/${selectedId}/select`, {
         method: 'POST',
       })
       if (!response.ok) {

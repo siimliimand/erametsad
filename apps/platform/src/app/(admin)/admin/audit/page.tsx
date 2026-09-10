@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1'
 import { Download as DownloadIcon } from 'lucide-react'
-import Link from 'next/link'
+
 
 import {
   AuditDrawerProvider,
@@ -16,6 +16,7 @@ import {
   groupLabel,
   UNGROUPED_GROUP_ID,
 } from './_components/action-registry'
+import { AdminLink } from '../../_components/AdminLink'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import { secondaryButtonClass } from '../../_components/FormField'
@@ -286,7 +287,7 @@ export default async function AdminAuditPage({
       if (value) search.set(key, value)
     }
     const qs = search.toString()
-    return qs === '' ? '/admin/audit' : `/admin/audit?${qs}`
+    return qs === '' ? '/audit' : `/audit?${qs}`
   }
 
   // Export link reuses the list's shareable filter parameters; `entry` is a
@@ -329,7 +330,7 @@ export default async function AdminAuditPage({
 
       <form
         method="get"
-        action="/admin/audit"
+        action="/audit"
         className="mb-md flex flex-wrap items-center gap-sm rounded-card border border-border bg-bgPage p-md"
       >
         {isSuper ? (
@@ -394,12 +395,12 @@ export default async function AdminAuditPage({
         >
           Filtreeri
         </button>
-        <Link
-          href="/admin/audit"
+        <AdminLink
+          href="/audit"
           className="text-label font-semibold text-ink-muted transition-colors duration-hover ease-hover hover:text-primary"
         >
           Tühjenda{activeFilterCount > 0 ? ` (${String(activeFilterCount)})` : ''}
-        </Link>
+        </AdminLink>
       </form>
 
       <AuditDrawerProvider
@@ -486,17 +487,17 @@ export default async function AdminAuditPage({
         </span>
         <span className="flex items-center gap-sm">
           {safePage > 1 ? (
-            <Link href={buildUrl({ page: String(safePage - 1) })} className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover">
+            <AdminLink href={buildUrl({ page: String(safePage - 1) })} className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover">
               ‹ Eelmine
-            </Link>
+            </AdminLink>
           ) : null}
           <span>
             Leht {String(safePage)} / {String(pageCount)}
           </span>
           {safePage < pageCount ? (
-            <Link href={buildUrl({ page: String(safePage + 1) })} className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover">
+            <AdminLink href={buildUrl({ page: String(safePage + 1) })} className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover">
               Järgmine ›
-            </Link>
+            </AdminLink>
           ) : null}
         </span>
       </div>

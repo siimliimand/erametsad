@@ -1,6 +1,5 @@
-import Link from 'next/link'
-
 import { deleteSpecialistAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import { DataTable } from '../../../_components/DataTable'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import { primaryButtonClass } from '../../../_components/FormField'
@@ -49,10 +48,10 @@ export default async function AdminSpecialistsPage({
         description="Meeskonna spetsialistid koos kontaktidega."
         backHref="/admin/content"
         actions={
-          <Link href="/admin/content/specialists/new" className={primaryButtonClass}>
+          <AdminLink href="/content/specialists/new" className={primaryButtonClass}>
             <PlusIcon />
             Uus spetsialist
-          </Link>
+          </AdminLink>
         }
       />
       <DataTable
@@ -61,12 +60,12 @@ export default async function AdminSpecialistsPage({
             key: 'name',
             label: 'Nimi',
             render: (row) => (
-              <Link
-                href={`/admin/content/specialists/${row.id}`}
+              <AdminLink
+                href={`/content/specialists/${row.id}`}
                 className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {row.name}
-              </Link>
+              </AdminLink>
             ),
           },
           { key: 'role', label: 'Amet', render: (row) => row.role ?? '—' },

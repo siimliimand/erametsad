@@ -1,11 +1,10 @@
-import Link from 'next/link'
-
 import {
   resumeUserAction,
   revokeUserSessionAction,
   suspendUserAction,
   updateUserAction,
 } from '../../../../_actions/users'
+import { AdminLink } from '../../../../_components/AdminLink'
 import { DataTable } from '../../../../_components/DataTable'
 import {
   FormField,
@@ -196,9 +195,9 @@ export function IdentityTab({
               <button type="submit" className={primaryButtonClass}>
                 Salvesta
               </button>
-              <Link href="/admin/users" className={secondaryButtonClass}>
+              <AdminLink href="/users" className={secondaryButtonClass}>
                 Tühista
-              </Link>
+              </AdminLink>
             </div>
           </form>
         ) : (

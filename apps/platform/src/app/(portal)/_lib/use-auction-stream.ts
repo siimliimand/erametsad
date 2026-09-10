@@ -13,6 +13,8 @@ import {
   type ReactNode,
 } from 'react'
 
+import { apiUrl } from '@/lib/api/client'
+
 // Payload shapes mirror the AuctionDO broadcasts (src/do/auction.ts) that
 // src/lib/realtime/auction-stream.ts pipes verbatim through
 // /api/v1/auctions/stream. The server's JSON.stringify drops keys whose
@@ -71,7 +73,7 @@ export interface AuctionStreamApi {
 
 const AuctionStreamContext = createContext<AuctionStreamApi | null>(null)
 
-const STREAM_URL = '/api/v1/auctions/stream'
+const STREAM_URL = apiUrl('/api/v1/auctions/stream')
 const BASE_BACKOFF_MS = 1_000
 const MAX_BACKOFF_MS = 30_000
 const EVENT_NAMES: readonly AuctionStreamEventName[] = [

@@ -55,13 +55,13 @@ export const workspaceKpiSublabels = {
 } as const
 
 export const workspaceKpiHrefs = {
-  activeAuctions: '/admin/auctions',
-  endingToday: '/admin/auctions',
-  bidsToday: '/admin/bids',
-  pendingApprovals: '/admin/companies',
-  newLeads: '/admin/leads',
-  pendingSignature: '/admin/contracts',
-  serviceFeeMonth: '/admin/statistics',
+  activeAuctions: '/auctions',
+  endingToday: '/auctions',
+  bidsToday: '/bids',
+  pendingApprovals: '/companies',
+  newLeads: '/leads',
+  pendingSignature: '/contracts',
+  serviceFeeMonth: '/statistics',
 } as const
 
 export const workspaceCardLabels = {
@@ -587,7 +587,7 @@ export function recentLeadRows(
       lead.assignedSpecialistId !== null
         ? (names.specialistNameById.get(lead.assignedSpecialistId) ?? null)
         : null,
-    href: `/admin/leads/${lead.id}`,
+    href: `/leads/${lead.id}`,
   }))
 }
 

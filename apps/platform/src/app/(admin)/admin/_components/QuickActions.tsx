@@ -3,10 +3,10 @@ import {
   ChevronRight as ChevronRightIcon,
   FileSignature as FileSignatureIcon,
 } from 'lucide-react'
-import Link from 'next/link'
 import type { ComponentType } from 'react'
 
 import { WorkspaceCard } from './WorkspaceCard'
+import { AdminLink } from '../../_components/AdminLink'
 import { BuildingIcon } from '../../_components/icons'
 import { workspaceCardLabels } from '../_lib/workspace'
 import type { QuickActionRow } from '../_lib/workspace'
@@ -37,7 +37,7 @@ export function QuickActions({ rows }: { rows: readonly QuickActionRow[] }) {
           {rows.map((row) => {
             const Icon = actionIcons[row.key]
             return (
-              <Link
+              <AdminLink
                 key={row.key}
                 href={row.href}
                 className="group flex items-center gap-3 px-5 py-3 transition-colors duration-hover ease-hover hover:bg-bgMist"
@@ -70,7 +70,7 @@ export function QuickActions({ rows }: { rows: readonly QuickActionRow[] }) {
                 >
                   <ChevronRightIcon className="h-3.5 w-3.5" />
                 </span>
-              </Link>
+              </AdminLink>
             )
           })}
         </div>

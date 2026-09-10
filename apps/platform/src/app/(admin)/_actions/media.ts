@@ -15,6 +15,8 @@ import {
   validateMediaUpload,
 } from '../admin/media/_lib/media-upload'
 
+import { adminUrl } from '@/lib/routing/admin-base-server'
+
 const mediaPath = '/admin/media'
 
 function readText(formData: FormData, key: string): string {
@@ -27,8 +29,8 @@ function readOptionalText(formData: FormData, key: string): string | null {
   return value.length > 0 ? value : null
 }
 
-function redirectWithError(path: string, message: string): never {
-  redirect(`${path}?viga=${encodeURIComponent(message)}`)
+async function redirectWithError(path: string, message: string): Promise<never> {
+  redirect(await adminUrl(`${path}?viga=${encodeURIComponent(message)}`))
 }
 
 function mediaItemPath(id: string): string {
@@ -40,7 +42,7 @@ async function persist<T>(path: string, prefix: string, write: () => Promise<T>)
   try {
     return await write()
   } catch (error) {
-    redirectWithError(path, `${prefix}${error instanceof Error ? error.message : String(error)}`)
+    return redirectWithError(path, `${prefix}${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -67,16 +69,16 @@ async function writeMediaAudit(
 }
 
 /** Focal form fields → nullable 0..1 columns; out-of-range values are rejected. */
-function readFocalPoint(
+async function readFocalPoint(
   formData: FormData,
   errorPath: string,
-): { focalX: number | null; focalY: number | null } {
+): Promise<{ focalX: number | null; focalY: number | null }> {
   const hasX = readText(formData, 'focalX').length > 0
   const hasY = readText(formData, 'focalY').length > 0
   const focalX = hasX ? focalCoordinateFrom(readText(formData, 'focalX')) : null
   const focalY = hasY ? focalCoordinateFrom(readText(formData, 'focalY')) : null
   if ((hasX && focalX === null) || (hasY && focalY === null)) {
-    redirectWithError(errorPath, 'Fookuspunkt peab olema vahemikus 0 kuni 100 protsenti.')
+    await redirectWithError(errorPath, 'Fookuspunkt peab olema vahemikus 0 kuni 100 protsenti.')
   }
   return { focalX, focalY }
 }
@@ -86,7 +88,7 @@ export async function uploadMediaAction(formData: FormData): Promise<void> {
 
   const file = formData.get('file')
   if (!(file instanceof File)) {
-    redirectWithError(mediaPath, 'Vali üleslaaditav fail.')
+    return redirectWithError(mediaPath, 'Vali üleslaaditav fail.')
   }
 
   const validationError = validateMediaUpload({
@@ -94,17 +96,17 @@ export async function uploadMediaAction(formData: FormData): Promise<void> {
     mimeType: file.type,
     size: file.size,
   })
-  if (validationError) redirectWithError(mediaPath, validationError)
+  if (validationError) return redirectWithError(mediaPath, validationError)
 
   // Alt gate (task 3.6): image uploads require a non-empty alt text.
   const alt = readOptionalText(formData, 'alt')
   const altError = validateMediaAlt(file.type, alt)
-  if (altError) redirectWithError(mediaPath, altError)
+  if (altError) return redirectWithError(mediaPath, altError)
 
-  const { focalX, focalY } = readFocalPoint(formData, mediaPath)
+  const { focalX, focalY } = await readFocalPoint(formData, mediaPath)
 
   const bucket = await getMediaBucket()
-  if (!bucket) redirectWithError(mediaPath, 'R2 salvestusruum pole saadaval.')
+  if (!bucket) return redirectWithError(mediaPath, 'R2 salvestusruum pole saadaval.')
 
   const id = crypto.randomUUID()
   const key = buildR2Key(id, file.name)
@@ -138,7 +140,7 @@ export async function uploadMediaAction(formData: FormData): Promise<void> {
       // The primary failure is what the admin needs to see.
     }
   }
-  if (failure) redirectWithError(mediaPath, `Üleslaadimine ebaõnnestus: ${failure}`)
+  if (failure) return redirectWithError(mediaPath, `Üleslaadimine ebaõnnestus: ${failure}`)
 
   // Rendition jobs ride the erametsad-jobs queue (design D6). The upload
   // stands on its own: a failed enqueue keeps the row's `pending` marker and
@@ -161,7 +163,7 @@ export async function uploadMediaAction(formData: FormData): Promise<void> {
   }
 
   revalidatePath(mediaPath)
-  redirect(mediaPath)
+  redirect(await adminUrl(mediaPath))
 }
 
 export async function updateMediaAction(formData: FormData): Promise<void> {
@@ -171,22 +173,22 @@ export async function updateMediaAction(formData: FormData): Promise<void> {
   const errorPath = id.length > 0 ? mediaItemPath(id) : mediaPath
   const filename = readText(formData, 'filename')
 
-  if (!id) redirectWithError(mediaPath, 'Faili identifikaator puudub.')
-  if (!filename) redirectWithError(errorPath, 'Failinimi on kohustuslik.')
+  if (!id) return redirectWithError(mediaPath, 'Faili identifikaator puudub.')
+  if (!filename) return redirectWithError(errorPath, 'Failinimi on kohustuslik.')
 
   const current = id
     ? await persist(errorPath, 'Faili lugemine ebaõnnestus: ', () =>
         repositories.findByID({ collection: 'media', id }),
       )
     : null
-  if (!current) redirectWithError(errorPath, 'Faili ei leitud.')
+  if (!current) return redirectWithError(errorPath, 'Faili ei leitud.')
 
   // Alt gate (task 3.6) at edit time, judged by the stored mime type.
   const alt = readOptionalText(formData, 'alt')
   const altError = validateMediaAlt(current.mimeType ?? '', alt)
-  if (altError) redirectWithError(errorPath, altError)
+  if (altError) return redirectWithError(errorPath, altError)
 
-  const { focalX, focalY } = readFocalPoint(formData, errorPath)
+  const { focalX, focalY } = await readFocalPoint(formData, errorPath)
 
   await persist(errorPath, 'Faili salvestamine ebaõnnestus: ', () =>
     repositories.update({
@@ -203,7 +205,7 @@ export async function updateMediaAction(formData: FormData): Promise<void> {
 
   revalidatePath(mediaPath)
   revalidatePath(mediaItemPath(id))
-  redirect(mediaPath)
+  redirect(await adminUrl(mediaPath))
 }
 
 /**
@@ -219,11 +221,11 @@ export async function replaceMediaFileAction(formData: FormData): Promise<void> 
   const id = readText(formData, 'id')
   const errorPath = id.length > 0 ? mediaItemPath(id) : mediaPath
 
-  if (!id) redirectWithError(mediaPath, 'Faili identifikaator puudub.')
+  if (!id) return redirectWithError(mediaPath, 'Faili identifikaator puudub.')
 
   const file = formData.get('file')
   if (!(file instanceof File)) {
-    redirectWithError(errorPath, 'Vali asendav fail.')
+    return redirectWithError(errorPath, 'Vali asendav fail.')
   }
 
   const validationError = validateMediaUpload({
@@ -231,18 +233,18 @@ export async function replaceMediaFileAction(formData: FormData): Promise<void> 
     mimeType: file.type,
     size: file.size,
   })
-  if (validationError) redirectWithError(errorPath, validationError)
+  if (validationError) return redirectWithError(errorPath, validationError)
 
   const current = await persist(errorPath, 'Faili lugemine ebaõnnestus: ', () =>
     repositories.findByID({ collection: 'media', id }),
   )
-  if (!current) redirectWithError(errorPath, 'Faili ei leitud.')
+  if (!current) return redirectWithError(errorPath, 'Faili ei leitud.')
 
   // Alt gate: when the replacement is an image, the row must end up with a
   // non-empty alt — the provided value or the stored one qualifies.
   const alt = readOptionalText(formData, 'alt') ?? current.alt
   const altError = validateMediaAlt(file.type, alt)
-  if (altError) redirectWithError(errorPath, altError)
+  if (altError) return redirectWithError(errorPath, altError)
 
   const focalX = readText(formData, 'focalX').length > 0
     ? focalCoordinateFrom(readText(formData, 'focalX'))
@@ -254,11 +256,11 @@ export async function replaceMediaFileAction(formData: FormData): Promise<void> 
     (readText(formData, 'focalX').length > 0 && focalX === null) ||
     (readText(formData, 'focalY').length > 0 && focalY === null)
   ) {
-    redirectWithError(errorPath, 'Fookuspunkt peab olema vahemikus 0 kuni 100 protsenti.')
+    return redirectWithError(errorPath, 'Fookuspunkt peab olema vahemikus 0 kuni 100 protsenti.')
   }
 
   const bucket = await getMediaBucket()
-  if (!bucket) redirectWithError(errorPath, 'R2 salvestusruum pole saadaval.')
+  if (!bucket) return redirectWithError(errorPath, 'R2 salvestusruum pole saadaval.')
 
   const nextKey = buildR2Key(id, file.name)
   const buffer = await file.arrayBuffer()
@@ -303,7 +305,7 @@ export async function replaceMediaFileAction(formData: FormData): Promise<void> 
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
   }
-  if (failure) redirectWithError(errorPath, `Faili asendamine ebaõnnestus: ${failure}`)
+  if (failure) return redirectWithError(errorPath, `Faili asendamine ebaõnnestus: ${failure}`)
 
   if (initialRenditionsFor(file.type)) {
     const queue = await getMediaQueue()
@@ -322,24 +324,24 @@ export async function replaceMediaFileAction(formData: FormData): Promise<void> 
 
   revalidatePath(mediaPath)
   revalidatePath(mediaItemPath(id))
-  redirect(mediaPath)
+  redirect(await adminUrl(mediaPath))
 }
 
 export async function deleteMediaAction(formData: FormData): Promise<void> {
   const { repositories } = await requireAdminRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(mediaPath, 'Faili identifikaator puudub.')
+  if (!id) return redirectWithError(mediaPath, 'Faili identifikaator puudub.')
 
   const current = await persist(mediaPath, 'Faili lugemine ebaõnnestus: ', () =>
     repositories.findByID({ collection: 'media', id }),
   )
-  if (!current) redirectWithError(mediaPath, 'Faili ei leitud.')
+  if (!current) return redirectWithError(mediaPath, 'Faili ei leitud.')
 
   const { r2Key } = current
   if (r2Key) {
     const bucket = await getMediaBucket()
-    if (!bucket) redirectWithError(mediaPath, 'R2 salvestusruum pole saadaval.')
+    if (!bucket) return redirectWithError(mediaPath, 'R2 salvestusruum pole saadaval.')
     // R2 delete is idempotent, so the object goes first: a failed row
     // delete can be retried, an orphaned object cannot be reached anymore.
     await persist(mediaPath, 'R2 objekti kustutamine ebaõnnestus: ', () =>
@@ -353,5 +355,5 @@ export async function deleteMediaAction(formData: FormData): Promise<void> {
 
   revalidatePath(mediaPath)
   revalidatePath(mediaItemPath(id))
-  redirect(mediaPath)
+  redirect(await adminUrl(mediaPath))
 }

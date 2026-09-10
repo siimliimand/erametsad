@@ -1,5 +1,4 @@
 import { EE_COUNTIES } from '@erametsad/types'
-import Link from 'next/link'
 
 import {
   createPartnerAction,
@@ -7,6 +6,7 @@ import {
   setPartnerActiveAction,
   updatePartnerAction,
 } from '../../../_actions/ops'
+import { AdminLink } from '../../../_components/AdminLink'
 import { DataTable } from '../../../_components/DataTable'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import {
@@ -328,12 +328,12 @@ export default async function PartnersPage({
       />
 
       <div className="mb-sm flex items-center gap-xs">
-        <Link
+        <AdminLink
           href={lisa ? '/admin/inquiries/partners' : '/admin/inquiries/partners?lisa=1'}
           className={lisa ? secondaryButtonClass : primaryButtonClass}
         >
           {lisa ? 'Sulge vorm' : 'Lisa partner'}
-        </Link>
+        </AdminLink>
       </div>
 
       {lisa ? (
@@ -430,12 +430,12 @@ export default async function PartnersPage({
             label: 'Tegevused',
             render: (row) => (
               <div className="flex flex-wrap items-center gap-xs">
-                <Link
-                  href={`/admin/inquiries/partners?muuda=${row.id}`}
+                <AdminLink
+                  href={`/inquiries/partners?muuda=${row.id}`}
                   className="text-label font-semibold text-primary hover:text-primaryHover"
                 >
                   Muuda
-                </Link>
+                </AdminLink>
                 {row.active ? (
                   <form action={setPartnerActiveAction} className="flex items-center gap-xs">
                     <input type="hidden" name="id" value={row.id} />

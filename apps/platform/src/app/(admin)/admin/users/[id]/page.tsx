@@ -1,6 +1,6 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { AdminLink } from '../../../_components/AdminLink'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import { PageHeader } from '../../../_components/PageHeader'
 import { requireAdminRepositories } from '../../../_lib/admin'
@@ -40,9 +40,9 @@ function DetailTabs({ userId, active }: { userId: string; active: TabId }) {
   return (
     <nav className="mb-md flex flex-wrap gap-xs border-b border-border pb-xs" aria-label="Kasutaja detaili vaated">
       {TABS.map((tab) => (
-        <Link
+        <AdminLink
           key={tab.id}
-          href={`/admin/users/${userId}?tab=${tab.id}`}
+          href={`/users/${userId}?tab=${tab.id}`}
           aria-current={tab.id === active ? 'page' : undefined}
           className={`rounded-pill px-3 py-1.5 text-label font-semibold transition-colors duration-hover ease-hover ${
             tab.id === active
@@ -51,7 +51,7 @@ function DetailTabs({ userId, active }: { userId: string; active: TabId }) {
           }`}
         >
           {tab.label}
-        </Link>
+        </AdminLink>
       ))}
     </nav>
   )

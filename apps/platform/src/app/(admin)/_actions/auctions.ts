@@ -61,6 +61,7 @@ import type { AuctionDoc, CoreRepositories, SettingsDoc } from '@/lib/data/repos
 import { centsToEuros, eurosToCents } from '@/lib/data/repositories/money'
 import { getRepositories } from '@/lib/data/runtime'
 import { eventBus } from '@/lib/notifications/event-bus'
+import { adminUrl } from '@/lib/routing/admin-base-server'
 import { upsertSnapshot } from '@/lib/stats/aggregation'
 
 const newAuctionPath = '/admin/auctions/new'
@@ -75,8 +76,8 @@ function readOptionalText(formData: FormData, key: string): string | null {
   return value === '' ? null : value
 }
 
-function redirectWithError(path: string, message: string): never {
-  redirect(`${path}?viga=${encodeURIComponent(message)}`)
+async function redirectWithError(path: string, message: string): Promise<never> {
+  redirect(await adminUrl(`${path}?viga=${encodeURIComponent(message)}`))
 }
 
 /** Appends a notice param to a path that may already carry a query string. */
@@ -85,8 +86,8 @@ function noticePath(path: string, key: 'teade' | 'viga', message: string): strin
   return `${path}${joiner}${key}=${encodeURIComponent(message)}`
 }
 
-function redirectNotice(path: string, key: 'teade' | 'viga', message: string): never {
-  redirect(noticePath(path, key, message))
+async function redirectNotice(path: string, key: 'teade' | 'viga', message: string): Promise<never> {
+  redirect(await adminUrl(noticePath(path, key, message)))
 }
 
 /**
@@ -150,7 +151,7 @@ function blockingGateSummary(blocking: PublishGateFailure[]): string {
  * legacy flat form keys. Numbers arrive as strings from FormData; arrays
  * arrive as newline/comma separated text.
  */
-function formToAuctionInput(formData: FormData): Record<string, unknown> {
+async function formToAuctionInput(formData: FormData): Promise<Record<string, unknown>> {
   const payloadJson = readText(formData, 'payload')
   if (payloadJson) {
     try {
@@ -159,7 +160,7 @@ function formToAuctionInput(formData: FormData): Record<string, unknown> {
         return parsed as Record<string, unknown>
       }
     } catch {
-      redirectWithError(newAuctionPath, 'Vigane vormi andmete JSON.')
+      return redirectWithError(newAuctionPath, 'Vigane vormi andmete JSON.')
     }
   }
 
@@ -219,14 +220,14 @@ function formToAuctionInput(formData: FormData): Record<string, unknown> {
   return input
 }
 
-function parseAuctionInputOrRedirect(raw: Record<string, unknown>, path: string): AuctionInput {
+async function parseAuctionInputOrRedirect(raw: Record<string, unknown>, path: string): Promise<AuctionInput> {
   const parsed = auctionInputSchema.safeParse(raw)
   if (!parsed.success) {
     const summary = parsed.error.issues
       .slice(0, 5)
       .map((issue) => `${issue.path.join('.') || 'vorm'}: ${issue.message}`)
       .join('; ')
-    redirectWithError(path, `Oksjoni andmed ei läbinud valideerimist: ${summary}`)
+    return redirectWithError(path, `Oksjoni andmed ei läbinud valideerimist: ${summary}`)
   }
   return applyQuickAuctionDefaults(parsed.data)
 }
@@ -373,8 +374,8 @@ export async function createAuctionAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
 
   const intent = wizardIntent(formData)
-  const raw = formToAuctionInput(formData)
-  const input = parseAuctionInputOrRedirect(raw, newAuctionPath)
+  const raw = await formToAuctionInput(formData)
+  const input = await parseAuctionInputOrRedirect(raw, newAuctionPath)
   const writeData = toAuctionWriteData(input)
 
   // Specialist lots are always their own; assigning another specialist is a
@@ -382,13 +383,13 @@ export async function createAuctionAction(formData: FormData): Promise<void> {
   let specialistId = typeof writeData.specialistId === 'string' ? writeData.specialistId : undefined
   if (session.role === 'specialist') {
     if (specialistId && specialistId !== session.userId) {
-      assertPermissionOrRedirect(session.role, 'auctions:reassign-specialist', newAuctionPath)
+      await assertPermissionOrRedirect(session.role, 'auctions:reassign-specialist', newAuctionPath)
     }
     specialistId = session.userId
   }
 
   if (writeData.feeOverridePercent !== undefined) {
-    assertPermissionOrRedirect(session.role, 'auctions:fee-override', newAuctionPath)
+    await assertPermissionOrRedirect(session.role, 'auctions:fee-override', newAuctionPath)
   }
 
   const slug = await uniqueSlug(repositories, writeData.slug ?? slugifyTitle(input.title))
@@ -429,7 +430,7 @@ export async function createAuctionAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure || !created) {
-    redirectWithError(newAuctionPath, `Oksjoni loomine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
+    return redirectWithError(newAuctionPath, `Oksjoni loomine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
   }
 
   // The draft exists at this point, so a failed gate lands back on the new
@@ -445,7 +446,7 @@ export async function createAuctionAction(formData: FormData): Promise<void> {
   }
 
   revalidatePath('/admin/auctions')
-  redirect(auctionDetailPath(created.id))
+  redirect(await adminUrl(auctionDetailPath(created.id)))
 }
 
 export async function updateAuctionAction(formData: FormData): Promise<void> {
@@ -455,15 +456,15 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
   const detailPath = auctionDetailPath(id)
   const editPath = `${detailPath}/edit`
   const intent = wizardIntent(formData)
-  if (!id) redirectWithError('/admin/auctions', 'Muudatuseks puudub oksjoni identifikaator.')
+  if (!id) return redirectWithError('/admin/auctions', 'Muudatuseks puudub oksjoni identifikaator.')
 
   const auction = await repositories.findByID({ collection: 'auctions', id })
-  if (!auction) redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
-  assertScopeOrRedirect(session.role, session.userId, auction, editPath)
-  assertPermissionOrRedirect(session.role, 'auctions:write', editPath)
+  if (!auction) return redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
+  await assertScopeOrRedirect(session.role, session.userId, auction, editPath)
+  await assertPermissionOrRedirect(session.role, 'auctions:write', editPath)
 
-  const raw = formToAuctionInput(formData)
-  const input = parseAuctionInputOrRedirect(raw, editPath)
+  const raw = await formToAuctionInput(formData)
+  const input = await parseAuctionInputOrRedirect(raw, editPath)
   const writeData = toAuctionWriteData(input)
 
   // An active (or scheduled) lot locks its mechanics: only content fields
@@ -490,7 +491,7 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
       if (overrideRequested && canOverrideMechanics) {
         mechanicsOverridden = true
       } else {
-        redirectWithError(editPath, 'Aktiivse oksjoni mehaanikat muuta ei saa.')
+        return redirectWithError(editPath, 'Aktiivse oksjoni mehaanikat muuta ei saa.')
       }
     }
   }
@@ -501,18 +502,18 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
     input.specialistId !== undefined && input.specialistId !== '' ? input.specialistId : undefined
   if (session.role === 'specialist') {
     if (requestedSpecialist && requestedSpecialist !== session.userId) {
-      assertPermissionOrRedirect(session.role, 'auctions:reassign-specialist', editPath)
+      await assertPermissionOrRedirect(session.role, 'auctions:reassign-specialist', editPath)
     }
     writeData.specialistId = session.userId
   } else if (requestedSpecialist && requestedSpecialist !== auction.specialistId) {
-    assertPermissionOrRedirect(session.role, 'auctions:reassign-specialist', editPath)
+    await assertPermissionOrRedirect(session.role, 'auctions:reassign-specialist', editPath)
   }
 
   const reserveChanged = input.reservePriceEur !== undefined
   const feeChanged =
     input.feeOverridePercent !== undefined && input.feeOverridePercent !== auction.feeOverridePercent
   if (feeChanged) {
-    assertPermissionOrRedirect(session.role, 'auctions:fee-override', editPath)
+    await assertPermissionOrRedirect(session.role, 'auctions:fee-override', editPath)
   }
 
   // Partial semantics: keys absent from the raw payload never overwrite the
@@ -547,7 +548,7 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(editPath, `Oksjoni salvestamine ebaõnnestus: ${failure}`)
+    return redirectWithError(editPath, `Oksjoni salvestamine ebaõnnestus: ${failure}`)
   }
 
   // Ajasta/Avalda kohe run their gates against the just-persisted state;
@@ -562,7 +563,7 @@ export async function updateAuctionAction(formData: FormData): Promise<void> {
 
   revalidatePath('/admin/auctions')
   revalidatePath(detailPath)
-  redirect(detailPath)
+  redirect(await adminUrl(detailPath))
 }
 
 export interface AuctionAutosaveResult {
@@ -713,7 +714,7 @@ export async function deleteAuctionAction(formData: FormData): Promise<void> {
   const { repositories } = await requireAdminRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError('/admin/auctions', 'Kustutamiseks puudub oksjoni identifikaator.')
+  if (!id) return redirectWithError('/admin/auctions', 'Kustutamiseks puudub oksjoni identifikaator.')
 
   let failure: string | null = null
   try {
@@ -722,11 +723,11 @@ export async function deleteAuctionAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError('/admin/auctions', `Oksjoni kustutamine ebaõnnestus: ${failure}`)
+    return redirectWithError('/admin/auctions', `Oksjoni kustutamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath('/admin/auctions')
-  redirect('/admin/auctions')
+  redirect(await adminUrl('/admin/auctions'))
 }
 
 const MIN_REASON_LENGTH = 5
@@ -734,30 +735,30 @@ const MIN_REASON_LENGTH = 5
 const reasonHint = `Kirjuta põhjus (vähemalt ${String(MIN_REASON_LENGTH)} tähemärki).`
 
 /** Permission denied becomes an explicit Estonian redirect error, never a silent no-op. */
-function assertPermissionOrRedirect(
+async function assertPermissionOrRedirect(
   role: StaffRole,
   permission: Parameters<typeof assertCan>[1],
   path: string,
-): void {
+): Promise<void> {
   try {
     assertCan(role, permission)
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
-      redirectWithError(path, error.message)
+      return redirectWithError(path, error.message)
     }
     throw error
   }
 }
 
-function assertScopeOrRedirect(
+async function assertScopeOrRedirect(
   role: StaffRole,
   userId: string,
   auction: { specialistId?: string | null; sellerId?: string | null },
   path: string,
-): void {
+): Promise<void> {
   const scope = auctionScope(role, userId)
   if (!auctionInScope(scope, auction)) {
-    redirectWithError(path, 'Oksjon ei ole teie tööulatuses.')
+    return redirectWithError(path, 'Oksjon ei ole teie tööulatuses.')
   }
 }
 
@@ -864,30 +865,30 @@ export async function endAuctionManuallyAction(formData: FormData): Promise<void
   const { session, repositories } = await requireAdminRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError('/admin/auctions', 'Lõpetamiseks puudub oksjoni identifikaator.')
+  if (!id) return redirectWithError('/admin/auctions', 'Lõpetamiseks puudub oksjoni identifikaator.')
   const auction = await repositories.findByID({ collection: 'auctions', id })
-  if (!auction) redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
+  if (!auction) return redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
   const detailPath = auctionDetailPath(id)
   // The monitor modal returns to its own screen; the list stays on the list.
   const feedbackPath = feedbackPathFrom(formData, detailPath)
 
-  assertPermissionOrRedirect(session.role, 'auctions:end-manual', detailPath)
-  assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
+  await assertPermissionOrRedirect(session.role, 'auctions:end-manual', detailPath)
+  await assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
   if (auction.status !== 'active') {
-    redirectWithError(feedbackPath, 'Käsitsi saab lõpetada ainult aktiivset oksjonit.')
+    return redirectWithError(feedbackPath, 'Käsitsi saab lõpetada ainult aktiivset oksjonit.')
   }
 
   const reason = readText(formData, 'reason')
   const outcome = readText(formData, 'outcome')
   if (reason.length < MIN_REASON_LENGTH) {
-    redirectWithError(feedbackPath, reasonHint)
+    return redirectWithError(feedbackPath, reasonHint)
   }
   if (outcome !== 'winner' && outcome !== 'unsold') {
-    redirectWithError(feedbackPath, 'Vali lõpetamise tulemus: võitja kuulutamine või müümata märkimine.')
+    return redirectWithError(feedbackPath, 'Vali lõpetamise tulemus: võitja kuulutamine või müümata märkimine.')
   }
 
   const antiSnipeBlock = await antiSnipeManualEndBlock(repositories, auction)
-  if (antiSnipeBlock !== null) redirectWithError(feedbackPath, antiSnipeBlock)
+  if (antiSnipeBlock !== null) return redirectWithError(feedbackPath, antiSnipeBlock)
 
   const leading = await repositories.find({
     collection: 'bids',
@@ -903,7 +904,7 @@ export async function endAuctionManuallyAction(formData: FormData): Promise<void
   const leadingBid = leading.docs[0]
 
   if (outcome === 'winner' && !leadingBid) {
-    redirectWithError(feedbackPath, 'Juhtivat pakkumust ei ole; märgi oksjon müümata.')
+    return redirectWithError(feedbackPath, 'Juhtivat pakkumust ei ole; märgi oksjon müümata.')
   }
 
   try {
@@ -953,7 +954,7 @@ export async function endAuctionManuallyAction(formData: FormData): Promise<void
       after,
     })
   } catch (error) {
-    redirectWithError(
+    return redirectWithError(
       feedbackPath,
       `Käsitsi lõpetamine ebaõnnestus: ${error instanceof Error ? error.message : String(error)}`,
     )
@@ -963,10 +964,12 @@ export async function endAuctionManuallyAction(formData: FormData): Promise<void
   revalidatePath(detailPath)
   revalidatePath(feedbackPath)
   redirect(
-    noticePath(
-      feedbackPath,
-      'teade',
-      outcome === 'winner' ? 'Oksjon lõpetatud; juhtiv pakkumus kuulutatud võitjaks.' : 'Oksjon lõpetatud ja märgitud müümata.',
+    await adminUrl(
+      noticePath(
+        feedbackPath,
+        'teade',
+        outcome === 'winner' ? 'Oksjon lõpetatud; juhtiv pakkumus kuulutatud võitjaks.' : 'Oksjon lõpetatud ja märgitud müümata.',
+      ),
     ),
   )
 }
@@ -979,22 +982,22 @@ export async function archiveAuctionAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError('/admin/auctions', 'Arhiiveerimiseks puudub oksjoni identifikaator.')
+  if (!id) return redirectWithError('/admin/auctions', 'Arhiiveerimiseks puudub oksjoni identifikaator.')
   const auction = await repositories.findByID({ collection: 'auctions', id })
-  if (!auction) redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
+  if (!auction) return redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
   const detailPath = auctionDetailPath(id)
 
-  assertPermissionOrRedirect(session.role, 'auctions:archive', detailPath)
-  assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
+  await assertPermissionOrRedirect(session.role, 'auctions:archive', detailPath)
+  await assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
 
   const reason = readText(formData, 'reason')
   if (reason.length < MIN_REASON_LENGTH) {
-    redirectWithError(detailPath, reasonHint)
+    return redirectWithError(detailPath, reasonHint)
   }
 
   const from = auction.status
   if (from !== 'unsold' && from !== 'completed') {
-    redirectWithError(
+    return redirectWithError(
       detailPath,
       'Arhiiveerida saab müümata või teostatud oksjonit; lõppenud oksjon vajab esiteks tulemust.',
     )
@@ -1021,7 +1024,7 @@ export async function archiveAuctionAction(formData: FormData): Promise<void> {
       after: { reason, from, status: 'archived' },
     })
   } catch (error) {
-    redirectWithError(
+    return redirectWithError(
       detailPath,
       `Arhiiveerimine ebaõnnestus: ${error instanceof Error ? error.message : String(error)}`,
     )
@@ -1029,7 +1032,7 @@ export async function archiveAuctionAction(formData: FormData): Promise<void> {
 
   revalidatePath('/admin/auctions')
   revalidatePath(detailPath)
-  redirect(`${detailPath}?teade=${encodeURIComponent('Oksjon arhiivitud.')}`)
+  redirect(await adminUrl(`${detailPath}?teade=${encodeURIComponent('Oksjon arhiivitud.')}`))
 }
 
 /**
@@ -1040,15 +1043,15 @@ export async function relistAuctionAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError('/admin/auctions', 'Uuesti avaldamiseks puudub oksjoni identifikaator.')
+  if (!id) return redirectWithError('/admin/auctions', 'Uuesti avaldamiseks puudub oksjoni identifikaator.')
   const auction = await repositories.findByID({ collection: 'auctions', id })
-  if (!auction) redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
+  if (!auction) return redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
   const detailPath = auctionDetailPath(id)
 
-  assertPermissionOrRedirect(session.role, 'auctions:write', detailPath)
-  assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
+  await assertPermissionOrRedirect(session.role, 'auctions:write', detailPath)
+  await assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
   if (auction.status !== 'ended' && auction.status !== 'unsold') {
-    redirectWithError(detailPath, 'Uuesti saab avaldada lõppenud või müümata märgitud oksjonit.')
+    return redirectWithError(detailPath, 'Uuesti saab avaldada lõppenud või müümata märgitud oksjonit.')
   }
 
   let clone: AuctionDoc | null = null
@@ -1066,11 +1069,11 @@ export async function relistAuctionAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure || !clone) {
-    redirectWithError(detailPath, `Uuesti avaldamine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
+    return redirectWithError(detailPath, `Uuesti avaldamine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
   }
 
   revalidatePath('/admin/auctions')
-  redirect(`/admin/auctions/${clone.id}/edit`)
+  redirect(await adminUrl(`/admin/auctions/${clone.id}/edit`))
 }
 
 // Minimal DO namespace surface (same local-declaration approach as
@@ -1162,10 +1165,10 @@ async function applyWizardIntent(
       (gate) => gate.field === 'startsAt',
     )
     if (timingGate) {
-      redirectWithError(paths.error, `Ajastamine ei ole lubatud: ${timingGate.message}`)
+      return redirectWithError(paths.error, `Ajastamine ei ole lubatud: ${timingGate.message}`)
     }
     if (!auction.endsAt || Date.parse(auction.endsAt) <= Date.parse(auction.startsAt ?? '')) {
-      redirectWithError(paths.error, 'Ajastamiseks määra lõppaeg pärast algusaega.')
+      return redirectWithError(paths.error, 'Ajastamiseks määra lõppaeg pärast algusaega.')
     }
     await repositories.update({
       collection: 'auctions',
@@ -1181,7 +1184,7 @@ async function applyWizardIntent(
     })
     revalidatePath('/admin/auctions')
     revalidatePath(paths.notice)
-    redirectNotice(paths.notice, 'teade', 'Oksjon ajastatud.')
+    return redirectNotice(paths.notice, 'teade', 'Oksjon ajastatud.')
   }
 
   const blocking = [
@@ -1189,39 +1192,39 @@ async function applyWizardIntent(
     ...collectPublishReadinessFailures(readinessSubjectOfAuction(auction)),
   ]
   if (blocking.length > 0) {
-    redirectWithError(paths.error, `Avaldamine on blokeeritud: ${blockingGateSummary(blocking)}`)
+    return redirectWithError(paths.error, `Avaldamine on blokeeritud: ${blockingGateSummary(blocking)}`)
   }
 
   await publishAuctionRow(repositories, auction, { actorId })
 
   revalidatePath('/admin/auctions')
   revalidatePath(paths.notice)
-  redirectNotice(paths.notice, 'teade', 'Oksjon on avaldatud.')
+  return redirectNotice(paths.notice, 'teade', 'Oksjon on avaldatud.')
 }
 
 export async function publishAuctionAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError('/admin/auctions', 'Avalikustamiseks puudub oksjoni identifikaator.')
+  if (!id) return redirectWithError('/admin/auctions', 'Avalikustamiseks puudub oksjoni identifikaator.')
   const detailPath = auctionDetailPath(id)
 
   const auction = await repositories.findByID({ collection: 'auctions', id })
-  if (!auction) redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
-  assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
-  assertPermissionOrRedirect(session.role, 'auctions:write', detailPath)
+  if (!auction) return redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
+  await assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
+  await assertPermissionOrRedirect(session.role, 'auctions:write', detailPath)
 
   if (auction.status !== 'draft' && auction.status !== 'scheduled') {
-    redirectWithError(detailPath, 'Avalikustada saab ainult mustandit või ajastatud oksjoni.')
+    return redirectWithError(detailPath, 'Avalikustada saab ainult mustandit või ajastatud oksjoni.')
   }
   if (!auction.startsAt || !auction.endsAt) {
-    redirectWithError(detailPath, 'Avalikustamiseks määra oksjonile algus- ja lõppaeg.')
+    return redirectWithError(detailPath, 'Avalikustamiseks määra oksjonile algus- ja lõppaeg.')
   }
   if (Date.parse(auction.endsAt) <= Date.parse(auction.startsAt)) {
-    redirectWithError(detailPath, 'Lõppaeg peab olema pärast algusaega.')
+    return redirectWithError(detailPath, 'Lõppaeg peab olema pärast algusaega.')
   }
   if (Date.parse(auction.endsAt) <= Date.now()) {
-    redirectWithError(detailPath, 'Lõppaeg peab olema tulevikus.')
+    return redirectWithError(detailPath, 'Lõppaeg peab olema tulevikus.')
   }
 
   // Publish gates (docs 03 validation summary): blocking failures stop the
@@ -1233,7 +1236,7 @@ export async function publishAuctionAction(formData: FormData): Promise<void> {
     ...collectPublishReadinessFailures(readinessSubjectOfAuction(auction)),
   ]
   if (blocking.length > 0) {
-    redirectWithError(detailPath, `Avaldamine on blokeeritud: ${blockingGateSummary(blocking)}`)
+    return redirectWithError(detailPath, `Avaldamine on blokeeritud: ${blockingGateSummary(blocking)}`)
   }
 
   const auditNote = readOptionalText(formData, 'auditNote')
@@ -1250,15 +1253,17 @@ export async function publishAuctionAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Avalikustamine ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Avalikustamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath('/admin/auctions')
   revalidatePath(detailPath)
   redirect(
-    `${detailPath}?teade=${encodeURIComponent(
-      target === 'scheduled' ? 'Oksjon ajastatud ja avalikustatud.' : 'Oksjon on aktiivne.',
-    )}`,
+    await adminUrl(
+      `${detailPath}?teade=${encodeURIComponent(
+        target === 'scheduled' ? 'Oksjon ajastatud ja avalikustatud.' : 'Oksjon on aktiivne.',
+      )}`,
+    ),
   )
 }
 
@@ -1270,13 +1275,13 @@ export async function duplicateAuctionAction(formData: FormData): Promise<void> 
   const { session, repositories } = await requireAdminRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError('/admin/auctions', 'Dubleerimiseks puudub oksjoni identifikaator.')
+  if (!id) return redirectWithError('/admin/auctions', 'Dubleerimiseks puudub oksjoni identifikaator.')
   const auction = await repositories.findByID({ collection: 'auctions', id })
-  if (!auction) redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
+  if (!auction) return redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
   const detailPath = auctionDetailPath(id)
 
-  assertPermissionOrRedirect(session.role, 'auctions:write', detailPath)
-  assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
+  await assertPermissionOrRedirect(session.role, 'auctions:write', detailPath)
+  await assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
 
   let clone: AuctionDoc | null = null
   let failure: string | null = null
@@ -1293,11 +1298,11 @@ export async function duplicateAuctionAction(formData: FormData): Promise<void> 
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure || !clone) {
-    redirectWithError(detailPath, `Dubleerimine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
+    return redirectWithError(detailPath, `Dubleerimine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
   }
 
   revalidatePath('/admin/auctions')
-  redirect(`${auctionDetailPath(clone.id)}/edit?teade=${encodeURIComponent('Koopia loodud mustandina.')}`)
+  redirect(await adminUrl(`${auctionDetailPath(clone.id)}/edit?teade=${encodeURIComponent('Koopia loodud mustandina.')}`))
 }
 
 /**
@@ -1308,13 +1313,13 @@ export async function regenerateAliasEmailAction(formData: FormData): Promise<vo
   const { session, repositories } = await requireAdminRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError('/admin/auctions', 'Aadressi vahetuseks puudub oksjoni identifikaator.')
+  if (!id) return redirectWithError('/admin/auctions', 'Aadressi vahetuseks puudub oksjoni identifikaator.')
   const auction = await repositories.findByID({ collection: 'auctions', id })
-  if (!auction) redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
+  if (!auction) return redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
   const detailPath = auctionDetailPath(id)
 
-  assertPermissionOrRedirect(session.role, 'auctions:write', detailPath)
-  assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
+  await assertPermissionOrRedirect(session.role, 'auctions:write', detailPath)
+  await assertScopeOrRedirect(session.role, session.userId, auction, detailPath)
 
   const previousAlias = auction.aliasEmail
   const aliasEmail = generateAliasEmail()
@@ -1337,11 +1342,11 @@ export async function regenerateAliasEmailAction(formData: FormData): Promise<vo
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Aadressi vahetus ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Aadressi vahetus ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(detailPath)
-  redirect(`${detailPath}?teade=${encodeURIComponent(`Uus alias-aadress: ${aliasEmail}`)}`)
+  redirect(await adminUrl(`${detailPath}?teade=${encodeURIComponent(`Uus alias-aadress: ${aliasEmail}`)}`))
 }
 
 function decisionFailure(outcome: string, action: string): string {
@@ -1363,13 +1368,13 @@ export async function approveAuctionBidAction(formData: FormData): Promise<void>
   const auctionId = readText(formData, 'auctionId')
   const bidId = readText(formData, 'bidId')
   if (!auctionId || !bidId) {
-    redirectWithError('/admin/auctions', 'Pakkumuse otsustamiseks puudub identifikaator.')
+    return redirectWithError('/admin/auctions', 'Pakkumuse otsustamiseks puudub identifikaator.')
   }
   const detailPath = auctionDetailPath(auctionId)
 
   const decision: ApproveDecision = await approveAlapakkumine(auctionId, bidId)
   if (decision.outcome !== 'approved') {
-    redirectWithError(
+    return redirectWithError(
       detailPath,
       decision.outcome === 'not_pending'
         ? `Pakkumus ei ole enam kinnitamisel (hetke olek: ${decision.status}).`
@@ -1386,7 +1391,7 @@ export async function approveAuctionBidAction(formData: FormData): Promise<void>
   })
 
   revalidatePath(detailPath)
-  redirect(`${detailPath}?teade=${encodeURIComponent('Alapakkumus kinnitatud ja juhtivaks seatud.')}`)
+  redirect(await adminUrl(`${detailPath}?teade=${encodeURIComponent('Alapakkumus kinnitatud ja juhtivaks seatud.')}`))
 }
 
 export async function rejectAuctionBidAction(formData: FormData): Promise<void> {
@@ -1395,17 +1400,17 @@ export async function rejectAuctionBidAction(formData: FormData): Promise<void> 
   const auctionId = readText(formData, 'auctionId')
   const bidId = readText(formData, 'bidId')
   if (!auctionId || !bidId) {
-    redirectWithError('/admin/auctions', 'Pakkumuse otsustamiseks puudub identifikaator.')
+    return redirectWithError('/admin/auctions', 'Pakkumuse otsustamiseks puudub identifikaator.')
   }
   const detailPath = auctionDetailPath(auctionId)
   const reason = readText(formData, 'reason')
   if (reason.length < MIN_REASON_LENGTH) {
-    redirectWithError(detailPath, reasonHint)
+    return redirectWithError(detailPath, reasonHint)
   }
 
   const decision: RejectDecision = await rejectAlapakkumine(auctionId, bidId, reason)
   if (decision.outcome !== 'rejected') {
-    redirectWithError(
+    return redirectWithError(
       detailPath,
       decision.outcome === 'not_pending'
         ? `Pakkumus ei ole enam kinnitamisel (hetke olek: ${decision.status}).`
@@ -1422,7 +1427,7 @@ export async function rejectAuctionBidAction(formData: FormData): Promise<void> 
   })
 
   revalidatePath(detailPath)
-  redirect(`${detailPath}?teade=${encodeURIComponent('Alapakkumus tagasi lükatud; pakkuja teavitatud põhjusega.')}`)
+  redirect(await adminUrl(`${detailPath}?teade=${encodeURIComponent('Alapakkumus tagasi lükatud; pakkuja teavitatud põhjusega.')}`))
 }
 
 export async function generateContractAction(formData: FormData): Promise<void> {
@@ -1430,14 +1435,14 @@ export async function generateContractAction(formData: FormData): Promise<void> 
 
   const auctionId = readText(formData, 'auctionId')
   if (!auctionId) {
-    redirectWithError('/admin/auctions', 'Lepingu koostamiseks puudub oksjoni identifikaator.')
+    return redirectWithError('/admin/auctions', 'Lepingu koostamiseks puudub oksjoni identifikaator.')
   }
   const detailPath = auctionDetailPath(auctionId)
 
   const auction = await repositories.findByID({ collection: 'auctions', id: auctionId })
-  if (!auction) redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
+  if (!auction) return redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
   if (auction.status !== 'appraised') {
-    redirectWithError(detailPath, 'Lepingu saab koostada ainult hinnatud (võitjaga) oksjonile.')
+    return redirectWithError(detailPath, 'Lepingu saab koostada ainult hinnatud (võitjaga) oksjonile.')
   }
 
   let failure: string | null = null
@@ -1466,12 +1471,12 @@ export async function generateContractAction(formData: FormData): Promise<void> 
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Lepingu koostamine ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Lepingu koostamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(detailPath)
   redirect(
-    `${detailPath}?teade=${encodeURIComponent(`Leping ${contractId} koostatud.`)}`,
+    await adminUrl(`${detailPath}?teade=${encodeURIComponent(`Leping ${contractId} koostatud.`)}`),
   )
 }
 
@@ -1635,24 +1640,24 @@ export async function voidSealedCeremonyAction(formData: FormData): Promise<void
 
   const auctionId = readText(formData, 'auctionId')
   if (!auctionId) {
-    redirectWithError('/admin/auctions', 'Tühistamiseks puudub oksjoni identifikaator.')
+    return redirectWithError('/admin/auctions', 'Tühistamiseks puudub oksjoni identifikaator.')
   }
   const detailPath = auctionDetailPath(auctionId)
   const ceremonyPath = `${detailPath}/ceremony`
 
   // docs 05: the void path is superadmin-only with a typed reason.
   if (session.role !== 'superadmin') {
-    redirectWithError(ceremonyPath, 'Avamise tühistada saab ainult superadmin.')
+    return redirectWithError(ceremonyPath, 'Avamise tühistada saab ainult superadmin.')
   }
   const reason = readText(formData, 'reason')
   if (reason.length < MIN_REASON_LENGTH) {
-    redirectWithError(ceremonyPath, `Tühistamise põhjus on kohustuslik (vähemalt ${String(MIN_REASON_LENGTH)} tähemärki).`)
+    return redirectWithError(ceremonyPath, `Tühistamise põhjus on kohustuslik (vähemalt ${String(MIN_REASON_LENGTH)} tähemärki).`)
   }
 
   const auction = await repositories.findByID({ collection: 'auctions', id: auctionId })
-  if (!auction) redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
+  if (!auction) return redirectWithError('/admin/auctions', 'Oksjonit ei leitud.')
   if (auction.status !== 'ended') {
-    redirectWithError(
+    return redirectWithError(
       ceremonyPath,
       'Tühistada saab enne võitja kinnitamist; pärast kinnitamist tühistab lepingu 08 moodulis.',
     )
@@ -1716,12 +1721,12 @@ export async function voidSealedCeremonyAction(formData: FormData): Promise<void
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(ceremonyPath, `Avamise tühistamine ebaõnnestus: ${failure}`)
+    return redirectWithError(ceremonyPath, `Avamise tühistamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(detailPath)
   revalidatePath(ceremonyPath)
-  redirect(`${detailPath}?teade=${encodeURIComponent('Oksjon tühistatud ja kuulutatud müümata.')}`)
+  redirect(await adminUrl(`${detailPath}?teade=${encodeURIComponent('Oksjon tühistatud ja kuulutatud müümata.')}`))
 }
 
 // ── Sealed-opening ceremony (task 3.3) ──────────────────────────────────────
@@ -2805,32 +2810,32 @@ const MAX_SHIFT_HOURS = 8760
 export async function bulkScheduleAuctionsAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
   const listPath = '/admin/auctions'
-  assertPermissionOrRedirect(session.role, 'auctions:write', listPath)
+  await assertPermissionOrRedirect(session.role, 'auctions:write', listPath)
 
   const ids = formData
     .getAll('ids')
     .filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
     .map((entry) => entry.trim())
   if (ids.length === 0) {
-    redirectWithError(listPath, 'Vali vähemalt üks oksjon.')
+    return redirectWithError(listPath, 'Vali vähemalt üks oksjon.')
   }
 
   const startsIso = tallinnWallTimeToUtcIso(readText(formData, 'startsAt'))
   if (startsIso === null) {
-    redirectWithError(listPath, 'Sisesta korrektne algusaeg (kellaaeg Europe/Tallinn).')
+    return redirectWithError(listPath, 'Sisesta korrektne algusaeg (kellaaeg Europe/Tallinn).')
   }
   if (Date.parse(startsIso) <= Date.now()) {
-    redirectWithError(listPath, 'Algusaeg peab olema tulevikus.')
+    return redirectWithError(listPath, 'Algusaeg peab olema tulevikus.')
   }
   const endsRaw = readText(formData, 'endsAt')
   let endsIso: string | null = null
   if (endsRaw !== '') {
     endsIso = tallinnWallTimeToUtcIso(endsRaw)
     if (endsIso === null) {
-      redirectWithError(listPath, 'Sisesta korrektne lõppaeg (kellaaeg Europe/Tallinn).')
+      return redirectWithError(listPath, 'Sisesta korrektne lõppaeg (kellaaeg Europe/Tallinn).')
     }
     if (Date.parse(endsIso) <= Date.parse(startsIso)) {
-      redirectWithError(listPath, 'Lõppaeg peab olema pärast algusaega.')
+      return redirectWithError(listPath, 'Lõppaeg peab olema pärast algusaega.')
     }
   }
   const shiftRaw = readText(formData, 'shiftEndHours')
@@ -2838,7 +2843,7 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
   if (shiftRaw !== '') {
     const parsed = Number.parseInt(shiftRaw, 10)
     if (!Number.isInteger(parsed) || parsed < -MAX_SHIFT_HOURS || parsed > MAX_SHIFT_HOURS) {
-      redirectWithError(
+      return redirectWithError(
         listPath,
         `Nihke sisend peab olema täisarv tundides (−${String(MAX_SHIFT_HOURS)}…${String(MAX_SHIFT_HOURS)}).`,
       )
@@ -2889,13 +2894,13 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
   }
 
   if (offending.length > 0) {
-    redirectWithError(
+    return redirectWithError(
       listPath,
       `Ajastada saab ainult mustandeid. Blokeeritud read: ${offending.slice(0, 5).join('; ')}`,
     )
   }
   if (schedulable.length === 0) {
-    redirectWithError(listPath, 'Ühtegi valitud oksjonit ei saa ajastada.')
+    return redirectWithError(listPath, 'Ühtegi valitud oksjonit ei saa ajastada.')
   }
 
   let failure: string | null = null
@@ -2935,11 +2940,11 @@ export async function bulkScheduleAuctionsAction(formData: FormData): Promise<vo
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(listPath, `Bulks ajastamine ebaõnnestus: ${failure}`)
+    return redirectWithError(listPath, `Bulks ajastamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath('/admin/auctions')
-  redirectNotice(
+  return redirectNotice(
     listPath,
     'teade',
     `Ajastatud ${String(schedulable.length)} oksjonit (olek: ajastatud).`,
@@ -3009,7 +3014,7 @@ export async function approveUnderbidAction(formData: FormData): Promise<void> {
     assertCan(session.role, 'underbids:decide')
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
-      redirectNotice(feedbackPath, 'viga', error.message)
+      return redirectNotice(feedbackPath, 'viga', error.message)
     }
     throw error
   }
@@ -3017,31 +3022,31 @@ export async function approveUnderbidAction(formData: FormData): Promise<void> {
   const auctionId = readText(formData, 'auctionId')
   const bidId = readText(formData, 'bidId')
   if (!auctionId || !bidId) {
-    redirectWithError(feedbackPath, 'Pakkumuse otsustamiseks puudub identifikaator.')
+    return redirectWithError(feedbackPath, 'Pakkumuse otsustamiseks puudub identifikaator.')
   }
 
   const trusted = await getRepositories()
   const auction = await loadAuctionForDecision(trusted, auctionId)
-  if (!auction) redirectWithError(feedbackPath, 'Oksjonit ei leitud.')
+  if (!auction) return redirectWithError(feedbackPath, 'Oksjonit ei leitud.')
   if (
     !auctionInScope(auctionScope(session.role, session.userId), {
       specialistId: auction.specialistId,
       sellerId: auction.sellerId,
     })
   ) {
-    redirectWithError(feedbackPath, 'Oksjon ei ole teie tööulatuses.')
+    return redirectWithError(feedbackPath, 'Oksjon ei ole teie tööulatuses.')
   }
 
   const decision: ApproveDecision = await approveAlapakkumine(auctionId, bidId)
   if (decision.outcome !== 'approved') {
     if (decision.outcome === 'not_pending') {
       const earlier = await earlierDecisionMessage(trusted, bidId)
-      redirectWithError(
+      return redirectWithError(
         feedbackPath,
         earlier ?? `Pakkumus ei ole enam kinnitamisel (hetke olek: ${decision.status}).`,
       )
     }
-    redirectWithError(feedbackPath, decisionFailure(decision.outcome, 'kinnitamine'))
+    return redirectWithError(feedbackPath, decisionFailure(decision.outcome, 'kinnitamine'))
   }
 
   await audit(repositories, {
@@ -3055,7 +3060,7 @@ export async function approveUnderbidAction(formData: FormData): Promise<void> {
   revalidatePath('/admin/bids')
   revalidatePath(auctionDetailPath(auctionId))
   revalidatePath(feedbackPath)
-  redirectNotice(feedbackPath, 'teade', 'Alapakkumus kinnitatud ja juhtivaks seatud; osapooled teavitatud.')
+  return redirectNotice(feedbackPath, 'teade', 'Alapakkumus kinnitatud ja juhtivaks seatud; osapooled teavitatud.')
 }
 
 export async function rejectUnderbidAction(formData: FormData): Promise<void> {
@@ -3065,7 +3070,7 @@ export async function rejectUnderbidAction(formData: FormData): Promise<void> {
     assertCan(session.role, 'underbids:decide')
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
-      redirectNotice(feedbackPath, 'viga', error.message)
+      return redirectNotice(feedbackPath, 'viga', error.message)
     }
     throw error
   }
@@ -3074,34 +3079,34 @@ export async function rejectUnderbidAction(formData: FormData): Promise<void> {
   const bidId = readText(formData, 'bidId')
   const reason = readText(formData, 'reason')
   if (!auctionId || !bidId) {
-    redirectWithError(feedbackPath, 'Pakkumuse otsustamiseks puudub identifikaator.')
+    return redirectWithError(feedbackPath, 'Pakkumuse otsustamiseks puudub identifikaator.')
   }
   if (reason.length < MIN_REASON_LENGTH) {
-    redirectWithError(feedbackPath, reasonHint)
+    return redirectWithError(feedbackPath, reasonHint)
   }
 
   const trusted = await getRepositories()
   const auction = await loadAuctionForDecision(trusted, auctionId)
-  if (!auction) redirectWithError(feedbackPath, 'Oksjonit ei leitud.')
+  if (!auction) return redirectWithError(feedbackPath, 'Oksjonit ei leitud.')
   if (
     !auctionInScope(auctionScope(session.role, session.userId), {
       specialistId: auction.specialistId,
       sellerId: auction.sellerId,
     })
   ) {
-    redirectWithError(feedbackPath, 'Oksjon ei ole teie tööulatuses.')
+    return redirectWithError(feedbackPath, 'Oksjon ei ole teie tööulatuses.')
   }
 
   const decision: RejectDecision = await rejectAlapakkumine(auctionId, bidId, reason)
   if (decision.outcome !== 'rejected') {
     if (decision.outcome === 'not_pending') {
       const earlier = await earlierDecisionMessage(trusted, bidId)
-      redirectWithError(
+      return redirectWithError(
         feedbackPath,
         earlier ?? `Pakkumus ei ole enam kinnitamisel (hetke olek: ${decision.status}).`,
       )
     }
-    redirectWithError(feedbackPath, decisionFailure(decision.outcome, 'tagasilükkamine'))
+    return redirectWithError(feedbackPath, decisionFailure(decision.outcome, 'tagasilükkamine'))
   }
 
   await audit(repositories, {
@@ -3115,7 +3120,7 @@ export async function rejectUnderbidAction(formData: FormData): Promise<void> {
   revalidatePath('/admin/bids')
   revalidatePath(auctionDetailPath(auctionId))
   revalidatePath(feedbackPath)
-  redirectNotice(feedbackPath, 'teade', 'Alapakkumus tagasi lükatud; pakkuja teavitatud põhjusega.')
+  return redirectNotice(feedbackPath, 'teade', 'Alapakkumus tagasi lükatud; pakkuja teavitatud põhjusega.')
 }
 
 // ── Audited identity reveal (task 3.2, design D5) ───────────────────────────

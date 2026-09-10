@@ -1,7 +1,7 @@
-import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
 import { saveSpecialistAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import {
   FormField,
   FormTextareaField,
@@ -66,9 +66,9 @@ export function SpecialistForm({ specialist }: { specialist?: Specialist }) {
         <button type="submit" className={primaryButtonClass}>
           Salvesta
         </button>
-        <Link href="/admin/content/specialists" className={secondaryButtonClass}>
+        <AdminLink href="/content/specialists" className={secondaryButtonClass}>
           Tühista
-        </Link>
+        </AdminLink>
       </div>
     </form>
   )

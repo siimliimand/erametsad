@@ -1,3 +1,5 @@
+import { apiFetch } from '@/lib/api/client'
+
 export type EidMethod = 'smartid' | 'mobileid' | 'idcard'
 
 export type EidPollState = 'pending' | 'completed' | 'failed'
@@ -61,7 +63,7 @@ export async function startEid(
 ): Promise<EidStartSuccess | AuthFailure> {
   let response: Response
   try {
-    response = await fetch(`/api/v1/auth/${method}/start`, {
+    response = await apiFetch(`/api/v1/auth/${method}/start`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ isikukood }),
@@ -115,7 +117,7 @@ export async function completeEid(
 ): Promise<{ ok: true } | AuthFailure> {
   let response: Response
   try {
-    response = await fetch(`/api/v1/auth/${method}/complete`, {
+    response = await apiFetch(`/api/v1/auth/${method}/complete`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sessionRef }),
@@ -139,7 +141,7 @@ export async function loginWithPassword(
 ): Promise<{ ok: true } | AuthFailure> {
   let response: Response
   try {
-    response = await fetch('/api/v1/auth/login', {
+    response = await apiFetch('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ identifier, password }),
@@ -174,13 +176,21 @@ function isProfileSummary(value: unknown): value is ProfileSummary {
 
 // Cookie-authenticated; null means the check failed and routing falls back
 // to the plain next target.
-export async function fetchMyProfiles(): Promise<ProfileSummary[] | null> {
+export interface MyProfilesResult {
+  role: string | null
+  profiles: ProfileSummary[]
+}
+
+export async function fetchMyProfiles(): Promise<MyProfilesResult | null> {
   try {
-    const response = await fetch('/api/v1/profiles')
+    const response = await apiFetch('/api/v1/profiles')
     if (!response.ok) return null
-    const body = (await response.json()) as { profiles?: unknown }
+    const body = (await response.json()) as { role?: unknown; profiles?: unknown }
     if (!Array.isArray(body.profiles)) return null
-    return body.profiles.filter(isProfileSummary)
+    return {
+      role: typeof body.role === 'string' ? body.role : null,
+      profiles: body.profiles.filter(isProfileSummary),
+    }
   } catch {
     return null
   }

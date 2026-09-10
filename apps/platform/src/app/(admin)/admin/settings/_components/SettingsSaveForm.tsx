@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import type { ReactNode } from 'react'
 
 import { updateSettingsAction } from '../../../_actions/content'
+import { useAdminBase } from '../../../_components/AdminBase'
 import { FormTextareaField, primaryButtonClass } from '../../../_components/FormField'
 import { Switch } from '../../../_components/ui/Switch'
 import { useToast } from '../../../_components/ui/Toast'
@@ -16,11 +17,12 @@ export interface SettingsSwitchField {
   checked: boolean
 }
 
-// The audited action always redirects: success lands on /admin/settings
-// (optionally ?ok=tasud), validation failures land there with ?viga=..., and an
-// expired session redirects to /login. Only a settings redirect without viga is
-// a save; the other cases keep their existing redirect-driven handling.
-const settingsRedirectPrefix = '/admin/settings'
+// The audited action always redirects: success lands on the settings page
+// (optionally ?ok=tasud), validation failures land there with ?viga=..., and
+// an expired session redirects to /login. Only a settings redirect without
+// viga is a save; the other cases keep their existing redirect-driven
+// handling. The URL base follows the host: /settings on the admin host,
+// /admin/settings elsewhere.
 
 // Mirrors UserDrawer.isRedirectSignal: a redirecting server action rejects with
 // a NEXT_REDIRECT digest (`NEXT_REDIRECT;replace;<url>;<status>`).
@@ -54,6 +56,7 @@ export function SettingsSaveForm({
   children: ReactNode
 }) {
   const pushToast = useToast()
+  const base = useAdminBase()
   const [pending, startTransition] = useTransition()
   const [switchChecked, setSwitchChecked] = useState(switchField?.checked ?? false)
 
@@ -69,7 +72,8 @@ export function SettingsSaveForm({
         }
         // Validation failures (?viga=) show the page ErrorNotice after the
         // redirect; unrelated redirects (login) just navigate.
-        if (!target.startsWith(settingsRedirectPrefix) || target.includes('viga=')) {
+        const settingsPath = `${base}/settings`
+        if (target.split('?')[0] !== settingsPath || target.includes('viga=')) {
           return
         }
       }

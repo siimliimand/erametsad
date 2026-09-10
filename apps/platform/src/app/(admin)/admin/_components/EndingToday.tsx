@@ -1,8 +1,8 @@
 import { Play as PlayIcon } from 'lucide-react'
-import Link from 'next/link'
 import type { ComponentType } from 'react'
 
 import { WorkspaceCard } from './WorkspaceCard'
+import { AdminLink } from '../../_components/AdminLink'
 import { MapPinHouseIcon, PackageIcon, TreePineIcon, ZapIcon } from '../../_components/icons'
 import { EmptyRow } from '../../_components/ui/EmptyRow'
 import { auctionObjectTypeLabels, auctionTypeLabels, formatEur } from '../../_lib/labels'
@@ -125,12 +125,12 @@ export function EndingToday({
                     <span className="font-mono text-label text-inkMuted">
                       #{row.id.slice(0, 8)}
                     </span>{' '}
-                    <Link
-                      href={`/admin/auctions/${row.id}`}
+                    <AdminLink
+                      href={`/auctions/${row.id}`}
                       className="font-medium text-primary transition-colors duration-hover ease-hover hover:text-primaryHover hover:underline"
                     >
                       {row.title}
-                    </Link>
+                    </AdminLink>
                   </td>
                   <td className="px-3 py-3">
                     <TypeChip objectType={row.objectType} type={row.type} />
@@ -156,21 +156,21 @@ export function EndingToday({
                   </td>
                   <td className="py-3 pl-3 pr-5 text-right">
                     {row.type === 'sealed' ? (
-                      <Link
-                        href={`/admin/auctions/${row.id}/ceremony`}
+                      <AdminLink
+                        href={`/auctions/${row.id}/ceremony`}
                         className={actionBtnClass}
                       >
                         <PlayIcon aria-hidden="true" className="h-3 w-3" />
                         Ava
-                      </Link>
+                      </AdminLink>
                     ) : (
-                      <Link
-                        href={`/admin/auctions/${row.id}/monitor`}
+                      <AdminLink
+                        href={`/auctions/${row.id}/monitor`}
                         className={actionBtnClass}
                       >
                         <PlayIcon aria-hidden="true" className="h-3 w-3" />
                         Monitor
-                      </Link>
+                      </AdminLink>
                     )}
                   </td>
                 </tr>

@@ -19,6 +19,7 @@ import { computeIpHash } from '@/lib/bidding/place-bid'
 import type { CoreRepositories } from '@/lib/data/repositories'
 import { maintenanceScopes, type MaintenanceScope } from '@/lib/data/schema'
 import { db } from '@/lib/db'
+import { adminUrl } from '@/lib/routing/admin-base-server'
 
 const settingsPath = '/admin/settings'
 const maintenanceConfirmWord = 'HOOLDUS'
@@ -28,8 +29,8 @@ function readText(formData: FormData, key: string): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function redirectWithError(message: string): never {
-  redirect(`${settingsPath}?viga=${encodeURIComponent(message)}`)
+async function redirectWithError(message: string): Promise<never> {
+  redirect(await adminUrl(`${settingsPath}?viga=${encodeURIComponent(message)}`))
 }
 
 /**
@@ -142,10 +143,10 @@ export async function setMaintenanceModeAction(formData: FormData): Promise<void
 
   if (enabled) {
     if (!isValidReason(reason)) {
-      redirectWithError('Põhjendus peab olema vähemalt 5 tähemärki.')
+      return redirectWithError('Põhjendus peab olema vähemalt 5 tähemärki.')
     }
     if (confirmWord.toUpperCase() !== maintenanceConfirmWord) {
-      redirectWithError(
+      return redirectWithError(
         `Kinnitussõna ei sobi. Trüki ${maintenanceConfirmWord}, et hooldusrežiimi sisse lülitada.`,
       )
     }
@@ -153,7 +154,7 @@ export async function setMaintenanceModeAction(formData: FormData): Promise<void
 
   const current = await findSettingsRow(repositories)
   if ((current?.maintenanceEnabled ?? false) === enabled) {
-    redirectWithError(
+    return redirectWithError(
       enabled
         ? 'Hooldusrežiim on juba sisse lülitatud.'
         : 'Hooldusrežiim on juba välja lülitatud.',
@@ -176,7 +177,7 @@ export async function setMaintenanceModeAction(formData: FormData): Promise<void
   })
 
   revalidatePath(settingsPath)
-  redirect(settingsPath)
+  redirect(await adminUrl(settingsPath))
 }
 
 export interface RevealKeyResult {

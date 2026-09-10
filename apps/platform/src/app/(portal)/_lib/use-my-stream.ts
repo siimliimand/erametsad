@@ -13,6 +13,8 @@ import {
   type ReactNode,
 } from 'react'
 
+import { apiUrl } from '@/lib/api/client'
+
 // Payload shapes mirror src/lib/realtime/my-stream.ts; the server's
 // JSON.stringify drops keys whose value is undefined, so those keys are
 // optional here. Consumers must still narrow values before use.
@@ -81,7 +83,7 @@ export interface MyStreamApi {
 
 const MyStreamContext = createContext<MyStreamApi | null>(null)
 
-const STREAM_URL = '/api/v1/my/stream'
+const STREAM_URL = apiUrl('/api/v1/my/stream')
 const BASE_BACKOFF_MS = 1_000
 const MAX_BACKOFF_MS = 30_000
 const EVENT_NAMES: readonly MyStreamEventName[] = [
@@ -146,7 +148,7 @@ export function MyStreamProvider({ children }: { children: ReactNode }) {
     const connect = (): void => {
       if (disposed) return
       setStatus('connecting')
-      const next = new EventSource(STREAM_URL)
+      const next = new EventSource(STREAM_URL, { withCredentials: true })
       source = next
       next.onopen = () => {
         const reconnected = attempt > 0

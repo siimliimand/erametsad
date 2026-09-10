@@ -42,6 +42,7 @@ import {
 } from '@/lib/data/schema'
 import { deriveCountyCodeFromCadastre } from '@/lib/leads/cadastre-county'
 import { sendEmail, type SendResult } from '@/lib/notifications/email-sender'
+import { adminUrl } from '@/lib/routing/admin-base-server'
 
 const REASON_MIN_LENGTH = 5
 
@@ -97,12 +98,12 @@ function appendQueryParam(path: string, key: string, value: string): string {
   return existingQuery ? `${basePath}?${existingQuery}&${encoded}` : `${basePath}?${encoded}`
 }
 
-function redirectWithError(path: string, message: string): never {
-  redirect(appendQueryParam(path, 'viga', message))
+async function redirectWithError(path: string, message: string): Promise<never> {
+  redirect(await adminUrl(appendQueryParam(path, 'viga', message)))
 }
 
-function redirectWithNotice(path: string, message: string): never {
-  redirect(appendQueryParam(path, 'teade', message))
+async function redirectWithNotice(path: string, message: string): Promise<never> {
+  redirect(await adminUrl(appendQueryParam(path, 'teade', message)))
 }
 
 function hasMinReason(value: string | null): boolean {
@@ -115,7 +116,7 @@ async function requirePermission(
 ): Promise<AdminSession> {
   const { session } = await requireAdminRepositories()
   if (!can(session.role, permission)) {
-    redirectWithError(fallbackPath, 'Teil puudub õigus selle toimingu sooritamiseks.')
+    return redirectWithError(fallbackPath, 'Teil puudub õigus selle toimingu sooritamiseks.')
   }
   return session
 }
@@ -205,17 +206,17 @@ export async function approveCompanyAccessRequestAction(formData: FormData): Pro
   const repositories = await getRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(REQUESTS_PATH, 'Taotluse identifikaator puudub.')
+  if (!id) return redirectWithError(REQUESTS_PATH, 'Taotluse identifikaator puudub.')
 
   const request = await repositories.findByID({ collection: 'company-access-request', id })
-  if (!request) redirectWithError(REQUESTS_PATH, 'Taotlust ei leitud.')
+  if (!request) return redirectWithError(REQUESTS_PATH, 'Taotlust ei leitud.')
   if (request.status !== 'pending' && request.status !== 'held') {
-    redirectWithError(REQUESTS_PATH, 'Taotlus on juba läbi vaadatud.')
+    return redirectWithError(REQUESTS_PATH, 'Taotlus on juba läbi vaadatud.')
   }
 
   const snapshot = resolveRegistrySnapshot(request.regCode, request.companyName, request.createdAt)
   if (snapshot.status === 'KUSTUTATUD') {
-    redirectWithError(REQUESTS_PATH, 'Ettevõte on äriregistrist kustutatud — ainult keeldumine on lubatud.')
+    return redirectWithError(REQUESTS_PATH, 'Ettevõte on äriregistrist kustutatud — ainult keeldumine on lubatud.')
   }
 
   const { docs: duplicateProfiles } = await repositories.find({
@@ -229,7 +230,7 @@ export async function approveCompanyAccessRequestAction(formData: FormData): Pro
     limit: 1,
   })
   if (duplicateProfiles.length > 0) {
-    redirectWithError(REQUESTS_PATH, 'Profiil on juba aktiveeritud — suunage ligipääs olemasoleva omaniku kaudu.')
+    return redirectWithError(REQUESTS_PATH, 'Profiil on juba aktiveeritud — suunage ligipääs olemasoleva omaniku kaudu.')
   }
 
   const rights = formData
@@ -246,7 +247,7 @@ export async function approveCompanyAccessRequestAction(formData: FormData): Pro
     snapshot.boardMembers,
   )
   if (boardCheck.level === 'none' && !readCheckbox(formData, 'checkedRegistry')) {
-    redirectWithError(REQUESTS_PATH, 'Kinnitage äriregistri andmed käsitsi enne nõustumist.')
+    return redirectWithError(REQUESTS_PATH, 'Kinnitage äriregistri andmed käsitsi enne nõustumist.')
   }
 
   // Volikiri enforcement (spec delta admin-people): a failed board-member
@@ -259,14 +260,14 @@ export async function approveCompanyAccessRequestAction(formData: FormData): Pro
   if (boardCheckFailed) {
     const justification = readText(formData, 'justification')
     if (!hasMinReason(justification)) {
-      redirectWithError(
+      return redirectWithError(
         REQUESTS_PATH,
         'Juhatuse liikmelisuse kontroll ebaõnnestus — nõustumise põhjendus on kohustuslik (vähemalt 5 tähemärki).',
       )
     }
     const file = readFile(formData, 'volikiri')
     if (!file) {
-      redirectWithError(REQUESTS_PATH, 'Nõustumine ilma juhatuse liikmelisuseta nõuab volikirja üleslaadimist.')
+      return redirectWithError(REQUESTS_PATH, 'Nõustumine ilma juhatuse liikmelisuseta nõuab volikirja üleslaadimist.')
     }
     const validationError = validateMediaUpload({
       filename: file.name,
@@ -274,11 +275,11 @@ export async function approveCompanyAccessRequestAction(formData: FormData): Pro
       size: file.size,
     })
     if (validationError) {
-      redirectWithError(REQUESTS_PATH, `Volikiri: ${validationError}`)
+      return redirectWithError(REQUESTS_PATH, `Volikiri: ${validationError}`)
     }
     const bucket = await getMediaBucket()
     if (!bucket) {
-      redirectWithError(REQUESTS_PATH, 'R2 salvestusruum pole saadaval — volikirja ei saa üles laadida.')
+      return redirectWithError(REQUESTS_PATH, 'R2 salvestusruum pole saadaval — volikirja ei saa üles laadida.')
     }
     const key = `volikiri/${id}/${new Date().toISOString().replace(/[:.]/g, '-')}-${sanitizeFilename(file.name)}`
     try {
@@ -286,7 +287,7 @@ export async function approveCompanyAccessRequestAction(formData: FormData): Pro
         httpMetadata: { contentType: file.type },
       })
     } catch (error) {
-      redirectWithError(
+      return redirectWithError(
         REQUESTS_PATH,
         `Volikirja üleslaadimine ebaõnnestus: ${error instanceof Error ? error.message : String(error)}`,
       )
@@ -373,12 +374,12 @@ export async function approveCompanyAccessRequestAction(formData: FormData): Pro
         // The primary failure is what the admin needs to see.
       }
     }
-    redirectWithError(REQUESTS_PATH, `Taotluse nõustumine ebaõnnestus: ${failure}`)
+    return redirectWithError(REQUESTS_PATH, `Taotluse nõustumine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(REQUESTS_PATH)
   revalidatePath('/admin/leads')
-  redirectWithNotice(
+  return redirectWithNotice(
     readRedirectTo(formData, REQUESTS_PATH),
     boardCheckFailed
       ? 'Taotlus nõustutud põhjenduse ja volikirjaga; profiil aktiveeritud ja taotlejale teavitatud.'
@@ -392,15 +393,15 @@ export async function rejectCompanyAccessRequestAction(formData: FormData): Prom
 
   const id = readText(formData, 'id')
   const reason = readText(formData, 'reason')
-  if (!id) redirectWithError(REQUESTS_PATH, 'Taotluse identifikaator puudub.')
+  if (!id) return redirectWithError(REQUESTS_PATH, 'Taotluse identifikaator puudub.')
   if (!hasMinReason(reason)) {
-    redirectWithError(REQUESTS_PATH, 'Keeldumise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+    return redirectWithError(REQUESTS_PATH, 'Keeldumise põhjus on kohustuslik (vähemalt 5 tähemärki).')
   }
 
   const request = await repositories.findByID({ collection: 'company-access-request', id })
-  if (!request) redirectWithError(REQUESTS_PATH, 'Taotlust ei leitud.')
+  if (!request) return redirectWithError(REQUESTS_PATH, 'Taotlust ei leitud.')
   if (request.status !== 'pending' && request.status !== 'held') {
-    redirectWithError(REQUESTS_PATH, 'Taotlus on juba läbi vaadatud.')
+    return redirectWithError(REQUESTS_PATH, 'Taotlus on juba läbi vaadatud.')
   }
 
   let failure: string | null = null
@@ -448,11 +449,11 @@ export async function rejectCompanyAccessRequestAction(formData: FormData): Prom
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(REQUESTS_PATH, `Taotluse keeldumine ebaõnnestus: ${failure}`)
+    return redirectWithError(REQUESTS_PATH, `Taotluse keeldumine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(REQUESTS_PATH)
-  redirectWithNotice(
+  return redirectWithNotice(
     readRedirectTo(formData, REQUESTS_PATH),
     'Taotlus keeldutud ja taotlejale põhjusega teavitatud.',
   )
@@ -465,15 +466,15 @@ export async function holdCompanyAccessRequestAction(formData: FormData): Promis
   const id = readText(formData, 'id')
   const note = readText(formData, 'note')
   const remindAt = readOptionalDatetime(formData, 'remindAt')
-  if (!id) redirectWithError(REQUESTS_PATH, 'Taotluse identifikaator puudub.')
+  if (!id) return redirectWithError(REQUESTS_PATH, 'Taotluse identifikaator puudub.')
   if (!hasMinReason(note)) {
-    redirectWithError(REQUESTS_PATH, 'Sisemine märkus on kohustuslik (vähemalt 5 tähemärki).')
+    return redirectWithError(REQUESTS_PATH, 'Sisemine märkus on kohustuslik (vähemalt 5 tähemärki).')
   }
 
   const request = await repositories.findByID({ collection: 'company-access-request', id })
-  if (!request) redirectWithError(REQUESTS_PATH, 'Taotlust ei leitud.')
+  if (!request) return redirectWithError(REQUESTS_PATH, 'Taotlust ei leitud.')
   if (request.status !== 'pending' && request.status !== 'held') {
-    redirectWithError(REQUESTS_PATH, 'Taotlus on juba läbi vaadatud.')
+    return redirectWithError(REQUESTS_PATH, 'Taotlus on juba läbi vaadatud.')
   }
 
   let failure: string | null = null
@@ -495,11 +496,11 @@ export async function holdCompanyAccessRequestAction(formData: FormData): Promis
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(REQUESTS_PATH, `Taotluse ootele panek ebaõnnestus: ${failure}`)
+    return redirectWithError(REQUESTS_PATH, `Taotluse ootele panek ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(REQUESTS_PATH)
-  redirectWithNotice(
+  return redirectWithNotice(
     readRedirectTo(formData, REQUESTS_PATH),
     'Taotlus pandud ootele sisemärkusega.',
   )
@@ -516,10 +517,10 @@ export async function registryRecheckAction(formData: FormData): Promise<void> {
 
   const id = readText(formData, 'id')
   const redirectPath = readRedirectTo(formData, REQUESTS_PATH)
-  if (!id) redirectWithError(redirectPath, 'Taotluse identifikaator puudub.')
+  if (!id) return redirectWithError(redirectPath, 'Taotluse identifikaator puudub.')
 
   const request = await repositories.findByID({ collection: 'company-access-request', id })
-  if (!request) redirectWithError(redirectPath, 'Taotlust ei leitud.')
+  if (!request) return redirectWithError(redirectPath, 'Taotlust ei leitud.')
 
   const snapshot = resolveRegistrySnapshot(request.regCode, request.companyName, request.createdAt)
 
@@ -541,11 +542,11 @@ export async function registryRecheckAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(redirectPath, `Registri kontrollimise logimine ebaõnnestus: ${failure}`)
+    return redirectWithError(redirectPath, `Registri kontrollimise logimine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(redirectPath)
-  redirectWithNotice(redirectPath, 'Äriregistri andmed kontrollitud; vaade logitud auditilogisse.')
+  return redirectWithNotice(redirectPath, 'Äriregistri andmed kontrollitud; vaade logitud auditilogisse.')
 }
 
 /**
@@ -805,7 +806,7 @@ export async function moveLeadStatusAction(input: {
 export async function moveLeadStatusFormAction(formData: FormData): Promise<void> {
   const { session } = await requireAdminRepositories()
   if (!can(session.role, 'leads:write')) {
-    redirectWithError(LEADS_PATH, 'Teil puudub õigus juhtlõimede muutmiseks.')
+    return redirectWithError(LEADS_PATH, 'Teil puudub õigus juhtlõimede muutmiseks.')
   }
   const repositories = await getRepositories()
 
@@ -813,14 +814,14 @@ export async function moveLeadStatusFormAction(formData: FormData): Promise<void
   const status = readText(formData, 'status')
   const note = readOptionalText(formData, 'note')
   const reference = readOptionalText(formData, 'reference')
-  if (!id) redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
+  if (!id) return redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
   const detailPath = `/admin/leads/${id}`
-  if (!isLeadStatus(status)) redirectWithError(detailPath, 'Tundmatu olek.')
+  if (!isLeadStatus(status)) return redirectWithError(detailPath, 'Tundmatu olek.')
 
   const loaded = await loadLeadInScope(repositories, session, id)
-  if (!loaded.ok) redirectWithError(LEADS_PATH, loaded.error)
+  if (!loaded.ok) return redirectWithError(LEADS_PATH, loaded.error)
   const lead = loaded.lead
-  if (lead.status === status) redirectWithNotice(detailPath, 'Olek on juba selline.')
+  if (lead.status === status) return redirectWithNotice(detailPath, 'Olek on juba selline.')
 
   const guard = evaluateLeadExitGuard({
     from: lead.status,
@@ -829,7 +830,7 @@ export async function moveLeadStatusFormAction(formData: FormData): Promise<void
     note: note ?? '',
     reference: reference ?? '',
   })
-  if (!guard.ok) redirectWithError(detailPath, guard.error)
+  if (!guard.ok) return redirectWithError(detailPath, guard.error)
 
   let failure: string | null = null
   try {
@@ -863,12 +864,12 @@ export async function moveLeadStatusFormAction(formData: FormData): Promise<void
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Oleku muutmine ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Oleku muutmine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(LEADS_PATH)
   revalidatePath(detailPath)
-  redirectWithNotice(detailPath, 'Olek uuendatud.')
+  return redirectWithNotice(detailPath, 'Olek uuendatud.')
 }
 
 export async function assignLeadSpecialistAction(formData: FormData): Promise<void> {
@@ -876,11 +877,11 @@ export async function assignLeadSpecialistAction(formData: FormData): Promise<vo
   const repositories = await getRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
+  if (!id) return redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
   const detailPath = `/admin/leads/${id}`
 
   const loaded = await loadLeadInScope(repositories, session, id)
-  if (!loaded.ok) redirectWithError(LEADS_PATH, loaded.error)
+  if (!loaded.ok) return redirectWithError(LEADS_PATH, loaded.error)
 
   const assignedSpecialistId = readOptionalText(formData, 'assignedSpecialist')
   if (assignedSpecialistId) {
@@ -888,7 +889,7 @@ export async function assignLeadSpecialistAction(formData: FormData): Promise<vo
       collection: 'specialists',
       id: assignedSpecialistId,
     })
-    if (!specialist) redirectWithError(detailPath, 'Määratud spetsialisti ei leitud.')
+    if (!specialist) return redirectWithError(detailPath, 'Määratud spetsialisti ei leitud.')
   }
 
   let failure: string | null = null
@@ -910,12 +911,12 @@ export async function assignLeadSpecialistAction(formData: FormData): Promise<vo
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Spetsialisti määramine ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Spetsialisti määramine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(LEADS_PATH)
   revalidatePath(detailPath)
-  redirectWithNotice(detailPath, 'Spetsialist määratud.')
+  return redirectWithNotice(detailPath, 'Spetsialist määratud.')
 }
 
 /** Manual county set/override on the lead detail (task 8.1). */
@@ -924,16 +925,16 @@ export async function setLeadCountyAction(formData: FormData): Promise<void> {
   const repositories = await getRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
+  if (!id) return redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
   const detailPath = `/admin/leads/${id}`
 
   const loaded = await loadLeadInScope(repositories, session, id)
-  if (!loaded.ok) redirectWithError(LEADS_PATH, loaded.error)
+  if (!loaded.ok) return redirectWithError(LEADS_PATH, loaded.error)
 
   const countyId = readOptionalText(formData, 'countyId')
   if (countyId) {
     const county = await repositories.findByID({ collection: 'counties', id: countyId })
-    if (!county) redirectWithError(detailPath, 'Maakonda ei leitud.')
+    if (!county) return redirectWithError(detailPath, 'Maakonda ei leitud.')
   }
 
   let failure: string | null = null
@@ -955,12 +956,12 @@ export async function setLeadCountyAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Maakonna määramine ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Maakonna määramine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(LEADS_PATH)
   revalidatePath(detailPath)
-  redirectWithNotice(detailPath, 'Maakond määratud.')
+  return redirectWithNotice(detailPath, 'Maakond määratud.')
 }
 
 export async function addLeadNoteAction(formData: FormData): Promise<void> {
@@ -969,12 +970,12 @@ export async function addLeadNoteAction(formData: FormData): Promise<void> {
 
   const id = readText(formData, 'id')
   const text = readText(formData, 'text')
-  if (!id) redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
+  if (!id) return redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
   const detailPath = `/admin/leads/${id}`
-  if (!text) redirectWithError(detailPath, 'Märkuse tekst on kohustuslik.')
+  if (!text) return redirectWithError(detailPath, 'Märkuse tekst on kohustuslik.')
 
   const loaded = await loadLeadInScope(repositories, session, id)
-  if (!loaded.ok) redirectWithError(LEADS_PATH, loaded.error)
+  if (!loaded.ok) return redirectWithError(LEADS_PATH, loaded.error)
 
   let failure: string | null = null
   try {
@@ -989,12 +990,12 @@ export async function addLeadNoteAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Märkuse salvestamine ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Märkuse salvestamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(detailPath)
   revalidatePath(LEADS_PATH)
-  redirectWithNotice(detailPath, 'Märkus lisatud.')
+  return redirectWithNotice(detailPath, 'Märkus lisatud.')
 }
 
 export async function setLeadNextActionAction(formData: FormData): Promise<void> {
@@ -1002,15 +1003,15 @@ export async function setLeadNextActionAction(formData: FormData): Promise<void>
   const repositories = await getRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
+  if (!id) return redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
   const detailPath = `/admin/leads/${id}`
 
   const dueAt = readOptionalDatetime(formData, 'dueAt')
-  if (!dueAt) redirectWithError(detailPath, 'Vali järgmise tegevuse kuupäev.')
+  if (!dueAt) return redirectWithError(detailPath, 'Vali järgmise tegevuse kuupäev.')
   const note = readOptionalText(formData, 'note')
 
   const loaded = await loadLeadInScope(repositories, session, id)
-  if (!loaded.ok) redirectWithError(LEADS_PATH, loaded.error)
+  if (!loaded.ok) return redirectWithError(LEADS_PATH, loaded.error)
 
   let failure: string | null = null
   try {
@@ -1025,12 +1026,12 @@ export async function setLeadNextActionAction(formData: FormData): Promise<void>
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Meeldetuletuse salvestamine ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Meeldetuletuse salvestamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(detailPath)
   revalidatePath(LEADS_PATH)
-  redirectWithNotice(detailPath, 'Järgmine tegevus seatud.')
+  return redirectWithNotice(detailPath, 'Järgmine tegevus seatud.')
 }
 
 export async function createLeadAction(formData: FormData): Promise<void> {
@@ -1040,12 +1041,12 @@ export async function createLeadAction(formData: FormData): Promise<void> {
   const contactName = readText(formData, 'contactName')
   const phone = readOptionalText(formData, 'phone')
   const email = readOptionalText(formData, 'email')
-  if (!contactName) redirectWithError(LEADS_PATH, 'Kontakti nimi on kohustuslik.')
+  if (!contactName) return redirectWithError(LEADS_PATH, 'Kontakti nimi on kohustuslik.')
   if (!phone && !email) {
-    redirectWithError(LEADS_PATH, 'Sisestage telefon või e-post.')
+    return redirectWithError(LEADS_PATH, 'Sisestage telefon või e-post.')
   }
   if (!readCheckbox(formData, 'consent')) {
-    redirectWithError(LEADS_PATH, 'Kinnitage kliendi nõusolek andmete töötlemiseks.')
+    return redirectWithError(LEADS_PATH, 'Kinnitage kliendi nõusolek andmete töötlemiseks.')
   }
 
   let failure: string | null = null
@@ -1128,11 +1129,11 @@ export async function createLeadAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(LEADS_PATH, `Juhtlõime loomine ebaõnnestus: ${failure}`)
+    return redirectWithError(LEADS_PATH, `Juhtlõime loomine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(LEADS_PATH)
-  redirectWithNotice(`/admin/leads/${leadId}`, 'Juhtlõige loodud.')
+  return redirectWithNotice(`/admin/leads/${leadId}`, 'Juhtlõige loodud.')
 }
 
 /**
@@ -1149,28 +1150,28 @@ export async function mergeLeadAction(formData: FormData): Promise<void> {
   const id = readText(formData, 'id')
   const targetId = readText(formData, 'targetId')
   if (!id || !targetId) {
-    redirectWithError(LEADS_PATH, 'Juhtlõime või sihtjuhtlõime identifikaator puudub.')
+    return redirectWithError(LEADS_PATH, 'Juhtlõime või sihtjuhtlõime identifikaator puudub.')
   }
-  if (id === targetId) redirectWithError(LEADS_PATH, 'Juhtlõiget ei saa endaga ühendada.')
+  if (id === targetId) return redirectWithError(LEADS_PATH, 'Juhtlõiget ei saa endaga ühendada.')
 
   const loaded = await loadLeadInScope(repositories, session, id)
-  if (!loaded.ok) redirectWithError(LEADS_PATH, loaded.error)
+  if (!loaded.ok) return redirectWithError(LEADS_PATH, loaded.error)
   const duplicate = loaded.lead
   const targetLoaded = await loadLeadInScope(repositories, session, targetId)
-  if (!targetLoaded.ok) redirectWithError(LEADS_PATH, targetLoaded.error)
+  if (!targetLoaded.ok) return redirectWithError(LEADS_PATH, targetLoaded.error)
   const target = targetLoaded.lead
 
   const duplicateAudits = await leadAuditsFor(repositories, id)
   const duplicateLifecycle = resolveLeadLifecycleFlags(duplicateAudits)
   if (duplicateLifecycle.mergedIntoId) {
-    redirectWithError(LEADS_PATH, 'See juhtlõige on juba ühendatud.')
+    return redirectWithError(LEADS_PATH, 'See juhtlõige on juba ühendatud.')
   }
   if (duplicateLifecycle.deleted) {
-    redirectWithError(LEADS_PATH, 'Kustutatud juhtlõiget ei saa ühendada.')
+    return redirectWithError(LEADS_PATH, 'Kustutatud juhtlõiget ei saa ühendada.')
   }
   const targetLifecycle = resolveLeadLifecycleFlags(await leadAuditsFor(repositories, targetId))
   if (targetLifecycle.deleted) {
-    redirectWithError(LEADS_PATH, 'Sihtjuhtlõige on kustutatud.')
+    return redirectWithError(LEADS_PATH, 'Sihtjuhtlõige on kustutatud.')
   }
 
   const mergedData: Record<string, unknown> = {}
@@ -1216,12 +1217,12 @@ export async function mergeLeadAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(LEADS_PATH, `Juhtlõimede ühendamine ebaõnnestus: ${failure}`)
+    return redirectWithError(LEADS_PATH, `Juhtlõimede ühendamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(LEADS_PATH)
   revalidatePath(`/admin/leads/${target.id}`)
-  redirectWithNotice(`/admin/leads/${target.id}`, 'Duplikaat ühendatud.')
+  return redirectWithNotice(`/admin/leads/${target.id}`, 'Duplikaat ühendatud.')
 }
 
 /**
@@ -1235,20 +1236,20 @@ export async function softDeleteLeadAction(formData: FormData): Promise<void> {
 
   const id = readText(formData, 'id')
   const reason = readText(formData, 'reason')
-  if (!id) redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
+  if (!id) return redirectWithError(LEADS_PATH, 'Juhtlõime identifikaator puudub.')
   const detailPath = `/admin/leads/${id}`
   if (session.role !== 'superadmin') {
-    redirectWithError(detailPath, 'Ainult peakasutaja saab juhtlõiget kustutada.')
+    return redirectWithError(detailPath, 'Ainult peakasutaja saab juhtlõiget kustutada.')
   }
   if (!hasMinReason(reason)) {
-    redirectWithError(detailPath, 'Kustutamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+    return redirectWithError(detailPath, 'Kustutamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
   }
 
   const loaded = await loadLeadInScope(repositories, session, id)
-  if (!loaded.ok) redirectWithError(LEADS_PATH, loaded.error)
+  if (!loaded.ok) return redirectWithError(LEADS_PATH, loaded.error)
 
   const lifecycle = resolveLeadLifecycleFlags(await leadAuditsFor(repositories, id))
-  if (lifecycle.deleted) redirectWithNotice(detailPath, 'Juhtlõige on juba kustutatud.')
+  if (lifecycle.deleted) return redirectWithNotice(detailPath, 'Juhtlõige on juba kustutatud.')
 
   let failure: string | null = null
   try {
@@ -1263,12 +1264,12 @@ export async function softDeleteLeadAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Pehme kustutamine ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Pehme kustutamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(LEADS_PATH)
   revalidatePath(detailPath)
-  redirectWithNotice(detailPath, 'Juhtlõige pehmelt kustutatud.')
+  return redirectWithNotice(detailPath, 'Juhtlõige pehmelt kustutatud.')
 }
 
 // ---------------------------------------------------------------------------
@@ -1467,11 +1468,11 @@ export async function forwardServiceRequestAction(formData: FormData): Promise<v
   const repositories = await getRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu identifikaator puudub.')
+  if (!id) return redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu identifikaator puudub.')
   const detailPath = `${SERVICE_REQUESTS_PATH}?detail=${id}`
 
   const request = await repositories.findByID({ collection: 'service-requests', id })
-  if (!request) redirectWithError(SERVICE_REQUESTS_PATH, 'Päringut ei leitud.')
+  if (!request) return redirectWithError(SERVICE_REQUESTS_PATH, 'Päringut ei leitud.')
 
   const partnerIds = [
     ...new Set(
@@ -1481,18 +1482,18 @@ export async function forwardServiceRequestAction(formData: FormData): Promise<v
     ),
   ]
   if (partnerIds.length === 0) {
-    redirectWithError(detailPath, 'Valige vähemalt üks partner.')
+    return redirectWithError(detailPath, 'Valige vähemalt üks partner.')
   }
 
   const sentIds = new Set((request.routedTo ?? []).filter((value): value is string => typeof value === 'string'))
   const newIds = partnerIds.filter((partnerId) => !sentIds.has(partnerId))
   if (newIds.length === 0) {
-    redirectWithError(detailPath, 'Kõik valitud partnerid on päringu juba saanud.')
+    return redirectWithError(detailPath, 'Kõik valitud partnerid on päringu juba saanud.')
   }
 
   const targets = await loadForwardTargets(repositories, newIds)
   if (targets.length === 0) {
-    redirectWithError(detailPath, 'Valitud partnereid ei leitud.')
+    return redirectWithError(detailPath, 'Valitud partnereid ei leitud.')
   }
 
   const payload = (request.payload ?? {}) as Record<string, unknown>
@@ -1539,17 +1540,17 @@ export async function forwardServiceRequestAction(formData: FormData): Promise<v
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Päringu edastamine ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Päringu edastamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(SERVICE_REQUESTS_PATH)
   if (failures.length > 0) {
-    redirectWithError(
+    return redirectWithError(
       detailPath,
       `Osaliselt edastatud; e-post ei läinud välja: ${failures.join(', ')}. Kasutage "Saada uuesti".`,
     )
   }
-  redirectWithNotice(detailPath, `Päring edastatud ${String(targets.length)} partnerile.`)
+  return redirectWithNotice(detailPath, `Päring edastatud ${String(targets.length)} partnerile.`)
 }
 
 export async function retryRequestForwardAction(formData: FormData): Promise<void> {
@@ -1559,17 +1560,17 @@ export async function retryRequestForwardAction(formData: FormData): Promise<voi
   const id = readText(formData, 'id')
   const partnerId = readText(formData, 'partnerId')
   if (!id || !partnerId) {
-    redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu või partneri identifikaator puudub.')
+    return redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu või partneri identifikaator puudub.')
   }
   const detailPath = `${SERVICE_REQUESTS_PATH}?detail=${id}`
 
   const request = await repositories.findByID({ collection: 'service-requests', id })
-  if (!request) redirectWithError(SERVICE_REQUESTS_PATH, 'Päringut ei leitud.')
+  if (!request) return redirectWithError(SERVICE_REQUESTS_PATH, 'Päringut ei leitud.')
 
   const targets = await loadForwardTargets(repositories, [partnerId])
   const target = targets[0]
-  if (!target) redirectWithError(detailPath, 'Partnerit ei leitud.')
-  if (!target.contactEmail) redirectWithError(detailPath, 'Partneril puudub suunamise e-post.')
+  if (!target) return redirectWithError(detailPath, 'Partnerit ei leitud.')
+  if (!target.contactEmail) return redirectWithError(detailPath, 'Partneril puudub suunamise e-post.')
 
   const payload = (request.payload ?? {}) as Record<string, unknown>
   const minimized = buildMinimizedForwardPayload(payload)
@@ -1598,11 +1599,11 @@ export async function retryRequestForwardAction(formData: FormData): Promise<voi
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Kordussaade ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Kordussaade ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(SERVICE_REQUESTS_PATH)
-  redirectWithNotice(detailPath, 'Kordussaade registreeritud.')
+  return redirectWithNotice(detailPath, 'Kordussaade registreeritud.')
 }
 
 export async function markRequestRespondedAction(formData: FormData): Promise<void> {
@@ -1613,14 +1614,14 @@ export async function markRequestRespondedAction(formData: FormData): Promise<vo
   const partnerId = readText(formData, 'partnerId')
   const note = readOptionalText(formData, 'note')
   if (!id || !partnerId) {
-    redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu või partneri identifikaator puudub.')
+    return redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu või partneri identifikaator puudub.')
   }
   const detailPath = `${SERVICE_REQUESTS_PATH}?detail=${id}`
 
   const request = await repositories.findByID({ collection: 'service-requests', id })
-  if (!request) redirectWithError(SERVICE_REQUESTS_PATH, 'Päringut ei leitud.')
+  if (!request) return redirectWithError(SERVICE_REQUESTS_PATH, 'Päringut ei leitud.')
   const partner = await repositories.findByID({ collection: 'partners', id: partnerId })
-  if (!partner) redirectWithError(detailPath, 'Partnerit ei leitud.')
+  if (!partner) return redirectWithError(detailPath, 'Partnerit ei leitud.')
 
   let failure: string | null = null
   try {
@@ -1639,11 +1640,11 @@ export async function markRequestRespondedAction(formData: FormData): Promise<vo
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Vastanuks märkimine ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Vastanuks märkimine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(SERVICE_REQUESTS_PATH)
-  redirectWithNotice(detailPath, 'Partner märgitud vastanuks.')
+  return redirectWithNotice(detailPath, 'Partner märgitud vastanuks.')
 }
 
 /** Marks a routed/answered request teostatud (task 8.4). */
@@ -1652,16 +1653,16 @@ export async function markRequestDoneAction(formData: FormData): Promise<void> {
   const repositories = await getRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu identifikaator puudub.')
+  if (!id) return redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu identifikaator puudub.')
   const detailPath = `${SERVICE_REQUESTS_PATH}?detail=${id}`
 
   const request = await repositories.findByID({ collection: 'service-requests', id })
-  if (!request) redirectWithError(SERVICE_REQUESTS_PATH, 'Päringut ei leitud.')
+  if (!request) return redirectWithError(SERVICE_REQUESTS_PATH, 'Päringut ei leitud.')
   if (request.status === 'teostatud') {
-    redirectWithNotice(detailPath, 'Päring on juba teostatud.')
+    return redirectWithNotice(detailPath, 'Päring on juba teostatud.')
   }
   if (request.status === 'suletud') {
-    redirectWithError(detailPath, 'Päring on suletud — olekut ei saa enam muuta.')
+    return redirectWithError(detailPath, 'Päring on suletud — olekut ei saa enam muuta.')
   }
 
   let failure: string | null = null
@@ -1683,11 +1684,11 @@ export async function markRequestDoneAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Teostatuks märkimine ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Teostatuks märkimine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(SERVICE_REQUESTS_PATH)
-  redirectWithNotice(detailPath, 'Päring märgitud teostatuks.')
+  return redirectWithNotice(detailPath, 'Päring märgitud teostatuks.')
 }
 
 /** Closes a request for good; closed rows leave the active workflow (task 8.4). */
@@ -1696,13 +1697,13 @@ export async function closeRequestAction(formData: FormData): Promise<void> {
   const repositories = await getRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu identifikaator puudub.')
+  if (!id) return redirectWithError(SERVICE_REQUESTS_PATH, 'Päringu identifikaator puudub.')
   const detailPath = `${SERVICE_REQUESTS_PATH}?detail=${id}`
 
   const request = await repositories.findByID({ collection: 'service-requests', id })
-  if (!request) redirectWithError(SERVICE_REQUESTS_PATH, 'Päringut ei leitud.')
+  if (!request) return redirectWithError(SERVICE_REQUESTS_PATH, 'Päringut ei leitud.')
   if (request.status === 'suletud') {
-    redirectWithNotice(detailPath, 'Päring on juba suletud.')
+    return redirectWithNotice(detailPath, 'Päring on juba suletud.')
   }
 
   let failure: string | null = null
@@ -1724,11 +1725,11 @@ export async function closeRequestAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(detailPath, `Sulgemine ebaõnnestus: ${failure}`)
+    return redirectWithError(detailPath, `Sulgemine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(SERVICE_REQUESTS_PATH)
-  redirectWithNotice(detailPath, 'Päring suletud.')
+  return redirectWithNotice(detailPath, 'Päring suletud.')
 }
 
 function attachmentKeys(value: unknown): string[] {
@@ -1875,7 +1876,7 @@ export async function createPartnerAction(formData: FormData): Promise<void> {
 
   const data = readPartnerForm(formData)
   const validationError = validatePartnerForm(data)
-  if (validationError) redirectWithError(PARTNERS_PATH, validationError)
+  if (validationError) return redirectWithError(PARTNERS_PATH, validationError)
 
   let failure: string | null = null
   let partnerId = ''
@@ -1904,12 +1905,12 @@ export async function createPartnerAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(PARTNERS_PATH, `Partneri loomine ebaõnnestus: ${failure}`)
+    return redirectWithError(PARTNERS_PATH, `Partneri loomine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(PARTNERS_PATH)
   revalidatePath(SERVICE_REQUESTS_PATH)
-  redirectWithNotice(`${PARTNERS_PATH}?muuda=${partnerId}`, 'Partner loodud.')
+  return redirectWithNotice(`${PARTNERS_PATH}?muuda=${partnerId}`, 'Partner loodud.')
 }
 
 export async function updatePartnerAction(formData: FormData): Promise<void> {
@@ -1917,14 +1918,14 @@ export async function updatePartnerAction(formData: FormData): Promise<void> {
   const repositories = await getRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(PARTNERS_PATH, 'Partneri identifikaator puudub.')
+  if (!id) return redirectWithError(PARTNERS_PATH, 'Partneri identifikaator puudub.')
 
   const existing = await repositories.findByID({ collection: 'partners', id })
-  if (!existing) redirectWithError(PARTNERS_PATH, 'Partnerit ei leitud.')
+  if (!existing) return redirectWithError(PARTNERS_PATH, 'Partnerit ei leitud.')
 
   const data = readPartnerForm(formData)
   const validationError = validatePartnerForm(data)
-  if (validationError) redirectWithError(`${PARTNERS_PATH}?muuda=${id}`, validationError)
+  if (validationError) return redirectWithError(`${PARTNERS_PATH}?muuda=${id}`, validationError)
 
   let failure: string | null = null
   try {
@@ -1961,12 +1962,12 @@ export async function updatePartnerAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(`${PARTNERS_PATH}?muuda=${id}`, `Partneri salvestamine ebaõnnestus: ${failure}`)
+    return redirectWithError(`${PARTNERS_PATH}?muuda=${id}`, `Partneri salvestamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(PARTNERS_PATH)
   revalidatePath(SERVICE_REQUESTS_PATH)
-  redirectWithNotice(`${PARTNERS_PATH}?muuda=${id}`, 'Partner uuendatud.')
+  return redirectWithNotice(`${PARTNERS_PATH}?muuda=${id}`, 'Partner uuendatud.')
 }
 
 export async function setPartnerActiveAction(formData: FormData): Promise<void> {
@@ -1976,16 +1977,16 @@ export async function setPartnerActiveAction(formData: FormData): Promise<void> 
   const id = readText(formData, 'id')
   const active = readText(formData, 'active') === 'on'
   const reason = readOptionalText(formData, 'reason')
-  if (!id) redirectWithError(PARTNERS_PATH, 'Partneri identifikaator puudub.')
+  if (!id) return redirectWithError(PARTNERS_PATH, 'Partneri identifikaator puudub.')
 
   const existing = await repositories.findByID({ collection: 'partners', id })
-  if (!existing) redirectWithError(PARTNERS_PATH, 'Partnerit ei leitud.')
+  if (!existing) return redirectWithError(PARTNERS_PATH, 'Partnerit ei leitud.')
   if (existing.active === active) {
-    redirectWithNotice(PARTNERS_PATH, 'Partneri olek on juba selline.')
+    return redirectWithNotice(PARTNERS_PATH, 'Partneri olek on juba selline.')
   }
   // Task 8.6: deactivating needs a typed reason; reactivating does not.
   if (!active && !hasMinReason(reason)) {
-    redirectWithError(PARTNERS_PATH, 'Deaktiveerimise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+    return redirectWithError(PARTNERS_PATH, 'Deaktiveerimise põhjus on kohustuslik (vähemalt 5 tähemärki).')
   }
 
   let failure: string | null = null
@@ -2003,12 +2004,12 @@ export async function setPartnerActiveAction(formData: FormData): Promise<void> 
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(PARTNERS_PATH, `Partneri oleku muutmine ebaõnnestus: ${failure}`)
+    return redirectWithError(PARTNERS_PATH, `Partneri oleku muutmine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(PARTNERS_PATH)
   revalidatePath(SERVICE_REQUESTS_PATH)
-  redirectWithNotice(PARTNERS_PATH, active ? 'Partner aktiveeritud.' : 'Partner deaktiveeritud.')
+  return redirectWithNotice(PARTNERS_PATH, active ? 'Partner aktiveeritud.' : 'Partner deaktiveeritud.')
 }
 
 export async function deletePartnerAction(formData: FormData): Promise<void> {
@@ -2016,10 +2017,10 @@ export async function deletePartnerAction(formData: FormData): Promise<void> {
   const repositories = await getRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(PARTNERS_PATH, 'Partneri identifikaator puudub.')
+  if (!id) return redirectWithError(PARTNERS_PATH, 'Partneri identifikaator puudub.')
 
   const existing = await repositories.findByID({ collection: 'partners', id })
-  if (!existing) redirectWithError(PARTNERS_PATH, 'Partnerit ei leitud.')
+  if (!existing) return redirectWithError(PARTNERS_PATH, 'Partnerit ei leitud.')
 
   const { docs: forwarded } = await repositories.find({
     collection: 'audit-entry',
@@ -2041,7 +2042,7 @@ export async function deletePartnerAction(formData: FormData): Promise<void> {
     )
   })
   if (forwardedHere) {
-    redirectWithError(PARTNERS_PATH, 'Partnerile on päringuid edastatud — kasutage deaktiveerimist.')
+    return redirectWithError(PARTNERS_PATH, 'Partnerile on päringuid edastatud — kasutage deaktiveerimist.')
   }
 
   let failure: string | null = null
@@ -2058,9 +2059,9 @@ export async function deletePartnerAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(PARTNERS_PATH, `Partneri kustutamine ebaõnnestus: ${failure}`)
+    return redirectWithError(PARTNERS_PATH, `Partneri kustutamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(PARTNERS_PATH)
-  redirectWithNotice(PARTNERS_PATH, 'Partner kustutatud.')
+  return redirectWithNotice(PARTNERS_PATH, 'Partner kustutatud.')
 }

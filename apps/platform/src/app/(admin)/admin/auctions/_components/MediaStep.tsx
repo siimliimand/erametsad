@@ -16,6 +16,8 @@ import {
   validateEditorImageUpload,
 } from '../../media/_lib/media-upload'
 import type { AttachmentTag } from '../../media/_lib/media-upload'
+
+import { apiFetch } from '@/lib/api/client'
 /**
  * Media section of Sisu (docs/design/admin/03 step 5): image upload with
  * D6 validation, the per-image alt text and focal-point picker, and the
@@ -43,7 +45,7 @@ async function uploadToMediaLibrary(
   for (const [key, value] of Object.entries(extra)) {
     body.append(key, value)
   }
-  const response = await fetch('/api/v1/media', { method: 'POST', body })
+  const response = await apiFetch('/api/v1/media', { method: 'POST', body })
   const data: unknown = await response.json().catch(() => null)
   if (!response.ok) {
     const message =

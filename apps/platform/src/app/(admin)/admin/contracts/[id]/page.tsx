@@ -1,7 +1,7 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { updateContractStatusAction } from '../../../_actions/contracts'
+import { AdminLink } from '../../../_components/AdminLink'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import { secondaryButtonClass } from '../../../_components/FormField'
 import { PageHeader } from '../../../_components/PageHeader'
@@ -95,24 +95,24 @@ export default async function ContractDetailPage({
           <Field label="Oksjon">{auction?.title ?? contract.lotId}</Field>
           <Field label="Müüja">
             {auction?.sellerId ? (
-              <Link
-                href={`/admin/users/${auction.sellerId}`}
+              <AdminLink
+                href={`/users/${auction.sellerId}`}
                 className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {partyLabel.get(auction.sellerId) ?? auction.sellerId}
-              </Link>
+              </AdminLink>
             ) : (
               '—'
             )}
           </Field>
           <Field label="Ostja (võitja)">
             {winningBid ? (
-              <Link
-                href={`/admin/users/${winningBid.userId}`}
+              <AdminLink
+                href={`/users/${winningBid.userId}`}
                 className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {partyLabel.get(winningBid.userId) ?? winningBid.userId}
-              </Link>
+              </AdminLink>
             ) : (
               '—'
             )}

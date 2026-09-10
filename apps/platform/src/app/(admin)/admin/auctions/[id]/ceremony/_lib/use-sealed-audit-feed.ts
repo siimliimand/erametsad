@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchSealedCeremonyAuditAction } from './fetch-sealed-audit'
 import type { SealedAuditFeedState, SealedAuditLineView } from './sealed-audit-view'
 
+import { apiUrl } from '@/lib/api/client'
+
 /**
  * Live feed for the sealed-opening audit strip. Follows the bid-monitor
  * SSE conventions (same AuctionDO stream, exponential reconnect backoff,
@@ -71,7 +73,8 @@ export function useSealedAuditFeed(auctionId: string): {
       if (disposed) return
       setState('connecting')
       const next = new EventSource(
-        `/api/v1/auctions/stream?auction=${encodeURIComponent(auctionId)}`,
+        apiUrl(`/api/v1/auctions/stream?auction=${encodeURIComponent(auctionId)}`),
+        { withCredentials: true },
       )
       source = next
 

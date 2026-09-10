@@ -1,6 +1,5 @@
-import Link from 'next/link'
-
 import { deleteFaqCategoryAction } from '../../../../_actions/content'
+import { AdminLink } from '../../../../_components/AdminLink'
 import { DataTable } from '../../../../_components/DataTable'
 import { ErrorNotice } from '../../../../_components/ErrorNotice'
 import { primaryButtonClass } from '../../../../_components/FormField'
@@ -52,10 +51,10 @@ export default async function AdminFaqCategoriesPage({
         description="Korduma kippuvate küsimuste rühmad ja nende järjekord."
         backHref="/admin/content"
         actions={
-          <Link href="/admin/content/faq/categories/new" className={primaryButtonClass}>
+          <AdminLink href="/content/faq/categories/new" className={primaryButtonClass}>
             <PlusIcon />
             Uus kategooria
-          </Link>
+          </AdminLink>
         }
       />
       <DataTable
@@ -64,12 +63,12 @@ export default async function AdminFaqCategoriesPage({
             key: 'title',
             label: 'Pealkiri',
             render: (row) => (
-              <Link
-                href={`/admin/content/faq/categories/${row.id}`}
+              <AdminLink
+                href={`/content/faq/categories/${row.id}`}
                 className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {row.title}
-              </Link>
+              </AdminLink>
             ),
           },
           { key: 'slug', label: 'URL' },

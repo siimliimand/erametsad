@@ -14,11 +14,19 @@
   // Host routing (design D7, change fix-phase-3-auction-portal): the portal
   // hostname oksjonid.erametsad.ww0.dev maps to the (portal) route group in
   // src/middleware.ts on this same Worker — no extra Worker exists for it.
-  // Attaching that hostname is a one-time dashboard step (Workers & Pages →
+  // Attaching a hostname is a one-time dashboard step (Workers & Pages →
   // erametsad-api → Settings → Domains & Routes → Add custom domain); see
-  // docs/runbooks/cutover-cloudflare-only.md §4. The api. and admin.
-  // hostnames are a documented follow-up: the middleware mapping table
-  // no-ops on them until their areas join the table.
+  // docs/runbooks/cutover-cloudflare-only.md §4. The admin. and api.
+  // hostnames joined the middleware mapping table (host-areas.ts): admin.
+  // serves the admin UI prefix-free, api. serves only /api routes and 308s
+  // stray page paths to the default host.
+  "vars": {
+    // Session cookies carry this Domain attribute on matching hosts so the
+    // api. host's Set-Cookie authenticates server components on the page
+    // hosts. Hosts outside the suffix (workers.dev, localhost) keep
+    // host-only cookies.
+    "SESSION_COOKIE_DOMAIN": "ww0.dev"
+  },
   // wrangler 4 rejects the legacy top-level "bindings" array (it silently
   // drops those bindings), so producers sit next to the consumer config and
   // KV/R2 use their canonical sections.

@@ -12,10 +12,14 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 
+
+import { useAdminBase } from './AdminBase'
 import { SearchIcon } from './icons'
 import { OverlayPortal } from './ui/OverlayPortal'
 import { trapTabKey, useDialogFocus, useEscapeKey } from './ui/useOverlay'
 import { ADMIN_MODULES } from '../_lib/permissions'
+
+import { joinAdminBase } from '@/lib/routing/admin-base'
 
 interface PaletteRoute {
   label: string
@@ -30,9 +34,10 @@ interface PaletteGroup {
 
 // Second routes inside a module (wizard, template list) beyond the module
 // root; keyed by AdminModuleId so the 13-module base stays registry-driven.
+// Hrefs are base-relative like every href inside the (admin) tree.
 const EXTRA_ROUTES: Partial<Record<string, readonly PaletteRoute[]>> = {
-  auctions: [{ label: 'Uus oksjon', href: '/admin/auctions/new' }],
-  contracts: [{ label: 'Lepingu mallid', href: '/admin/contracts/templates' }],
+  auctions: [{ label: 'Uus oksjon', href: '/auctions/new' }],
+  contracts: [{ label: 'Lepingu mallid', href: '/contracts/templates' }],
 }
 
 // Derived from ADMIN_MODULES so the palette can never drift from the nav
@@ -66,6 +71,7 @@ function filterGroups(query: string): readonly PaletteGroup[] {
 
 export function TopbarSearch() {
   const router = useRouter()
+  const base = useAdminBase()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -108,7 +114,7 @@ export function TopbarSearch() {
 
   function navigate(href: string) {
     setOpen(false)
-    router.push(href)
+    router.push(joinAdminBase(base, href))
   }
 
   // Fresh palette on every open: cleared query, first item highlighted.

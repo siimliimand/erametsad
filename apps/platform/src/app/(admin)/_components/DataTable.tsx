@@ -1,6 +1,6 @@
-import Link from 'next/link'
 import type { ReactNode } from 'react'
 
+import { AdminLink } from './AdminLink'
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from './icons'
 
 export interface DataTableColumnSort {
@@ -68,7 +68,7 @@ export function DataTable<T>({
                 className="py-2.5 px-3 text-label font-medium text-inkMuted whitespace-nowrap first:pl-5 last:pr-5"
               >
                 {column.sort ? (
-                  <Link
+                  <AdminLink
                     href={column.sort.href}
                     title={`Sorteeri ${column.label} järgi`}
                     className={`inline-flex items-center gap-1 whitespace-nowrap no-underline transition-colors duration-hover ease-hover hover:text-primary ${
@@ -77,7 +77,7 @@ export function DataTable<T>({
                   >
                     {column.label}
                     <SortGlyph dir={column.sort.dir} active={Boolean(column.sort.dir)} />
-                  </Link>
+                  </AdminLink>
                 ) : (
                   column.label
                 )}

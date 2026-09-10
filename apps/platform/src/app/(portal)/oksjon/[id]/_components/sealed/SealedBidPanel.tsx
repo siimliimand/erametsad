@@ -20,6 +20,7 @@ import {
   type SealedProfileType,
 } from './SealedIdentityForm'
 
+import { apiFetch } from '@/lib/api/client'
 import type { AuctionStatus } from '@/lib/data/schema'
 
 // ── Public props contract ───────────────────────────────────────────────
@@ -122,7 +123,7 @@ async function submitSealedBidViaApi(input: {
 }): Promise<SealedSubmitOutcome> {
   let response: Response
   try {
-    response = await fetch('/api/v1/bids/create', {
+    response = await apiFetch('/api/v1/bids/create', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({

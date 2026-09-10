@@ -6,6 +6,7 @@ import { selectActiveProfile } from '@/lib/auth/profile-scope'
 import {
   getUserSession,
   issueSessionAccessToken,
+  sessionCookieDomainFromHost,
   setAccessTokenCookie,
 } from '@/lib/auth/session'
 import { getRepositories } from '@/lib/data/runtime'
@@ -75,6 +76,6 @@ export async function POST(
   }
 
   const response = NextResponse.json({ profile: profileResponse })
-  setAccessTokenCookie(response, accessToken)
+  setAccessTokenCookie(response, accessToken, sessionCookieDomainFromHost(request.headers.get('host')))
   return response
 }

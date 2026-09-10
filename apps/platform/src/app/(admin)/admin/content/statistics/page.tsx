@@ -1,6 +1,5 @@
-import Link from 'next/link'
-
 import { deleteStatisticsSnapshotAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import { DataTable } from '../../../_components/DataTable'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import { primaryButtonClass } from '../../../_components/FormField'
@@ -54,10 +53,10 @@ export default async function AdminStatisticsPage({
         description="Müügistatistika kokkuvõtted kuupäeva ja objekti tüübi järgi."
         backHref="/admin/content"
         actions={
-          <Link href="/admin/content/statistics/new" className={primaryButtonClass}>
+          <AdminLink href="/content/statistics/new" className={primaryButtonClass}>
             <PlusIcon />
             Uus kirje
-          </Link>
+          </AdminLink>
         }
       />
       <DataTable

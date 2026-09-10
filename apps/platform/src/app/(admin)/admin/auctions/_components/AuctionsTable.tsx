@@ -12,12 +12,13 @@ import {
   Download as DownloadIcon,
   Settings2 as Settings2Icon,
 } from 'lucide-react'
-import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 
 import { Countdown } from './Countdown'
 import { EndAuctionModal } from './EndAuctionModal'
+import { useAdminBase } from '../../../_components/AdminBase'
+import { AdminLink } from '../../../_components/AdminLink'
 import {
   DataTable,
   type DataTableColumn,
@@ -53,6 +54,7 @@ import { tallinnWallTimeToUtcIso } from '../../content/_components/scheduled-pub
 import type { SortKey } from '../_lib/list-view'
 
 import type { AuctionObjectType, AuctionStatus } from '@/lib/data/schema'
+import { joinAdminBase } from '@/lib/routing/admin-base'
 
 export interface AuctionTableRow {
   id: string
@@ -270,6 +272,7 @@ export function AuctionsTable({
   archiveAction,
   relistAction,
 }: AuctionsTableProps) {
+  const base = useAdminBase()
   const [selected, setSelected] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
   )
@@ -361,13 +364,13 @@ export function AuctionsTable({
         return
       }
       event.preventDefault()
-      window.location.href = '/admin/auctions/new'
+      window.location.href = joinAdminBase(base, '/auctions/new')
     }
     window.addEventListener('keydown', onKeyDown)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [roleCanWrite])
+  }, [base, roleCanWrite])
 
   const toggleRow = (id: string): void => {
     setSelected((previous) => {
@@ -459,13 +462,13 @@ export function AuctionsTable({
       label: 'ID',
       sort: sorts.id,
       render: (row) => (
-        <Link
-          href={`/admin/auctions/${row.id}`}
+        <AdminLink
+          href={`/auctions/${row.id}`}
           className="font-mono text-bodySm text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
           title={row.id}
         >
           #{row.id.slice(0, 8)}
-        </Link>
+        </AdminLink>
       ),
     },
     {
@@ -483,12 +486,12 @@ export function AuctionsTable({
               <span className="sr-only">Kiiroksjon</span>
             </>
           ) : null}
-          <Link
-            href={`/admin/auctions/${row.id}`}
+          <AdminLink
+            href={`/auctions/${row.id}`}
             className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
           >
             {row.title}
-          </Link>
+          </AdminLink>
         </span>
       ),
     },
@@ -615,14 +618,14 @@ export function AuctionsTable({
             Vaata
           </a>
           {roleCanWrite ? (
-            <Link
+            <AdminLink
               href={row.editHref}
               title="Muuda oksjonit"
               className={raBtnActionClass}
             >
               <PencilIcon aria-hidden="true" className="h-3 w-3" />
               Muuda
-            </Link>
+            </AdminLink>
           ) : null}
           {roleCanWrite ? (
             <form action={duplicateAction}>

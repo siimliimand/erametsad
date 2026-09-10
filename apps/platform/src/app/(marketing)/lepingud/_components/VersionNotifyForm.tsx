@@ -3,6 +3,8 @@
 import { Btn, FormInput, Toast } from '@erametsad/ui';
 import { useState, type SyntheticEvent } from 'react';
 
+import { apiFetch } from '@/lib/api/client'
+
 const SUCCESS_MESSAGE = 'Kontrolli posti — saatsime kinnitussõnumi';
 const GENERIC_ERROR = 'Sisemine viga';
 
@@ -36,7 +38,7 @@ export function VersionNotifyForm() {
   async function submit(form: HTMLFormElement, honeypotValue: string) {
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/v1/newsletter', {
+      const response = await apiFetch('/api/v1/newsletter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, company_website: honeypotValue }),

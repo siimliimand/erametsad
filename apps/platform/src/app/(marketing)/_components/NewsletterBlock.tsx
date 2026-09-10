@@ -3,6 +3,8 @@
 import { Btn, FormInput, Toast } from '@erametsad/ui';
 import { useState, type SyntheticEvent } from 'react';
 
+import { apiFetch } from '@/lib/api/client'
+
 export interface NewsletterBlockProps {
   title?: string;
   description?: string;
@@ -43,7 +45,7 @@ export function NewsletterBlock({
     setError(undefined);
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/v1/newsletter', {
+      const res = await apiFetch('/api/v1/newsletter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // company_website is the honeypot the route validates.

@@ -1,5 +1,6 @@
 const CONSENT_COOKIE = 'erametsad_consent'
 
+import { apiFetch } from '@/lib/api/client'
 // Same value shape the events route reads: URL-encoded JSON per the shell
 // spec, written by the CookieBanner (task 2.4). Necessary is always granted
 // and not represented here; only statistics gates event sending.
@@ -33,7 +34,7 @@ export function track(name: string, props?: Record<string, unknown>): void {
     if (name !== 'cookie_consent') {
       if (readConsent()?.statistics !== true) return
     }
-    void fetch('/api/v1/events', {
+    void apiFetch('/api/v1/events', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name, props }),

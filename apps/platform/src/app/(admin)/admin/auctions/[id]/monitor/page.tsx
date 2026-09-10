@@ -237,7 +237,7 @@ export default async function AuctionMonitorPage({
       <PageHeader
         title={`Monitor: ${auction.title}`}
         description="Sama otseülekanne, mida kasutab avalik portaal. Vaikimisi näidatakse summasid ja aegu; identiteet avaneb ainult auditeeritud paljastamisega."
-        backHref={`/admin/auctions/${id}`}
+        backHref={`/auctions/${id}`}
         actions={<StatusPill status={auction.status} />}
       />
       <BidMonitor

@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -46,6 +46,11 @@ vi.mock('next/headers', () => ({
     get: (name: string) =>
       state.cookies[name] !== undefined ? { value: state.cookies[name] } : undefined,
   })),
+  // No x-admin-base header: the admin base stays /admin in tests, matching
+  // the default host URL space.
+  headers: vi.fn(() => ({
+    get: () => null,
+  })),
 }))
 
 vi.mock('@/lib/auth/jwt', () => ({
@@ -60,10 +65,11 @@ vi.mock('@/lib/data/runtime', () => ({
 }))
 
 const ADMIN_ROUTE_ROOT = fileURLToPath(new URL('..', import.meta.url))
+const ADMIN_TREE_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 
-/** Registry href -> page.tsx path under (admin)/admin. `/admin` is the segment index. */
+/** Base-relative registry href -> page.tsx path under (admin)/admin. */
 function pageFileFor(href: string): string {
-  const segment = href === '/admin' ? '' : href.replace(/^\/admin\/?/, '')
+  const segment = href === '/' ? '' : href.replace(/^\//, '')
   const parts = segment === '' ? [] : segment.split('/')
   return [...parts, 'page.tsx'].join('/')
 }
@@ -129,8 +135,34 @@ describe('admin module routes', () => {
     const hrefs = ADMIN_MODULES.map((module) => module.href)
     expect(new Set(hrefs).size).toBe(13)
     for (const href of hrefs) {
-      expect(href === '/admin' || href.startsWith('/admin/'), `${href} is admin-scoped`).toBe(true)
+      expect(href === '/' || href.startsWith('/'), `${href} is base-relative`).toBe(true)
     }
+  })
+})
+
+describe('base-relative href convention', () => {
+  it('keeps every href in the (admin) tree free of the /admin prefix', () => {
+    // Links inside the admin tree carry base-relative paths; the admin base
+    // provider joins the /admin prefix on hosts that serve it there. A
+    // hard-coded /admin href would double the prefix on the admin host.
+    const violations: string[] = []
+    const visit = (dir: string): void => {
+      for (const entry of existsSync(dir) ? readdirSync(dir, { withFileTypes: true }) : []) {
+        const full = `${dir}/${entry.name}`
+        if (entry.isDirectory()) {
+          if (entry.name === '__tests__' || entry.name === 'node_modules') continue
+          visit(full)
+          continue
+        }
+        if (!entry.name.endsWith('.tsx')) continue
+        const content = readFileSync(full, 'utf8')
+        if (/href=\{?["'`]\/admin(\/|["'`])/.test(content) || /location\.href = ["'`]\/admin/.test(content)) {
+          violations.push(full)
+        }
+      }
+    }
+    visit(ADMIN_TREE_ROOT)
+    expect(violations, `hard-coded /admin hrefs in: ${violations.join(', ')}`).toEqual([])
   })
 })
 
@@ -138,7 +170,7 @@ describe('legacy admin path redirects', () => {
   const noParams = Promise.resolve<Record<string, string | string[] | undefined>>({})
 
   it('sends /admin/leads/requests to /admin/companies', async () => {
-    await expect(redirectTarget(() => { LeadsRequestsRedirectPage(); })).resolves.toBe('/admin/companies')
+    await expect(redirectTarget(() => LeadsRequestsRedirectPage())).resolves.toBe('/admin/companies')
   })
 
   it('sends /admin/requests to /admin/inquiries', async () => {
@@ -174,7 +206,7 @@ describe('legacy admin path redirects', () => {
   })
 
   it('sends /admin/content/settings to /admin/settings', async () => {
-    await expect(redirectTarget(() => { ContentSettingsRedirectPage(); })).resolves.toBe('/admin/settings')
+    await expect(redirectTarget(() => ContentSettingsRedirectPage())).resolves.toBe('/admin/settings')
   })
 })
 
@@ -194,17 +226,17 @@ describe('per-module role gating', () => {
 
   it('gates governance module routes away from the specialist', () => {
     expect(readableHrefs('specialist')).toEqual([
-      '/admin',
-      '/admin/auctions',
-      '/admin/bids',
-      '/admin/leads',
-      '/admin/inquiries',
-      '/admin/statistics',
+      '/',
+      '/auctions',
+      '/bids',
+      '/leads',
+      '/inquiries',
+      '/statistics',
     ])
   })
 
   it('gates every read-write module route away from the seller', () => {
-    expect(readableHrefs('seller')).toEqual(['/admin', '/admin/auctions', '/admin/bids'])
+    expect(readableHrefs('seller')).toEqual(['/', '/auctions', '/bids'])
   })
 })
 

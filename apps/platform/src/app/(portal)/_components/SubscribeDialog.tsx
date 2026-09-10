@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { type ListingFilterState } from '../_lib/filter-params'
 
+import { apiFetch } from '@/lib/api/client'
+
 type SubscriptionChannel = 'email' | 'sms'
 type SubscriptionFrequency = 'immediate' | 'daily' | 'weekly'
 
@@ -278,7 +280,7 @@ export function SubscribeDialog({ isOpen, filter, onClose, onSaved }: SubscribeD
     let cancelled = false
     // Same cookie auth the POST uses: a 401 here means the save would run
     // as a guest, so this probe decides the form variant.
-    fetch('/api/v1/auction-subscriptions')
+    apiFetch('/api/v1/auction-subscriptions')
       .then((response) => {
         if (response.status === 401) return 'guest' as const
         if (response.ok) return 'authed' as const
@@ -316,7 +318,7 @@ export function SubscribeDialog({ isOpen, filter, onClose, onSaved }: SubscribeD
           }
         : { filterJson, channel, frequency, ...(consent ? { consent: true } : {}) }
     try {
-      const response = await fetch('/api/v1/auction-subscriptions', {
+      const response = await apiFetch('/api/v1/auction-subscriptions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

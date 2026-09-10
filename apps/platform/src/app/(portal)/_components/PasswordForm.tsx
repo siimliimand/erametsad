@@ -9,6 +9,8 @@ import {
   evaluatePassword,
 } from './PasswordStrengthMeter'
 
+import { apiFetch } from '@/lib/api/client'
+
 const NETWORK_ERROR = 'Võrguühendus ei ole saadaval. Proovi uuesti.'
 const DEFAULT_FALLBACK_ERROR = 'Parooli salvestamine ei õnnestunud. Proovi uuesti.'
 
@@ -204,7 +206,7 @@ export function PasswordResetRequestForm({ next }: PasswordResetRequestFormProps
     setError(null)
     setBusy(true)
     try {
-      const response = await fetch('/api/v1/auth/forgot-password', {
+      const response = await apiFetch('/api/v1/auth/forgot-password', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ identifier: identifier.trim() }),

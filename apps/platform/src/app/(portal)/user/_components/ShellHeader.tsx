@@ -6,6 +6,7 @@ import { useEffect, useState, type SVGProps } from 'react'
 
 import { logoutAction } from '@/app/(portal)/_actions/logout'
 import { useMyStream } from '@/app/(portal)/_lib/use-my-stream'
+import { apiFetch } from '@/lib/api/client'
 
 // Inline Lucide-geometry icons (ISC); apps/platform does not declare
 // lucide-react as a direct dependency, so the few icons the shell needs are
@@ -171,7 +172,7 @@ export function ShellHeader({ profileName }: { profileName: string | null }) {
 
   useEffect(() => {
     let active = true
-    fetch('/api/v1/my/notifications?unread=1')
+    apiFetch('/api/v1/my/notifications?unread=1')
       .then((response) => (response.ok ? (response.json() as Promise<NotificationsResponse>) : null))
       .then((data) => {
         if (active && data && typeof data.unreadCount === 'number') {
@@ -186,7 +187,7 @@ export function ShellHeader({ profileName }: { profileName: string | null }) {
 
   useEffect(() => {
     let active = true
-    fetch('/api/v1/profiles')
+    apiFetch('/api/v1/profiles')
       .then((response) => (response.ok ? (response.json() as Promise<ProfilesResponse>) : null))
       .then((data) => {
         if (!active || !data || !Array.isArray(data.profiles)) return
@@ -217,7 +218,7 @@ export function ShellHeader({ profileName }: { profileName: string | null }) {
     setSwitching(true)
     setSwitchError(null)
     try {
-      const response = await fetch(`/api/v1/profiles/${profileId}/select`, {
+      const response = await apiFetch(`/api/v1/profiles/${profileId}/select`, {
         method: 'POST',
       })
       if (!response.ok) {

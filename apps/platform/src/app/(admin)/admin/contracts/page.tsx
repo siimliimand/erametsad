@@ -1,4 +1,3 @@
-import Link from 'next/link'
 
 import { ContainerDownloadButton } from './_components/ContainerDownloadButton'
 import { HtmlPreviewDrawer } from './_components/HtmlPreviewDrawer'
@@ -19,6 +18,7 @@ import {
   getContractDocumentAction,
   resendContractAction,
 } from '../../_actions/contracts'
+import { AdminLink } from '../../_components/AdminLink'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import {
@@ -324,9 +324,9 @@ export default async function AdminContractsPage({
         title="Lepingud"
         description="Sõlmitavad ja sõlmitud müügilepingud koos pooltega."
         actions={
-          <Link href="/admin/contracts/templates" className={secondaryButtonClass}>
+          <AdminLink href="/contracts/templates" className={secondaryButtonClass}>
             Lepingu mallid
-          </Link>
+          </AdminLink>
         }
       />
 
@@ -393,9 +393,9 @@ export default async function AdminContractsPage({
           Otsi
         </button>
         {hasActiveFilters ? (
-          <Link href="/admin/contracts" className={secondaryButtonClass}>
+          <AdminLink href="/contracts" className={secondaryButtonClass}>
             Tühjenda
-          </Link>
+          </AdminLink>
         ) : null}
       </form>
 
@@ -405,13 +405,13 @@ export default async function AdminContractsPage({
             key: 'nr',
             label: 'Nr',
             render: (row) => (
-              <Link
-                href={`/admin/contracts/${row.id}`}
+              <AdminLink
+                href={`/contracts/${row.id}`}
                 title={row.id}
                 className="font-mono text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {contractNumber(row.id)}
-              </Link>
+              </AdminLink>
             ),
           },
           {
@@ -425,12 +425,12 @@ export default async function AdminContractsPage({
             label: 'Müüja',
             render: (row) =>
               row.sellerId ? (
-                <Link
-                  href={`/admin/users/${row.sellerId}`}
+                <AdminLink
+                  href={`/users/${row.sellerId}`}
                   className="text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
                 >
                   {row.sellerName}
-                </Link>
+                </AdminLink>
               ) : (
                 row.sellerName
               ),
@@ -440,12 +440,12 @@ export default async function AdminContractsPage({
             label: 'Ostja',
             render: (row) =>
               row.buyerId ? (
-                <Link
-                  href={`/admin/users/${row.buyerId}`}
+                <AdminLink
+                  href={`/users/${row.buyerId}`}
                   className="text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
                 >
                   {row.buyerName}
-                </Link>
+                </AdminLink>
               ) : (
                 row.buyerName
               ),
@@ -495,12 +495,12 @@ export default async function AdminContractsPage({
             label: 'Tegevused',
             render: (row) => (
               <div className="flex flex-col items-start gap-xs">
-                <Link
-                  href={`/admin/contracts/${row.id}`}
+                <AdminLink
+                  href={`/contracts/${row.id}`}
                   className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
                 >
                   Vaata
-                </Link>
+                </AdminLink>
                 {row.hasDocument ? (
                   <>
                     <HtmlPreviewDrawer
@@ -558,23 +558,23 @@ export default async function AdminContractsPage({
         </span>
         <span className="flex items-center gap-sm">
           {safePage > 1 ? (
-            <Link
+            <AdminLink
               href={buildUrl({ page: String(safePage - 1) })}
               className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
             >
               ‹ Eelmine
-            </Link>
+            </AdminLink>
           ) : null}
           <span>
             Leht {String(safePage)} / {String(pageCount)}
           </span>
           {safePage < pageCount ? (
-            <Link
+            <AdminLink
               href={buildUrl({ page: String(safePage + 1) })}
               className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
             >
               Järgmine ›
-            </Link>
+            </AdminLink>
           ) : null}
         </span>
       </div>

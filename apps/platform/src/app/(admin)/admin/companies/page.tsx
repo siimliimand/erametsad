@@ -1,4 +1,3 @@
-import Link from 'next/link'
 
 import { HistoryExportButton } from './_components/HistoryExportButton'
 import type {
@@ -16,6 +15,7 @@ import {
   parseCompanyHistoryFilters,
   paginateCompanyHistory,
 } from './_components/history-view'
+import { AdminLink } from '../../_components/AdminLink'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import { FormField, FormSelectField, primaryButtonClass, secondaryButtonClass } from '../../_components/FormField'
@@ -82,12 +82,12 @@ function PaginationLink({
   }
   search.set('lehekulg', String(page))
   return (
-    <Link
-      href={`/admin/companies?${search.toString()}`}
+    <AdminLink
+      href={`/companies?${search.toString()}`}
       className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
     >
       {label}
-    </Link>
+    </AdminLink>
   )
 }
 
@@ -398,11 +398,11 @@ export default async function CompanyAccessRequestsPage({
         backHref="/admin/leads"
       />
       <div className="mb-md inline-flex gap-1 rounded-input border border-border bg-bg-mist p-1">
-        <a href="/admin/companies" className={tabClass(!historyView)}>
+        <a href="/companies" className={tabClass(!historyView)}>
           Ootel taotlused
           <span className={tabCountClass(!historyView)}>{String(openCards.length)}</span>
         </a>
-        <a href="/admin/companies?vaade=ajalugu" className={tabClass(historyView)}>
+        <a href="/companies?vaade=ajalugu" className={tabClass(historyView)}>
           Ajalugu
           <span className={tabCountClass(historyView)}>{String(historyRows.length)}</span>
         </a>
@@ -447,9 +447,9 @@ export default async function CompanyAccessRequestsPage({
             <button type="submit" className={primaryButtonClass}>
               Filtreeri
             </button>
-            <Link href="/admin/companies?vaade=ajalugu" className={secondaryButtonClass}>
+            <AdminLink href="/companies?vaade=ajalugu" className={secondaryButtonClass}>
               Tühjenda
-            </Link>
+            </AdminLink>
           </form>
           <div className="mb-md flex flex-wrap items-center justify-between gap-sm">
             <span className="text-label text-ink-muted">

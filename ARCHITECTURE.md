@@ -102,7 +102,7 @@ The monorepo is under active implementation. `apps/platform` holds the core back
 |---|---|---|
 | `erametsad.ee` | Public marketing & SEO site | Next.js 15 (SSG/ISR), static where possible |
 | `oksjonid.erametsad.ee` | Auction portal SPA | React SPA or Next.js client-heavy routes |
-| `api.erametsad.ee` + `admin.erametsad.ee` | Core backend + role-gated admin | Next.js on Cloudflare Workers (via OpenNext) |
+| `api.erametsad.ee` + `admin.erametsad.ee` | Core backend + role-gated admin (admin UI prefix-free on its own host: `/auctions` renders the admin, `/admin/x` 308s to `/x`) | Next.js on Cloudflare Workers (via OpenNext) |
 
 **Prototype domains (ww0.dev):** Under the `ww0.dev` zone, the prototype runs at `erametsad.ww0.dev`, `oksjonid.erametsad.ww0.dev`, `api.erametsad.ww0.dev`, and `admin.erametsad.ww0.dev`. The production `.ee` cutover is a separate future step.
 
@@ -123,7 +123,7 @@ The monorepo is under active implementation. `apps/platform` holds the core back
 
 All marketing-site content is managed via D1-backed CMS content tables. The site generates statically where possible and hydrates live data client-side.
 
-Host routing lives in `apps/platform/src/lib/routing/host-areas.ts` plus application middleware. The portal host serves the `(portal)` route group; the default host serves `(marketing)` plus `/admin` and `/styleguide`. On the default host, `/` rewrites to `/avaleht` and `/lepingud` to `/lepingud/dokumendid` (the portal keeps the real `/` and `/lepingud` routes on its host). Marketing-only paths 308 to the default host when requested on the portal host, portal paths 308 the reverse way, and `/metsateatise-juhend` 301s to `/metsateatis`. Support APIs `POST /api/v1/consent`, `/api/v1/newsletter` (double opt-in), `/api/v1/events` (consent-gated), and `POST /api/v1/service-requests` (honeypot, 5/min IP limit, duplicate throttle, R2 attachment for hooldusraie, partner routing record) back the cookie banner, newsletter block, analytics skeleton, and the Päringud service-request forms.
+Host routing lives in `apps/platform/src/lib/routing/host-areas.ts` plus application middleware. The portal host serves the `(portal)` route group; the default host serves `(marketing)` plus `/admin` and `/styleguide`. On the default host, `/` rewrites to `/avaleht` and `/lepingud` to `/lepingud/dokumendid` (the portal keeps the real `/` and `/lepingud` routes on its host). Marketing-only paths 308 to the default host when requested on the portal host, portal paths 308 the reverse way, and `/metsateatise-juhend` 301s to `/metsateatis`. The admin host `admin.erametsad.ww0.dev` serves the admin UI prefix-free: `/` and root paths render the admin through an internal rewrite, `/admin`-prefixed URLs 308 to the clean form, the login and password flows stay same-host, and portal or marketing paths 308 to their hosts. The API host `api.erametsad.ww0.dev` serves only `/api` routes and 308s stray page paths to the default host; browser API calls target it with credentialed CORS (`API_CORS_DOMAIN_SUFFIXES` allowlist) and zone-scoped session cookies (`SESSION_COOKIE_DOMAIN`), while hosts outside the suffix keep host-only cookies. Support APIs `POST /api/v1/consent`, `/api/v1/newsletter` (double opt-in), `/api/v1/events` (consent-gated), and `POST /api/v1/service-requests` (honeypot, 5/min IP limit, duplicate throttle, R2 attachment for hooldusraie, partner routing record) back the cookie banner, newsletter block, analytics skeleton, and the Päringud service-request forms.
 
 ### 3.2 Auction Portal
 

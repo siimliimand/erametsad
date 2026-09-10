@@ -3,6 +3,8 @@
 import { Toast } from '@erametsad/ui'
 import { useState, type SyntheticEvent } from 'react'
 
+import { apiFetch } from '@/lib/api/client'
+
 // Local minimal newsletter form for the articles hub. Task 3.1 owns the
 // shared NewsletterBlock at (marketing)/_components; until it lands, this
 // island posts the same contract (email + honeypot) to /api/v1/newsletter.
@@ -23,7 +25,7 @@ export function NewsletterSignup() {
     const honeypot = typeof honeypotValue === 'string' ? honeypotValue : ''
     setPending(true)
     try {
-      const response = await fetch('/api/v1/newsletter', {
+      const response = await apiFetch('/api/v1/newsletter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), company_website: honeypot }),

@@ -21,13 +21,13 @@ describe('TopbarSearch palette coverage', () => {
 
   it('keeps the wizard and template sub-routes', () => {
     const hrefs = PALETTE_GROUPS.flatMap((group) => group.routes.map((route) => route.href))
-    expect(hrefs).toContain('/admin/auctions/new')
-    expect(hrefs).toContain('/admin/contracts/templates')
+    expect(hrefs).toContain('/auctions/new')
+    expect(hrefs).toContain('/contracts/templates')
   })
 
   it('labels the CMS module Sisuhaldus', () => {
     const content = PALETTE_GROUPS.find((group) => group.id === 'content')
     expect(content?.label).toBe('Sisuhaldus')
-    expect(content?.routes[0]?.href).toBe('/admin/content')
+    expect(content?.routes[0]?.href).toBe('/content')
   })
 })

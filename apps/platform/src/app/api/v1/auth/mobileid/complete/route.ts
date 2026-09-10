@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 import { completeEidLogin } from '@/lib/auth/eid-provider'
+import { sessionCookieDomainFromHost } from '@/lib/auth/session'
 
 export async function POST(request: NextRequest) {
   let body: Record<string, unknown>
@@ -17,5 +18,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'sessionRef is required' }, { status: 400 })
   }
 
-  return completeEidLogin('mobileid', sessionRef)
+  return completeEidLogin(
+    'mobileid',
+    sessionRef,
+    sessionCookieDomainFromHost(request.headers.get('host')),
+  )
 }

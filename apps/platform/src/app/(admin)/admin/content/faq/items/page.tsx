@@ -1,6 +1,5 @@
-import Link from 'next/link'
-
 import { deleteFaqItemAction } from '../../../../_actions/content'
+import { AdminLink } from '../../../../_components/AdminLink'
 import { DataTable } from '../../../../_components/DataTable'
 import { ErrorNotice } from '../../../../_components/ErrorNotice'
 import {
@@ -65,10 +64,10 @@ export default async function AdminFaqItemsPage({
         description="Korduma kippuvad küsimused koos kategooriaga."
         backHref="/admin/content"
         actions={
-          <Link href="/admin/content/faq/items/new" className={primaryButtonClass}>
+          <AdminLink href="/content/faq/items/new" className={primaryButtonClass}>
             <PlusIcon />
             Uus küsimus
-          </Link>
+          </AdminLink>
         }
       />
       <form className="mb-md flex flex-wrap items-end gap-sm">
@@ -90,12 +89,12 @@ export default async function AdminFaqItemsPage({
             key: 'question',
             label: 'Küsimus',
             render: (row) => (
-              <Link
-                href={`/admin/content/faq/items/${row.id}`}
+              <AdminLink
+                href={`/content/faq/items/${row.id}`}
                 className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {row.question}
-              </Link>
+              </AdminLink>
             ),
           },
           {

@@ -4,6 +4,8 @@ import { Btn } from '@erametsad/ui'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { apiFetch } from '@/lib/api/client'
+
 export interface AutobidderExisting {
   id: string
   /** Current maximum in EUR. */
@@ -110,12 +112,12 @@ export function AutobidderControl({
     try {
       const response =
         current !== null
-          ? await fetch(`/api/v1/auto-bidders/${encodeURIComponent(current.id)}`, {
+          ? await apiFetch(`/api/v1/auto-bidders/${encodeURIComponent(current.id)}`, {
               method: 'PATCH',
               headers: { 'content-type': 'application/json' },
               body: JSON.stringify({ maxAmount: value }),
             })
-          : await fetch('/api/v1/auto-bidders', {
+          : await apiFetch('/api/v1/auto-bidders', {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
               body: JSON.stringify({ auctionId, maxAmount: value }),

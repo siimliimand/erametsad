@@ -424,12 +424,12 @@ describe('recent lead rows', () => {
       source: 'Veebivorm',
       countyName: 'Tartumaa',
       specialistName: 'Jaan Spetsialist',
-      href: '/admin/leads/lead-1',
+      href: '/leads/lead-1',
     })
     expect(rows[1]?.source).toBeNull()
     expect(rows[1]?.countyName).toBeNull()
     expect(rows[1]?.specialistName).toBeNull()
-    expect(rows[1]?.href).toBe('/admin/leads/lead-2')
+    expect(rows[1]?.href).toBe('/leads/lead-2')
   })
 
   it('falls back to null names for unknown ids and honours limits', () => {
@@ -766,7 +766,7 @@ describe('buildQuickActions role scoping', () => {
         note: 'uued taotlused kinnitamisel',
         count: 5,
         countLabel: '5 uut',
-        href: '/admin/companies',
+        href: '/companies',
       },
       {
         key: 'underbids',
@@ -774,7 +774,7 @@ describe('buildQuickActions role scoping', () => {
         note: 'vajab otsust · vanim 5 päeva',
         count: 2,
         countLabel: '2',
-        href: '/admin/bids',
+        href: '/bids',
       },
       {
         key: 'contracts-signing',
@@ -782,7 +782,7 @@ describe('buildQuickActions role scoping', () => {
         note: 'saadetud allkirja ootama',
         count: 2,
         countLabel: '2 saadetud',
-        href: '/admin/contracts',
+        href: '/contracts',
       },
     ])
   })
@@ -961,7 +961,7 @@ describe('getWorkspaceData', () => {
           note: 'uued taotlused kinnitamisel',
           count: 0,
           countLabel: '0 uut',
-          href: '/admin/companies',
+          href: '/companies',
         },
         {
           key: 'underbids',
@@ -969,7 +969,7 @@ describe('getWorkspaceData', () => {
           note: 'vajab otsust',
           count: 0,
           countLabel: '0',
-          href: '/admin/bids',
+          href: '/bids',
         },
         {
           key: 'contracts-signing',
@@ -977,7 +977,7 @@ describe('getWorkspaceData', () => {
           note: 'saadetud allkirja ootama',
           count: 0,
           countLabel: '0 saadetud',
-          href: '/admin/contracts',
+          href: '/contracts',
         },
       ],
       recentLeads: [],

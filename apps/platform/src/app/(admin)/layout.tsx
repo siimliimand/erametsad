@@ -2,16 +2,20 @@ import type { Metadata } from 'next'
 
 import './admin.css'
 
+import { AdminBaseProvider } from './_components/AdminBase'
 import type { AdminNavBadge } from './_components/AdminNav'
+import { AdminSessionRefresh } from './_components/AdminSessionRefresh'
 import { AdminShell } from './_components/AdminShell'
 import { requireAdminRepositories } from './_lib/admin'
 import { userRoleLabels } from './_lib/labels'
 import { visibleModules } from './_lib/permissions'
 import type { AdminModuleId } from './_lib/permissions'
 
+
 import type { CoreRepositories, RepositorySlug } from '@/lib/data/repositories'
 import type { WhereClause } from '@/lib/data/repositories/where'
 import { getRepositories } from '@/lib/data/runtime'
+import { getAdminBase } from '@/lib/routing/admin-base-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -108,26 +112,31 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     Promise.all(badgeTasks),
   ])
 
+  const adminBase = await getAdminBase()
+
   const badges = Object.fromEntries(badgeEntries) as Partial<Record<AdminModuleId, AdminNavBadge>>
   const roleLabel = userRoleLabels[session.role]
 
   return (
-    <AdminShell
+    <AdminBaseProvider base={adminBase}>
+      <AdminSessionRefresh />
+      <AdminShell
       modules={visibleModules(session.role)}
       roleLabel={roleLabel}
       userName={operator?.name ?? operator?.email ?? roleLabel}
       environmentLabel={environmentBadgeLabel()}
       badges={badges}
-      notifications={{
-        unreadCount: unread.docs.length,
-        items: unread.docs.slice(0, 5).map((doc) => ({
-          id: doc.id,
-          title: doc.title,
-          createdAt: doc.createdAt,
-        })),
-      }}
-    >
-      {children}
-    </AdminShell>
+        notifications={{
+          unreadCount: unread.docs.length,
+          items: unread.docs.slice(0, 5).map((doc) => ({
+            id: doc.id,
+            title: doc.title,
+            createdAt: doc.createdAt,
+          })),
+        }}
+      >
+        {children}
+      </AdminShell>
+    </AdminBaseProvider>
   )
 }
