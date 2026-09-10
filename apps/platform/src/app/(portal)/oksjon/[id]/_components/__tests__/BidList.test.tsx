@@ -71,7 +71,7 @@ function plain(value: string): string {
 }
 
 function eur(value: number): string {
-  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
 
 function apiResponse(status: number, body: unknown): Response {
@@ -116,7 +116,7 @@ function text(): string {
 }
 
 function rowNodes(): HTMLElement[] {
-  return [...container.querySelectorAll('ol > li')] as HTMLElement[]
+  return [...container.querySelectorAll('tbody tr')] as HTMLElement[]
 }
 
 afterEach(() => {
@@ -170,7 +170,7 @@ describe('BidList guest variant', () => {
 })
 
 describe('BidList authed variant', () => {
-  it('renders descending rows with Pakkuja labels, autobid chip, and own-bid highlight', async () => {
+  it('renders descending demo table rows with Pakkuja labels, source chip, leading highlight, and own-bid chip', async () => {
     await mount(
       authedView({
         bidCount: 3,
@@ -190,27 +190,42 @@ describe('BidList authed variant', () => {
 
     const nodes = rowNodes()
     expect(nodes).toHaveLength(3)
-    // Descending by amount regardless of server order.
-    expect(nodes[0]?.textContent).toContain('#1')
+    // Descending by amount regardless of server order; the leading row
+    // carries the demo highlight plus the Liidab chip.
+    expect(nodes[0]?.className).toContain('bg-primaryLight')
     expect(plain(nodes[0]?.textContent ?? '')).toContain(plain(eur(1500)))
+    expect(nodes[0]?.textContent).toContain('Liidab')
     expect(nodes[0]?.textContent).toContain('Pakkuja #3')
     expect(nodes[0]?.textContent).toContain('Sinu pakkumine')
-    expect(nodes[0]?.className).toContain('bg-primaryLight')
+    expect(nodes[0]?.textContent).toContain('Käsitsi')
 
-    expect(nodes[1]?.textContent).toContain('#2')
     expect(plain(nodes[1]?.textContent ?? '')).toContain(plain(eur(1200)))
-    expect(nodes[1]?.textContent).toContain('Automaatpakkuja')
+    expect(nodes[1]?.textContent).not.toContain('Liidab')
+    expect(nodes[1]?.textContent).toContain('Automaat')
     expect(nodes[1]?.textContent).not.toContain('Sinu pakkumine')
 
-    expect(nodes[2]?.textContent).toContain('#3')
     expect(plain(nodes[2]?.textContent ?? '')).toContain(plain(eur(900)))
     expect(plain(nodes[2]?.textContent ?? '')).toContain('5 minutit tagasi')
+
+    // Demo history note with the shown/total counts.
+    expect(text()).toContain('Kuvame 3 viimast pakkumist kokku 3-st.')
   })
 
   it('shows the empty state before any bids exist', async () => {
     await mount(authedView({ bidCount: 0, leadingBidAmount: null, bids: [] }))
     expect(text()).toContain('Pakkumisi veel pole.')
     expect(rowNodes()).toHaveLength(0)
+  })
+
+  it('shows the note with the authoritative total when it differs from the shown rows', async () => {
+    await mount(
+      authedView({
+        bidCount: 14,
+        leadingBidAmount: 1500,
+        bids: [row({ id: 'b2', amount: 1500, label: 'Pakkuja #3' })],
+      }),
+    )
+    expect(text()).toContain('Kuvame 1 viimast pakkumist kokku 14-st.')
   })
 
   it('keeps the banner hidden while the viewer leads', async () => {

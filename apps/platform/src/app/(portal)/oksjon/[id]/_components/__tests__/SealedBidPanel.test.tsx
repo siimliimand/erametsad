@@ -76,7 +76,7 @@ function plain(value: string): string {
 }
 
 function eur(value: number): string {
-  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
 
 function inputAmount(value: number): string {
@@ -149,7 +149,7 @@ function modalButton(label: string): HTMLButtonElement {
 
 async function confirmModal(): Promise<void> {
   await act(async () => {
-    modalButton('Esita pakkumine').click()
+    modalButton('Kinnita').click()
     await flush()
   })
 }
@@ -181,8 +181,8 @@ afterEach(() => {
 describe('SealedBidPanel guest rendering', () => {
   it('shows the count, the login hint, and no form for guests while active', async () => {
     await mount(baseProps())
-    expect(text()).toContain('Suletud pakkumine')
-    expect(text()).toContain('Pakkumisi: 3')
+    expect(text()).toContain('Pimepakkumine')
+    expect(text()).toContain('Pakkumuste arv: 3')
     expect(text()).toContain('Logi sisse pakkumise tegemiseks.')
     expect(container.querySelector('a[href="/login?next=%2Foksjon%2Fa1"]')).not.toBeNull()
     expect(container.querySelector('form')).toBeNull()
@@ -190,10 +190,11 @@ describe('SealedBidPanel guest rendering', () => {
     expect(text()).not.toContain('€')
   })
 
-  it('shows the final price to guests on an ended auction', async () => {
+  it('shows the result phase card with the final price to guests on an ended auction', async () => {
     await mount(baseProps({ status: 'ended', bidCount: null, finalPrice: 4000 }))
     expect(text()).toContain('Oksjon on lõppenud')
-    expect(text()).toContain(`Lõpphind: ${plain(eur(4000))}`)
+    expect(text()).toContain('Lõpphind')
+    expect(text()).toContain(plain(eur(4000)))
     expect(container.querySelector('form')).toBeNull()
   })
 
@@ -209,22 +210,23 @@ describe('SealedBidPanel count-only states', () => {
     await mount(
       baseProps({ status: 'scheduled', bidCount: 7, viewer: baseViewer() }),
     )
-    expect(text()).toContain('Suletud pakkumine')
-    expect(text()).toContain('Pakkumisi: 7')
+    expect(text()).toContain('Pimepakkumine')
+    expect(text()).toContain('Pakkumuste arv: 7')
     expect(text()).toContain('Oksjon pole veel alanud.')
     expect(text()).toContain(`Oksjon algab: ${plain(fmtDateTime('2026-09-01T09:00:00.000Z'))}`)
     expect(container.querySelector('form')).toBeNull()
     expect(container.querySelector('input')).toBeNull()
   })
 
-  it('renders the active form with the start price and prefilled identity', async () => {
+  it('renders the active form with the amount field and prefilled identity', async () => {
     await mount(baseProps({ viewer: baseViewer() }))
-    expect(text()).toContain('Pakkumisi: 3')
-    expect(text()).toContain(`Alghind`)
-    expect(text()).toContain(plain(eur(1000)))
+    expect(text()).toContain('Pakkumuste arv: 3')
+    expect(text()).toContain('Pakkumise summa (€)')
     expect(text()).toContain(`Vähim lubatud pakkumine: ${inputAmount(1000)} €`)
+    expect(text()).toContain('Soovitame alghinnast madalamat pakkumist vältida')
+    expect(text()).toContain('Teenustasu 3% + km')
     const submit = [...container.querySelectorAll('button')].find((button) =>
-      button.textContent.includes('Esita pakkumine'),
+      button.textContent.includes('Esita pimepakkumine'),
     )
     expect(submit).toBeDefined()
     expect(text()).not.toContain('Esita täienduspakkumine')
@@ -247,7 +249,7 @@ describe('SealedBidPanel locked card after submission', () => {
         }),
       }),
     )
-    expect(text()).toContain('Pakkumine on esitatud')
+    expect(text()).toContain('Pimepakkumine on esitatud')
 
     await clickButton('Muuda pakkumist')
     expect(text()).toContain('Esita täienduspakkumine')
@@ -256,7 +258,7 @@ describe('SealedBidPanel locked card after submission', () => {
     await submitForm()
 
     expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
-    expect(plain(document.body.textContent)).toContain('Kinnita siduv pakkumine')
+    expect(plain(document.body.textContent)).toContain('Kinnita pakkumine')
     expect(plain(document.body.textContent)).toContain(plain(eur(1800)))
     expect(plain(document.body.textContent)).toContain(
       'Uus pakkumine asendab sinu eelmise pakkumise.',
@@ -273,7 +275,7 @@ describe('SealedBidPanel locked card after submission', () => {
     expect(body.type).toBe('sealed')
     expect(body.amount).toBe(1800)
 
-    expect(text()).toContain('Pakkumine on esitatud')
+    expect(text()).toContain('Pimepakkumine on esitatud')
     expect(text()).toContain(plain(eur(1800)))
     expect(
       container.querySelector('[aria-label="Summa on peidetud kuni pakkumiste avamiseni"]'),
@@ -304,7 +306,7 @@ describe('SealedBidPanel locked card after submission', () => {
     expect(body.type).toBe('sealed')
     expect(body.amount).toBe(1500)
     expect(nav.refresh).toHaveBeenCalledTimes(1)
-    expect(text()).not.toContain('Pakkumine on esitatud')
+    expect(text()).not.toContain('Pimepakkumine on esitatud')
     expect(container.querySelector('form')).not.toBeNull()
   })
 
@@ -317,7 +319,7 @@ describe('SealedBidPanel locked card after submission', () => {
         }),
       }),
     )
-    expect(text()).toContain('Pakkumine on esitatud')
+    expect(text()).toContain('Pimepakkumine on esitatud')
     expect(text()).toContain('•••• €')
     expect(text()).not.toContain('1500')
     expect(text()).toContain(
@@ -338,7 +340,7 @@ describe('SealedBidPanel locked card after submission', () => {
         }),
       }),
     )
-    expect(text()).toContain('Pakkumine on esitatud')
+    expect(text()).toContain('Pimepakkumine on esitatud')
     expect(text()).toContain('Täienduspakkumiste limiit on täis.')
     expect(text()).not.toContain('Muuda pakkumist')
     expect(container.querySelector('form')).toBeNull()
@@ -399,7 +401,9 @@ describe('SealedBidPanel post-opening states', () => {
       }),
     )
     expect(text()).toContain('Palju õnne! Sinu pakkumine osutus edukaimaks.')
-    expect(text()).toContain(`Lõpphind: ${plain(eur(5000))}`)
+    expect(text()).toContain('Lõpphind')
+    expect(text()).toContain(plain(eur(5000)))
+    expect(text()).toContain('Võitjale lisandub teenustasu 3% + km.')
     expect(
       container.querySelector('a[href="/lepingud/oksjonileping/a1"]'),
     ).not.toBeNull()

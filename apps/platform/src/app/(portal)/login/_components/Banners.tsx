@@ -1,5 +1,7 @@
 'use client'
 
+import { CircleAlert, ShieldAlert } from 'lucide-react'
+
 interface BannerLayoutProps {
   severity: 'alert' | 'info'
   title: string
@@ -7,23 +9,24 @@ interface BannerLayoutProps {
 }
 
 function BannerLayout({ severity, title, children }: BannerLayoutProps) {
-  const tone =
-    severity === 'alert'
-      ? 'border-danger bg-dangerLight'
-      : 'border-info bg-infoLight'
+  const isAlert = severity === 'alert'
+  const Icon = isAlert ? ShieldAlert : CircleAlert
+  const tone = isAlert ? 'border-danger bg-dangerLight' : 'border-info bg-infoLight'
   return (
     <div
-      role={severity === 'alert' ? 'alert' : 'status'}
-      className={`rounded-card border p-md ${tone}`}
+      role={isAlert ? 'alert' : 'status'}
+      className={`flex items-start gap-sm rounded-card border p-md ${tone}`}
     >
-      <p
-        className={`font-label font-semibold uppercase tracking-wide ${
-          severity === 'alert' ? 'text-danger' : 'text-info'
-        }`}
-      >
-        {title}
-      </p>
-      <div className="mt-2xs font-body text-body text-ink">{children}</div>
+      <Icon
+        className={`mt-0.5 h-5 w-5 shrink-0 ${isAlert ? 'text-danger' : 'text-info'}`}
+        aria-hidden="true"
+      />
+      <div>
+        <p className={`font-heading text-body font-bold ${isAlert ? 'text-danger' : 'text-info'}`}>
+          {title}
+        </p>
+        <div className="mt-2xs font-body text-bodySm text-ink">{children}</div>
+      </div>
     </div>
   )
 }

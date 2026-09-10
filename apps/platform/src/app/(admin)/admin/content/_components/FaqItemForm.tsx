@@ -1,8 +1,8 @@
-import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
 import { RichTextFormValue } from './RichTextFormValue'
 import { saveFaqItemAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import {
   FormField,
   FormSelectField,
@@ -72,9 +72,9 @@ export function FaqItemForm({
         <button type="submit" className={primaryButtonClass}>
           Salvesta
         </button>
-        <Link href="/admin/content/faq/items" className={secondaryButtonClass}>
+        <AdminLink href="/content/faq/items" className={secondaryButtonClass}>
           Tühista
-        </Link>
+        </AdminLink>
       </div>
     </form>
   )

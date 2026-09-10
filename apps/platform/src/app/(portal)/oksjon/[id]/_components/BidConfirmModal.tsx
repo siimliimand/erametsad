@@ -21,7 +21,12 @@ export interface BidConfirmModalProps {
 }
 
 function eur(value: number): string {
-  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+  return value.toLocaleString('et-EE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
 }
 
 export function BidConfirmModal({
@@ -41,10 +46,9 @@ export function BidConfirmModal({
       size="sm"
     >
       <div className="flex flex-col gap-sm">
-        <div className="flex items-baseline justify-between gap-sm rounded-input bg-bgMist px-sm py-xs">
-          <span className="text-bodySm text-inkMuted">Pakkumise summa</span>
-          <span className="font-heading text-h3 text-ink">{eur(amount)}</span>
-        </div>
+        <p className="font-heading text-3xl font-extrabold text-primaryDark">
+          {eur(amount)}
+        </p>
         {nextStepAmount !== null && (
           <p className="text-bodySm text-inkMuted">
             Järgmine lubatud pakkumine on vähemalt {eur(nextStepAmount)}.
@@ -62,7 +66,7 @@ export function BidConfirmModal({
           <Btn variant="outline" onClick={onClose} disabled={isSubmitting}>
             Katkesta
           </Btn>
-          <Btn onClick={onConfirm} isLoading={isSubmitting}>
+          <Btn variant="cta" onClick={onConfirm} isLoading={isSubmitting}>
             Esita pakkumine
           </Btn>
         </div>

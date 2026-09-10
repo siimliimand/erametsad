@@ -333,18 +333,35 @@ interface CookieWriteOptions {
   sameSite?: boolean | 'lax' | 'strict' | 'none'
   path?: string
   maxAge?: number
+  domain?: string
 }
 
 interface CookieWriter {
   set(name: string, value: string, options: CookieWriteOptions): unknown
 }
 
-function writeAccessCookie(store: CookieWriter, accessToken: string): void {
-  store.set('access_token', accessToken, ACCESS_COOKIE_OPTIONS)
+// Deployments that serve the API on its own hostname need the session
+// cookies visible to every subdomain of the site, so the API host's
+// Set-Cookie can authenticate server components on the page hosts too.
+// The configured domain only applies when the request host actually sits
+// under it — a workers.dev host must keep host-only cookies, and browsers
+// reject a Domain attribute outside the request host's suffix anyway.
+export function sessionCookieDomainFromHost(host: string | null | undefined): string {
+  const configured = process.env.SESSION_COOKIE_DOMAIN?.trim().toLowerCase()
+  if (!configured) return ''
+  const hostname = host?.trim().toLowerCase().replace(/:\d+$/, '') ?? ''
+  if (hostname === configured || hostname.endsWith(`.${configured}`)) {
+    return configured
+  }
+  return ''
 }
 
-function writeRefreshCookie(store: CookieWriter, refreshToken: string): void {
-  store.set('refresh_token', refreshToken, REFRESH_COOKIE_OPTIONS)
+function writeAccessCookie(store: CookieWriter, accessToken: string, domain = ''): void {
+  store.set('access_token', accessToken, { ...ACCESS_COOKIE_OPTIONS, domain })
+}
+
+function writeRefreshCookie(store: CookieWriter, refreshToken: string, domain = ''): void {
+  store.set('refresh_token', refreshToken, { ...REFRESH_COOKIE_OPTIONS, domain })
 }
 
 /** Cookie writer for server actions: `cookies()` from next/headers. */
@@ -352,32 +369,35 @@ export function writeSessionCookies(
   store: CookieWriter,
   accessToken: string,
   refreshToken: string,
+  domain = '',
 ): void {
-  writeAccessCookie(store, accessToken)
-  writeRefreshCookie(store, refreshToken)
+  writeAccessCookie(store, accessToken, domain)
+  writeRefreshCookie(store, refreshToken, domain)
 }
 
 export function setAccessTokenCookie(
   response: NextResponse,
   accessToken: string,
+  domain = '',
 ): void {
-  writeAccessCookie(response.cookies, accessToken)
+  writeAccessCookie(response.cookies, accessToken, domain)
 }
 
 export function setSessionCookies(
   response: NextResponse,
   accessToken: string,
   refreshToken: string,
+  domain = '',
 ): void {
-  writeSessionCookies(response.cookies, accessToken, refreshToken)
+  writeSessionCookies(response.cookies, accessToken, refreshToken, domain)
 }
 
 /** Cookie clearing for server actions (maxAge 0 drops both cookies). */
-export function clearSessionCookiesOnStore(store: CookieWriter): void {
-  writeAccessCookie(store, '')
-  writeRefreshCookie(store, '')
+export function clearSessionCookiesOnStore(store: CookieWriter, domain = ''): void {
+  writeAccessCookie(store, '', domain)
+  writeRefreshCookie(store, '', domain)
 }
 
-export function clearSessionCookies(response: NextResponse): void {
-  clearSessionCookiesOnStore(response.cookies)
+export function clearSessionCookies(response: NextResponse, domain = ''): void {
+  clearSessionCookiesOnStore(response.cookies, domain)
 }

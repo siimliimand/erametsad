@@ -51,6 +51,7 @@ import type {
   PageBlockType,
   RedirectType,
 } from '@/lib/data/schema'
+import { adminUrl } from '@/lib/routing/admin-base-server'
 
 const articlesPath = '/admin/content/articles'
 const pagesPath = '/admin/content/pages'
@@ -117,8 +118,8 @@ function readJsonValue(formData: FormData, key: string): { invalid: boolean; val
   }
 }
 
-function redirectWithError(path: string, message: string): never {
-  redirect(`${path}?viga=${encodeURIComponent(message)}`)
+async function redirectWithError(path: string, message: string): Promise<never> {
+  redirect(await adminUrl(`${path}?viga=${encodeURIComponent(message)}`))
 }
 
 function formPath(basePath: string, id: string): string {
@@ -130,7 +131,7 @@ async function persist<T>(path: string, prefix: string, write: () => Promise<T>)
   try {
     return await write()
   } catch (error) {
-    redirectWithError(path, `${prefix}${error instanceof Error ? error.message : String(error)}`)
+    return redirectWithError(path, `${prefix}${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -141,14 +142,14 @@ function revalidate(basePath: string, id: string): void {
   }
 }
 
-function readPublishAt(formData: FormData, errorPath: string, label: string): string | null {
+async function readPublishAt(formData: FormData, errorPath: string, label: string): Promise<string | null> {
   const raw = readText(formData, 'publishAt')
   if (raw.length === 0) {
     return null
   }
   const iso = tallinnWallTimeToUtcIso(raw)
   if (!iso) {
-    redirectWithError(errorPath, `${label} peab olema korrektne kuupäev ja kellaaeg.`)
+    await redirectWithError(errorPath, `${label} peab olema korrektne kuupäev ja kellaaeg.`)
   }
   return iso
 }
@@ -284,7 +285,7 @@ async function persistSlugChangeRedirect(
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(errorPath, `Suunamise loomine ebaõnnestus: ${failure}`)
+    return redirectWithError(errorPath, `Suunamise loomine ebaõnnestus: ${failure}`)
   }
 }
 
@@ -298,19 +299,19 @@ export async function saveArticleAction(formData: FormData): Promise<void> {
   const slug = readText(formData, 'slug')
   const status = readText(formData, 'status') as ContentStatus
 
-  if (!title) redirectWithError(errorPath, 'Pealkiri on kohustuslik.')
-  if (!slug) redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
-  if (!contentStatuses.includes(status)) redirectWithError(errorPath, 'Vali sobiv olek.')
+  if (!title) return redirectWithError(errorPath, 'Pealkiri on kohustuslik.')
+  if (!slug) return redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
+  if (!contentStatuses.includes(status)) return redirectWithError(errorPath, 'Vali sobiv olek.')
 
   await publishDueScheduledContent(repositories, session.userId)
 
-  const publishAtIso = readPublishAt(formData, errorPath, 'Avaldamise aeg')
+  const publishAtIso = await readPublishAt(formData, errorPath, 'Avaldamise aeg')
   const current = id
     ? await persist(errorPath, 'Artikli lugemine ebaõnnestus: ', () =>
         repositories.findByID({ collection: 'articles', id }),
       )
     : null
-  if (id && !current) redirectWithError(errorPath, 'Artiklit ei leitud.')
+  if (id && !current) return redirectWithError(errorPath, 'Artiklit ei leitud.')
 
   const decision = resolvePublishDecision({
     requestedStatus: status,
@@ -372,7 +373,7 @@ export async function saveArticleAction(formData: FormData): Promise<void> {
 
   revalidate(articlesPath, id)
   revalidatePath(contentPublicPath('articles', slug))
-  redirect(articlesPath)
+  redirect(await adminUrl(articlesPath))
 }
 
 export async function setArticleStatusAction(formData: FormData): Promise<void> {
@@ -381,15 +382,15 @@ export async function setArticleStatusAction(formData: FormData): Promise<void> 
 
   const id = readText(formData, 'id')
   const status = readText(formData, 'status') as ContentStatus
-  if (!id) redirectWithError(articlesPath, 'Artikli identifikaator puudub.')
-  if (!contentStatuses.includes(status)) redirectWithError(articlesPath, 'Vali sobiv olek.')
+  if (!id) return redirectWithError(articlesPath, 'Artikli identifikaator puudub.')
+  if (!contentStatuses.includes(status)) return redirectWithError(articlesPath, 'Vali sobiv olek.')
 
   await publishDueScheduledContent(repositories, session.userId)
 
   const current = await persist(articlesPath, 'Artikli lugemine ebaõnnestus: ', () =>
     repositories.findByID({ collection: 'articles', id }),
   )
-  if (!current) redirectWithError(articlesPath, 'Artiklit ei leitud.')
+  if (!current) return redirectWithError(articlesPath, 'Artiklit ei leitud.')
 
   const decision = resolvePublishDecision({
     requestedStatus: status,
@@ -419,7 +420,7 @@ export async function setArticleStatusAction(formData: FormData): Promise<void> 
 
   revalidate(articlesPath, id)
   revalidatePath(contentPublicPath('articles', current.slug))
-  redirect(articlesPath)
+  redirect(await adminUrl(articlesPath))
 }
 
 export async function deleteArticleAction(formData: FormData): Promise<void> {
@@ -427,14 +428,14 @@ export async function deleteArticleAction(formData: FormData): Promise<void> {
   assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(articlesPath, 'Artikli identifikaator puudub.')
+  if (!id) return redirectWithError(articlesPath, 'Artikli identifikaator puudub.')
 
   await persist(articlesPath, 'Artikli kustutamine ebaõnnestus: ', () =>
     repositories.delete({ collection: 'articles', id }),
   )
 
   revalidate(articlesPath, id)
-  redirect(articlesPath)
+  redirect(await adminUrl(articlesPath))
 }
 
 export async function savePageAction(formData: FormData): Promise<void> {
@@ -451,23 +452,23 @@ export async function savePageAction(formData: FormData): Promise<void> {
   const status = (scheduleIntent ? 'published' : readText(formData, 'status')) as ContentStatus
   const layout = readJsonValue(formData, 'layout')
 
-  if (!title) redirectWithError(errorPath, 'Pealkiri on kohustuslik.')
-  if (!slug) redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
-  if (!contentStatuses.includes(status)) redirectWithError(errorPath, 'Vali sobiv olek.')
-  if (layout.invalid) redirectWithError(errorPath, 'Paigutus peab olema korrektne JSON.')
+  if (!title) return redirectWithError(errorPath, 'Pealkiri on kohustuslik.')
+  if (!slug) return redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
+  if (!contentStatuses.includes(status)) return redirectWithError(errorPath, 'Vali sobiv olek.')
+  if (layout.invalid) return redirectWithError(errorPath, 'Paigutus peab olema korrektne JSON.')
 
   await publishDueScheduledContent(repositories, session.userId)
 
-  const publishAtIso = readPublishAt(formData, errorPath, 'Avaldamise aeg')
+  const publishAtIso = await readPublishAt(formData, errorPath, 'Avaldamise aeg')
   if (scheduleIntent && (publishAtIso === null || publishAtIso <= new Date().toISOString())) {
-    redirectWithError(errorPath, 'Ajastamiseks vali tulevikus olev avaldamise aeg.')
+    return redirectWithError(errorPath, 'Ajastamiseks vali tulevikus olev avaldamise aeg.')
   }
   const current = id
     ? await persist(errorPath, 'Lehe lugemine ebaõnnestus: ', () =>
         repositories.findByID({ collection: 'pages', id }),
       )
     : null
-  if (id && !current) redirectWithError(errorPath, 'Lehte ei leitud.')
+  if (id && !current) return redirectWithError(errorPath, 'Lehte ei leitud.')
 
   const decision = resolvePublishDecision({
     requestedStatus: status,
@@ -531,7 +532,7 @@ export async function savePageAction(formData: FormData): Promise<void> {
 
   revalidate(pagesPath, id)
   revalidatePath(contentPublicPath('pages', slug))
-  redirect(pagesPath)
+  redirect(await adminUrl(pagesPath))
 }
 
 export async function deletePageAction(formData: FormData): Promise<void> {
@@ -539,14 +540,14 @@ export async function deletePageAction(formData: FormData): Promise<void> {
   assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(pagesPath, 'Lehe identifikaator puudub.')
+  if (!id) return redirectWithError(pagesPath, 'Lehe identifikaator puudub.')
 
   await persist(pagesPath, 'Lehe kustutamine ebaõnnestus: ', () =>
     repositories.delete({ collection: 'pages', id }),
   )
 
   revalidate(pagesPath, id)
-  redirect(pagesPath)
+  redirect(await adminUrl(pagesPath))
 }
 
 /** One validated block as stored in snapshots and `page_blocks.config_json`. */
@@ -678,19 +679,19 @@ export async function savePageBlocksAction(formData: FormData): Promise<void> {
   assertCan(session.role, 'content:write')
 
   const pageId = readText(formData, 'pageId')
-  if (!pageId) redirectWithError(pagesPath, 'Lehe identifikaator puudub.')
+  if (!pageId) return redirectWithError(pagesPath, 'Lehe identifikaator puudub.')
   const errorPath = formPath(pagesPath, pageId)
 
   const raw = readJsonValue(formData, 'blocks')
-  if (raw.invalid) redirectWithError(errorPath, 'Blokid peavad olema korrektne JSON.')
+  if (raw.invalid) return redirectWithError(errorPath, 'Blokid peavad olema korrektne JSON.')
   const parsed = parseSnapshotBlocks(raw.value)
-  if (!parsed.ok) redirectWithError(errorPath, parsed.error)
+  if (!parsed.ok) return redirectWithError(errorPath, parsed.error)
 
   const repositories = await getRepositories()
   const page = await persist(errorPath, 'Lehe lugemine ebaõnnestus: ', () =>
     repositories.findByID({ collection: 'pages', id: pageId }),
   )
-  if (!page) redirectWithError(errorPath, 'Lehte ei leitud.')
+  if (!page) return redirectWithError(errorPath, 'Lehte ei leitud.')
 
   await persist(errorPath, 'Blokide salvestamine ebaõnnestus: ', async () => {
     const previousDocs = await replacePageBlocks(repositories, pageId, parsed.blocks)
@@ -716,32 +717,32 @@ export async function restorePageVersionAction(formData: FormData): Promise<void
   assertCan(session.role, 'content:write')
 
   const pageId = readText(formData, 'pageId')
-  if (!pageId) redirectWithError(pagesPath, 'Lehe identifikaator puudub.')
+  if (!pageId) return redirectWithError(pagesPath, 'Lehe identifikaator puudub.')
   const errorPath = formPath(pagesPath, pageId)
   const versionId = readText(formData, 'versionId')
-  if (!versionId) redirectWithError(errorPath, 'Versiooni identifikaator puudub.')
+  if (!versionId) return redirectWithError(errorPath, 'Versiooni identifikaator puudub.')
   // Restores overwrite the current blocks: reason-required like settings saves.
   const reason = readText(formData, 'reason')
   if (!isValidReason(reason)) {
-    redirectWithError(errorPath, 'Põhjendus peab olema vähemalt 5 tähemärki.')
+    return redirectWithError(errorPath, 'Põhjendus peab olema vähemalt 5 tähemärki.')
   }
 
   const repositories = await getRepositories()
   const page = await persist(errorPath, 'Lehe lugemine ebaõnnestus: ', () =>
     repositories.findByID({ collection: 'pages', id: pageId }),
   )
-  if (!page) redirectWithError(errorPath, 'Lehte ei leitud.')
+  if (!page) return redirectWithError(errorPath, 'Lehte ei leitud.')
 
   const version = await persist(errorPath, 'Versiooni lugemine ebaõnnestus: ', () =>
     repositories.findByID({ collection: 'page-versions', id: versionId }),
   )
   if (version?.pageId !== pageId) {
-    redirectWithError(errorPath, 'Versiooni ei leitud.')
+    return redirectWithError(errorPath, 'Versiooni ei leitud.')
   }
 
   const parsed = parseSnapshotBlocks(version.snapshotJson)
   if (!parsed.ok) {
-    redirectWithError(errorPath, `Versiooni andmed ei ole korrektsed: ${parsed.error}`)
+    return redirectWithError(errorPath, `Versiooni andmed ei ole korrektsed: ${parsed.error}`)
   }
 
   await persist(errorPath, 'Versiooni taastamine ebaõnnestus: ', async () => {
@@ -762,7 +763,7 @@ export async function restorePageVersionAction(formData: FormData): Promise<void
 
   revalidate(pagesPath, pageId)
   revalidatePath(contentPublicPath('pages', page.slug))
-  redirect(errorPath)
+  redirect(await adminUrl(errorPath))
 }
 
 export async function saveFaqCategoryAction(formData: FormData): Promise<void> {
@@ -775,10 +776,10 @@ export async function saveFaqCategoryAction(formData: FormData): Promise<void> {
   const slug = readText(formData, 'slug')
   const order = readInt(formData, 'order')
 
-  if (!title) redirectWithError(errorPath, 'Pealkiri on kohustuslik.')
-  if (!slug) redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
+  if (!title) return redirectWithError(errorPath, 'Pealkiri on kohustuslik.')
+  if (!slug) return redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
   if (!Number.isInteger(order) || order < 0) {
-    redirectWithError(errorPath, 'Järjekord peab olema mitte negatiivne täisarv.')
+    return redirectWithError(errorPath, 'Järjekord peab olema mitte negatiivne täisarv.')
   }
 
   const data = { title, slug, order, active: readBool(formData, 'active') }
@@ -790,7 +791,7 @@ export async function saveFaqCategoryAction(formData: FormData): Promise<void> {
   )
 
   revalidate(faqCategoriesPath, id)
-  redirect(faqCategoriesPath)
+  redirect(await adminUrl(faqCategoriesPath))
 }
 
 export async function deleteFaqCategoryAction(formData: FormData): Promise<void> {
@@ -798,14 +799,14 @@ export async function deleteFaqCategoryAction(formData: FormData): Promise<void>
   assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(faqCategoriesPath, 'Kategooria identifikaator puudub.')
+  if (!id) return redirectWithError(faqCategoriesPath, 'Kategooria identifikaator puudub.')
 
   await persist(faqCategoriesPath, 'Kategooria kustutamine ebaõnnestus: ', () =>
     repositories.delete({ collection: 'faq-categories', id }),
   )
 
   revalidate(faqCategoriesPath, id)
-  redirect(faqCategoriesPath)
+  redirect(await adminUrl(faqCategoriesPath))
 }
 
 export async function saveFaqItemAction(formData: FormData): Promise<void> {
@@ -819,17 +820,17 @@ export async function saveFaqItemAction(formData: FormData): Promise<void> {
   const categoryId = readText(formData, 'categoryId')
   const order = readInt(formData, 'order')
 
-  if (!question) redirectWithError(errorPath, 'Küsimus on kohustuslik.')
-  if (!answer) redirectWithError(errorPath, 'Vastus on kohustuslik.')
-  if (!categoryId) redirectWithError(errorPath, 'Vali kategooria.')
+  if (!question) return redirectWithError(errorPath, 'Küsimus on kohustuslik.')
+  if (!answer) return redirectWithError(errorPath, 'Vastus on kohustuslik.')
+  if (!categoryId) return redirectWithError(errorPath, 'Vali kategooria.')
   if (!Number.isInteger(order) || order < 0) {
-    redirectWithError(errorPath, 'Järjekord peab olema mitte negatiivne täisarv.')
+    return redirectWithError(errorPath, 'Järjekord peab olema mitte negatiivne täisarv.')
   }
 
   const category = await persist(errorPath, 'Kategooria lugemine ebaõnnestus: ', () =>
     repositories.findByID({ collection: 'faq-categories', id: categoryId }),
   )
-  if (!category) redirectWithError(errorPath, 'Valitud kategooriat ei leitud.')
+  if (!category) return redirectWithError(errorPath, 'Valitud kategooriat ei leitud.')
 
   const data = {
     question,
@@ -848,7 +849,7 @@ export async function saveFaqItemAction(formData: FormData): Promise<void> {
   )
 
   revalidate(faqItemsPath, id)
-  redirect(faqItemsPath)
+  redirect(await adminUrl(faqItemsPath))
 }
 
 export async function deleteFaqItemAction(formData: FormData): Promise<void> {
@@ -856,14 +857,14 @@ export async function deleteFaqItemAction(formData: FormData): Promise<void> {
   assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(faqItemsPath, 'Küsimuse identifikaator puudub.')
+  if (!id) return redirectWithError(faqItemsPath, 'Küsimuse identifikaator puudub.')
 
   await persist(faqItemsPath, 'Küsimuse kustutamine ebaõnnestus: ', () =>
     repositories.delete({ collection: 'faq-items', id }),
   )
 
   revalidate(faqItemsPath, id)
-  redirect(faqItemsPath)
+  redirect(await adminUrl(faqItemsPath))
 }
 
 export async function saveTestimonialAction(formData: FormData): Promise<void> {
@@ -877,11 +878,11 @@ export async function saveTestimonialAction(formData: FormData): Promise<void> {
   const status = readText(formData, 'status') as ContentStatus
   const rating = readOptionalNumber(formData, 'rating')
 
-  if (!name) redirectWithError(errorPath, 'Nimi on kohustuslik.')
-  if (!content) redirectWithError(errorPath, 'Tsitaat on kohustuslik.')
-  if (!contentStatuses.includes(status)) redirectWithError(errorPath, 'Vali sobiv olek.')
+  if (!name) return redirectWithError(errorPath, 'Nimi on kohustuslik.')
+  if (!content) return redirectWithError(errorPath, 'Tsitaat on kohustuslik.')
+  if (!contentStatuses.includes(status)) return redirectWithError(errorPath, 'Vali sobiv olek.')
   if (rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
-    redirectWithError(errorPath, 'Hinne peab olema täisarv vahemikus 1 kuni 5.')
+    return redirectWithError(errorPath, 'Hinne peab olema täisarv vahemikus 1 kuni 5.')
   }
 
   const data = {
@@ -901,7 +902,7 @@ export async function saveTestimonialAction(formData: FormData): Promise<void> {
   )
 
   revalidate(testimonialsPath, id)
-  redirect(testimonialsPath)
+  redirect(await adminUrl(testimonialsPath))
 }
 
 export async function deleteTestimonialAction(formData: FormData): Promise<void> {
@@ -909,14 +910,14 @@ export async function deleteTestimonialAction(formData: FormData): Promise<void>
   assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(testimonialsPath, 'Tagasiside identifikaator puudub.')
+  if (!id) return redirectWithError(testimonialsPath, 'Tagasiside identifikaator puudub.')
 
   await persist(testimonialsPath, 'Tagasiside kustutamine ebaõnnestus: ', () =>
     repositories.delete({ collection: 'testimonials', id }),
   )
 
   revalidate(testimonialsPath, id)
-  redirect(testimonialsPath)
+  redirect(await adminUrl(testimonialsPath))
 }
 
 export async function savePartnerServiceAction(formData: FormData): Promise<void> {
@@ -929,10 +930,10 @@ export async function savePartnerServiceAction(formData: FormData): Promise<void
   const slug = readText(formData, 'slug')
   const order = readInt(formData, 'order')
 
-  if (!name) redirectWithError(errorPath, 'Nimi on kohustuslik.')
-  if (!slug) redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
+  if (!name) return redirectWithError(errorPath, 'Nimi on kohustuslik.')
+  if (!slug) return redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
   if (!Number.isInteger(order) || order < 0) {
-    redirectWithError(errorPath, 'Järjekord peab olema mitte negatiivne täisarv.')
+    return redirectWithError(errorPath, 'Järjekord peab olema mitte negatiivne täisarv.')
   }
 
   const data = {
@@ -952,7 +953,7 @@ export async function savePartnerServiceAction(formData: FormData): Promise<void
   )
 
   revalidate(partnerServicesPath, id)
-  redirect(partnerServicesPath)
+  redirect(await adminUrl(partnerServicesPath))
 }
 
 export async function deletePartnerServiceAction(formData: FormData): Promise<void> {
@@ -960,14 +961,14 @@ export async function deletePartnerServiceAction(formData: FormData): Promise<vo
   assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(partnerServicesPath, 'Teenuse identifikaator puudub.')
+  if (!id) return redirectWithError(partnerServicesPath, 'Teenuse identifikaator puudub.')
 
   await persist(partnerServicesPath, 'Teenuse kustutamine ebaõnnestus: ', () =>
     repositories.delete({ collection: 'partner-services', id }),
   )
 
   revalidate(partnerServicesPath, id)
-  redirect(partnerServicesPath)
+  redirect(await adminUrl(partnerServicesPath))
 }
 
 export async function saveLegalDocumentAction(formData: FormData): Promise<void> {
@@ -982,23 +983,23 @@ export async function saveLegalDocumentAction(formData: FormData): Promise<void>
   const status = readText(formData, 'status') as ContentStatus
   const typeRaw = readText(formData, 'type')
 
-  if (!title) redirectWithError(errorPath, 'Pealkiri on kohustuslik.')
-  if (!slug) redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
-  if (!content) redirectWithError(errorPath, 'Sisu on kohustuslik.')
-  if (!contentStatuses.includes(status)) redirectWithError(errorPath, 'Vali sobiv olek.')
+  if (!title) return redirectWithError(errorPath, 'Pealkiri on kohustuslik.')
+  if (!slug) return redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
+  if (!content) return redirectWithError(errorPath, 'Sisu on kohustuslik.')
+  if (!contentStatuses.includes(status)) return redirectWithError(errorPath, 'Vali sobiv olek.')
   if (typeRaw.length > 0 && !legalDocumentTypes.includes(typeRaw as LegalDocumentType)) {
-    redirectWithError(errorPath, 'Vali sobiv dokumendi tüüp.')
+    return redirectWithError(errorPath, 'Vali sobiv dokumendi tüüp.')
   }
 
   await publishDueScheduledContent(repositories, session.userId)
 
-  const publishAtIso = readPublishAt(formData, errorPath, 'Avaldamise aeg')
+  const publishAtIso = await readPublishAt(formData, errorPath, 'Avaldamise aeg')
   const current = id
     ? await persist(errorPath, 'Dokumendi lugemine ebaõnnestus: ', () =>
         repositories.findByID({ collection: 'legal-documents', id }),
       )
     : null
-  if (id && !current) redirectWithError(errorPath, 'Dokumenti ei leitud.')
+  if (id && !current) return redirectWithError(errorPath, 'Dokumenti ei leitud.')
 
   const decision = resolvePublishDecision({
     requestedStatus: status,
@@ -1059,7 +1060,7 @@ export async function saveLegalDocumentAction(formData: FormData): Promise<void>
 
   revalidate(legalDocumentsPath, id)
   revalidatePath(contentPublicPath('legal-documents', slug))
-  redirect(legalDocumentsPath)
+  redirect(await adminUrl(legalDocumentsPath))
 }
 
 export async function deleteLegalDocumentAction(formData: FormData): Promise<void> {
@@ -1067,14 +1068,14 @@ export async function deleteLegalDocumentAction(formData: FormData): Promise<voi
   assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(legalDocumentsPath, 'Dokumendi identifikaator puudub.')
+  if (!id) return redirectWithError(legalDocumentsPath, 'Dokumendi identifikaator puudub.')
 
   await persist(legalDocumentsPath, 'Dokumendi kustutamine ebaõnnestus: ', () =>
     repositories.delete({ collection: 'legal-documents', id }),
   )
 
   revalidate(legalDocumentsPath, id)
-  redirect(legalDocumentsPath)
+  redirect(await adminUrl(legalDocumentsPath))
 }
 
 /** from→to map over the stored redirects, the input of the chain validator. */
@@ -1098,23 +1099,23 @@ export async function saveRedirectAction(formData: FormData): Promise<void> {
   const to = readText(formData, 'to')
   const type = readText(formData, 'type') as RedirectType
 
-  if (!from) redirectWithError(errorPath, 'Kust on kohustuslik.')
-  if (!to) redirectWithError(errorPath, 'Kuhu on kohustuslik.')
-  if (!redirectTypes.includes(type)) redirectWithError(errorPath, 'Vali suunamise tüüp.')
+  if (!from) return redirectWithError(errorPath, 'Kust on kohustuslik.')
+  if (!to) return redirectWithError(errorPath, 'Kuhu on kohustuslik.')
+  if (!redirectTypes.includes(type)) return redirectWithError(errorPath, 'Vali suunamise tüüp.')
 
   const current = id
     ? await persist(errorPath, 'Suunamise lugemine ebaõnnestus: ', () =>
         repositories.findByID({ collection: 'redirects', id }),
       )
     : null
-  if (id && !current) redirectWithError(errorPath, 'Suunamist ei leitud.')
+  if (id && !current) return redirectWithError(errorPath, 'Suunamist ei leitud.')
 
   const byFrom = await redirectChainMap(repositories)
   // The row being edited keeps its old mapping in the loaded map; drop it so
   // the chain walk sees the post-save state and cannot count it as a hop.
   if (current) byFrom.delete(current.from)
   const validationError = validateRedirect(from, to, byFrom)
-  if (validationError) redirectWithError(errorPath, validationError)
+  if (validationError) return redirectWithError(errorPath, validationError)
 
   const data = { from, to, type, active: readBool(formData, 'active') }
 
@@ -1140,7 +1141,7 @@ export async function saveRedirectAction(formData: FormData): Promise<void> {
   }
   revalidatePath(from)
   revalidatePath(to)
-  redirect(redirectsPath)
+  redirect(await adminUrl(redirectsPath))
 }
 
 /** Delete requires a typed reason and lands on the append-only audit log. */
@@ -1150,15 +1151,15 @@ export async function deleteRedirectAction(formData: FormData): Promise<void> {
 
   const id = readText(formData, 'id')
   const reason = readText(formData, 'reason')
-  if (!id) redirectWithError(redirectsPath, 'Suunamise identifikaator puudub.')
+  if (!id) return redirectWithError(redirectsPath, 'Suunamise identifikaator puudub.')
   if (!isValidReason(reason)) {
-    redirectWithError(redirectsPath, 'Kustutamise põhjus peab olema vähemalt 5 tähemärki.')
+    return redirectWithError(redirectsPath, 'Kustutamise põhjus peab olema vähemalt 5 tähemärki.')
   }
 
   const current = await persist(redirectsPath, 'Suunamise lugemine ebaõnnestus: ', () =>
     repositories.findByID({ collection: 'redirects', id }),
   )
-  if (!current) redirectWithError(redirectsPath, 'Suunamist ei leitud.')
+  if (!current) return redirectWithError(redirectsPath, 'Suunamist ei leitud.')
 
   await persist(redirectsPath, 'Suunamise kustutamine ebaõnnestus: ', async () => {
     await repositories.delete({ collection: 'redirects', id })
@@ -1174,7 +1175,7 @@ export async function deleteRedirectAction(formData: FormData): Promise<void> {
 
   revalidate(redirectsPath, id)
   revalidatePath(current.from)
-  redirect(redirectsPath)
+  redirect(await adminUrl(redirectsPath))
 }
 
 // ── Redirects CSV bulk import (task 3.5) ────────────────────────────────────
@@ -1288,8 +1289,8 @@ export async function saveSpecialistAction(formData: FormData): Promise<void> {
   const name = readText(formData, 'name')
   const slug = readText(formData, 'slug')
 
-  if (!name) redirectWithError(errorPath, 'Nimi on kohustuslik.')
-  if (!slug) redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
+  if (!name) return redirectWithError(errorPath, 'Nimi on kohustuslik.')
+  if (!slug) return redirectWithError(errorPath, 'URL-nimi on kohustuslik.')
 
   const data = {
     name,
@@ -1311,7 +1312,7 @@ export async function saveSpecialistAction(formData: FormData): Promise<void> {
   )
 
   revalidate(specialistsPath, id)
-  redirect(specialistsPath)
+  redirect(await adminUrl(specialistsPath))
 }
 
 export async function deleteSpecialistAction(formData: FormData): Promise<void> {
@@ -1319,14 +1320,14 @@ export async function deleteSpecialistAction(formData: FormData): Promise<void> 
   assertCan(session.role, 'content:write')
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(specialistsPath, 'Spetsialisti identifikaator puudub.')
+  if (!id) return redirectWithError(specialistsPath, 'Spetsialisti identifikaator puudub.')
 
   await persist(specialistsPath, 'Spetsialisti kustutamine ebaõnnestus: ', () =>
     repositories.delete({ collection: 'specialists', id }),
   )
 
   revalidate(specialistsPath, id)
-  redirect(specialistsPath)
+  redirect(await adminUrl(specialistsPath))
 }
 
 export async function saveStatisticsSnapshotAction(formData: FormData): Promise<void> {
@@ -1341,21 +1342,21 @@ export async function saveStatisticsSnapshotAction(formData: FormData): Promise<
   const volume = readOptionalNumber(formData, 'volume')
   const eur = readNumber(formData, 'eur')
 
-  if (!date) redirectWithError(errorPath, 'Kuupäev on kohustuslik.')
+  if (!date) return redirectWithError(errorPath, 'Kuupäev on kohustuslik.')
   if (!auctionObjectTypes.includes(objectType)) {
-    redirectWithError(errorPath, 'Vali sobiv objekti tüüp.')
+    return redirectWithError(errorPath, 'Vali sobiv objekti tüüp.')
   }
   if (!Number.isInteger(count) || count < 0) {
-    redirectWithError(errorPath, 'Arv peab olema mitte negatiivne täisarv.')
+    return redirectWithError(errorPath, 'Arv peab olema mitte negatiivne täisarv.')
   }
   if (area !== null && (!Number.isFinite(area) || area < 0)) {
-    redirectWithError(errorPath, 'Pindala peab olema mitte negatiivne number.')
+    return redirectWithError(errorPath, 'Pindala peab olema mitte negatiivne number.')
   }
   if (volume !== null && (!Number.isFinite(volume) || volume < 0)) {
-    redirectWithError(errorPath, 'Maht peab olema mitte negatiivne number.')
+    return redirectWithError(errorPath, 'Maht peab olema mitte negatiivne number.')
   }
   if (!Number.isFinite(eur) || eur < 0) {
-    redirectWithError(errorPath, 'Summa peab olema mitte negatiivne number.')
+    return redirectWithError(errorPath, 'Summa peab olema mitte negatiivne number.')
   }
 
   const data = { date, objectType, count, area, volume, eur }
@@ -1367,21 +1368,21 @@ export async function saveStatisticsSnapshotAction(formData: FormData): Promise<
   )
 
   revalidate(statisticsPath, id)
-  redirect(statisticsPath)
+  redirect(await adminUrl(statisticsPath))
 }
 
 export async function deleteStatisticsSnapshotAction(formData: FormData): Promise<void> {
   const { repositories } = await requireAdminRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(statisticsPath, 'Statistikakirje identifikaator puudub.')
+  if (!id) return redirectWithError(statisticsPath, 'Statistikakirje identifikaator puudub.')
 
   await persist(statisticsPath, 'Statistikakirje kustutamine ebaõnnestus: ', () =>
     repositories.delete({ collection: 'statistics-snapshots', id }),
   )
 
   revalidate(statisticsPath, id)
-  redirect(statisticsPath)
+  redirect(await adminUrl(statisticsPath))
 }
 
 const settingsSections = ['uldine', 'tasud', 'oksjonid', 'lipud'] as const
@@ -1417,12 +1418,12 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
 
   const section = readText(formData, 'section')
   if (!settingsSections.includes(section as (typeof settingsSections)[number])) {
-    redirectWithError(settingsPath, 'Tundmatu seadete sektsioon.')
+    return redirectWithError(settingsPath, 'Tundmatu seadete sektsioon.')
   }
   // Reason-required saves (design D7): without a valid reason nothing changes.
   const reason = readText(formData, 'reason')
   if (!isValidReason(reason)) {
-    redirectWithError(settingsPath, 'Põhjendus peab olema vähemalt 5 tähemärki.')
+    return redirectWithError(settingsPath, 'Põhjendus peab olema vähemalt 5 tähemärki.')
   }
 
   const { docs } = await persist(settingsPath, 'Sätete lugemine ebaõnnestus: ', () =>
@@ -1441,10 +1442,10 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
     const supportPhone = readOptionalText(formData, 'supportPhone')
     const aliasDomain = readOptionalText(formData, 'aliasDomain')
     if (supportEmail !== null && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(supportEmail)) {
-      redirectWithError(settingsPath, 'Klienditoe e-post peab olema korrektne e-posti aadress.')
+      return redirectWithError(settingsPath, 'Klienditoe e-post peab olema korrektne e-posti aadress.')
     }
     if (supportPhone !== null && !/^\+?[\d ()-]{5,20}$/.test(supportPhone)) {
-      redirectWithError(settingsPath, 'Klienditoe telefon peab koosnema numbritest (lubatud +, tühik ja sidekriips).')
+      return redirectWithError(settingsPath, 'Klienditoe telefon peab koosnema numbritest (lubatud +, tühik ja sidekriips).')
     }
     if (
       aliasDomain !== null &&
@@ -1452,7 +1453,7 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
         aliasDomain.toLowerCase(),
       )
     ) {
-      redirectWithError(
+      return redirectWithError(
         settingsPath,
         'Alias-domeen peab olema korrektne domeeninimi (näiteks oksjonid.erametsad.ee).',
       )
@@ -1494,13 +1495,13 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
     const { feePercent: feeBounds, quickAuctionFeePercent: quickFeeBounds, minimumFeeCents: minFeeBounds } =
       settingsBounds
     if (!Number.isInteger(feePercent) || feePercent < feeBounds.min || feePercent > feeBounds.max) {
-      redirectWithError(
+      return redirectWithError(
         settingsPath,
         `Vahendustasu peab olema täisarv vahemikus ${String(feeBounds.min)} kuni ${String(feeBounds.max)}.`,
       )
     }
     if (!Number.isInteger(vatPercent) || vatPercent < 0 || vatPercent > 100) {
-      redirectWithError(settingsPath, 'Käibemaks peab olema täisarv vahemikus 0 kuni 100.')
+      return redirectWithError(settingsPath, 'Käibemaks peab olema täisarv vahemikus 0 kuni 100.')
     }
     if (
       quickAuctionFeePercent !== null &&
@@ -1508,7 +1509,7 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
         quickAuctionFeePercent < quickFeeBounds.min ||
         quickAuctionFeePercent > quickFeeBounds.max)
     ) {
-      redirectWithError(
+      return redirectWithError(
         settingsPath,
         `Kiiroksjoni teenustasu peab olema täisarv vahemikus ${String(quickFeeBounds.min)} kuni ${String(quickFeeBounds.max)} või tühi (kasutatakse vaikemäära).`,
       )
@@ -1518,7 +1519,7 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
       minimumFeeCents < minFeeBounds.min ||
       minimumFeeCents > minFeeBounds.max
     ) {
-      redirectWithError(
+      return redirectWithError(
         settingsPath,
         `Minimaalne tasu peab olema vahemikus 0 kuni ${String(minFeeBounds.max / 100)} eurot.`,
       )
@@ -1548,17 +1549,17 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
       antiSnipeDurationMinutes < 1 ||
       antiSnipeDurationMinutes > 30
     ) {
-      redirectWithError(settingsPath, 'Aja pikendamise minutid peavad olema täisarv vahemikus 1 kuni 30.')
+      return redirectWithError(settingsPath, 'Aja pikendamise minutid peavad olema täisarv vahemikus 1 kuni 30.')
     }
     if (!Number.isInteger(sealedRevisionCap) || sealedRevisionCap < 0 || sealedRevisionCap > 5) {
-      redirectWithError(settingsPath, 'Paranduste limiit peab olema täisarv vahemikus 0 kuni 5.')
+      return redirectWithError(settingsPath, 'Paranduste limiit peab olema täisarv vahemikus 0 kuni 5.')
     }
     if (
       !Number.isInteger(minAuctionDurationHours) ||
       minAuctionDurationHours < minDurationBounds.min ||
       minAuctionDurationHours > minDurationBounds.max
     ) {
-      redirectWithError(
+      return redirectWithError(
         settingsPath,
         `Minimaalne oksjoni kestus peab olema täisarv vahemikus ${String(minDurationBounds.min)} kuni ${String(minDurationBounds.max)} tundi.`,
       )
@@ -1569,7 +1570,7 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
       sealedApproverRole: readText(formData, 'sealedApproverRole'),
     })
     if (!parsedDefaults.ok) {
-      redirectWithError(settingsPath, parsedDefaults.error)
+      return redirectWithError(settingsPath, parsedDefaults.error)
     }
     const previousDefaults = readFlagObject(currentFlags.auctionDefaults ?? {})
     data = {
@@ -1627,5 +1628,5 @@ export async function updateSettingsAction(formData: FormData): Promise<void> {
   })
 
   revalidatePath(settingsPath)
-  redirect(feeChanged ? `${settingsPath}?ok=tasud` : settingsPath)
+  redirect(await adminUrl(feeChanged ? `${settingsPath}?ok=tasud` : settingsPath))
 }

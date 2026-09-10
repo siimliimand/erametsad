@@ -95,6 +95,20 @@ admin-scope:
   spacing: { md: 16, lg: 24 }
   extras: "status triads (--st-*), tints (--tint-primary, --tint-primary-strong), shadows, --rail-w 56, --topbar-h 64, --overlay, --z-scale (topbar 90, drawer 140, modal 150, toast 160), keyframes cd-blink/row-flash/live-pulse/save-ping/modal-in"
 
+# Portal scope: the (portal) route group redefines color tokens under the
+# `.portal-scope` class (apps/platform/src/app/(portal)/portal.css). Root
+# defaults above are unchanged outside the portal shell.
+portal-scope:
+  primary: "#2E6B4F"
+  primary-hover: "#25573F"
+  primary-light: "#E9F0EC"
+  bg-page: "#FFFFFF"
+  bg-mist: "#F1F5F2"
+  ink: "#1B211D"
+  ink-muted: "#6B7570"
+  border: "#E3E7E4"
+  font-heading: "Manrope 700/800 (next/font, --font-manrope)"
+
 hero-overlay: "linear-gradient(90deg, rgba(22,56,42,.85), rgba(22,56,42,.35))"
 ---
 
@@ -136,11 +150,11 @@ Core interactive components include `Btn` in three styles (solid primary green, 
 
 `LotCard` has two presentations. The enhanced listing card shows the photo with two overlays: an object-type badge at the top left and a countdown pill at the top right. Under the title sits a two-by-two metadata grid with a Lucide icon per cell: `MapPin` for the parish and county, `Ruler` for the area in hectares, `Trees` for the species list, and `Package` for the volume in cubic metres. Cells without data collapse. A divider separates the Alghind (or archive Lõpphind) price block from a "Vaata lähemalt" pill. The whole card is one link, and the call to action is a styled span inside it, so no nested interactive elements appear. Without the optional props the card renders the minimal presentation, which `AuctionTicker` and `ArchiveCard` still use.
 
-The listing filters live in a sidebar aside on desktop. They keep chip selects for species (Puuliik) and logging type (Raieliik), range sliders for area (Pindala), volume (Maht), and price (Hind), plus the "Telli teavitus" and "Tühjenda" actions. The sort control moved to the results bar. On mobile the filters collapse behind a disclosure above the map.
+The listing filters live in a sidebar aside on desktop. They keep chip selects for species (Puuliik) and logging type (Raieliik), range sliders for area (Pindala) and price (Hind), a Raietähtaeg (aasta) select, and the "Telli teavitus" and "Tühjenda" actions. The Maht (m³) range left the panel with the demo parity change, and legacy `volumeMin`/`volumeMax` URL parameters still apply server-side. The sort control moved to the results bar. On mobile the filters collapse behind a disclosure above the map.
 
 A slim server-rendered results bar sits above the card grid. It shows the found count as "Leitud N oksjonit" with Estonian pluralization, next to a "Sorteeri" select. The select posts the same `sort` and `order` URL parameters the filter panel used, so shared links keep working.
 
-`MapEstonia` wraps Leaflet with Maa-amet orthophoto tiles and county GeoJSON overlays. On the listing page the map is always visible above the results bar. It runs 400 pixels tall at desktop and about 240 pixels on mobile. Clustering and popups stay as built. The old `?view=kart` parameter still parses but no longer changes the layout.
+`MapEstonia` wraps Leaflet with Maa-amet orthophoto tiles and county GeoJSON overlays. On the listing page the map is a toggle: the toolbar's Kaardivaade and Loendivaade pair switches between the pin map and the card grid, and `view=kaart` (legacy `view=kart` still parses) selects the map view in the URL. The map runs 400 pixels tall at desktop and about 240 pixels on mobile, with a demo popup card showing Pindala, Alghind, Katastritunnus, Aega jäänud, and a "Vaata" action. Clustering stays as built.
 
 `Countdown` synchronises with the server and uses the status colour phases: neutral, amber below one hour, red below five minutes, with optional pulse. The listing tabs row holds six tabs: Kõik objektid, Raieõigused, Metskinnistud, Põllumaad, Paketid, and Kiiroksjonid. Kõik objektid comes first and is the default view, under the heading "Aktiivsed oksjonid". Each tab carries a live count pill. Põllumaad renders its empty state until the schema stores its object type.
 
@@ -166,6 +180,16 @@ KPI strips use `KpiCard`: a muted label, a 32-pixel JetBrains Mono value with ta
 
 Admin motion stays subtle and purposeful. `admin.css` defines the keyframes the primitives reference: cd-blink (critical countdown blink), row-flash, live-pulse, save-ping, and modal-in. Overlay entry animates in 180 to 200 ms, and the drawer slide uses the 200 ms dropdown curve. The ceremony reveal honors `prefers-reduced-motion` with a plain, unstaggered fallback.
 
+## Portal design tokens
+
+The portal redefines tokens under `.portal-scope` in `apps/platform/src/app/(portal)/portal.css`, and `(portal)/layout.tsx` renders that class on its root element. The overrides change the shared color variables from `packages/ui/src/styles/tokens.css` inside the `(portal)` route group only. Marketing and admin keep the root defaults, and the layering follows the same pattern the admin uses with `.admin-scope`. The Colour and Typography sections above describe those shared defaults.
+
+The portal palette replaces eight values. Primary relaxes to a leaf green (`#2E6B4F`) with hover `#25573F` and light `#E9F0EC`. The page surface turns white and the mist band warms to `#F1F5F2`. Ink deepens to `#1B211D`, muted text lifts to `#6B7570`, and borders lighten to `#E3E7E4`. Accent, CTA amber, danger, info, status colours, radii, and shadows stay shared with the root tokens.
+
+Headings render in Manrope at weights 700 and 800. The portal layout loads the face through `next/font` as `--font-manrope`, and `portal.css` points `--font-heading` at it inside the scope. The files stay self-hosted, so the CSP gains no hosts. Inter remains the body face and JetBrains Mono keeps prices and countdown digits.
+
+The shared `Countdown` gains a `format="portal"` preset that renders `2p HH:MM:SS` and swaps to a "Lõpeb varsti" pill in the final hour. The default output is unchanged, so admin and marketing render as before. Lucide stays the icon set; every demo icon maps to a Lucide equivalent.
+
 ## Motion
 
 Motion is kept subtle. Hover transitions run 150 milliseconds with ease-out. Element reveals on scroll run 300 milliseconds with a custom cubic bezier. Dropdowns and accordions use 200 milliseconds. Modal entries fade in and scale slightly over 200 milliseconds. Countdown digits pulse at 80 milliseconds when below one hour. An anti-snipe extension flashes the timer green over 500 milliseconds.
@@ -186,16 +210,30 @@ Lucide React is the only icon set. Key icons map to product concepts: `TreePine`
 
 ## Mockup deviations
 
-The listing redesign follows the approved mockup with five deliberate deviations.
+The demo mockups in `docs/design/demo/portal/` are the design baseline for the auction portal. Every portal page matches its demo page in tokens and layout. The five deviations recorded earlier came from an older mockup round and no longer apply. Two deviation groups remain: working features the static mockups lack, and small implementation gaps recorded during the build.
 
-- Status phases stay live: the countdown runs neutral, turns amber below one hour, and turns red below five minutes. The mockup's static red badge is not used.
-- JetBrains Mono stays for prices and countdown digits.
-- Volume keeps the unit m³ from the data layer, not the mockup's "tm".
-- Lucide stays the icon set. The mockup's Material Symbols map to `MapPin`, `Ruler`, `Trees`, and `Package`.
-- The Maht and Raieliik filters stay even though the mockup lacks them.
+Functional deviations, kept on purpose and styled in the demo design language:
+
+- Open auctions restate the bid amount in a confirm modal before the API call. The demo submits directly.
+- The user menu keeps the profile switcher entries (active profile marked) beside the navigation items.
+- The "Teavitused" menu item carries an unread badge.
+- The sealed-bid panel renders the identity snapshot fields (name, isikukood, address, email, phone) above the amount form.
+- The open bid panel keeps the alapakkumine toggle; the demo has no equivalent.
+- The notifications page keeps a third panel, Otsingute tellimused (saved searches), below the demo's two panels.
+- The free-text `q` filter keeps working as a URL parameter. The visible search box went with the old shell header, and the demo has no search UI.
+- Registration keeps its functional 4-step flow (Tuvastus, Profiili tüüp, Andmed ja nõusolekud, Valmis) under the demo step-bar visuals. The demo shows 3 steps.
+
+Implementation gaps, recorded during the build:
+
+- The listing's Raietähtaeg (aasta) select writes only the `cutDeadlineYear` URL parameter. The query layer has no matching filter, because the schema stores no cut-deadline year. The select renders the demo window (current year plus two) instead of stored values.
+- The cut-type chips carry the demo codes VR, HR, SR, LR, and RD. The seed data still stores the older U/H/T/L/R codes, so the chips match nothing until the data layer adopts the demo taxonomy.
+- The "Saada test-teavitus" button on the notification preference matrix shows a confirmation toast only. No test-notification endpoint exists yet.
+- The GDPR export ("Ekspordi mu andmed (ZIP)") and Kustuta konto buttons are placeholders that point to the support channel. Self-service endpoints do not exist yet.
+- The archive Tüüp chip Põllumaa has no object type in the schema, so its selection returns an empty result set.
+- The portal footer social links point at demo targets. The CMS social columns do not exist yet.
 
 ## Brand voice
 
 The voice in Estonian follows four traits: clear (short sentences, no jargon), honest (fees upfront, no hidden conditions), matter-of-fact (friendly but not chatty), and human (real names, real phone numbers, the tone of a trusted forester).
 
-<!-- Last updated: 2026-09-09 -->
+<!-- Last updated: 2026-09-10 -->

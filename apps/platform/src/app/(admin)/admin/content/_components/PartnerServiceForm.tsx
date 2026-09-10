@@ -1,7 +1,7 @@
-import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
 import { savePartnerServiceAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import {
   FormField,
   FormTextareaField,
@@ -53,9 +53,9 @@ export function PartnerServiceForm({ service }: { service?: PartnerService }) {
         <button type="submit" className={primaryButtonClass}>
           Salvesta
         </button>
-        <Link href="/admin/content/partner-services" className={secondaryButtonClass}>
+        <AdminLink href="/content/partner-services" className={secondaryButtonClass}>
           Tühista
-        </Link>
+        </AdminLink>
       </div>
     </form>
   )

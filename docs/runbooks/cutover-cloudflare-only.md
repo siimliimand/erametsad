@@ -110,7 +110,7 @@ Before you send traffic to the portal hostname, deploy the app with this middlew
 
 Session cookies are host-only. No `domain:` attribute is set in `src/lib/auth/session.ts`, so each hostname keeps an independent session.
 
-The `api.` and `admin.` hostnames attach to this same Worker. The middleware no-ops on them today. Mapping them to their own areas is a documented follow-up, not part of this change.
+The `admin.erametsad.ww0.dev` hostname attaches to this same Worker and joins the middleware mapping table (`host-areas.ts`) with a prefix-free URL space: `/` and root paths render the admin UI through an internal rewrite into the `/admin` route space, any `/admin`-prefixed URL 308s to the clean form, the login and password flows stay same-host so the host-only session cookie lands on the admin hostname, and portal and marketing paths 308 to their hosts. The `api.erametsad.ww0.dev` hostname attaches to the same Worker and serves only `/api` routes; the middleware 308s stray page paths to the default host. Browser API calls go to this host: the client bundle gets `NEXT_PUBLIC_API_ORIGIN=https://api.erametsad.ww0.dev` at build time (deploy.yml build step), the middleware answers credentialed CORS for same-site subdomain origins (`API_CORS_DOMAIN_SUFFIXES` in `src/lib/api/config.ts`), and the Worker var `SESSION_COOKIE_DOMAIN=ww0.dev` scopes session cookies to the zone so the API host's Set-Cookie authenticates server components on the page hosts. Hosts outside the suffix (workers.dev, localhost) keep host-only cookies.
 
 ### Email DNS
 

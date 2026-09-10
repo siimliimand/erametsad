@@ -1,12 +1,12 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 
 import { kanbanColumns } from './lead-flow'
 import { moveLeadStatusAction } from '../../../_actions/ops'
+import { AdminLink } from '../../../_components/AdminLink'
 import { EllipsisIcon, ExternalLinkIcon } from '../../../_components/icons'
 import { useEscapeKey } from '../../../_components/ui/useOverlay'
 
@@ -302,12 +302,12 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
                     >
                       <div className="flex items-start justify-between gap-xs">
                         <span className="min-w-0">
-                          <Link
-                            href={`/admin/leads/${card.id}`}
+                          <AdminLink
+                            href={`/leads/${card.id}`}
                             className="text-bodySm font-semibold text-ink hover:text-primary"
                           >
                             {card.contactName}
-                          </Link>
+                          </AdminLink>
                           <span className="block font-mono text-label text-ink-muted">
                             {shortLeadId(card.id)}
                           </span>
@@ -373,9 +373,9 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
                       {card.duplicateOfId ? (
                         <p className="text-bodySm text-info">
                           võimalik duplikaat{' '}
-                          <Link className="underline" href={`/admin/leads/${card.duplicateOfId}`}>
+                          <AdminLink className="underline" href={`/leads/${card.duplicateOfId}`}>
                             {shortLeadId(card.duplicateOfId)}
-                          </Link>
+                          </AdminLink>
                         </p>
                       ) : null}
                     </div>
@@ -419,10 +419,10 @@ export function LeadsKanban({ cards }: { cards: KanbanCardView[] }) {
               </button>
             ))}
           <div className="mx-1 my-1 border-t border-border" />
-          <Link role="menuitem" href={`/admin/leads/${menu.leadId}`} className={menuItemClass}>
+          <AdminLink role="menuitem" href={`/leads/${menu.leadId}`} className={menuItemClass}>
             <ExternalLinkIcon className="h-3.5 w-3.5 text-ink-muted" />
             Ava detailvaade
-          </Link>
+          </AdminLink>
         </div>
       ) : null}
 

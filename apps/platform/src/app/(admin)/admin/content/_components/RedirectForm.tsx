@@ -1,7 +1,7 @@
-import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
 import { saveRedirectAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import {
   FormField,
   FormSelectField,
@@ -54,9 +54,9 @@ export function RedirectForm({ redirect }: { redirect?: Redirect }) {
         <button type="submit" className={primaryButtonClass}>
           Salvesta
         </button>
-        <Link href="/admin/content/redirects" className={secondaryButtonClass}>
+        <AdminLink href="/content/redirects" className={secondaryButtonClass}>
           Tühista
-        </Link>
+        </AdminLink>
       </div>
     </form>
   )

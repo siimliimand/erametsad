@@ -5,19 +5,26 @@ function fmtDate(value: string | null): string | null {
   return new Date(time).toLocaleDateString('et-EE', { dateStyle: 'long' })
 }
 
-function CheckIcon({ done }: { done: boolean }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-        done ? 'border-statusActive bg-statusActive text-white' : 'border-border bg-white text-transparent'
-      }`}
-    >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} className="h-3.5 w-3.5">
-        <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </span>
-  )
+interface RailState {
+  label: string
+  date: string | null
+  done: boolean
+  current: boolean
+  danger?: boolean
+}
+
+function railDot(state: RailState): string {
+  if (state.danger) return 'border-danger bg-danger'
+  if (state.current) return 'border-ctaHover bg-cta'
+  if (state.done) return 'border-primary bg-primary'
+  return 'border-border bg-white'
+}
+
+function railLabel(state: RailState): string {
+  if (state.danger) return 'text-danger'
+  if (state.current) return 'text-ink'
+  if (state.done) return 'text-primary'
+  return 'text-inkMuted'
 }
 
 interface ContractTimelineProps {
@@ -28,44 +35,55 @@ interface ContractTimelineProps {
 }
 
 /**
- * Koostatud → Saadetud allkirjastamisele → Allkirjastatud; `voided` swaps the
- * final state for Tühistatud.
+ * Demo 13 status rail: Koostatud → Saadetud allkirjastamisele →
+ * Allkirjastatud → Erametsadi vastuallkiri (flips to "Ootab Erametsadi
+ * vastuallkirja" once signed); `voided` swaps the tail for Tühistatud.
  */
 export function ContractTimeline({ status, createdAt, sentAt, signedAt }: ContractTimelineProps) {
-  const states = [
-    { label: 'Koostatud', date: fmtDate(createdAt), done: true },
+  const signed = status === 'signed'
+  const states: RailState[] = [
+    { label: 'Koostatud', date: fmtDate(createdAt), done: true, current: false },
     {
       label: 'Saadetud allkirjastamisele',
       date: fmtDate(sentAt),
-      done: status === 'sent' || status === 'signed' || status === 'voided',
+      done: status === 'sent' || signed || status === 'voided',
+      current: status === 'sent',
     },
   ]
   if (status === 'voided') {
-    states.push({ label: 'Tühistatud', date: null, done: false })
+    states.push({ label: 'Tühistatud', date: null, done: false, current: false, danger: true })
   } else {
-    states.push({ label: 'Allkirjastatud', date: fmtDate(signedAt), done: status === 'signed' })
+    states.push({
+      label: 'Allkirjastatud',
+      date: fmtDate(signedAt),
+      done: signed,
+      current: false,
+    })
+    states.push({
+      label: signed ? 'Ootab Erametsadi vastuallkirja' : 'Erametsadi vastuallkiri',
+      date: null,
+      done: false,
+      current: signed,
+    })
   }
 
   return (
-    <ol className="flex flex-wrap items-center gap-x-sm gap-y-2xs" aria-label="Lepingu oleku ajajoon">
-      {states.map((state, index) => (
-        <li key={state.label} className="flex items-center gap-xs">
-          {index > 0 && <span aria-hidden="true" className="h-px w-6 bg-border" />}
-          <CheckIcon done={state.done} />
-          <span className="flex flex-col">
-            <span
-              className={`font-label font-semibold ${state.done ? 'text-ink' : 'text-inkMuted'} ${
-                state.label === 'Tühistatud' ? 'text-danger' : ''
-              }`}
-            >
-              {state.label}
-            </span>
-            {state.date !== null && (
-              <span className="font-body text-bodySm text-inkMuted">{state.date}</span>
-            )}
-          </span>
-        </li>
+    <div
+      role="list"
+      aria-label="Lepingu staatus"
+      className="flex flex-wrap items-center gap-x-7 gap-y-2.5 rounded-card bg-bgMist px-5 py-4"
+    >
+      {states.map((state) => (
+        <span
+          key={state.label}
+          role="listitem"
+          className={`flex items-center gap-2 text-bodySm font-semibold ${railLabel(state)}`}
+        >
+          <span aria-hidden="true" className={`h-2.5 w-2.5 flex-none rounded-full border-2 ${railDot(state)}`} />
+          {state.label}
+          {state.date !== null && <span className="font-mono font-medium">{state.date}</span>}
+        </span>
       ))}
-    </ol>
+    </div>
   )
 }

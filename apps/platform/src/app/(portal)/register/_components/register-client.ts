@@ -1,6 +1,7 @@
 // Client wrappers for the register wizard's backend contracts: company
 // lookup, account registration, and company access requests.
 
+import { apiFetch } from '@/lib/api/client'
 export interface CompanyLookupResult {
   name: string
   regCode: string
@@ -97,7 +98,7 @@ export async function submitRegistration(
     // No password field: new accounts start passwordless. The issued session
     // authenticates the user, who then sets the first password via
     // /update-password?first=1.
-    response = await fetch('/api/v1/auth/register', {
+    response = await apiFetch('/api/v1/auth/register', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(input),
@@ -160,7 +161,7 @@ export async function sendAccessRequest(
 ): Promise<AccessRequestResult> {
   let response: Response
   try {
-    response = await fetch('/api/v1/business/request-access', {
+    response = await apiFetch('/api/v1/business/request-access', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(input),

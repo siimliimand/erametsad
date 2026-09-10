@@ -1,15 +1,19 @@
 'use client'
 
-import { Btn, Card, FormRange, FormSelect, Toast } from '@erametsad/ui'
+import { Btn, Card, ConsentCheck, FormInput, FormRange, FormSelect, Toast } from '@erametsad/ui'
+import { Bell, RotateCcw } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-import { SubscribeDialog } from './SubscribeDialog'
+import {
+  filterJsonFromListingState,
+  validateSubscribeForm,
+  SubscribeDialog,
+} from './SubscribeDialog'
 import {
   AREA_RANGE,
   DEFAULT_LISTING_FILTERS,
   PRICE_RANGE,
-  VOLUME_RANGE,
   countActiveFilters,
   listingFiltersEqual,
   parseListingFilters,
@@ -17,6 +21,8 @@ import {
   type ListingFilterState,
 } from '../_lib/filter-params'
 import { SPECIES } from '../_lib/species'
+
+import { apiFetch } from '@/lib/api/client'
 
 interface CountyParish {
   id: string
@@ -48,21 +54,37 @@ function parseCounties(value: unknown): CountyOption[] {
   return value.filter(isCountyOption)
 }
 
-// Chips keep the "Name (CODE)" format; the plain names live in the
-// shared species table for reuse by the lot card.
+// Demo chip anatomy: the visible label is the bare code, the tooltip
+// carries the Estonian name, and the accessible name reads "CODE Name"
+// per the listing spec ("the chips read MA Mänd, …"). Chip values stay
+// data-layer tokens so `species=` links keep working; `ha` keeps its
+// stored value while displaying the demo code HB.
 const SPECIES_CHIP_OPTIONS = SPECIES.map((species) => ({
   value: species.value,
-  label: `${species.name} (${species.code})`,
+  label: species.code,
+  title: species.name,
+  // "the chips read MA Mänd, KU Kuusk, …"
+  ariaLabel: `${species.code} ${species.name}`,
 }))
 
-// No label taxonomy exists in the repo; seed data stores bare codes.
+// Demo cut-type codes (design Decision 6). The seed data still stores
+// the older U/H/T/L/R codes, so these chips match nothing until the
+// data layer adopts the demo taxonomy.
 const LOGGING_TYPE_OPTIONS = [
-  { value: 'u', label: 'Uuendusraie (U)' },
-  { value: 'h', label: 'Hooldusraie (H)' },
-  { value: 't', label: 'Taastusraie (T)' },
-  { value: 'l', label: 'Langu- ja kahjustuspuude raie (L)' },
-  { value: 'r', label: 'Sanitaarraie (R)' },
+  { value: 'vr', label: 'VR', title: 'Raieliik VR' },
+  { value: 'hr', label: 'HR', title: 'Harvendusraie' },
+  { value: 'sr', label: 'SR', title: 'Sanitaarraie' },
+  { value: 'lr', label: 'LR', title: 'Lageraie' },
+  { value: 'rd', label: 'RD', title: 'Rekonstruktsiooniraie' },
 ] as const
+
+// The data layer stores no cut-deadline year, so the select renders the
+// demo window (current year plus two) instead of stored values.
+const CUT_DEADLINE_YEARS = [0, 1, 2].map((offset) => new Date().getFullYear() + offset)
+
+// Demo consent wording for the guest inline sub-form.
+const SUBSCRIBE_CONSENT_LABEL =
+  'Nõustun, et Erametsad töötleb mu isikuandmeid sobivate oksjonite teavitamiseks.'
 
 function toggleToken(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((token) => token !== value) : [...list, value]
@@ -70,27 +92,36 @@ function toggleToken(list: string[], value: string): string[] {
 
 interface FilterSectionProps {
   label: string
+  labelId: string
   children: React.ReactNode
 }
 
-function FilterSection({ label, children }: FilterSectionProps) {
+function FilterSection({ label, labelId, children }: FilterSectionProps) {
   return (
     <div className="flex flex-col gap-xs">
-      <span className="font-body text-bodySm font-semibold text-primary">{label}</span>
+      <span id={labelId} className="font-body text-bodySm font-semibold text-primary">
+        {label}
+      </span>
       {children}
     </div>
   )
 }
 
 interface FilterChipsProps {
-  options: readonly { value: string; label: string }[]
+  options: readonly {
+    value: string
+    label: string
+    title: string
+    ariaLabel?: string
+  }[]
   selected: string[]
+  labelledby: string
   onToggle: (value: string) => void
 }
 
-function FilterChips({ options, selected, onToggle }: FilterChipsProps) {
+function FilterChips({ options, selected, labelledby, onToggle }: FilterChipsProps) {
   return (
-    <div className="flex flex-wrap gap-xs">
+    <div role="group" aria-labelledby={labelledby} className="flex flex-wrap gap-xs">
       {options.map((option) => {
         const isActive = selected.includes(option.value)
         return (
@@ -99,6 +130,8 @@ function FilterChips({ options, selected, onToggle }: FilterChipsProps) {
             type="button"
             onClick={() => { onToggle(option.value); }}
             aria-pressed={isActive}
+            aria-label={option.ariaLabel ?? option.title}
+            title={option.title}
             className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-pill px-4 py-2 font-body text-bodySm font-semibold transition-colors duration-hover ease-hover motion-reduce:transition-none ${
               isActive
                 ? 'bg-primary text-inkInverse'
@@ -122,17 +155,22 @@ export function ListingFilters({ tab }: { tab: string }) {
   const [draft, setDraft] = useState<ListingFilterState | null>(null)
   const [counties, setCounties] = useState<CountyOption[] | null>(null)
   const [resetEpoch, setResetEpoch] = useState(0)
-  const [subscribeOpen, setSubscribeOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  const panelId = useId()
+  const [subscribeOpen, setSubscribeOpen] = useState(false)
+  const [subFormOpen, setSubFormOpen] = useState(false)
+  const [subscribeMode, setSubscribeMode] = useState<'authed' | 'guest' | null>(null)
+  const [email, setEmail] = useState('')
+  const [consent, setConsent] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [subscribeError, setSubscribeError] = useState<string | null>(null)
 
   const state = draft !== null && !listingFiltersEqual(draft, urlState) ? draft : urlState
   const activeCount = countActiveFilters(state)
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/v1/counties')
+    apiFetch('/api/v1/counties')
       .then((response) => {
         if (!response.ok) throw new Error(String(response.status))
         return response.json()
@@ -142,6 +180,29 @@ export function ListingFilters({ tab }: { tab: string }) {
       })
       .catch(() => {
         // Select stays disabled; a reload or later retry recovers it.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Same auth probe the dialog runs: a 401 means the save would run as a
+  // guest, so guests get the demo inline sub-form and authed users the
+  // subscription modal. Probe errors fall back to the guest form, which
+  // stays safe for authed users too (the POST simply succeeds).
+  useEffect(() => {
+    let cancelled = false
+    apiFetch('/api/v1/auction-subscriptions')
+      .then((response) => {
+        if (response.status === 401) return 'guest' as const
+        if (response.ok) return 'authed' as const
+        throw new Error(String(response.status))
+      })
+      .then((mode) => {
+        if (!cancelled) setSubscribeMode(mode)
+      })
+      .catch(() => {
+        if (!cancelled) setSubscribeMode('guest')
       })
     return () => {
       cancelled = true
@@ -175,6 +236,50 @@ export function ListingFilters({ tab }: { tab: string }) {
     setResetEpoch((epoch) => epoch + 1)
   }
 
+  const toggleSubscribe = () => {
+    if (subscribeMode === 'authed') {
+      setSubscribeOpen(true)
+      return
+    }
+    setSubFormOpen((open) => !open)
+  }
+
+  const submitGuestSubscription = async () => {
+    const errors = validateSubscribeForm('guest', 'email', email, consent)
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
+    setBusy(true)
+    setSubscribeError(null)
+    // Same guest contract as SubscribeDialog: the route has no top-level
+    // guest email field, so the address travels inside filterJson.
+    const payload = {
+      filterJson: { ...filterJsonFromListingState(state), guestEmail: email.trim() },
+      channel: 'email' as const,
+      frequency: 'immediate' as const,
+      consent: true,
+    }
+    try {
+      const response = await apiFetch('/api/v1/auction-subscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error ?? `Salvestamine ebaõnnestus (${String(response.status)})`)
+      }
+      setSubFormOpen(false)
+      setEmail('')
+      setConsent(false)
+      setToast('Otsingutellimus on salvestatud.')
+    } catch (cause) {
+      setSubscribeError(cause instanceof Error ? cause.message : 'Salvestamine ebaõnnestus')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const activeBadge =
     activeCount > 0 ? (
       <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-primary px-1.5 font-mono text-[11px] font-bold text-inkInverse">
@@ -187,136 +292,166 @@ export function ListingFilters({ tab }: { tab: string }) {
       hover={false}
       content={
         <div className="flex flex-col gap-md">
-          {/* A native <details open> cannot be responsive-conditional, so the
-              collapse is driven by state below lg and overridden by lg:flex. */}
-          <button
-            type="button"
-            onClick={() => { setFiltersOpen((open) => !open); }}
-            aria-expanded={filtersOpen}
-            aria-controls={panelId}
-            className="flex w-full items-center justify-between gap-sm lg:hidden"
-          >
-            <span className="font-heading text-h4 font-semibold text-ink">Filtrid</span>
-            {activeBadge}
-          </button>
-          <div className="hidden w-full items-center justify-between gap-sm lg:flex">
+          {/* The listing toolbar owns the mobile disclosure; the card
+              itself renders fully expanded in both states. */}
+          <div className="flex w-full items-center justify-between gap-sm">
             <span className="font-heading text-h4 font-semibold text-ink">Filtrid</span>
             {activeBadge}
           </div>
 
-          <div id={panelId} className={`${filtersOpen ? 'flex' : 'hidden'} flex-col gap-md lg:flex`}>
-            <div className="grid gap-sm">
-              <FormSelect
-                label="Maakond"
-                name="county"
-                value={countyValue}
-                onChange={(event) => { update({
-                    county: event.target.value === '' ? [] : [event.target.value],
-                    parish: [],
-                  }); }
-                }
-                options={[
-                  { value: '', label: 'Kõik maakonnad' },
-                  ...(counties ?? []).map((county) => ({
-                    value: county.name,
-                    label: county.name,
-                  })),
-                ]}
-              />
-              <FormSelect
-                label="Vald"
-                name="parish"
-                value={parishValue}
-                disabled={selectedCounty === null}
-                onChange={(event) => { update({
-                    parish: event.target.value === '' ? [] : [event.target.value],
-                  }); }
-                }
-                options={[
-                  { value: '', label: 'Kõik vallad' },
-                  ...(selectedCounty?.parishes ?? []).map((parish) => ({
-                    value: parish.name,
-                    label: parish.name,
-                  })),
-                ]}
-              />
-            </div>
+          <div className="grid gap-sm">
+            <FormSelect
+              label="Maakond"
+              name="county"
+              value={countyValue}
+              onChange={(event) => { update({
+                  county: event.target.value === '' ? [] : [event.target.value],
+                  parish: [],
+                }); }
+              }
+              options={[
+                { value: '', label: 'Kõik maakonnad' },
+                ...(counties ?? []).map((county) => ({
+                  value: county.name,
+                  label: county.name,
+                })),
+              ]}
+            />
+            <FormSelect
+              label="Vald"
+              name="parish"
+              value={parishValue}
+              disabled={selectedCounty === null}
+              hint="Vali kõigepealt maakond."
+              onChange={(event) => { update({
+                  parish: event.target.value === '' ? [] : [event.target.value],
+                }); }
+              }
+              options={[
+                { value: '', label: 'Kõik vallad' },
+                ...(selectedCounty?.parishes ?? []).map((parish) => ({
+                  value: parish.name,
+                  label: parish.name,
+                })),
+              ]}
+            />
+          </div>
 
-            <FilterSection label="Puuliik">
-              <FilterChips
-                options={SPECIES_CHIP_OPTIONS}
-                selected={state.species}
-                onToggle={(value) => { update({ species: toggleToken(state.species, value) }); }}
-              />
-            </FilterSection>
+          <FilterSection label="Puuliigid" labelId="speciesLabel">
+            <FilterChips
+              options={SPECIES_CHIP_OPTIONS}
+              selected={state.species}
+              labelledby="speciesLabel"
+              onToggle={(value) => { update({ species: toggleToken(state.species, value) }); }}
+            />
+          </FilterSection>
 
-            <FilterSection label="Raieliik">
-              <FilterChips
-                options={LOGGING_TYPE_OPTIONS}
-                selected={state.loggingTypes}
-                onToggle={(value) => { update({ loggingTypes: toggleToken(state.loggingTypes, value) }); }
-                }
-              />
-            </FilterSection>
+          <FilterSection label="Raieliigid" labelId="cutLabel">
+            <FilterChips
+              options={LOGGING_TYPE_OPTIONS}
+              selected={state.loggingTypes}
+              labelledby="cutLabel"
+              onToggle={(value) => { update({ loggingTypes: toggleToken(state.loggingTypes, value) }); }
+              }
+            />
+          </FilterSection>
 
-            <div className="grid gap-sm">
-              <FormRange
-                key={`area-${String(resetEpoch)}`}
-                label="Pindala (ha)"
-                name="area"
-                min={AREA_RANGE.min}
-                max={AREA_RANGE.max}
-                step={1}
-                value={[state.areaMin ?? AREA_RANGE.min, state.areaMax ?? AREA_RANGE.max]}
-                onChange={([min, max]) => { update({
-                    areaMin: min > AREA_RANGE.min ? min : undefined,
-                    areaMax: max < AREA_RANGE.max ? max : undefined,
-                  }); }
-                }
-              />
-              <FormRange
-                key={`volume-${String(resetEpoch)}`}
-                label="Maht (m³)"
-                name="volume"
-                min={VOLUME_RANGE.min}
-                max={VOLUME_RANGE.max}
-                step={1}
-                value={[
-                  state.volumeMin ?? VOLUME_RANGE.min,
-                  state.volumeMax ?? VOLUME_RANGE.max,
-                ]}
-                onChange={([min, max]) => { update({
-                    volumeMin: min > VOLUME_RANGE.min ? min : undefined,
-                    volumeMax: max < VOLUME_RANGE.max ? max : undefined,
-                  }); }
-                }
-              />
-              <FormRange
-                key={`price-${String(resetEpoch)}`}
-                label="Hind (€)"
-                name="price"
-                min={PRICE_RANGE.min}
-                max={PRICE_RANGE.max}
-                step={100}
-                value={[state.priceMin ?? PRICE_RANGE.min, state.priceMax ?? PRICE_RANGE.max]}
-                onChange={([min, max]) => { update({
-                    priceMin: min > PRICE_RANGE.min ? min : undefined,
-                    priceMax: max < PRICE_RANGE.max ? max : undefined,
-                  }); }
-                }
-              />
-            </div>
+          <div className="grid gap-sm">
+            <FormRange
+              key={`area-${String(resetEpoch)}`}
+              label="Pindala (ha)"
+              name="area"
+              min={AREA_RANGE.min}
+              max={AREA_RANGE.max}
+              step={1}
+              value={[state.areaMin ?? AREA_RANGE.min, state.areaMax ?? AREA_RANGE.max]}
+              onChange={([min, max]) => { update({
+                  areaMin: min > AREA_RANGE.min ? min : undefined,
+                  areaMax: max < AREA_RANGE.max ? max : undefined,
+                }); }
+              }
+            />
+            <FormRange
+              key={`price-${String(resetEpoch)}`}
+              label="Hind (€)"
+              name="price"
+              min={PRICE_RANGE.min}
+              max={PRICE_RANGE.max}
+              step={100}
+              value={[state.priceMin ?? PRICE_RANGE.min, state.priceMax ?? PRICE_RANGE.max]}
+              onChange={([min, max]) => { update({
+                  priceMin: min > PRICE_RANGE.min ? min : undefined,
+                  priceMax: max < PRICE_RANGE.max ? max : undefined,
+                }); }
+              }
+            />
+            <FormSelect
+              label="Raietähtaeg (aasta)"
+              name="cutDeadlineYear"
+              value={state.cutDeadlineYear === undefined ? '' : String(state.cutDeadlineYear)}
+              onChange={(event) => { update({
+                  cutDeadlineYear:
+                    event.target.value === '' ? undefined : Number(event.target.value),
+                }); }
+              }
+              options={[
+                { value: '', label: 'Kõik' },
+                ...CUT_DEADLINE_YEARS.map((year) => ({
+                  value: String(year),
+                  label: String(year),
+                })),
+              ]}
+            />
+          </div>
 
-            <div className="flex flex-col gap-sm sm:flex-row sm:items-center">
-              <Btn type="button" onClick={() => { setSubscribeOpen(true); }}>
-                Telli teavitus
-              </Btn>
-              {activeCount > 0 && (
-                <Btn type="button" variant="outline" onClick={clear} className="sm:self-start">
-                  Tühjenda
-                </Btn>
-              )}
-            </div>
+          <div className="flex flex-col gap-sm sm:flex-row sm:items-center">
+            <Btn type="button" variant="outline" onClick={clear} className="sm:self-start">
+              <RotateCcw size={15} aria-hidden="true" /> Tühjenda
+            </Btn>
+            <Btn
+              type="button"
+              onClick={toggleSubscribe}
+              aria-expanded={subFormOpen}
+              aria-controls="subForm"
+            >
+              <Bell size={15} aria-hidden="true" /> Telli teavitus
+            </Btn>
+          </div>
+
+          <div
+            id="subForm"
+            // Tailwind classes, not the hidden attribute: .flex would beat the
+            // UA [hidden] rule and leave the closed form visible.
+            className={`flex-col gap-sm rounded-input border border-border bg-bgMist p-sm ${
+              subFormOpen ? 'flex' : 'hidden'
+            }`}
+          >
+            <FormInput
+              label="E-post"
+              name="subEmail"
+              type="email"
+              autoComplete="email"
+              placeholder="sinu@email.ee"
+              required
+              value={email}
+              disabled={busy}
+              {...(fieldErrors.email ? { error: fieldErrors.email } : {})}
+              onChange={(event) => { setEmail(event.target.value); }}
+            />
+            <ConsentCheck
+              name="subConsent"
+              label={SUBSCRIBE_CONSENT_LABEL}
+              {...(fieldErrors.consent ? { error: fieldErrors.consent } : {})}
+              onChange={setConsent}
+            />
+            {subscribeError !== null && (
+              <p role="alert" className="font-body text-bodySm text-danger">
+                {subscribeError}
+              </p>
+            )}
+            <Btn type="button" variant="cta" isLoading={busy} onClick={() => { void submitGuestSubscription(); }}>
+              Telli teavitus
+            </Btn>
           </div>
 
           <SubscribeDialog

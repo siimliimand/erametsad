@@ -252,7 +252,39 @@ describe('PasswordForm behaviour', () => {
     )
 
     setInputValue(input('new-password'), ISIKUKOOD)
-    expect(plain(node().textContent)).toContain('Ei tohi olla sinu isikukood')
+    expect(plain(node().textContent)).toContain('Ei tohi kattuda isikukoodiga')
     expect(findButton('Salvesta').disabled).toBe(true)
+  })
+
+  it('gates submit until the repeated password matches (withRepeatPassword)', async () => {
+    const fetchMock =
+      vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+        () => Promise.resolve(jsonOk({ message: 'Parool on muudetud' })),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+    await mount(
+      createElement(PasswordForm, {
+        endpoint: '/api/v1/auth/change-password',
+        withCurrentPassword: true,
+        withRepeatPassword: true,
+        submitLabel: 'Salvesta',
+      }),
+    )
+
+    setInputValue(input('current-password'), 'VanaParool1!')
+    setInputValue(input('new-password'), VALID_PASSWORD)
+    setInputValue(input('repeat-password'), 'PassWord2!')
+    expect(findButton('Salvesta').disabled).toBe(true)
+    expect(plain(node().textContent)).toContain('Paroolid ei kattu.')
+
+    setInputValue(input('repeat-password'), VALID_PASSWORD)
+    expect(findButton('Salvesta').disabled).toBe(false)
+    await submitFilled()
+
+    const call = singleFetchCall(fetchMock)
+    expect(call.body).toEqual({
+      oldPassword: 'VanaParool1!',
+      newPassword: VALID_PASSWORD,
+    })
   })
 })

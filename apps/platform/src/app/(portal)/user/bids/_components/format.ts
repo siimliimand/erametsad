@@ -1,5 +1,11 @@
 export function formatEur(value: number): string {
-  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+  // Demo shows whole euros ("7 750 €"); cents appear only when they exist.
+  return value.toLocaleString('et-EE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
 }
 
 export function formatEurInput(value: number): string {

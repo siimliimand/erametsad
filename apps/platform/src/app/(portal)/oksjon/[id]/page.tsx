@@ -1,16 +1,21 @@
-import { DocumentLink, MapEstonia, StatusPill } from '@erametsad/ui'
+import { MapEstonia, StatusPill } from '@erametsad/ui'
+import { ExternalLink, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { AnchorTabs } from './_components/AnchorTabs'
 import { BidList } from './_components/BidList'
+import { DocumentList } from './_components/DocumentList'
 import {
   DossierTable,
   PackageSection,
   type DossierRow,
 } from './_components/DossierTable'
+import { FactsCard } from './_components/FactsCard'
 import { Gallery, type GalleryImage } from './_components/Gallery'
 import { LiveBidPanel } from './_components/LiveBidPanel'
 import { LiveCountdown } from './_components/LiveCountdown'
+import { LotHeadBand } from './_components/LotHeadBand'
 import { RichText, richTextBlocks } from './_components/RichText'
 import { SellerContact } from './_components/SellerContact'
 import {
@@ -39,7 +44,13 @@ export const dynamic = 'force-dynamic'
 // ── Formatting ──────────────────────────────────────────────────────────
 
 function eur(value: number): string {
-  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+  // Demo shows whole euros ("12 000 €"); cents appear only when they exist.
+  return value.toLocaleString('et-EE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
 }
 
 function num(value: number): string {
@@ -50,6 +61,37 @@ function fmtDate(value: string): string | null {
   const time = Date.parse(value)
   if (Number.isNaN(time)) return null
   return new Date(time).toLocaleDateString('et-EE', { dateStyle: 'long' })
+}
+
+/** Demo D.M.YYYY kl HH:MM deadline line. */
+function fmtDeadline(value: string): string | null {
+  const time = Date.parse(value)
+  if (Number.isNaN(time)) return null
+  const date = new Date(time)
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${String(date.getDate())}.${String(date.getMonth() + 1)}.${String(
+    date.getFullYear(),
+  )} kl ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+// ── Object-type naming (crumbs, rail type line) ─────────────────────────
+
+const OBJECT_TYPE_LABELS: Record<
+  AuctionDossier['objectType'],
+  { singular: string; plural: string; tab: string }
+> = {
+  raieoigus: { singular: 'Raieõigus', plural: 'Raieõigused', tab: 'raieoigused' },
+  kinnistu: {
+    singular: 'Metskinnistu',
+    plural: 'Metskinnistud',
+    tab: 'metskinnistud',
+  },
+  kiire: {
+    singular: 'Kiiroksjon',
+    plural: 'Kiiroksjonid',
+    tab: 'kiiroksjonid',
+  },
+  pakett: { singular: 'Pakett', plural: 'Paketid', tab: 'paketid' },
 }
 
 // ── Media / files ───────────────────────────────────────────────────────
@@ -282,6 +324,25 @@ function StatusBadge({ auction }: { auction: AuctionDossier }) {
   return <StatusPill status={STATUS_PILL_MAP[auction.status]} />
 }
 
+function QuickAuctionBadge() {
+  return (
+    <span className="inline-flex items-center rounded-pill bg-primaryLight px-2 py-0.5 text-xs font-medium text-primaryDark">
+      Kiiroksjon
+    </span>
+  )
+}
+
+// Demo dark sealed badge with the lock icon (03-lot-detail-sealed.html
+// .badge-sealed).
+function SealedBadge() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-pill bg-primaryDark px-3 py-0.5 text-bodySm font-semibold text-white">
+      <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+      Suletud pimepakkumine
+    </span>
+  )
+}
+
 function similarLink(auction: AuctionDossier): string {
   const county = auction.county?.code ?? auction.county?.id
   return county !== undefined && county !== ''
@@ -465,6 +526,10 @@ export default async function AuctionPage({
   const auction = await getAuctionDossier(repositories, id, viewer)
   if (!auction) notFound()
 
+  const isSealed = auction.type === 'sealed'
+  const typeLabels = OBJECT_TYPE_LABELS[auction.objectType]
+  const typeHref = `/?tab=${typeLabels.tab}`
+
   // Role-shaped bid list (task 4.5); open auctions only — sealed pages keep
   // the count on SealedBidPanel.
   const bidView =
@@ -543,12 +608,14 @@ export default async function AuctionPage({
     rows.push({
       label: 'Katastritunnused',
       value: auction.cadastres.join(', '),
+      mono: true,
     })
   }
   if (auction.registryNumbers.length > 0) {
     rows.push({
       label: 'Kinnistu registrinumber',
       value: auction.registryNumbers.join(', '),
+      mono: true,
     })
   }
   if (auction.county !== null)
@@ -558,22 +625,46 @@ export default async function AuctionPage({
   if (auction.address !== null)
     rows.push({ label: 'Aadress', value: auction.address })
   if (auction.area !== null)
-    rows.push({ label: 'Pindala', value: `${num(auction.area)} ha` })
+    rows.push({
+      label: 'Pindala',
+      value: `${num(auction.area)} ha`,
+      mono: true,
+    })
   if (auction.volume !== null) {
-    rows.push({ label: 'Raiemaht', value: `${num(auction.volume)} m³` })
+    rows.push({
+      label: 'Raiemaht',
+      value: `${num(auction.volume)} m³`,
+      mono: true,
+    })
   }
   if (auction.species.length > 0) {
-    rows.push({ label: 'Puuliigid', value: auction.species.join(', ') })
+    rows.push({
+      label: 'Puuliigid',
+      value: auction.species.join(', '),
+      mono: true,
+    })
   }
   if (auction.loggingTypes.length > 0) {
-    rows.push({ label: 'Raieliigid', value: auction.loggingTypes.join(', ') })
+    rows.push({
+      label: 'Raieliigid',
+      value: auction.loggingTypes.join(', '),
+      mono: true,
+    })
   }
   if (auction.compartments.length > 0) {
-    rows.push({ label: 'Eraldised', value: auction.compartments.join(', ') })
+    rows.push({
+      label: 'Eraldised',
+      value: auction.compartments.join(', '),
+      mono: true,
+    })
   }
   const notifications = notificationNumbers(auction.forestNotifications)
   if (notifications.length > 0) {
-    rows.push({ label: 'Metsateatise nr', value: notifications.join(', ') })
+    rows.push({
+      label: 'Metsateatise nr',
+      value: notifications.join(', '),
+      mono: true,
+    })
   }
   const loggingDeadline = deadlineValue(auction.deadlines, [
     'loggingDeadline',
@@ -581,14 +672,22 @@ export default async function AuctionPage({
     'raie',
   ])
   if (loggingDeadline !== null) {
-    rows.push({ label: 'Raie teostamise tähtaeg', value: loggingDeadline })
+    rows.push({
+      label: 'Raie teostamise tähtaeg',
+      value: loggingDeadline,
+      mono: true,
+    })
   }
   const removalDeadline = deadlineValue(auction.deadlines, [
     'removalDeadline',
     'removal',
   ])
   if (removalDeadline !== null) {
-    rows.push({ label: 'Väljaveo tähtaeg', value: removalDeadline })
+    rows.push({
+      label: 'Väljaveo tähtaeg',
+      value: removalDeadline,
+      mono: true,
+    })
   }
   const storageApproval = approvalLabel(auction.deadlines, [
     'storageLocationApproval',
@@ -606,10 +705,26 @@ export default async function AuctionPage({
   }
   const rental = rentalLabel(auction.deadlines)
   if (rental !== null) rows.push({ label: 'Üürileping', value: rental })
-  if (auction.type !== 'sealed') {
-    rows.push({ label: 'Alghind', value: eur(auction.minBid) })
+  if (isSealed) {
+    rows.push({ label: 'Oksjoni tüüp', value: 'Suletud pimepakkumine' })
+    rows.push({ label: 'Alghind', value: eur(auction.minBid), mono: true })
+    const sealedDeadline =
+      auction.endsAt !== null ? fmtDeadline(auction.endsAt) : null
+    if (sealedDeadline !== null) {
+      rows.push({
+        label: 'Pakkumiste tähtaeg',
+        value: sealedDeadline,
+        mono: true,
+      })
+    }
+  } else {
+    rows.push({ label: 'Alghind', value: eur(auction.minBid), mono: true })
     if (auction.bidStep !== null) {
-      rows.push({ label: 'Pakkumise samm', value: eur(auction.bidStep) })
+      rows.push({
+        label: 'Pakkumise samm',
+        value: eur(auction.bidStep),
+        mono: true,
+      })
     }
   }
 
@@ -622,197 +737,331 @@ export default async function AuctionPage({
   const metsaregisterHref =
     auction.metsaregisterLink ?? 'https://register.metsad.ee'
 
+  const factsLinks = [
+    { label: 'Katastrikaart', href: katasterHref },
+    { label: 'Metsaregister', href: metsaregisterHref },
+  ]
+
+  const locationLine =
+    [auction.county?.name, auction.parish?.name, auction.address]
+      .filter((part) => part !== undefined && part !== null && part !== '')
+      .join(' · ') || 'Asukoht määramata'
+
+  const anchorTabs = [
+    { id: 'ulevaade', label: 'Ülevaade' },
+    { id: 'asukoht', label: 'Asukoht' },
+    { id: 'dokumendid', label: 'Dokumendid' },
+    { id: 'pakkumised', label: 'Pakkumised' },
+  ]
+
+  const headingClass = 'mb-3.5 font-heading text-h3 text-ink'
+  const sectionIntroClass = '-mt-1 mb-4 text-bodySm text-inkMuted'
+
   return (
     <AuctionStreamProvider>
-      <div className="flex flex-col gap-lg">
-        <div className="flex flex-col gap-xs">
-          <Link
-            href="/"
-            className="text-bodySm text-inkMuted hover:text-primary"
+      {isSealed ? (
+        <LotHeadBand
+          title={auction.title}
+          typeLabel={typeLabels.plural}
+          typeHref={typeHref}
+          badges={
+            <>
+              <StatusBadge auction={auction} />
+              {auction.isQuickAuction && <QuickAuctionBadge />}
+              <SealedBadge />
+            </>
+          }
+          deadline={
+            countdownEndsAt !== null
+              ? { endsAt: countdownEndsAt, serverNow }
+              : null
+          }
+        />
+      ) : (
+        <>
+          <nav
+            aria-label="Jäljerada"
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 text-bodySm"
           >
-            ‹ Kõik oksjonid
-          </Link>
-          <div className="flex flex-wrap items-center gap-sm">
-            <h1 className="font-heading text-h2 text-ink">{auction.title}</h1>
-            <StatusBadge auction={auction} />
-            {auction.isQuickAuction && (
-              <span className="inline-flex items-center rounded-pill bg-primaryLight px-2 py-0.5 text-xs font-medium text-primaryDark">
-                Kiiroksjon
-              </span>
-            )}
-            {countdownEndsAt !== null && (
-              <LiveCountdown
-                auctionId={auction.id}
-                endsAt={countdownEndsAt}
-                serverNow={serverNow}
-                className="ml-auto"
-              />
-            )}
+            <ol className="m-0 flex list-none flex-wrap items-center gap-x-2 gap-y-1 p-0">
+              <li>
+                <Link
+                  href="/"
+                  className="text-inkMuted no-underline transition-colors duration-hover hover:text-primary"
+                >
+                  Oksjonid
+                </Link>
+              </li>
+              <li aria-hidden="true" className="text-border">
+                /
+              </li>
+              <li>
+                <Link
+                  href={typeHref}
+                  className="text-inkMuted no-underline transition-colors duration-hover hover:text-primary"
+                >
+                  {typeLabels.plural}
+                </Link>
+              </li>
+              <li aria-hidden="true" className="text-border">
+                /
+              </li>
+              <li aria-current="page" className="font-semibold text-ink">
+                {auction.title}
+              </li>
+            </ol>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <StatusBadge auction={auction} />
+              {auction.isQuickAuction && <QuickAuctionBadge />}
+            </div>
+          </nav>
+          <div className="-mx-md mt-sm border-b border-border bg-bgPage px-md md:-mx-lg md:px-lg">
+            <AnchorTabs items={anchorTabs} />
           </div>
-        </div>
+        </>
+      )}
 
-        <div className="grid gap-lg lg:grid-cols-3">
-          <div className="flex flex-col gap-lg lg:col-span-2">
-            <Gallery images={images} />
-
-            <section className="flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card">
-              <h2 className="font-heading text-h4 text-ink">
-                Asukoht ja kaart
-              </h2>
-              <p className="text-bodySm text-inkMuted">
-                {[auction.county?.name, auction.parish?.name, auction.address]
-                  .filter(
-                    (part) =>
-                      part !== undefined && part !== null && part !== '',
-                  )
-                  .join(' · ') || 'Asukoht määramata'}
-              </p>
-              {auction.coordinates !== null && (
-                <MapEstonia
-                  pins={[
-                    {
-                      lat: auction.coordinates.lat,
-                      lng: auction.coordinates.lng,
-                      label: auction.title,
-                    },
-                  ]}
-                  center={[auction.coordinates.lat, auction.coordinates.lng]}
-                  zoom={13}
-                  className="h-72 w-full rounded-card"
-                />
+      <div
+        className={`grid items-start gap-lg lg:grid-cols-[minmax(0,1fr)_400px] ${
+          isSealed ? '' : 'pt-md'
+        }`}
+      >
+        {/* Main column */}
+        <div className="flex min-w-0 flex-col gap-lg">
+          {isSealed ? (
+            <>
+              <Gallery images={images} />
+              {rows.length > 0 && (
+                <FactsCard rows={rows} links={factsLinks} />
               )}
-              <div className="flex flex-wrap gap-sm">
-                <a
-                  href={katasterHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-bodySm font-semibold text-primary hover:text-primaryHover"
+              {auction.packageRows.length > 0 && (
+                <section
+                  aria-label="Pakett"
+                  className="rounded-card border border-border bg-bgPage p-7 shadow-card"
                 >
-                  Kataster ↗
-                </a>
-                <a
-                  href={metsaregisterHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-bodySm font-semibold text-primary hover:text-primaryHover"
+                  <h2 className={headingClass}>Pakett</h2>
+                  <PackageSection
+                    header={auction.packageHeader}
+                    columns={auction.packageColumns}
+                    rows={auction.packageRows}
+                  />
+                </section>
+              )}
+              {(description.length > 0 || secondaryInfo.length > 0) && (
+                <section
+                  aria-labelledby="sealed-info-heading"
+                  className="rounded-card border border-border bg-bgPage p-7 shadow-card"
                 >
-                  Metsaregister ↗
-                </a>
-              </div>
-            </section>
-
-            {rows.length > 0 && (
-              <section className="flex flex-col gap-sm">
-                <h2 className="font-heading text-h4 text-ink">Andmetabel</h2>
-                <DossierTable rows={rows} />
-              </section>
-            )}
-
-            {auction.packageRows.length > 0 && (
-              <section className="flex flex-col gap-sm">
-                <h2 className="font-heading text-h4 text-ink">Pakett</h2>
-                <PackageSection
-                  header={auction.packageHeader}
-                  columns={auction.packageColumns}
-                  rows={auction.packageRows}
-                />
-              </section>
-            )}
-
-            {description.length > 0 && (
-              <section className="flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card">
-                <h2 className="font-heading text-h4 text-ink">
-                  Oksjoni info ja erisused
-                </h2>
-                <RichText blocks={description} />
-              </section>
-            )}
-
-            {secondaryInfo.length > 0 && (
-              <section className="flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card">
-                <h2 className="font-heading text-h4 text-ink">Lisainfo</h2>
-                <RichText blocks={secondaryInfo} />
-              </section>
-            )}
-
-            {files.length > 0 && (
-              <section className="flex flex-col gap-sm">
-                <h2 className="font-heading text-h4 text-ink">Failid</h2>
-                <div className="grid gap-sm sm:grid-cols-2">
-                  {files.map((file) => (
-                    <DocumentLink
-                      key={file.href}
-                      title={file.title}
-                      href={file.href}
-                      {...(file.size !== undefined
-                        ? { fileSize: file.size }
-                        : {})}
-                      {...(file.format !== undefined
-                        ? { format: file.format }
-                        : {})}
-                    />
-                  ))}
+                  <h2 id="sealed-info-heading" className={headingClass}>
+                    Info
+                  </h2>
+                  <div className="flex flex-col gap-md">
+                    <RichText blocks={description} />
+                    <RichText blocks={secondaryInfo} />
+                  </div>
+                </section>
+              )}
+              {files.length > 0 && (
+                <section
+                  aria-labelledby="sealed-docs-heading"
+                  className="rounded-card border border-border bg-bgPage p-7 shadow-card"
+                >
+                  <h2 id="sealed-docs-heading" className={headingClass}>
+                    Dokumendid
+                  </h2>
+                  <DocumentList items={files} variant="plain" />
+                </section>
+              )}
+            </>
+          ) : (
+            <>
+              <section id="ulevaade" aria-label="Ülevaade" className="scroll-mt-24">
+                <div className="flex flex-col gap-md">
+                  <Gallery images={images} />
+                  {description.length > 0 && (
+                    <div>
+                      <h2 className={headingClass}>
+                        Oksjoni info ja erisused
+                      </h2>
+                      <RichText blocks={description} />
+                    </div>
+                  )}
+                  {secondaryInfo.length > 0 && (
+                    <div>
+                      <h2 className={headingClass}>Lisainfo</h2>
+                      <RichText blocks={secondaryInfo} />
+                    </div>
+                  )}
+                  {rows.length > 0 && (
+                    <div>
+                      <h2 className={headingClass}>Peamised andmed</h2>
+                      <DossierTable rows={rows} />
+                    </div>
+                  )}
+                  {auction.packageRows.length > 0 && (
+                    <div>
+                      <h2 className={headingClass}>Pakett</h2>
+                      <PackageSection
+                        header={auction.packageHeader}
+                        columns={auction.packageColumns}
+                        rows={auction.packageRows}
+                      />
+                    </div>
+                  )}
                 </div>
               </section>
-            )}
-          </div>
 
-          <div className="flex flex-col gap-lg">
-            {auction.type === 'sealed' ? (
-              <SealedBidPanel
-                auctionId={auction.id}
-                status={auction.status}
-                startsAt={auction.startsAt}
-                endsAt={auction.endsAt}
-                minBid={auction.minBid}
-                bidCount={auction.bidCount}
-                finalPrice={auction.finalPrice}
-                viewer={sealedViewer}
-              />
-            ) : isEndedLike ? (
-              <EndedPanel
-                auction={auction}
-                unsold={auction.status === 'unsold'}
-              />
-            ) : (
-              <LiveBidPanel
-                auctionId={auction.id}
-                objectType={auction.objectType}
-                status={auction.status}
-                startsAt={auction.startsAt}
-                endsAt={auction.endsAt}
-                minBid={auction.minBid}
-                bidStep={auction.bidStep}
-                leadingBidAmount={auction.leadingBidAmount}
-                finalPrice={auction.finalPrice}
-                antiSnipeMinutes={antiSnipeMinutes}
-                allowUnderStart={allowUnderStart}
-                viewer={
-                  auth === null
-                    ? null
-                    : {
-                        hasBid: auction.participation?.hasBid ?? false,
-                        isLeading: auction.participation?.isLeading ?? false,
-                        hasRights: null,
-                        hasRaamleping,
-                        hasAutobidder: auction.participation?.hasAutobidder ?? false,
-                        hasPendingUnderStart:
-                          auction.participation?.hasPendingUnderStart ?? false,
-                        autobidderId: ownAutobidder?.id ?? null,
-                        autobidderMaxAmount: ownAutobidder?.maxAmount ?? null,
-                      }
-                }
-              />
-            )}
-            {bidView !== null && (
-              <BidList auctionId={auction.id} initialView={bidView} />
-            )}
-            <SellerContact
-              specialist={auction.contact.specialist}
-              aliasEmail={auction.contact.aliasEmail}
-            />
-          </div>
+              <section id="asukoht" aria-label="Asukoht" className="scroll-mt-24">
+                <h2 className={headingClass}>Asukoht ja kaart</h2>
+                <p className={sectionIntroClass}>
+                  Ligikaudne asukoht kaardil — täpne piiritlus katastrikaardil
+                  ja metsaregistris.
+                </p>
+                {auction.coordinates !== null && (
+                  <div className="h-72 overflow-hidden rounded-hero border border-border shadow-card lg:h-96 [&_.map-estonia]:h-full [&_.map-estonia]:min-h-0 [&_.map-estonia__fallback]:h-full [&_.map-estonia__fallback]:min-h-0">
+                    <MapEstonia
+                      pins={[
+                        {
+                          lat: auction.coordinates.lat,
+                          lng: auction.coordinates.lng,
+                          label: auction.title,
+                        },
+                      ]}
+                      center={[
+                        auction.coordinates.lat,
+                        auction.coordinates.lng,
+                      ]}
+                      zoom={13}
+                    />
+                  </div>
+                )}
+                <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-bodySm text-inkMuted">
+                  {auction.coordinates !== null && (
+                    <span className="font-mono text-xs text-ink">
+                      {`${auction.coordinates.lat.toFixed(4)}° N · ${auction.coordinates.lng.toFixed(4)}° E`}
+                    </span>
+                  )}
+                  <span>{locationLine}</span>
+                  <div className="flex flex-wrap gap-2.5 sm:ml-auto">
+                    {factsLinks.map((link) => (
+                      <a
+                        key={link.href}
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-button border border-primary px-3.5 py-1.5 text-bodySm font-semibold text-primary transition-colors duration-hover hover:bg-primaryLight hover:text-primaryHover"
+                      >
+                        {link.label}
+                        <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              {files.length > 0 && (
+                <section
+                  id="dokumendid"
+                  aria-label="Dokumendid"
+                  className="scroll-mt-24"
+                >
+                  <h2 className={headingClass}>Dokumendid</h2>
+                  <p className={sectionIntroClass}>
+                    Ametlikud dokumendid. Allalaadimine toimub turvalise,
+                    allkirjastatud lingiga.
+                  </p>
+                  <DocumentList items={files} variant="panel" />
+                </section>
+              )}
+
+              {bidView !== null && (
+                <div id="pakkumised" className="scroll-mt-24">
+                  <BidList auctionId={auction.id} initialView={bidView} />
+                </div>
+              )}
+            </>
+          )}
         </div>
+
+        {/* Side rail */}
+        <aside
+          aria-label={isSealed ? 'Pimepakkumine' : 'Pakkumise paneel'}
+          className="flex flex-col gap-lg self-start lg:sticky lg:top-6"
+        >
+          {isSealed ? (
+            <SealedBidPanel
+              auctionId={auction.id}
+              status={auction.status}
+              startsAt={auction.startsAt}
+              endsAt={auction.endsAt}
+              minBid={auction.minBid}
+              bidCount={auction.bidCount}
+              finalPrice={auction.finalPrice}
+              viewer={sealedViewer}
+            />
+          ) : (
+            <>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.05em] text-inkMuted">
+                  {`${typeLabels.singular} · Avatud oksjon`}
+                </p>
+                <h1 className="break-words font-heading text-h3 font-bold leading-tight text-ink">
+                  {auction.title}
+                </h1>
+                {countdownEndsAt !== null && (
+                  <div className="mt-2">
+                    <LiveCountdown
+                      auctionId={auction.id}
+                      endsAt={countdownEndsAt}
+                      serverNow={serverNow}
+                    />
+                  </div>
+                )}
+              </div>
+              {isEndedLike ? (
+                <EndedPanel
+                  auction={auction}
+                  unsold={auction.status === 'unsold'}
+                />
+              ) : (
+                <LiveBidPanel
+                  auctionId={auction.id}
+                  objectType={auction.objectType}
+                  status={auction.status}
+                  startsAt={auction.startsAt}
+                  endsAt={auction.endsAt}
+                  minBid={auction.minBid}
+                  bidStep={auction.bidStep}
+                  leadingBidAmount={auction.leadingBidAmount}
+                  finalPrice={auction.finalPrice}
+                  antiSnipeMinutes={antiSnipeMinutes}
+                  allowUnderStart={allowUnderStart}
+                  bidCount={auction.bidCount}
+                  viewer={
+                    auth === null
+                      ? null
+                      : {
+                          hasBid: auction.participation?.hasBid ?? false,
+                          isLeading: auction.participation?.isLeading ?? false,
+                          hasRights: null,
+                          hasRaamleping,
+                          hasAutobidder:
+                            auction.participation?.hasAutobidder ?? false,
+                          hasPendingUnderStart:
+                            auction.participation?.hasPendingUnderStart ?? false,
+                          autobidderId: ownAutobidder?.id ?? null,
+                          autobidderMaxAmount: ownAutobidder?.maxAmount ?? null,
+                        }
+                  }
+                />
+              )}
+            </>
+          )}
+          <SellerContact
+            specialist={auction.contact.specialist}
+            aliasEmail={auction.contact.aliasEmail}
+          />
+        </aside>
       </div>
     </AuctionStreamProvider>
   )

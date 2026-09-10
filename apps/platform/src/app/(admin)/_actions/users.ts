@@ -16,19 +16,13 @@ import {
 import { isSuspendDuration, suspendedUntil } from '../admin/users/_components/suspend'
 
 import { verifyAccessToken } from '@/lib/auth/jwt'
-import {
-  clearSessionCookiesOnStore,
-  createSession,
-  getUserSession,
-  revokeSession,
-  revokeUserSessions,
-  writeSessionCookies,
-} from '@/lib/auth/session'
+import { clearSessionCookiesOnStore, createSession, getUserSession, revokeSession, revokeUserSessions, sessionCookieDomainFromHost, writeSessionCookies } from '@/lib/auth/session'
 import { computeIpHash } from '@/lib/bidding/place-bid'
 import type { CoreRepositories, UserDoc } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
 import { auctionObjectTypes, userRoles } from '@/lib/data/schema'
 import { db } from '@/lib/db'
+import { adminUrl } from '@/lib/routing/admin-base-server'
 
 const REASON_MIN_LENGTH = 5
 
@@ -92,17 +86,21 @@ function hasMinReason(value: string): boolean {
   return value.length >= REASON_MIN_LENGTH
 }
 
-function redirectWithError(path: string, message: string): never {
-  redirect(`${path}?viga=${encodeURIComponent(message)}`)
+async function redirectWithError(path: string, message: string): Promise<never> {
+  redirect(await adminUrl(`${path}?viga=${encodeURIComponent(message)}`))
 }
 
-function redirectWithNotice(path: string, message: string): never {
-  redirect(`${path}?teade=${encodeURIComponent(message)}`)
+async function redirectWithNotice(path: string, message: string): Promise<never> {
+  redirect(await adminUrl(`${path}?teade=${encodeURIComponent(message)}`))
 }
 
-function assertPermissionOrRedirect(role: Parameters<typeof can>[0], permission: AdminPermission, path: string): void {
+async function assertPermissionOrRedirect(
+  role: Parameters<typeof can>[0],
+  permission: AdminPermission,
+  path: string,
+): Promise<void> {
   if (!can(role, permission)) {
-    redirectWithError(path, 'Teil puudub õigus selle toimingu sooritamiseks.')
+    await redirectWithError(path, 'Teil puudub õigus selle toimingu sooritamiseks.')
   }
 }
 
@@ -378,15 +376,15 @@ export async function updateUserAction(formData: FormData): Promise<void> {
   const { session } = await requireAdminRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError('/admin/users', 'Kasutaja identifikaator puudub.')
+  if (!id) return redirectWithError('/admin/users', 'Kasutaja identifikaator puudub.')
 
   const editPath = `/admin/users/${id}`
-  assertPermissionOrRedirect(session.role, 'users:write', editPath)
+  await assertPermissionOrRedirect(session.role, 'users:write', editPath)
   const repositories = await getRepositories()
 
   const role = readText(formData, 'role')
   if (!userRoles.includes(role as (typeof userRoles)[number]) || role === 'guest') {
-    redirectWithError(editPath, 'Vali sobiv roll.')
+    return redirectWithError(editPath, 'Vali sobiv roll.')
   }
 
   let failure: string | null = null
@@ -404,12 +402,12 @@ export async function updateUserAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(editPath, `Kasutaja salvestamine ebaõnnestus: ${failure}`)
+    return redirectWithError(editPath, `Kasutaja salvestamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath('/admin/users')
   revalidatePath(editPath)
-  redirectWithNotice(editPath, 'Kasutaja andmed salvestatud.')
+  return redirectWithNotice(editPath, 'Kasutaja andmed salvestatud.')
 }
 
 export async function grantAuctionRightAction(formData: FormData): Promise<void> {
@@ -421,19 +419,19 @@ export async function grantAuctionRightAction(formData: FormData): Promise<void>
   const notify = readCheckbox(formData, 'notify')
   const editPath = `/admin/users/${userId}`
 
-  if (!userId) redirectWithError('/admin/users', 'Kasutaja identifikaator puudub.')
-  assertPermissionOrRedirect(session.role, 'users:write', editPath)
+  if (!userId) return redirectWithError('/admin/users', 'Kasutaja identifikaator puudub.')
+  await assertPermissionOrRedirect(session.role, 'users:write', editPath)
   if (!auctionObjectTypes.includes(objectType as (typeof auctionObjectTypes)[number])) {
-    redirectWithError(editPath, 'Vali sobiv objekti tüüp.')
+    return redirectWithError(editPath, 'Vali sobiv objekti tüüp.')
   }
   if (!hasMinReason(reason)) {
-    redirectWithError(editPath, 'Õiguse andmise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+    return redirectWithError(editPath, 'Õiguse andmise põhjus on kohustuslik (vähemalt 5 tähemärki).')
   }
 
   const repositories = await getRepositories()
 
   const user = await repositories.findByID({ collection: 'users', id: userId })
-  if (!user) redirectWithError('/admin/users', 'Kasutajat ei leitud.')
+  if (!user) return redirectWithError('/admin/users', 'Kasutajat ei leitud.')
 
   const existing = await repositories.find({
     collection: 'auction-rights',
@@ -447,7 +445,7 @@ export async function grantAuctionRightAction(formData: FormData): Promise<void>
     limit: 1,
   })
   if (existing.docs.length > 0) {
-    redirectWithError(editPath, 'See oksjoniõigus on juba antud.')
+    return redirectWithError(editPath, 'See oksjoniõigus on juba antud.')
   }
 
   let failure: string | null = null
@@ -486,11 +484,11 @@ export async function grantAuctionRightAction(formData: FormData): Promise<void>
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(editPath, `Oksjoniõiguse andmine ebaõnnestus: ${failure}`)
+    return redirectWithError(editPath, `Oksjoniõiguse andmine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(editPath)
-  redirectWithNotice(editPath, `Õigus antud${notify ? ' ja kasutajat teavitatud' : ''}.`)
+  return redirectWithNotice(editPath, `Õigus antud${notify ? ' ja kasutajat teavitatud' : ''}.`)
 }
 
 export async function revokeAuctionRightAction(formData: FormData): Promise<void> {
@@ -503,21 +501,21 @@ export async function revokeAuctionRightAction(formData: FormData): Promise<void
   const editPath = `/admin/users/${userId}`
 
   if (!rightId || !userId) {
-    redirectWithError('/admin/users', 'Oksjoniõiguse identifikaator puudub.')
+    return redirectWithError('/admin/users', 'Oksjoniõiguse identifikaator puudub.')
   }
-  assertPermissionOrRedirect(session.role, 'users:write', editPath)
+  await assertPermissionOrRedirect(session.role, 'users:write', editPath)
   if (!hasMinReason(reason)) {
-    redirectWithError(editPath, 'Õiguse tühistamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+    return redirectWithError(editPath, 'Õiguse tühistamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
   }
 
   const repositories = await getRepositories()
 
   const right = await repositories.findByID({ collection: 'auction-rights', id: rightId })
   if (right?.userId !== userId) {
-    redirectWithError(editPath, 'Oksjoniõigust ei leitud või see ei kuulu sellele kasutajale.')
+    return redirectWithError(editPath, 'Oksjoniõigust ei leitud või see ei kuulu sellele kasutajale.')
   }
   if (right.revokedAt !== null) {
-    redirectWithError(editPath, 'See oksjoniõigus on juba tühistatud.')
+    return redirectWithError(editPath, 'See oksjoniõigus on juba tühistatud.')
   }
 
   let failure: string | null = null
@@ -553,11 +551,11 @@ export async function revokeAuctionRightAction(formData: FormData): Promise<void
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(editPath, `Oksjoniõiguse tühistamine ebaõnnestus: ${failure}`)
+    return redirectWithError(editPath, `Oksjoniõiguse tühistamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(editPath)
-  redirectWithNotice(editPath, `Õigus tühistatud${notify ? ' ja kasutajat teavitatud' : ''}.`)
+  return redirectWithNotice(editPath, `Õigus tühistatud${notify ? ' ja kasutajat teavitatud' : ''}.`)
 }
 
 export async function suspendUserAction(formData: FormData): Promise<void> {
@@ -568,21 +566,21 @@ export async function suspendUserAction(formData: FormData): Promise<void> {
   const reason = readText(formData, 'reason')
   const editPath = `/admin/users/${userId}`
 
-  if (!userId) redirectWithError('/admin/users', 'Kasutaja identifikaator puudub.')
-  assertPermissionOrRedirect(session.role, 'users:write', editPath)
+  if (!userId) return redirectWithError('/admin/users', 'Kasutaja identifikaator puudub.')
+  await assertPermissionOrRedirect(session.role, 'users:write', editPath)
   if (!isSuspendDuration(duration)) {
-    redirectWithError(editPath, 'Vali peatamise kestus.')
+    return redirectWithError(editPath, 'Vali peatamise kestus.')
   }
   if (!hasMinReason(reason)) {
-    redirectWithError(editPath, 'Peatamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+    return redirectWithError(editPath, 'Peatamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
   }
 
   const repositories = await getRepositories()
 
   const user = await repositories.findByID({ collection: 'users', id: userId })
-  if (!user) redirectWithError('/admin/users', 'Kasutajat ei leitud.')
+  if (!user) return redirectWithError('/admin/users', 'Kasutajat ei leitud.')
   if (user.status === 'suspended') {
-    redirectWithError(editPath, 'Kasutaja konto on juba peatatud.')
+    return redirectWithError(editPath, 'Kasutaja konto on juba peatatud.')
   }
 
   const activeAutobidders = await repositories.find({
@@ -641,12 +639,12 @@ export async function suspendUserAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(editPath, `Kasutaja peatamine ebaõnnestus: ${failure}`)
+    return redirectWithError(editPath, `Kasutaja peatamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(editPath)
   revalidatePath('/admin/users')
-  redirectWithNotice(editPath, 'Konto peatatud; aktiivsed automaatpakkujad deaktiveeritud ja kasutaja teavitatud.')
+  return redirectWithNotice(editPath, 'Konto peatatud; aktiivsed automaatpakkujad deaktiveeritud ja kasutaja teavitatud.')
 }
 
 export async function resumeUserAction(formData: FormData): Promise<void> {
@@ -656,18 +654,18 @@ export async function resumeUserAction(formData: FormData): Promise<void> {
   const reason = readText(formData, 'reason')
   const editPath = `/admin/users/${userId}`
 
-  if (!userId) redirectWithError('/admin/users', 'Kasutaja identifikaator puudub.')
-  assertPermissionOrRedirect(session.role, 'users:write', editPath)
+  if (!userId) return redirectWithError('/admin/users', 'Kasutaja identifikaator puudub.')
+  await assertPermissionOrRedirect(session.role, 'users:write', editPath)
   if (!hasMinReason(reason)) {
-    redirectWithError(editPath, 'Aktiveerimise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+    return redirectWithError(editPath, 'Aktiveerimise põhjus on kohustuslik (vähemalt 5 tähemärki).')
   }
 
   const repositories = await getRepositories()
 
   const user = await repositories.findByID({ collection: 'users', id: userId })
-  if (!user) redirectWithError('/admin/users', 'Kasutajat ei leitud.')
+  if (!user) return redirectWithError('/admin/users', 'Kasutajat ei leitud.')
   if (user.status !== 'suspended') {
-    redirectWithError(editPath, 'Kasutaja konto ei ole peatatud.')
+    return redirectWithError(editPath, 'Kasutaja konto ei ole peatatud.')
   }
 
   let failure: string | null = null
@@ -700,12 +698,12 @@ export async function resumeUserAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(editPath, `Kasutaja aktiveerimine ebaõnnestus: ${failure}`)
+    return redirectWithError(editPath, `Kasutaja aktiveerimine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(editPath)
   revalidatePath('/admin/users')
-  redirectWithNotice(editPath, 'Konto aktiveeritud uuesti ja kasutajat teavitatud.')
+  return redirectWithNotice(editPath, 'Konto aktiveeritud uuesti ja kasutajat teavitatud.')
 }
 
 export async function revealIsikukoodAction(
@@ -757,12 +755,12 @@ export async function revokeUserSessionAction(formData: FormData): Promise<void>
   const editPath = `/admin/users/${userId}`
 
   if (!userId || !sessionId) {
-    redirectWithError('/admin/users', 'Sessiooni identifikaator puudub.')
+    return redirectWithError('/admin/users', 'Sessiooni identifikaator puudub.')
   }
 
   const record = await getUserSession(sessionId)
   if (record?.userId !== userId) {
-    redirectWithError(editPath, 'Sessiooni ei leitud või see ei kuulu sellele kasutajale.')
+    return redirectWithError(editPath, 'Sessiooni ei leitud või see ei kuulu sellele kasutajale.')
   }
 
   let failure: string | null = null
@@ -772,11 +770,11 @@ export async function revokeUserSessionAction(formData: FormData): Promise<void>
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(editPath, `Sessiooni tühistamine ebaõnnestus: ${failure}`)
+    return redirectWithError(editPath, `Sessiooni tühistamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(editPath)
-  redirect(editPath)
+  redirect(await adminUrl(editPath))
 }
 
 /**
@@ -793,23 +791,23 @@ export async function startImpersonationAction(formData: FormData): Promise<void
   const reason = readText(formData, 'reason')
   const editPath = `/admin/users/${userId}`
 
-  if (!userId) redirectWithError('/admin/users', 'Kasutaja identifikaator puudub.')
-  assertPermissionOrRedirect(session.role, 'users:write', editPath)
+  if (!userId) return redirectWithError('/admin/users', 'Kasutaja identifikaator puudub.')
+  await assertPermissionOrRedirect(session.role, 'users:write', editPath)
   if (!hasMinReason(reason)) {
-    redirectWithError(editPath, 'Vaatluse alustamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
+    return redirectWithError(editPath, 'Vaatluse alustamise põhjus on kohustuslik (vähemalt 5 tähemärki).')
   }
 
   const repositories = await getRepositories()
 
   const user = await repositories.findByID({ collection: 'users', id: userId })
-  if (!user) redirectWithError('/admin/users', 'Kasutajat ei leitud.')
+  if (!user) return redirectWithError('/admin/users', 'Kasutajat ei leitud.')
   // Staff targets would chain administrative access through the view
   // session, so impersonation stays limited to portal roles.
   if (isStaffRole(user.role)) {
-    redirectWithError(editPath, 'Töötaja konto vaatlemine ei ole lubatud.')
+    return redirectWithError(editPath, 'Töötaja konto vaatlemine ei ole lubatud.')
   }
   if (user.status !== 'active') {
-    redirectWithError(editPath, 'Kasutaja konto ei ole aktiivne.')
+    return redirectWithError(editPath, 'Kasutaja konto ei ole aktiivne.')
   }
 
   const { accessToken, refreshToken, sessionId } = await createSession(
@@ -837,7 +835,7 @@ export async function startImpersonationAction(formData: FormData): Promise<void
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(editPath, `Vaatluse ajalimiidi seadmine ebaõnnestus: ${failure}`)
+    return redirectWithError(editPath, `Vaatluse ajalimiidi seadmine ebaõnnestus: ${failure}`)
   }
 
   // Fail closed: the browser's cookies only move once the start is on the
@@ -856,13 +854,14 @@ export async function startImpersonationAction(formData: FormData): Promise<void
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(editPath, `Vaatluse alustamise logimine ebaõnnestus: ${failure}`)
+    return redirectWithError(editPath, `Vaatluse alustamise logimine ebaõnnestus: ${failure}`)
   }
 
-  writeSessionCookies(await cookies(), accessToken, refreshToken)
+  const host = (await headers()).get('host')
+  writeSessionCookies(await cookies(), accessToken, refreshToken, sessionCookieDomainFromHost(host))
 
   revalidatePath(editPath)
-  redirect('/user')
+  redirect(await adminUrl('/user'))
 }
 
 /**
@@ -883,7 +882,7 @@ export async function stopImpersonationAction(): Promise<void> {
   const record = await getUserSession(sessionId)
   if (record === null) redirect('/')
   if (record.impersonatedBy !== operatorId || record.userId !== payload.userId) {
-    redirect('/')
+    redirect(await adminUrl('/'))
   }
 
   const repositories = await getRepositories()
@@ -923,15 +922,20 @@ export async function stopImpersonationAction(): Promise<void> {
   const operator = await repositories.findByID({ collection: 'users', id: operatorId })
   if (operator && isStaffRole(operator.role) && operator.status === 'active') {
     const restored = await createSession(operator.id, operator.role)
-    writeSessionCookies(await cookies(), restored.accessToken, restored.refreshToken)
-    redirectWithNotice(
+    writeSessionCookies(
+      await cookies(),
+      restored.accessToken,
+      restored.refreshToken,
+      sessionCookieDomainFromHost((await headers()).get('host')),
+    )
+    return redirectWithNotice(
       `/admin/users/${payload.userId}`,
       expired ? 'Vaatlus aegus (30 minutit).' : 'Vaatlus lõpetatud.',
     )
   }
 
   clearSessionCookiesOnStore(await cookies())
-  redirect('/login')
+  redirect(await adminUrl('/login'))
 }
 
 /**

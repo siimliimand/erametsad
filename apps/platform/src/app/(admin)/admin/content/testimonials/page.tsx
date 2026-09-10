@@ -1,6 +1,5 @@
-import Link from 'next/link'
-
 import { deleteTestimonialAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import { DataTable } from '../../../_components/DataTable'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import { primaryButtonClass } from '../../../_components/FormField'
@@ -54,10 +53,10 @@ export default async function AdminTestimonialsPage({
         description="Klientide tagasiside ja esile tõstetud tsitaadid."
         backHref="/admin/content"
         actions={
-          <Link href="/admin/content/testimonials/new" className={primaryButtonClass}>
+          <AdminLink href="/content/testimonials/new" className={primaryButtonClass}>
             <PlusIcon />
             Uus tagasiside
-          </Link>
+          </AdminLink>
         }
       />
       <DataTable
@@ -66,12 +65,12 @@ export default async function AdminTestimonialsPage({
             key: 'name',
             label: 'Nimi',
             render: (row) => (
-              <Link
-                href={`/admin/content/testimonials/${row.id}`}
+              <AdminLink
+                href={`/content/testimonials/${row.id}`}
                 className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {row.name}
-              </Link>
+              </AdminLink>
             ),
           },
           { key: 'role', label: 'Amet', render: (row) => row.role ?? '—' },

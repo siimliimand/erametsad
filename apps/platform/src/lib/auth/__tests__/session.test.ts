@@ -9,6 +9,7 @@ import type { SessionRow } from '../session'
 import {
   createSession,
   findSessionByAccessToken,
+  sessionCookieDomainFromHost,
   getUserSession,
   issueSessionAccessToken,
   listUserSessions,
@@ -416,5 +417,46 @@ describe('session cookies', () => {
     expect(refresh?.options.path).toBe('/api/v1/auth')
     expect(refresh?.options.httpOnly).toBe(true)
     expect(refresh?.options.maxAge).toBe(7 * 24 * 60 * 60)
+  })
+
+  it('keeps cookies host-only when no session cookie domain is configured', () => {
+    const { calls, response } = cookieStub()
+    const previous = process.env.SESSION_COOKIE_DOMAIN
+    delete process.env.SESSION_COOKIE_DOMAIN
+
+    setSessionCookies(response, 'a', 'r', sessionCookieDomainFromHost('api.erametsad.ww0.dev'))
+
+    for (const call of calls) expect(call.options.domain).toBe('')
+
+    if (previous !== undefined) process.env.SESSION_COOKIE_DOMAIN = previous
+  })
+
+  it('scopes cookies to the configured domain for hosts under it', () => {
+    const { calls, response } = cookieStub()
+    const previous = process.env.SESSION_COOKIE_DOMAIN
+    process.env.SESSION_COOKIE_DOMAIN = 'ww0.dev'
+
+    setSessionCookies(response, 'a', 'r', sessionCookieDomainFromHost('api.erametsad.ww0.dev'))
+
+    for (const call of calls) expect(call.options.domain).toBe('ww0.dev')
+
+    if (previous !== undefined) process.env.SESSION_COOKIE_DOMAIN = previous
+    else delete process.env.SESSION_COOKIE_DOMAIN
+  })
+
+  it('refuses the domain for hosts outside the suffix', () => {
+    expect(sessionCookieDomainFromHost('erametsad-api.example.workers.dev')).toBe('')
+    expect(sessionCookieDomainFromHost('evil.example.com')).toBe('')
+    expect(sessionCookieDomainFromHost('ww0.dev.evil.com')).toBe('')
+    expect(sessionCookieDomainFromHost(null)).toBe('')
+  })
+
+  it('accepts the bare domain and subdomains, ignoring the port', () => {
+    const previous = process.env.SESSION_COOKIE_DOMAIN
+    process.env.SESSION_COOKIE_DOMAIN = 'ww0.dev'
+    expect(sessionCookieDomainFromHost('ww0.dev')).toBe('ww0.dev')
+    expect(sessionCookieDomainFromHost('erametsad.ww0.dev:3000')).toBe('ww0.dev')
+    if (previous !== undefined) process.env.SESSION_COOKIE_DOMAIN = previous
+    else delete process.env.SESSION_COOKIE_DOMAIN
   })
 })

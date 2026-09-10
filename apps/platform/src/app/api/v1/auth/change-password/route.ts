@@ -4,7 +4,11 @@ import type { NextRequest } from 'next/server'
 import { verifyAccessToken } from '@/lib/auth/jwt'
 import { hashCredentialPassword, verifyCredentialPassword } from '@/lib/auth/password'
 import { checkPasswordPolicy } from '@/lib/auth/password-policy'
-import { clearSessionCookies, revokeAllUserSessions } from '@/lib/auth/session'
+import {
+  clearSessionCookies,
+  revokeAllUserSessions,
+  sessionCookieDomainFromHost,
+} from '@/lib/auth/session'
 import { getRepositories } from '@/lib/data/runtime'
 import { authRateLimiter } from '@/lib/rate-limit'
 
@@ -98,7 +102,7 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({
     message: 'Parool on muudetud. Palun logige uuesti sisse.',
   })
-  clearSessionCookies(response)
+  clearSessionCookies(response, sessionCookieDomainFromHost(request.headers.get('host')))
 
   return response
 }

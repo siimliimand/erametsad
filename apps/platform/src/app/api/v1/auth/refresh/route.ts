@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server'
 import {
   clearSessionCookies,
   refreshSession,
+  sessionCookieDomainFromHost,
   setSessionCookies,
 } from '@/lib/auth/session'
 
@@ -24,11 +25,16 @@ export async function POST(request: NextRequest) {
       { error: 'Autentimine ebaõnnestus' },
       { status: 401 },
     )
-    clearSessionCookies(response)
+    clearSessionCookies(response, sessionCookieDomainFromHost(request.headers.get('host')))
     return response
   }
 
   const response = NextResponse.json({ accessToken: rotated.accessToken })
-  setSessionCookies(response, rotated.accessToken, rotated.refreshToken)
+  setSessionCookies(
+    response,
+    rotated.accessToken,
+    rotated.refreshToken,
+    sessionCookieDomainFromHost(request.headers.get('host')),
+  )
   return response
 }

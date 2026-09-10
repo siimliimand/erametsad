@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { describe, expect, it } from 'vitest'
 
-import { DEFAULT_HOSTNAME, PORTAL_HOSTNAME } from '@/lib/routing/host-areas'
+import { ADMIN_HOSTNAME, API_HOSTNAME, DEFAULT_HOSTNAME, PORTAL_HOSTNAME } from '@/lib/routing/host-areas'
 import { middleware } from '@/middleware'
 
 function requestFor(host: string, pathAndQuery: string): NextRequest {
@@ -167,7 +167,7 @@ describe('middleware legacy guide redirect', () => {
 
 describe('middleware unmapped-host no-op', () => {
   it('passes marketing paths through on unmapped hostnames untouched', () => {
-    for (const host of ['api.erametsad.ww0.dev', 'admin.erametsad.ww0.dev', 'localhost:3000']) {
+    for (const host of ['stats.erametsad.ww0.dev', 'erametsad-api.example.workers.dev', 'localhost:3000']) {
       const response = middleware(requestFor(host, '/teenused/hindamine?kee=info'))
 
       expect(response.status).toBe(200)
@@ -199,6 +199,155 @@ describe('middleware unmapped-host no-op', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('location')).toBeNull()
     expect(response.headers.get('x-middleware-rewrite')).toBeNull()
+  })
+})
+
+describe('middleware admin host routing', () => {
+  it('rewrites / to the admin landing, preserving query, with the empty base header', () => {
+    const response = middleware(requestFor(ADMIN_HOSTNAME, '/?kampaania=x'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+    expect(response.headers.get('x-middleware-rewrite')).toBe(
+      'http://localhost:3000/admin?kampaania=x',
+    )
+    // x-admin-base rides the rewritten REQUEST to the app (empty base on
+    // this host), so it never appears as a response header.
+  })
+
+  it('rewrites clean admin paths into the /admin route space', () => {
+    const response = middleware(requestFor(ADMIN_HOSTNAME, '/auctions?tab=type'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+    expect(response.headers.get('x-middleware-rewrite')).toBe(
+      'http://localhost:3000/admin/auctions?tab=type',
+    )
+  })
+
+  it('canonicalizes /admin URLs to the prefix-free form with 308', () => {
+    const response = middleware(requestFor(ADMIN_HOSTNAME, '/admin/auctions?tab=type'))
+
+    expect(response.status).toBe(308)
+    expect(response.headers.get('location')).toBe(`https://${ADMIN_HOSTNAME}/auctions?tab=type`)
+  })
+
+  it('keeps the auth flow same-host without redirecting or rewriting', () => {
+    for (const pathAndQuery of ['/login?next=%2Fadmin', '/reset-password?token=abc']) {
+      const response = middleware(requestFor(ADMIN_HOSTNAME, pathAndQuery))
+
+      expect(response.status).toBe(200)
+      expect(response.headers.get('location')).toBeNull()
+      expect(response.headers.get('x-middleware-rewrite')).toBeNull()
+    }
+  })
+
+  it('redirects portal paths to the portal host with 308', () => {
+    const response = middleware(requestFor(ADMIN_HOSTNAME, '/oksjon/9?ref=list'))
+
+    expect(response.status).toBe(308)
+    expect(response.headers.get('location')).toBe(`https://${PORTAL_HOSTNAME}/oksjon/9?ref=list`)
+  })
+
+  it('redirects marketing paths to the default host with 308', () => {
+    const response = middleware(requestFor(ADMIN_HOSTNAME, '/teenused/hindamine?kee=info'))
+
+    expect(response.status).toBe(308)
+    expect(response.headers.get('location')).toBe(
+      `https://${DEFAULT_HOSTNAME}/teenused/hindamine?kee=info`,
+    )
+  })
+
+  it('keeps shared API paths same-host', () => {
+    const response = middleware(requestFor(ADMIN_HOSTNAME, '/api/v1/auctions'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+  })
+})
+
+describe('middleware api host routing', () => {
+  it('redirects stray page paths to the default host with 308', () => {
+    const response = middleware(requestFor(API_HOSTNAME, '/admin/auctions?tab=type'))
+
+    expect(response.status).toBe(308)
+    expect(response.headers.get('location')).toBe(`https://${DEFAULT_HOSTNAME}/admin/auctions?tab=type`)
+  })
+
+  it('serves api routes same-host without rewriting', () => {
+    const response = middleware(requestFor(API_HOSTNAME, '/api/v1/auctions'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull()
+  })
+})
+
+describe('middleware api cors allowlist', () => {
+  it('answers same-site subdomain origins with credentialed CORS', () => {
+    const request = new NextRequest('http://localhost:3000/api/v1/auctions', {
+      headers: {
+        host: API_HOSTNAME,
+        origin: `https://${ADMIN_HOSTNAME}`,
+      },
+    })
+    const response = middleware(request)
+
+    expect(response.headers.get('access-control-allow-origin')).toBe(`https://${ADMIN_HOSTNAME}`)
+    expect(response.headers.get('access-control-allow-credentials')).toBe('true')
+    expect(response.headers.get('vary')).toContain('Origin')
+  })
+
+  it('answers localhost origins (local dev)', () => {
+    const request = new NextRequest('http://localhost:3000/api/v1/auctions', {
+      headers: { host: 'localhost:3000', origin: 'http://localhost:3000' },
+    })
+    const response = middleware(request)
+
+    expect(response.headers.get('access-control-allow-origin')).toBe('http://localhost:3000')
+    expect(response.headers.get('access-control-allow-credentials')).toBe('true')
+  })
+
+  it('allows the workers.dev preview origin as an exact entry', () => {
+    const request = new NextRequest('http://localhost:3000/api/v1/auctions', {
+      headers: {
+        host: API_HOSTNAME,
+        origin: 'https://erametsad-api.siim-liimand.workers.dev',
+      },
+    })
+    const response = middleware(request)
+
+    expect(response.headers.get('access-control-allow-origin')).toBe(
+      'https://erametsad-api.siim-liimand.workers.dev',
+    )
+    expect(response.headers.get('access-control-allow-credentials')).toBe('true')
+  })
+
+  it('gives foreign origins no CORS headers at all', () => {
+    const request = new NextRequest('http://localhost:3000/api/v1/auctions', {
+      headers: { host: API_HOSTNAME, origin: 'https://evil.example.com' },
+    })
+    const response = middleware(request)
+
+    expect(response.headers.get('access-control-allow-origin')).toBeNull()
+    expect(response.headers.get('access-control-allow-credentials')).toBeNull()
+  })
+
+  it('answers credentialed preflights with 204 and the allowed methods', () => {
+    const request = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+      method: 'OPTIONS',
+      headers: {
+        host: API_HOSTNAME,
+        origin: `https://${DEFAULT_HOSTNAME}`,
+        'access-control-request-method': 'POST',
+      },
+    })
+    const response = middleware(request)
+
+    expect(response.status).toBe(204)
+    expect(response.headers.get('access-control-allow-origin')).toBe(`https://${DEFAULT_HOSTNAME}`)
+    expect(response.headers.get('access-control-allow-credentials')).toBe('true')
+    expect(response.headers.get('access-control-allow-methods')).toContain('POST')
   })
 })
 

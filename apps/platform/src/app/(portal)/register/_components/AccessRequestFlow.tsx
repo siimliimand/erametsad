@@ -88,10 +88,10 @@ export function AccessRequestFlow({
   }
 
   return (
-    <section aria-label="Juurdepääsu taotlemine" className="mt-md flex flex-col gap-md">
+    <section aria-label="Juurdepääsu taotlemine" className="flex flex-col gap-md">
       <div className="flex flex-col gap-2xs">
-        <h2 className="font-heading text-h3 text-ink">Taotle juurdepääsu</h2>
-        <p className="font-body text-body text-inkMuted">
+        <h2 className="font-heading text-h3 font-bold text-ink">Taotle juurdepääsu</h2>
+        <p className="font-body text-bodySm text-inkMuted">
           Ettevõte {company.name} (registrikood {company.regCode}) on juba
           oksjonikeskkonnas. Uue profiili loomise asemel saad taotleda
           juurdepääsu olemasolevale profiilile. Taotlus vaatab üle

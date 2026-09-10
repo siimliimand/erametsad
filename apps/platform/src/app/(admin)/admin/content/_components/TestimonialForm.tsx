@@ -1,7 +1,7 @@
-import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
 import { saveTestimonialAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import {
   FormField,
   FormSelectField,
@@ -69,9 +69,9 @@ export function TestimonialForm({ testimonial }: { testimonial?: Testimonial }) 
         <button type="submit" className={primaryButtonClass}>
           Salvesta
         </button>
-        <Link href="/admin/content/testimonials" className={secondaryButtonClass}>
+        <AdminLink href="/content/testimonials" className={secondaryButtonClass}>
           Tühista
-        </Link>
+        </AdminLink>
       </div>
     </form>
   )

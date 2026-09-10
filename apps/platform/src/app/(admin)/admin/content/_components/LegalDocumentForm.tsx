@@ -1,9 +1,9 @@
-import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
 import { RichTextFormValue } from './RichTextFormValue'
 import { redirectPathsForSlugChange, utcIsoToTallinnInputValue } from './scheduled-publish'
 import { saveLegalDocumentAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import {
   FormField,
   FormSelectField,
@@ -95,13 +95,13 @@ export function LegalDocumentForm({ document }: { document?: LegalDocument }) {
         <button type="submit" className={primaryButtonClass}>
           Salvesta
         </button>
-        <Link href="/admin/content/legal-documents" className={secondaryButtonClass}>
+        <AdminLink href="/content/legal-documents" className={secondaryButtonClass}>
           Tühista
-        </Link>
+        </AdminLink>
         {document?.status === 'published' ? (
-          <Link href="/lepingud/dokumendid" target="_blank" className={secondaryButtonClass}>
+          <AdminLink href="/lepingud/dokumendid" target="_blank" className={secondaryButtonClass}>
             Vaata avaldatud loendit
-          </Link>
+          </AdminLink>
         ) : null}
       </div>
     </form>

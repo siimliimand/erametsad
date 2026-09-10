@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ComponentType, ReactNode, SVGProps } from 'react'
 
+
+import { useAdminBase } from './AdminBase'
 import {
   BuildingIcon,
   ChartColumnIcon,
@@ -20,6 +22,8 @@ import {
   UsersIcon,
 } from './icons'
 import type { AdminModuleDefinition, AdminModuleId } from '../_lib/permissions'
+
+import { joinAdminBase } from '@/lib/routing/admin-base'
 
 const moduleIcons: Record<AdminModuleId, ComponentType<SVGProps<SVGSVGElement>>> = {
   workspace: DashboardIcon,
@@ -45,8 +49,12 @@ export interface AdminNavBadge {
   count?: number
 }
 
+// The workspace module is the admin root ('/admin' joined, '' on the
+// prefix-free admin host), so it only matches exactly; every other module
+// owns its whole subtree.
 function isActive(pathname: string, href: string): boolean {
-  return href === '/admin' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
+  if (href === '/' || href === '/admin') return pathname === href
+  return pathname === href || pathname.startsWith(`${href}/`)
 }
 
 function badgeCountLabel(count: number): string {
@@ -118,16 +126,18 @@ export function AdminNav({
   orientation?: 'vertical' | 'horizontal'
 }) {
   const pathname = usePathname()
+  const base = useAdminBase()
 
   if (orientation === 'horizontal') {
     return (
       <nav aria-label="Halduse peamenüü" className="flex items-center gap-xs overflow-x-auto">
         {modules.map((module) => {
-          const active = isActive(pathname, module.href)
+          const href = joinAdminBase(base, module.href)
+          const active = isActive(pathname, href)
           return (
             <Link
               key={module.id}
-              href={module.href}
+              href={href}
               aria-current={active ? 'page' : undefined}
               className={`whitespace-nowrap rounded-pill px-3 py-1 text-label font-semibold transition-colors duration-hover ease-hover ${
                 active ? 'bg-[var(--tint-primary-strong)] text-primary' : 'text-inkMuted hover:bg-[var(--tint-primary)] hover:text-primary'
@@ -146,11 +156,12 @@ export function AdminNav({
     <nav aria-label="Halduse peamenüü" className="flex w-full flex-col items-center gap-1 py-md">
       {modules.map((module) => {
         const Icon = moduleIcons[module.id]
-        const active = isActive(pathname, module.href)
+        const href = joinAdminBase(base, module.href)
+        const active = isActive(pathname, href)
         return (
           <Link
             key={module.id}
-            href={module.href}
+            href={href}
             aria-label={`${module.label}${badgeAnnouncement(badges?.[module.id])}`}
             aria-current={active ? 'page' : undefined}
             className={`group relative flex h-10 w-10 items-center justify-center rounded-button transition-colors duration-hover ease-hover ${

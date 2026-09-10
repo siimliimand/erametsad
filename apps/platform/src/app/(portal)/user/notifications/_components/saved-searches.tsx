@@ -1,6 +1,6 @@
 'use client'
 
-import { Btn, Card, FormSelect, Modal } from '@erametsad/ui'
+import { Btn, FormSelect, Modal } from '@erametsad/ui'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
@@ -173,29 +173,57 @@ export function SavedSearches({ unsubscribeToken, onTokenHandled }: SavedSearche
   const count = list.length
 
   return (
-    <div className="flex flex-col gap-md">
-      <Card
-        hover={false}
-        content={
-          <div className="flex flex-col gap-xs">
-            <h2 className="font-heading text-h4 text-ink">Tühistamine meili lingi kaudu</h2>
-            <p className="font-body text-bodySm text-inkMuted">
-              Iga otsingutellimuse e-kirja jalas on tühistamislink. Link avab selle lehe ja
-              tühistab tellimuse ilma sisselogimiseta.
-            </p>
-          </div>
-        }
-      />
+    <section
+      id="otsingute-tellimused"
+      aria-labelledby="saved-searches-title"
+      className="scroll-mt-24 rounded-card border border-border bg-white p-6 shadow-card max-md:p-[14px]"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="saved-searches-title" className="font-heading text-[22px] font-bold text-ink">
+          Otsingute tellimused
+        </h2>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => { setEditTarget({ mode: 'create' }); }}
+            className="inline-flex h-8 items-center justify-center rounded-button bg-primary px-3.5 text-label font-semibold text-inkInverse transition-colors duration-hover ease-hover hover:bg-primaryHover motion-reduce:transition-none"
+          >
+            Uus tellimus
+          </button>
+          {count > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteAllCount('')
+                setDeleteAllOpen(true)
+              }}
+              className="inline-flex h-8 items-center justify-center rounded-button border border-primary bg-transparent px-3.5 text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:bg-primaryLight motion-reduce:transition-none"
+            >
+              Kustuta kõik
+            </button>
+          )}
+        </div>
+      </div>
+      <p className="mt-1.5 text-[15px] text-inkMuted">
+        Tellitud otsingud teavitavad sind, kui uus oksjon vastab sinu filtritele.
+      </p>
+
+      <div className="mt-3 rounded-card bg-bgMist px-[18px] py-[14px]">
+        <p className="m-0 text-bodySm text-inkMuted">
+          Iga otsingutellimuse e-kirja jalas on tühistamislink. Link avab selle lehe ja tühistab
+          tellimuse ilma sisselogimiseta.
+        </p>
+      </div>
 
       {unsubscribe.phase === 'pending' && (
-        <p role="status" className="font-body text-body text-inkMuted">
+        <p role="status" className="mt-3 font-body text-body text-inkMuted">
           Tühistamine…
         </p>
       )}
       {unsubscribe.phase === 'success' && (
         <div
           role="status"
-          className="rounded-card border border-primary bg-primaryLight px-md py-sm font-body text-body text-primaryDark"
+          className="mt-3 rounded-card border border-primary bg-primaryLight px-6 py-3 font-body text-body text-primaryDark"
         >
           {unsubscribe.message}
         </div>
@@ -203,111 +231,99 @@ export function SavedSearches({ unsubscribeToken, onTokenHandled }: SavedSearche
       {unsubscribe.phase === 'error' && (
         <div
           role="alert"
-          className="rounded-card border border-danger bg-bgMist px-md py-sm font-body text-body text-danger"
+          className="mt-3 rounded-card border border-danger bg-bgMist px-6 py-3 font-body text-body text-danger"
         >
           {unsubscribe.message}
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-sm">
-        <p className="font-body text-body text-inkMuted">
-          {items === null
-            ? 'Tellimuste laadimine…'
-            : count === 0
-              ? 'Teil ei ole veel otsingutellimusi'
-              : `Otsingutellimusi: ${String(count)}`}
-        </p>
-        <div className="flex gap-xs">
-          <Btn size="sm" onClick={() => { setEditTarget({ mode: 'create' }); }}>
-            Uus tellimus
-          </Btn>
-          {count > 0 && (
-            <Btn
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setDeleteAllCount('')
-                setDeleteAllOpen(true)
-              }}
-            >
-              Kustuta kõik
-            </Btn>
-          )}
-        </div>
-      </div>
+      <p className="mt-3 font-body text-body text-inkMuted">
+        {items === null
+          ? 'Tellimuste laadimine…'
+          : count === 0
+            ? 'Teil ei ole veel otsingutellimusi'
+            : `Otsingutellimusi: ${String(count)}`}
+      </p>
 
       {(loadError !== null || actionError !== null) && (
-        <div className="flex flex-wrap items-center justify-between gap-sm rounded-card border border-danger bg-bgMist px-md py-sm">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-card border border-danger bg-bgMist px-6 py-3">
           <p role="alert" className="font-body text-body text-danger">
             {loadError ?? actionError}
           </p>
           {loadError !== null && (
-            <Btn variant="outline" size="sm" onClick={() => void loadItems()}>
+            <button
+              type="button"
+              onClick={() => void loadItems()}
+              className="inline-flex h-8 items-center rounded-button border border-primary px-3.5 text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:bg-primaryLight"
+            >
               Proovi uuesti
-            </Btn>
+            </button>
           )}
         </div>
       )}
 
       {items !== null && count === 0 && (
-        <div className="rounded-card border border-border bg-bgPage px-md py-lg text-center">
-          <p className="font-body text-body text-inkMuted">
+        <div className="mt-3 rounded-card bg-bgMist px-6 py-10 text-center">
+          <p className="m-0 font-body text-body text-inkMuted">
             Tellimuse loomisel saadame teavitusi, kui uued oksjonid vastavad teie valitud
             filtritele.
           </p>
         </div>
       )}
 
-      <div className="flex flex-col gap-md">
+      <div className="mt-3 flex flex-col gap-4">
         {list.map((subscription) => {
           const chips = filterChips(subscription.filter)
           const busy = busyId === subscription.id
           return (
-            <Card key={subscription.id} hover={false} content={
-              <div className="flex flex-col gap-sm">
-                <div className="flex flex-wrap items-center justify-between gap-xs">
-                  <h3 className="font-heading text-h4 text-ink">Otsingutellimus</h3>
-                  <div className="flex flex-wrap gap-xs">
-                    <Btn
-                      variant="outline"
-                      size="sm"
-                      onClick={() => { setEditTarget({ mode: 'edit', subscription }); }}
-                      disabled={busy}
-                    >
-                      Muuda
-                    </Btn>
-                    {confirmingId === subscription.id ? (
-                      <>
-                        <Btn
-                          size="sm"
-                          onClick={() => void deleteSubscription(subscription.id)}
-                          isLoading={busy}
-                        >
-                          Kinnita kustutamine
-                        </Btn>
-                        <Btn
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => { setConfirmingId(null); }}
-                          disabled={busy}
-                        >
-                          Loobu
-                        </Btn>
-                      </>
-                    ) : (
-                      <Btn
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => { setConfirmingId(subscription.id); }}
+            <article
+              key={subscription.id}
+              className="flex flex-col gap-3 rounded-card border border-border bg-bgPage p-5"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-heading text-h4 font-bold text-ink">Otsingutellimus</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setEditTarget({ mode: 'edit', subscription }); }}
+                    disabled={busy}
+                    className="inline-flex h-8 items-center justify-center rounded-button border border-primary bg-transparent px-3.5 text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:bg-primaryLight motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Muuda
+                  </button>
+                  {confirmingId === subscription.id ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void deleteSubscription(subscription.id)}
                         disabled={busy}
+                        className="inline-flex h-8 items-center justify-center rounded-button bg-primary px-3.5 text-label font-semibold text-inkInverse transition-colors duration-hover ease-hover hover:bg-primaryHover motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        Kustuta
-                      </Btn>
-                    )}
-                  </div>
+                        {busy ? 'Kustutan…' : 'Kinnita kustutamine'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setConfirmingId(null); }}
+                        disabled={busy}
+                        className="inline-flex h-8 items-center justify-center rounded-button bg-transparent px-3.5 text-label font-semibold text-inkMuted transition-colors duration-hover ease-hover hover:text-ink motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Loobu
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setConfirmingId(subscription.id); }}
+                      disabled={busy}
+                      className="inline-flex h-8 items-center justify-center rounded-button bg-transparent px-3.5 text-label font-semibold text-inkMuted transition-colors duration-hover ease-hover hover:text-ink motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Kustuta
+                    </button>
+                  )}
                 </div>
+              </div>
 
-                <div className="flex flex-wrap gap-xs">
+                <div className="flex flex-wrap gap-2">
                   {chips.length === 0 ? (
                     <StaticChip label="Kõik oksjonid" />
                   ) : (
@@ -315,7 +331,7 @@ export function SavedSearches({ unsubscribeToken, onTokenHandled }: SavedSearche
                   )}
                 </div>
 
-                <div className="grid gap-sm sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <FormSelect
                     label="Kanal"
                     name={`channel-${subscription.id}`}
@@ -351,8 +367,7 @@ export function SavedSearches({ unsubscribeToken, onTokenHandled }: SavedSearche
                 <p className="font-body text-bodySm text-inkMuted">
                   Loodud {formatEstonianDateTime(subscription.createdAt)}
                 </p>
-              </div>
-            } />
+            </article>
           )
         })}
       </div>
@@ -415,6 +430,6 @@ export function SavedSearches({ unsubscribeToken, onTokenHandled }: SavedSearche
           </div>
         </div>
       </Modal>
-    </div>
+    </section>
   )
 }

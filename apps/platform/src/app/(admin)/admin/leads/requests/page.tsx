@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 
-export default function CompanyAccessRequestsRedirectPage() {
-  redirect('/admin/companies')
+import { adminUrl } from '@/lib/routing/admin-base-server'
+
+export default async function CompanyAccessRequestsRedirectPage() {
+  redirect(await adminUrl('/admin/companies'))
 }

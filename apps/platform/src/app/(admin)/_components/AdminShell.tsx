@@ -1,9 +1,9 @@
 'use client'
 
-import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 
+import { AdminLink } from './AdminLink'
 import { AdminNav, type AdminNavBadge } from './AdminNav'
 import { NotificationBell, type BellNotification } from './NotificationBell'
 import { TopbarSearch } from './TopbarSearch'
@@ -91,15 +91,15 @@ export function AdminShell({
     <ToastProvider>
       <div className="admin-scope flex min-h-screen flex-col bg-bgMist md:flex-row">
         <aside className="hidden w-14 shrink-0 flex-col items-center border-r border-border bg-bgPage text-ink md:flex">
-          <Link
-            href="/admin"
+          <AdminLink
+            href="/"
             aria-label="Erametsa halduspaneel"
             className="flex h-14 w-14 items-center justify-center"
           >
             <span className="flex h-8 w-8 items-center justify-center rounded-button bg-bgMist font-heading text-h4 font-extrabold text-primary">
               E
             </span>
-          </Link>
+          </AdminLink>
           <AdminNav modules={modules} badges={badges} />
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">

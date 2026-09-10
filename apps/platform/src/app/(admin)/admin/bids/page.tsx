@@ -1,8 +1,8 @@
-import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import { IdentityRevealChip } from './_components/identity-chip'
 import { approveUnderbidAction, rejectUnderbidAction } from '../../_actions/auctions'
+import { AdminLink } from '../../_components/AdminLink'
 import { DataTable, type DataTableColumn } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import { PageHeader } from '../../_components/PageHeader'
@@ -243,7 +243,7 @@ export default async function AdminBidsPage({
     if (countyFilter) search.set('county', countyFilter)
     if (view === 'oksjonid') search.set('vaade', 'oksjonid')
     const qs = search.toString()
-    return qs === '' ? '/admin/bids' : `/admin/bids?${qs}`
+    return qs === '' ? '/bids' : `/bids?${qs}`
   }
 
   const filterSelectClass =
@@ -341,15 +341,15 @@ export default async function AdminBidsPage({
       key: 'auction',
       label: 'Oksjon',
       render: (row) => (
-        <Link
-          href={`/admin/auctions/${row.auctionId}/monitor`}
+        <AdminLink
+          href={`/auctions/${row.auctionId}/monitor`}
           className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
         >
           {row.auctionTitle}
           <span className="ml-1 text-inkMuted">
             ({auctionTypeLabels[row.auctionType]} · {auctionStatusLabels[row.auctionStatus]})
           </span>
-        </Link>
+        </AdminLink>
       ),
     },
     {
@@ -403,7 +403,7 @@ export default async function AdminBidsPage({
         description={`Müüja otsuse tähtaeg: ${String(deadlineDays)} päeva (Seaded). Kollane märgib tähtaja ületamist, punane kahekordset ületamist.`}
         actions={
           <nav aria-label="Vaade" className="flex items-center gap-xs">
-            <Link
+            <AdminLink
               href={viewHref('jarjekord')}
               aria-current={!grouped ? 'page' : undefined}
               className={`rounded-pill border px-3 py-1 text-label font-semibold ${
@@ -411,8 +411,8 @@ export default async function AdminBidsPage({
               }`}
             >
               Järjekord
-            </Link>
-            <Link
+            </AdminLink>
+            <AdminLink
               href={viewHref('oksjonid')}
               aria-current={grouped ? 'page' : undefined}
               className={`rounded-pill border px-3 py-1 text-label font-semibold ${
@@ -420,12 +420,12 @@ export default async function AdminBidsPage({
               }`}
             >
               Oksjoniti
-            </Link>
+            </AdminLink>
           </nav>
         }
       />
 
-      <form method="get" action="/admin/bids" className="mb-md flex flex-wrap items-center gap-sm rounded-card border border-border bg-bgPage p-md">
+      <form method="get" action="/bids" className="mb-md flex flex-wrap items-center gap-sm rounded-card border border-border bg-bgPage p-md">
         {grouped ? <input type="hidden" name="vaade" value="oksjonid" /> : null}
         <label className="flex items-center gap-xs text-label text-inkMuted">
           Mehaanika
@@ -470,12 +470,12 @@ export default async function AdminBidsPage({
             return (
               <section key={auctionId} className="rounded-card border border-border bg-bgPage p-md">
                 <header className="mb-sm flex flex-wrap items-center gap-sm">
-                  <Link
-                    href={`/admin/auctions/${auctionId}/monitor`}
+                  <AdminLink
+                    href={`/auctions/${auctionId}/monitor`}
                     className="font-heading text-h4 font-bold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
                   >
                     {first.auctionTitle}
-                  </Link>
+                  </AdminLink>
                   <StatusChip status={first.auctionStatus} />
                   <span className="text-label text-inkMuted">
                     {auctionTypeLabels[first.auctionType]}

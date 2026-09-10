@@ -84,7 +84,9 @@ export async function GET(request: NextRequest) {
   const repos = await getRepositories(sessionGuardContext(payload))
   const { docs } = await repos.find({ collection: 'profile' })
 
-  return NextResponse.json({ profiles: docs.map(toPublicProfile) })
+  // role rides along so the login router can send staff straight to the
+  // admin workspace without the buyer profile-selection step.
+  return NextResponse.json({ role: payload.role, profiles: docs.map(toPublicProfile) })
 }
 
 export async function PATCH(request: NextRequest) {

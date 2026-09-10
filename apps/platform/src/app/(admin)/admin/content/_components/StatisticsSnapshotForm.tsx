@@ -1,6 +1,5 @@
-import Link from 'next/link'
-
 import { saveStatisticsSnapshotAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import {
   FormField,
   FormSelectField,
@@ -86,9 +85,9 @@ export function StatisticsSnapshotForm({ snapshot }: { snapshot?: StatisticsSnap
         <button type="submit" className={primaryButtonClass}>
           Salvesta
         </button>
-        <Link href="/admin/content/statistics" className={secondaryButtonClass}>
+        <AdminLink href="/content/statistics" className={secondaryButtonClass}>
           Tühista
-        </Link>
+        </AdminLink>
       </div>
     </form>
   )

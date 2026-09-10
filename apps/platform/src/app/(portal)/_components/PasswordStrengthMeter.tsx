@@ -1,10 +1,8 @@
 'use client'
 
-export const PASSWORD_MIN_LENGTH = 10
+import { Check, Circle } from 'lucide-react'
 
-// A valid password that barely clears the rules stays "Kesine"; extra length
-// pushes it to "Tugev".
-const STRONG_MIN_LENGTH = 12
+export const PASSWORD_MIN_LENGTH = 10
 
 export interface PasswordRules {
   minLength: boolean
@@ -35,39 +33,29 @@ export function evaluatePassword(
     notIsikukood: !expected || password.trim() !== expected,
   }
   const valid = Object.values(rules).every(Boolean)
-  const tier: PasswordTier = !valid
-    ? 'weak'
-    : password.length >= STRONG_MIN_LENGTH
-      ? 'strong'
-      : 'medium'
+  // Demo meter: one segment per satisfied rule and the label follows the
+  // count (0-2 Nõrk, 3 Keskmine, 4-5 Tugev). The submit gate uses `valid`,
+  // which is stricter than the meter label.
+  const score = Object.values(rules).filter(Boolean).length
+  const tier: PasswordTier =
+    score <= 2 ? 'weak' : score === 3 ? 'medium' : 'strong'
   return { valid, tier, rules }
 }
 
 const RULE_CHECKS: readonly { key: keyof PasswordRules; label: string }[] = [
   { key: 'minLength', label: `Vähemalt ${String(PASSWORD_MIN_LENGTH)} tähemärki` },
-  { key: 'hasUppercase', label: 'Vähemalt üks suurtäht' },
-  { key: 'hasNumber', label: 'Vähemalt üks number' },
-  { key: 'hasSymbol', label: 'Vähemalt üks sümbol' },
-  { key: 'notIsikukood', label: 'Ei tohi olla sinu isikukood' },
+  { key: 'hasUppercase', label: 'Üks suur täht' },
+  { key: 'hasNumber', label: 'Üks number' },
+  { key: 'hasSymbol', label: 'Üks sümbol' },
+  { key: 'notIsikukood', label: 'Ei tohi kattuda isikukoodiga' },
 ]
 
-const TIER_META: Record<
-  PasswordTier,
-  { label: string; segments: number; bar: string; text: string }
-> = {
-  weak: {
-    label: 'Nõrk',
-    segments: 1,
-    bar: 'bg-statusCritical',
-    text: 'text-statusCritical',
-  },
-  medium: { label: 'Kesine', segments: 2, bar: 'bg-cta', text: 'text-ctaHover' },
-  strong: {
-    label: 'Tugev',
-    segments: 3,
-    bar: 'bg-statusActive',
-    text: 'text-statusActive',
-  },
+const SEGMENT_COUNT = 5
+
+const TIER_META: Record<PasswordTier, { label: string; bar: string; text: string }> = {
+  weak: { label: 'Nõrk', bar: 'bg-danger', text: 'text-danger' },
+  medium: { label: 'Keskmine', bar: 'bg-cta', text: 'text-ctaHover' },
+  strong: { label: 'Tugev', bar: 'bg-accent', text: 'text-primaryHover' },
 }
 
 interface PasswordStrengthMeterProps {
@@ -83,40 +71,51 @@ export function PasswordStrengthMeter({
 }: PasswordStrengthMeterProps) {
   const { tier, rules } = evaluatePassword(password, isikukood)
   const meta = TIER_META[tier]
+  const score = Object.values(rules).filter(Boolean).length
   const active = password.length > 0
 
   return (
-    <div className={className ?? 'flex flex-col gap-xs'}>
-      <div className="flex items-center gap-sm">
-        <div className="flex flex-1 gap-2xs" aria-hidden="true">
-          {[0, 1, 2].map((segment) => (
-            <span
-              key={segment}
-              className={`h-1 flex-1 rounded-pill ${
-                active && segment < meta.segments ? meta.bar : 'bg-border'
-              }`}
-            />
-          ))}
-        </div>
-        <span
-          className={`font-label ${active ? meta.text : 'text-inkMuted'}`}
-          aria-live="polite"
-        >
-          {active ? meta.label : 'Parooli tugevus'}
-        </span>
+    <div className={className ?? 'flex flex-col gap-2xs'}>
+      <div className="flex gap-1.5" aria-hidden="true">
+        {Array.from({ length: SEGMENT_COUNT }, (_, segment) => (
+          <span
+            key={segment}
+            className={`h-1.5 flex-1 rounded-pill transition-colors duration-hover ease-hover motion-reduce:transition-none ${
+              active && segment < score ? meta.bar : 'bg-border'
+            }`}
+          />
+        ))}
       </div>
+      <p
+        className={`font-label text-bodySm font-semibold ${
+          active ? meta.text : 'text-inkMuted'
+        }`}
+        aria-live="polite"
+      >
+        {active ? meta.label : 'Parooli tugevus'}
+      </p>
 
-      <ul className="flex flex-col gap-2xs">
+      <ul className="flex flex-col gap-1">
         {RULE_CHECKS.map(({ key, label }) => {
           const ok = rules[key]
           return (
             <li
               key={key}
-              className={`flex items-center gap-2xs font-body text-bodySm ${
-                ok ? 'text-statusActive' : 'text-inkMuted'
+              className={`flex items-center gap-2 font-body text-bodySm ${
+                ok ? 'text-ink' : 'text-inkMuted'
               }`}
             >
-              <span aria-hidden="true">{ok ? '✓' : '✗'}</span>
+              {ok ? (
+                <Check
+                  className="h-3.5 w-3.5 shrink-0 text-accent"
+                  aria-hidden="true"
+                />
+              ) : (
+                <Circle
+                  className="h-3.5 w-3.5 shrink-0 text-border"
+                  aria-hidden="true"
+                />
+              )}
               <span className="sr-only">{ok ? 'Täidetud' : 'Täitmata'}: </span>
               {label}
             </li>

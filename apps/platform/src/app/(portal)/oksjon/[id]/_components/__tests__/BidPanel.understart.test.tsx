@@ -41,32 +41,30 @@ function render(props: BidPanelProps): string {
 
 // The page passes allowUnderStart only for open active auctions when
 // Settings.alapakkumineEnabled is true (task 3.1); the toggle must appear
-// exactly there and nowhere else.
+// exactly there and nowhere else. The demo bid rail always carries the
+// Automaatpakkuja switch, so the toggle is identified by its unique label
+// texts rather than the shared role="switch" marker.
 describe('BidPanel alapakkumine toggle gating', () => {
   it('renders the toggle when allowUnderStart is true', () => {
     const html = render(baseProps({ allowUnderStart: true }))
-    expect(html).toContain('role="switch"')
-    expect(html).toContain('aria-checked="false"')
     expect(html).toContain('Alapakkumine alghinnast madalamalt')
     expect(html).toContain('Nõuab müüja nõusolekut')
   })
 
   it('hides the toggle when allowUnderStart is omitted (default false)', () => {
     const html = render(baseProps())
-    expect(html).not.toContain('role="switch"')
     expect(html).not.toContain('Alapakkumine alghinnast madalamalt')
+    expect(html).not.toContain('Nõuab müüja nõusolekut')
   })
 
   it('hides the toggle when allowUnderStart is false', () => {
     const html = render(baseProps({ allowUnderStart: false }))
-    expect(html).not.toContain('role="switch"')
     expect(html).not.toContain('Alapakkumine alghinnast madalamalt')
   })
 
   it('hides the toggle on the guest panel even when allowed', () => {
     const html = render(baseProps({ viewer: null, allowUnderStart: true }))
     expect(html).toContain('Logi sisse pakkumise tegemiseks.')
-    expect(html).not.toContain('role="switch"')
     expect(html).not.toContain('Alapakkumine alghinnast madalamalt')
   })
 
@@ -75,7 +73,6 @@ describe('BidPanel alapakkumine toggle gating', () => {
       baseProps({ status: 'ended', finalPrice: 1500, allowUnderStart: true }),
     )
     expect(html).toContain('Oksjon on lõppenud')
-    expect(html).not.toContain('role="switch"')
     expect(html).not.toContain('Alapakkumine alghinnast madalamalt')
   })
 
@@ -84,7 +81,6 @@ describe('BidPanel alapakkumine toggle gating', () => {
       baseProps({ status: 'scheduled', startsAt: '2026-09-15T10:00:00.000Z', allowUnderStart: true }),
     )
     expect(html).toContain('Oksjon pole veel alanud.')
-    expect(html).not.toContain('role="switch"')
     expect(html).not.toContain('Alapakkumine alghinnast madalamalt')
   })
 })

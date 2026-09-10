@@ -1,9 +1,18 @@
 'use client'
 
 import { Btn, Modal } from '@erametsad/ui'
+import {
+  CircleSlash,
+  CheckCircle2,
+  Hourglass,
+  Info,
+  Lock,
+  LockOpen,
+  ShieldCheck,
+} from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState, type SyntheticEvent } from 'react'
+import { useEffect, useState, type SyntheticEvent } from 'react'
 
 import {
   SealedIdentityForm,
@@ -20,6 +29,7 @@ import {
   type SealedProfileType,
 } from './SealedIdentityForm'
 
+import { apiFetch } from '@/lib/api/client'
 import type { AuctionStatus } from '@/lib/data/schema'
 
 // ── Public props contract ───────────────────────────────────────────────
@@ -76,7 +86,12 @@ interface SealedSubmitOutcome {
 // ── Formatting / parsing (mirrors BidPanel conventions) ─────────────────
 
 function eur(value: number): string {
-  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+  return value.toLocaleString('et-EE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
 }
 
 function inputAmount(value: number): string {
@@ -94,6 +109,17 @@ function fmtDateTime(iso: string): string | null {
   const time = Date.parse(iso)
   if (Number.isNaN(time)) return null
   return new Date(time).toLocaleString('et-EE', { dateStyle: 'long', timeStyle: 'short' })
+}
+
+/** Demo D.M.YYYY kl HH:MM absolute deadline line (03-lot-detail-sealed.html). */
+function fmtDeadline(iso: string): string | null {
+  const time = Date.parse(iso)
+  if (Number.isNaN(time)) return null
+  const date = new Date(time)
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${String(date.getDate())}.${String(date.getMonth() + 1)}.${String(
+    date.getFullYear(),
+  )} kl ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 // ── API submission (POST /api/v1/bids/create contract) ──────────────────
@@ -122,7 +148,7 @@ async function submitSealedBidViaApi(input: {
 }): Promise<SealedSubmitOutcome> {
   let response: Response
   try {
-    response = await fetch('/api/v1/bids/create', {
+    response = await apiFetch('/api/v1/bids/create', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -169,7 +195,7 @@ async function submitSealedBidViaApi(input: {
   return { ok: false, message: sealedApiErrorToEstonian(message) }
 }
 
-// ── Panel ───────────────────────────────────────────────────────────────
+// ── Demo building blocks ────────────────────────────────────────────────
 
 const ENDED_STATUSES: readonly AuctionStatus[] = [
   'ended',
@@ -179,8 +205,206 @@ const ENDED_STATUSES: readonly AuctionStatus[] = [
   'archived',
 ]
 
+// Demo .sealed-panel: the dark "Pimepakkumine" head with the circular lock.
 const PANEL_CLASSES =
-  'flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card'
+  'overflow-hidden rounded-card border border-border bg-bgPage shadow-card'
+
+function SealedHead() {
+  return (
+    <div className="flex items-center gap-3.5 bg-primaryDark px-6 py-5">
+      <span
+        aria-hidden="true"
+        className="flex h-[46px] w-[46px] flex-none items-center justify-center rounded-full bg-white/10 text-cta"
+      >
+        <Lock className="h-5 w-5" />
+      </span>
+      <div>
+        <h2 className="m-0 font-heading text-xl font-bold leading-tight text-white">
+          Pimepakkumine
+        </h2>
+        <p className="mb-0 mt-0.5 text-xs text-white/70">
+          Üks konfidentsiaalne pakkumine — parim võidab
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function SealedBody({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-col gap-4 p-6">{children}</div>
+}
+
+function ExplanationBox() {
+  return (
+    <p className="m-0 flex items-start gap-2.5 rounded-button bg-primaryLight p-4 text-bodySm leading-relaxed text-ink">
+      <ShieldCheck
+        className="mt-0.5 h-4 w-4 flex-none text-primary"
+        aria-hidden="true"
+      />
+      <span>
+        <b>Suletud pimepakkumine</b> — kõik saabunud pakkumised avatakse
+        üheaegselt pärast pakkumisaja lõppu. Pakkumiste summasid ja pakkujate
+        isikuandmeid ei avaldata enne avamist. Esitatud pakkumine on siduv ning
+        seda ei saa tagasi võtta. Võrdsete pakkumiste korral loetakse võitjaks
+        varasemalt esitanud pakkuja.
+      </span>
+    </p>
+  )
+}
+
+const SECOND = 1000
+const MINUTE = 60 * SECOND
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+function formatRemaining(remaining: number): string {
+  const days = Math.floor(remaining / DAY)
+  const hours = Math.floor((remaining % DAY) / HOUR)
+  const minutes = Math.floor((remaining % HOUR) / MINUTE)
+  const seconds = Math.floor((remaining % MINUTE) / SECOND)
+  return `${String(days)}p ${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`
+}
+
+/** Demo .deadline-box: ticking countdown plus the absolute deadline line. */
+function DeadlineBox({ endsAt }: { endsAt: string | null }) {
+  const endMs = endsAt !== null ? new Date(endsAt).getTime() : Number.NaN
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const tick = () => {
+      setNow(Date.now())
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => {
+      clearInterval(id)
+    }
+  }, [])
+
+  const remaining = endMs - now
+  const hasDeadline = Number.isFinite(endMs)
+  const isEnded = hasDeadline && remaining <= 0
+  const timeColor = isEnded
+    ? 'text-inkMuted'
+    : remaining < 5 * MINUTE
+      ? 'text-statusCritical'
+      : remaining < HOUR
+        ? 'text-ctaHover'
+        : 'text-ink'
+  const absolute = endsAt !== null ? fmtDeadline(endsAt) : null
+
+  return (
+    <div className="rounded-button border border-border bg-bgMist p-4">
+      <p
+        role="timer"
+        aria-label="Aega pakkumise esitamiseks"
+        className="m-0 flex items-baseline gap-2"
+      >
+        <span className="text-xs text-inkMuted">
+          {hasDeadline && !isEnded ? 'Aega jäänud' : 'Oksjon lõppenud'}
+        </span>
+        {/* Ticking text: the server renders a value one tick behind the
+            client, so the seconds can never match during hydration. */}
+        <span suppressHydrationWarning className={`font-mono text-lg font-medium ${timeColor}`}>
+          {hasDeadline && !isEnded ? formatRemaining(remaining) : '00:00:00'}
+        </span>
+      </p>
+      {absolute !== null && (
+        <p className="mb-0 mt-0.5 text-xs text-inkMuted">
+          Pakkumiste tähtaeg: <span className="font-mono">{absolute}</span>
+        </p>
+      )}
+    </div>
+  )
+}
+
+function BidCountLine({ count }: { count: number | null }) {
+  if (count === null) return null
+  return (
+    <p className="m-0 text-bodySm text-inkMuted">
+      Pakkumuste arv:{' '}
+      <b className="font-mono font-semibold text-ink">{String(count)}</b>
+    </p>
+  )
+}
+
+function NoteLine({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="m-0 flex items-start gap-2 text-xs text-inkMuted">
+      <Info className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" />
+      <span>{children}</span>
+    </p>
+  )
+}
+
+/** Demo .fee-line: fee-on-win line; sealed panels may state the rate because it binds only on a win. */
+function FeeOnWinLine() {
+  return (
+    <p className="m-0 border-t border-border pt-3.5 text-xs text-inkMuted">
+      <b className="text-ink">Teenustasu 3% + km</b> — rakendub vaid oksjoni
+      võitmise korral.
+    </p>
+  )
+}
+
+function ConfidentialFootnote() {
+  return (
+    <p className="m-0 text-xs leading-relaxed text-inkMuted">
+      Konfidentsiaalne: kuni avamiseni näeb süsteem ainult pakkumiste arvu —
+      summasid ei näe müüja, teised pakkujad ega ka administraatorid.{' '}
+      <Link
+        href="/tingimused"
+        className="font-semibold text-primary hover:text-primaryHover"
+      >
+        Loe tingimustest
+      </Link>
+    </p>
+  )
+}
+
+/** Demo .phase-card for post-opening states. */
+function PhaseCard({
+  icon,
+  title,
+  children,
+}: {
+  icon: React.ReactNode
+  title: string
+  children?: React.ReactNode
+}) {
+  return (
+    <section className="flex flex-col items-center gap-2 rounded-card border border-border bg-bgPage p-8 text-center shadow-card">
+      <span className="text-primary [&>svg]:h-8 [&>svg]:w-8" aria-hidden="true">
+        {icon}
+      </span>
+      <h2 className="m-0 mt-1 font-heading text-xl font-bold text-ink">{title}</h2>
+      {children}
+    </section>
+  )
+}
+
+function ResultPrice({ finalPrice }: { finalPrice: number | null }) {
+  if (finalPrice === null) return null
+  return (
+    <>
+      <p className="mb-0 mt-3 text-xs font-semibold uppercase tracking-[0.04em] text-inkMuted">
+        Lõpphind
+      </p>
+      <p className="m-0 font-heading text-[2.75rem] font-extrabold leading-tight text-primaryDark">
+        {eur(finalPrice)}
+      </p>
+      <p className="m-0 text-bodySm text-inkMuted">
+        Võitjale lisandub teenustasu 3% + km.
+      </p>
+    </>
+  )
+}
+
+// ── Panel ───────────────────────────────────────────────────────────────
 
 export function SealedBidPanel({
   auctionId,
@@ -316,103 +540,81 @@ export function SealedBidPanel({
     router.refresh()
   }
 
-  // ── Guest ─────────────────────────────────────────────────────────────
-
-  if (viewer === null) {
-    if (isUnsold || isEnded) {
-      return (
-        <section className={PANEL_CLASSES}>
-          <h2 className="font-heading text-h4 text-ink">
-            {isUnsold ? 'Oksjon jäi müümata' : 'Oksjon on lõppenud'}
-          </h2>
-          {!isUnsold && finalPrice !== null && (
-            <p className="text-body text-inkMuted">
-              Lõpphind: <span className="font-semibold text-ink">{eur(finalPrice)}</span>
-            </p>
-          )}
-        </section>
-      )
-    }
-    return (
-      <section className={PANEL_CLASSES}>
-        <h2 className="font-heading text-h4 text-ink">Suletud pakkumine</h2>
-        {bidCount !== null && (
-          <p className="text-bodySm text-inkMuted">Pakkumisi: {String(bidCount)}</p>
-        )}
-        {isScheduled ? (
-          <p className="text-body text-inkMuted">Oksjon pole veel alanud.</p>
-        ) : (
-          <p className="text-body text-inkMuted">Logi sisse pakkumise tegemiseks.</p>
-        )}
-        <Link
-          href={`/login?next=${encodeURIComponent(`/oksjon/${auctionId}`)}`}
-          className="inline-flex h-10 items-center justify-center rounded-button bg-primary px-4 font-label font-semibold text-inkInverse transition-colors hover:bg-primaryHover md:w-auto"
-        >
-          Logi sisse
-        </Link>
-      </section>
-    )
-  }
-
-  // ── Unsold ────────────────────────────────────────────────────────────
+  // ── Post-opening result states (demo phase cards) ─────────────────────
 
   if (isUnsold) {
     return (
-      <section className={PANEL_CLASSES}>
-        <h2 className="font-heading text-h4 text-ink">Oksjon jäi müümata</h2>
-        <p className="text-bodySm text-inkMuted">
+      <PhaseCard icon={<CircleSlash />} title="Oksjon jäi müümata">
+        <p className="m-0 text-bodySm text-inkMuted">
           Müüja ei kinnitanud müüki. Sinu pakkumise andmed arhiveeritakse.
         </p>
-      </section>
+      </PhaseCard>
     )
   }
 
-  // ── Post-opening result states ────────────────────────────────────────
-
   if (isEnded) {
-    if (viewer.outcome === 'won') {
+    if (viewer?.outcome === 'won') {
       return (
-        <section className={PANEL_CLASSES}>
-          <h2 className="font-heading text-h4 text-ink">
-            Palju õnne! Sinu pakkumine osutus edukaimaks.
-          </h2>
-          {finalPrice !== null && (
-            <p className="text-body text-inkMuted">
-              Lõpphind: <span className="font-semibold text-ink">{eur(finalPrice)}</span>
-            </p>
-          )}
+        <PhaseCard icon={<LockOpen />} title="Palju õnne! Sinu pakkumine osutus edukaimaks.">
+          <p className="m-0 text-bodySm text-inkMuted">
+            Pakkumised avati korraga. Võitjaga võetakse ühendust e-posti teel.
+          </p>
+          <ResultPrice finalPrice={finalPrice} />
           <Link
             href={`/lepingud/oksjonileping/${auctionId}`}
-            className="text-bodySm font-semibold text-primary hover:text-primaryHover"
+            className="mt-2 text-bodySm font-semibold text-primary hover:text-primaryHover"
           >
             Vaata oksjonilepingut ›
           </Link>
-        </section>
+        </PhaseCard>
       )
     }
-    if (viewer.outcome === 'lost') {
+    if (viewer?.outcome === 'lost') {
       return (
-        <section className={PANEL_CLASSES}>
-          <h2 className="font-heading text-h4 text-ink">
-            Sinu pakkumine ei olnud edukaim
-          </h2>
-        </section>
+        <PhaseCard icon={<CircleSlash />} title="Sinu pakkumine ei olnud edukaim">
+          <p className="m-0 text-bodySm text-inkMuted">
+            Tänan osalemast. Tulemused on nähtavad oksjoni ajaloo lehel.
+          </p>
+        </PhaseCard>
       )
     }
     return (
-      <section className={PANEL_CLASSES}>
-        <h2 className="font-heading text-h4 text-ink">Oksjon on lõppenud</h2>
+      <PhaseCard icon={<Hourglass />} title="Oksjon on lõppenud">
         {participant && finalPrice === null ? (
-          <p className="text-body text-inkMuted">
+          <p className="m-0 text-bodySm text-inkMuted">
             Pakkumised avatakse üheaegselt. Teavitame sind tulemusest.
           </p>
         ) : (
-          finalPrice !== null && (
-            <p className="text-body text-inkMuted">
-              Lõpphind: <span className="font-semibold text-ink">{eur(finalPrice)}</span>
-            </p>
-          )
+          <ResultPrice finalPrice={finalPrice} />
         )}
+      </PhaseCard>
+    )
+  }
+
+  // ── Guest ─────────────────────────────────────────────────────────────
+
+  if (viewer === null) {
+    return (
+      <section className={PANEL_CLASSES}>
+        <SealedHead />
+        <SealedBody>
+          <ExplanationBox />
+          <DeadlineBox endsAt={endsAt} />
+          <BidCountLine count={bidCount} />
+          {isScheduled ? (
+            <p className="m-0 text-body text-inkMuted">Oksjon pole veel alanud.</p>
+          ) : (
+            <p className="m-0 text-body text-inkMuted">
+              Logi sisse pakkumise tegemiseks.
+            </p>
+          )}
+          <Link
+            href={`/login?next=${encodeURIComponent(`/oksjon/${auctionId}`)}`}
+            className="inline-flex h-10 items-center justify-center rounded-button bg-primary px-4 font-label font-semibold text-inkInverse transition-colors hover:bg-primaryHover md:w-auto"
+          >
+            Logi sisse
+          </Link>
+        </SealedBody>
       </section>
     )
   }
@@ -423,14 +625,16 @@ export function SealedBidPanel({
     const startsAtLabel = startsAt !== null ? fmtDateTime(startsAt) : null
     return (
       <section className={PANEL_CLASSES}>
-        <h2 className="font-heading text-h4 text-ink">Suletud pakkumine</h2>
-        {bidCount !== null && (
-          <p className="text-bodySm text-inkMuted">Pakkumisi: {String(bidCount)}</p>
-        )}
-        <p className="text-body text-inkMuted">Oksjon pole veel alanud.</p>
-        {startsAtLabel !== null && (
-          <p className="text-body text-ink">Oksjon algab: {startsAtLabel}</p>
-        )}
+        <SealedHead />
+        <SealedBody>
+          <ExplanationBox />
+          <DeadlineBox endsAt={endsAt} />
+          <BidCountLine count={bidCount} />
+          <p className="m-0 text-body text-inkMuted">Oksjon pole veel alanud.</p>
+          {startsAtLabel !== null && (
+            <p className="m-0 text-body text-ink">Oksjon algab: {startsAtLabel}</p>
+          )}
+        </SealedBody>
       </section>
     )
   }
@@ -442,154 +646,166 @@ export function SealedBidPanel({
       lastSubmission.at !== '' ? fmtDateTime(lastSubmission.at) : null
     return (
       <section className={PANEL_CLASSES}>
-        <h2 className="font-heading text-h4 text-ink">Pakkumine on esitatud</h2>
-        <div className="flex items-baseline justify-between gap-sm rounded-input bg-bgMist px-sm py-xs">
-          <span className="text-bodySm text-inkMuted">Summa</span>
-          {lastSubmission.amount !== null ? (
-            <span
-              aria-label="Summa on peidetud kuni pakkumiste avamiseni"
-              className="font-heading text-h3 text-ink"
-            >
-              <span aria-hidden="true" className="select-none blur-sm">
-                {eur(lastSubmission.amount)}
-              </span>
-            </span>
-          ) : (
-            <span className="font-heading text-h3 text-ink">•••• €</span>
-          )}
-        </div>
-        {submittedLabel !== null && (
-          <p className="text-bodySm text-inkMuted">Esitatud: {submittedLabel}</p>
-        )}
-        <p className="text-bodySm text-inkMuted">
-          Summa avatakse koos teiste pakkumistega pärast pakkumisaja lõppu.
-        </p>
-        {remainingRevisions > 0 ? (
-          <>
-            <p className="text-bodySm text-inkMuted">
-              Täienduspakkumisi jäänud: {String(remainingRevisions)}
+        <SealedHead />
+        <SealedBody>
+          <DeadlineBox endsAt={endsAt} />
+          <BidCountLine count={bidCount} />
+          <div className="m-0 flex flex-col items-start gap-2 rounded-button bg-bgMist p-4">
+            <p className="m-0 flex items-center gap-2 text-body font-semibold text-ink">
+              <CheckCircle2 className="h-4 w-4 flex-none text-accent" aria-hidden="true" />
+              Pimepakkumine on esitatud.
             </p>
-            <Btn
-              variant="outline"
-              onClick={() => {
-                setRevising(true)
-                if (lastSubmission.amount !== null) {
-                  setAmountStr(inputAmount(lastSubmission.amount))
-                }
-              }}
-            >
-              Muuda pakkumist
-            </Btn>
-          </>
-        ) : (
-          <p className="text-bodySm text-inkMuted">
-            Täienduspakkumiste limiit on täis.
-          </p>
-        )}
+            {lastSubmission.amount !== null ? (
+              <span
+                aria-label="Summa on peidetud kuni pakkumiste avamiseni"
+                className="font-heading text-h3 text-ink"
+              >
+                <span aria-hidden="true" className="select-none blur-sm">
+                  {eur(lastSubmission.amount)}
+                </span>
+              </span>
+            ) : (
+              <span className="font-heading text-h3 text-ink">•••• €</span>
+            )}
+            {submittedLabel !== null && (
+              <p className="m-0 font-mono text-xs text-inkMuted">
+                Esitatud: {submittedLabel}
+              </p>
+            )}
+            <p className="m-0 text-bodySm text-inkMuted">
+              Summa avatakse koos teiste pakkumistega pärast pakkumisaja lõppu.
+            </p>
+            {remainingRevisions > 0 ? (
+              <>
+                <p className="m-0 text-bodySm text-inkMuted">
+                  Täienduspakkumisi jäänud: {String(remainingRevisions)}
+                </p>
+                <Btn
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setRevising(true)
+                    if (lastSubmission.amount !== null) {
+                      setAmountStr(inputAmount(lastSubmission.amount))
+                    }
+                  }}
+                >
+                  Muuda pakkumist
+                </Btn>
+              </>
+            ) : (
+              <p className="m-0 text-bodySm text-inkMuted">
+                Täienduspakkumiste limiit on täis.
+              </p>
+            )}
+          </div>
+          <NoteLine>
+            Saad pakkumist kuni tähtajani muuta — kehtib viimane.
+          </NoteLine>
+          <FeeOnWinLine />
+          <ConfidentialFootnote />
+        </SealedBody>
       </section>
     )
   }
 
-  // ── Active: bid form ──────────────────────────────────────────────────
-
-  const endsAtLabel = endsAt !== null ? fmtDateTime(endsAt) : null
+  // ── Active: bid form (identity snapshot above the amount, deviation D5) ─
 
   return (
     <section className={PANEL_CLASSES}>
-      <h2 className="font-heading text-h4 text-ink">Suletud pakkumine</h2>
-      {bidCount !== null && (
-        <p className="text-bodySm text-inkMuted">Pakkumisi: {String(bidCount)}</p>
-      )}
+      <SealedHead />
+      <SealedBody>
+        <ExplanationBox />
+        <DeadlineBox endsAt={endsAt} />
+        <BidCountLine count={bidCount} />
 
-      <div>
-        <p className="text-label text-inkMuted">Alghind</p>
-        <p className="font-heading text-h3 text-ink">{eur(minBid)}</p>
-      </div>
-      {endsAtLabel !== null && (
-        <p className="text-bodySm text-inkMuted">Pakkumisaeg lõpeb: {endsAtLabel}</p>
-      )}
+        <form onSubmit={openConfirm} className="flex flex-col gap-xs">
+          <SealedIdentityForm
+            profileType={viewer.profileType}
+            values={identity}
+            onChange={setIdentity}
+            errors={errors}
+            disabled={isCapLocked}
+          />
 
-      <div className="flex flex-col gap-2xs rounded-card bg-bgMist p-xs">
-        <p className="text-bodySm text-inkMuted">
-          Kõik saabunud pakkumised avatakse üheaegselt pärast pakkumisaja lõppu.
-          Pakkumiste summasid ja pakkujate isikuandmeid ei avaldata enne avamist.
-          Esitatud pakkumine on siduv ning seda ei saa tagasi võtta. Võrdsete
-          pakkumiste korral loetakse võitjaks varasemalt esitanud pakkuja.
-        </p>
-      </div>
+          <div>
+            <label htmlFor="sealed-bid-amount" className="text-label font-semibold text-ink">
+              Pakkumise summa (€)
+            </label>
+            <input
+              id="sealed-bid-amount"
+              name="amount"
+              inputMode="decimal"
+              autoComplete="off"
+              value={amountStr}
+              disabled={isCapLocked}
+              onChange={(event) => {
+                setAmountStr(event.target.value)
+                setAmountError(null)
+              }}
+              aria-invalid={amountError !== null}
+              className="mt-1.5 h-12 w-full rounded-input border border-border bg-bgPage px-4 font-mono text-lg text-ink outline-none transition-colors aria-[invalid=true]:border-danger focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-bgMist disabled:text-inkMuted"
+            />
+            <p className="mb-0 mt-1.5 text-bodySm text-inkMuted">
+              Vähim lubatud pakkumine: {inputAmount(minBid)} €
+            </p>
+            <p className="mb-0 mt-1 text-bodySm text-inkMuted">
+              Soovitame alghinnast madalamat pakkumist vältida — reservhind ei
+              ole avalik.
+            </p>
+          </div>
 
-      <form onSubmit={openConfirm} className="flex flex-col gap-xs">
-        <label htmlFor="sealed-bid-amount" className="text-label font-semibold text-ink">
-          Sinu pakkumine (€)
-        </label>
-        <input
-          id="sealed-bid-amount"
-          name="amount"
-          inputMode="decimal"
-          autoComplete="off"
-          value={amountStr}
-          disabled={isCapLocked}
-          onChange={(event) => {
-            setAmountStr(event.target.value)
-            setAmountError(null)
+          {amountError !== null && (
+            <p role="alert" className="text-bodySm text-danger">
+              {amountError}
+            </p>
+          )}
+
+          <div className="[&>button]:w-full">
+            <Btn type="submit" variant="cta" isLoading={isSubmitting} disabled={isCapLocked}>
+              {participant ? 'Esita täienduspakkumine' : 'Esita pimepakkumine'}
+            </Btn>
+          </div>
+          {participant && !isCapLocked && (
+            <button
+              type="button"
+              className="text-bodySm font-semibold text-primary hover:text-primaryHover"
+              onClick={() => {
+                setRevising(false)
+                setErrors({
+                  name: null,
+                  code: null,
+                  address: null,
+                  email: null,
+                  phone: null,
+                })
+                setAmountError(null)
+              }}
+            >
+              Katkesta muutmine
+            </button>
+          )}
+        </form>
+
+        <NoteLine>
+          Saad pakkumist kuni tähtajani muuta — kehtib viimane.
+        </NoteLine>
+        <FeeOnWinLine />
+        <ConfidentialFootnote />
+
+        <BidConfirmModal
+          isOpen={modalAmount !== null}
+          onClose={() => {
+            setModalAmount(null)
           }}
-          aria-invalid={amountError !== null}
-          className="h-12 w-full rounded-input border border-border bg-bgPage px-4 text-body text-ink outline-none transition-colors aria-[invalid=true]:border-danger focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-bgMist disabled:text-inkMuted"
+          amount={modalAmount ?? 0}
+          isRevision={participant}
+          isSubmitting={isSubmitting}
+          onConfirm={() => {
+            void confirmBid()
+          }}
         />
-        <p className="text-bodySm text-inkMuted">
-          Vähim lubatud pakkumine: {inputAmount(minBid)} €
-        </p>
-
-        <SealedIdentityForm
-          profileType={viewer.profileType}
-          values={identity}
-          onChange={setIdentity}
-          errors={errors}
-          disabled={isCapLocked}
-        />
-
-        {amountError !== null && (
-          <p role="alert" className="text-bodySm text-danger">
-            {amountError}
-          </p>
-        )}
-
-        <Btn type="submit" isLoading={isSubmitting} disabled={isCapLocked}>
-          {participant ? 'Esita täienduspakkumine' : 'Esita pakkumine'}
-        </Btn>
-        {participant && !isCapLocked && (
-          <button
-            type="button"
-            className="text-bodySm font-semibold text-primary hover:text-primaryHover"
-            onClick={() => {
-              setRevising(false)
-              setErrors({
-                name: null,
-                code: null,
-                address: null,
-                email: null,
-                phone: null,
-              })
-              setAmountError(null)
-            }}
-          >
-            Katkesta muutmine
-          </button>
-        )}
-      </form>
-
-      <BidConfirmModal
-        isOpen={modalAmount !== null}
-        onClose={() => {
-          setModalAmount(null)
-        }}
-        amount={modalAmount ?? 0}
-        isRevision={participant}
-        isSubmitting={isSubmitting}
-        onConfirm={() => {
-          void confirmBid()
-        }}
-      />
+      </SealedBody>
     </section>
   )
 }
@@ -619,29 +835,29 @@ function BidConfirmModal({
     <Modal
       isOpen={isOpen}
       onClose={isSubmitting ? () => undefined : onClose}
-      title="Kinnita siduv pakkumine"
+      title="Kinnita pakkumine"
       size="sm"
     >
       <div className="flex flex-col gap-sm">
-        <div className="flex items-baseline justify-between gap-sm rounded-input bg-bgMist px-sm py-xs">
-          <span className="text-bodySm text-inkMuted">Pakkumise summa</span>
-          <span className="font-heading text-h3 text-ink">{eur(amount)}</span>
-        </div>
+        <p className="font-heading text-3xl font-extrabold text-primaryDark">
+          {eur(amount)}
+        </p>
         {isRevision && (
           <p className="text-bodySm text-inkMuted">
             Uus pakkumine asendab sinu eelmise pakkumise.
           </p>
         )}
         <p className="text-bodySm text-inkMuted">
-          Pakkumine on siduv ja seda ei saa tagasi võtta. Pakkumiste summad
-          hoitakse peidetud kuni nende üheaegse avamiseni pärast oksjoni lõppu.
+          Pakkumine on konfidentsiaalne, siduv ja seda ei saa tagasi võtta.
+          Summad hoitakse peidetud kuni nende üheaegse avamiseni pärast oksjoni
+          lõppu. Saad pakkumist kuni tähtajani muuta — kehtib viimane.
         </p>
         <div className="mt-2xs flex flex-col gap-xs sm:flex-row">
           <Btn variant="outline" onClick={onClose} disabled={isSubmitting}>
             Katkesta
           </Btn>
-          <Btn onClick={onConfirm} isLoading={isSubmitting}>
-            Esita pakkumine
+          <Btn variant="cta" onClick={onConfirm} isLoading={isSubmitting}>
+            Kinnita
           </Btn>
         </div>
       </div>

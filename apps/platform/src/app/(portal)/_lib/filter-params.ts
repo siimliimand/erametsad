@@ -1,8 +1,16 @@
 // Round-trips the query params that parseAuctionSearchParams in
 // @/lib/auction/queries accepts: county, parish, species, loggingType, q,
-// areaMin/areaMax, volumeMin/volumeMax, priceMin/priceMax, sort, order.
-// The server parser stays the single source of truth; this module only
-// mirrors its param names and defaults so panel state survives reload.
+// areaMin/areaMax, priceMin/priceMax, sort, order. The server parser stays
+// the single source of truth; this module only mirrors its param names and
+// defaults so panel state survives reload.
+//
+// Demo parity (design Decision 6): the panel dropped the Maht (m³) range
+// and gained Raietähtaeg (aasta). volumeMin/volumeMax stay parsed and
+// serialized so shared legacy links keep applying server-side, but the
+// panel no longer edits or counts them. cutDeadlineYear has no server
+// counterpart yet (the schema stores no cut-deadline year); the param is
+// kept in the URL so the query layer can adopt it without a contract
+// change.
 
 export const LISTING_SORT_FIELDS = ['startPrice', 'endPrice', 'endTime'] as const
 
@@ -21,10 +29,13 @@ export interface ListingFilterState {
   q: string
   areaMin?: number | undefined
   areaMax?: number | undefined
+  /** Legacy URL round-trip only: the demo panel has no Maht (m³) range. */
   volumeMin?: number | undefined
   volumeMax?: number | undefined
   priceMin?: number | undefined
   priceMax?: number | undefined
+  /** Raietähtaeg (aasta); the query layer has no matching filter yet. */
+  cutDeadlineYear?: number | undefined
   sortField: ListingSortField
   sortDirection: ListingSortDirection
 }
@@ -41,7 +52,8 @@ export const DEFAULT_LISTING_FILTERS: ListingFilterState = {
 
 // Slider bounds for the dual range inputs. A bound resting at the slider
 // extreme means "no limit", and serializeListingFilters omits it so the
-// URL never carries meaningless bounds.
+// URL never carries meaningless bounds. VOLUME_RANGE stays only as the
+// legacy round-trip bound for the dropped Maht (m³) range.
 export const AREA_RANGE = { min: 0, max: 500 }
 export const VOLUME_RANGE = { min: 0, max: 10000 }
 export const PRICE_RANGE = { min: 0, max: 1000000 }
@@ -69,6 +81,11 @@ function numberToken(bag: SearchParamBag, key: string): number | undefined {
   const value = Number(raw)
   if (!Number.isFinite(value) || value < 0 || value > 1e9) return undefined
   return value
+}
+
+function yearToken(bag: SearchParamBag, key: string): number | undefined {
+  const value = numberToken(bag, key)
+  return value !== undefined && Number.isInteger(value) ? value : undefined
 }
 
 export function parseListingFilters(bag: SearchParamBag): ListingFilterState {
@@ -101,6 +118,7 @@ export function parseListingFilters(bag: SearchParamBag): ListingFilterState {
     volumeMax: numberToken(bag, 'volumeMax'),
     priceMin: numberToken(bag, 'priceMin'),
     priceMax: numberToken(bag, 'priceMax'),
+    cutDeadlineYear: yearToken(bag, 'cutDeadlineYear'),
     sortField,
     sortDirection,
   }
@@ -142,6 +160,9 @@ export function serializeListingFilters(
   setRange(search, 'area', state.areaMin, state.areaMax, AREA_RANGE)
   setRange(search, 'volume', state.volumeMin, state.volumeMax, VOLUME_RANGE)
   setRange(search, 'price', state.priceMin, state.priceMax, PRICE_RANGE)
+  if (state.cutDeadlineYear !== undefined) {
+    search.set('cutDeadlineYear', String(state.cutDeadlineYear))
+  }
   if (
     state.sortField !== DEFAULT_SORT_FIELD ||
     state.sortDirection !== DEFAULT_SORT_DIRECTION
@@ -161,8 +182,10 @@ export function countActiveFilters(state: ListingFilterState): number {
   if (state.loggingTypes.length > 0) count += 1
   if (state.q !== '') count += 1
   if (state.areaMin !== undefined || state.areaMax !== undefined) count += 1
-  if (state.volumeMin !== undefined || state.volumeMax !== undefined) count += 1
+  // volumeMin/volumeMax are legacy link state only, so they stay out of
+  // the count the demo "Filtrid (n)" badge shows.
   if (state.priceMin !== undefined || state.priceMax !== undefined) count += 1
+  if (state.cutDeadlineYear !== undefined) count += 1
   if (
     state.sortField !== DEFAULT_SORT_FIELD ||
     state.sortDirection !== DEFAULT_SORT_DIRECTION

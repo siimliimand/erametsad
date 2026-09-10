@@ -1,5 +1,4 @@
-import Link from 'next/link'
-
+import { AdminLink } from '../../../../_components/AdminLink'
 import { DataTable } from '../../../../_components/DataTable'
 import { bidSourceLabels, bidStatusLabels, formatDateTime, formatEur } from '../../../../_lib/labels'
 
@@ -28,12 +27,12 @@ export function BidsTab({ rows }: { rows: BidRow[] }) {
             key: 'auctionTitle',
             label: 'Oksjon',
             render: (row) => (
-              <Link
-                href={`/admin/auctions/${row.auctionId}`}
+              <AdminLink
+                href={`/auctions/${row.auctionId}`}
                 className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {row.auctionTitle}
-              </Link>
+              </AdminLink>
             ),
           },
           { key: 'amount', label: 'Summa', render: (row) => formatEur(row.amount) },

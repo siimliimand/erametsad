@@ -2,9 +2,11 @@ import { EEIsikukood, EEPhone } from '@erametsad/types'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-
 import { isikukoodBanError } from '@/app/(portal)/_actions/register/ban-guard'
-import { createSession, setSessionCookies } from '@/lib/auth/session'
+import { createSession,
+  sessionCookieDomainFromHost,
+  setSessionCookies,
+} from '@/lib/auth/session'
 import type { CreateDataFor } from '@/lib/data/repositories/registry'
 import { getRepositories } from '@/lib/data/runtime'
 import { authRateLimiter } from '@/lib/rate-limit'
@@ -188,7 +190,8 @@ export async function POST(request: NextRequest) {
     },
   })
 
-  setSessionCookies(response, accessToken, refreshToken)
+  const cookieDomain = sessionCookieDomainFromHost(request.headers.get('host'))
+  setSessionCookies(response, accessToken, refreshToken, cookieDomain)
 
   return response
 }

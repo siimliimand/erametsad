@@ -1,7 +1,7 @@
-import Link from 'next/link'
 
 import { RedirectDeleteButton } from './_components/RedirectDeleteButton'
 import { validateRedirect } from './_lib/redirect-validation'
+import { AdminLink } from '../../../_components/AdminLink'
 import { DataTable } from '../../../_components/DataTable'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import { primaryButtonClass } from '../../../_components/FormField'
@@ -65,10 +65,10 @@ export default async function AdminRedirectsPage({
         description="Vanad URL-id suunatakse uutele aadressitele."
         backHref="/admin/content"
         actions={
-          <Link href="/admin/content/redirects/new" className={primaryButtonClass}>
+          <AdminLink href="/content/redirects/new" className={primaryButtonClass}>
             <PlusIcon />
             Uus suunamine
-          </Link>
+          </AdminLink>
         }
       />
       <DataTable
@@ -77,12 +77,12 @@ export default async function AdminRedirectsPage({
             key: 'from',
             label: 'Kust',
             render: (row) => (
-              <Link
-                href={`/admin/content/redirects/${row.id}`}
+              <AdminLink
+                href={`/content/redirects/${row.id}`}
                 className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {row.from}
-              </Link>
+              </AdminLink>
             ),
           },
           { key: 'to', label: 'Kuhu' },

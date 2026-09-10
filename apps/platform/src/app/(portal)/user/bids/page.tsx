@@ -1,13 +1,20 @@
 import type { Metadata } from 'next'
 
+import { UserPageHead } from '../_components/UserPageHead'
 import { BidsView } from './_components/bids-view'
-import { BIDS_TABS, type BidsTabId, type MyBidRow } from './_components/types'
+import {
+  ACTIVE_GROUP_STATUSES,
+  filtersFromOlek,
+  filtersFromTab,
+  type BidFilterId,
+  type MyBidRow,
+} from './_components/types'
 
 import { requirePortalSession } from '@/app/(portal)/_lib/session'
 import type { AuctionDoc, CoreRepositories } from '@/lib/data/repositories'
 import { centsToEuros } from '@/lib/data/repositories'
 import { getRepositories } from '@/lib/data/runtime'
-import type { AuctionStatus, Bid, County } from '@/lib/data/schema'
+import type { Bid, County } from '@/lib/data/schema'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,19 +22,18 @@ export const metadata: Metadata = {
   title: 'Minu pakkumised',
 }
 
-const ACTIVE_GROUP_STATUSES: readonly AuctionStatus[] = ['scheduled', 'active']
-
 interface BidsPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
 // Same shaping as GET /api/v1/auctions/with-user-bids, read directly from
-// the repositories to avoid a self-fetch (profile page pattern). Three row
+// the repositories to avoid a self-fetch (profile page pattern). Four row
 // fields the API row omits are added for this page: auctionType (AVATUD/
 // SULETUD badge, sealed masking), minBidEur and bidStepEur (autobidder
-// floor hint). Reads run as system context scoped by the verified session
-// user id — the guarded repositories would hide rival leading bids.
-// Bids carry only userId, so scoping is by user, not the active profile.
+// floor hint) and areaHa (demo sub line). Reads run as system context
+// scoped by the verified session user id — the guarded repositories would
+// hide rival leading bids. Bids carry only userId, so scoping is by user,
+// not the active profile.
 function standingBid(auctionBids: Bid[]): Bid | null {
   const candidates = auctionBids.filter((bid) => bid.status !== 'rejected')
   const byNewest = [...candidates].sort((a, b) => {
@@ -77,6 +83,7 @@ function toRow(
         auction.bidStepCents === null
           ? null
           : centsToEuros(auction.bidStepCents),
+      areaHa: auction.areaHa ?? null,
       county:
         auction.countyId === null
           ? null
@@ -115,6 +122,41 @@ function byEndsAtAsc(a: MyBidRow, b: MyBidRow): number {
 
 function byEndsAtDesc(a: MyBidRow, b: MyBidRow): number {
   return byEndsAtAsc(b, a)
+}
+
+// A won auction whose contract is prepared but not yet signed shows the
+// "Leping allkirja ootel" pill and the signing action on its card. Prepare
+// binds the owner at creation, so signedBy scopes live rows (same query as
+// the /lepingud list).
+async function markPendingContracts(
+  repos: CoreRepositories,
+  userId: string,
+  rows: MyBidRow[],
+): Promise<void> {
+  const wonIds = rows
+    .filter((row) => row.outcome === 'won')
+    .map((row) => row.auction.id)
+  if (wonIds.length === 0) return
+
+  const pendingResult = await repos.find({
+    collection: 'contracts',
+    where: {
+      and: [
+        { signedBy: { equals: userId } },
+        { status: { in: ['prepared', 'sent'] } },
+        { lot: { in: wonIds } },
+      ],
+    },
+    pagination: false,
+  })
+  const pendingLots = new Set(
+    pendingResult.docs.map((contract) => contract.lotId),
+  )
+  for (const row of rows) {
+    if (row.outcome === 'won' && pendingLots.has(row.auction.id)) {
+      row.contractPending = true
+    }
+  }
 }
 
 async function loadRows(
@@ -176,6 +218,8 @@ async function loadRows(
     )
   }
 
+  await markPendingContracts(repos, userId, rows)
+
   return {
     active: rows
       .filter((row) =>
@@ -190,17 +234,36 @@ async function loadRows(
   }
 }
 
+// Chips keep the filter URL-addressable: `olek` carries the pressed chip ids,
+// the removed tab values map onto chips for old deep links.
+function initialFiltersOf(params: Record<string, string | string[] | undefined>): BidFilterId[] {
+  const rawOlek = Array.isArray(params.olek) ? params.olek[0] : params.olek
+  if (rawOlek !== undefined) return filtersFromOlek(rawOlek)
+  const rawTab = Array.isArray(params.tab) ? params.tab[0] : params.tab
+  return filtersFromTab(rawTab)
+}
+
 export default async function UserBidsPage({ searchParams }: BidsPageProps) {
   const { session } = await requirePortalSession('/user/bids')
   const params = await searchParams
-  const rawTab = Array.isArray(params.tab) ? params.tab[0] : params.tab
-  const found = BIDS_TABS.find((entry) => entry.id === rawTab)
-  const initialTab: BidsTabId = found ? found.id : 'aktiivsed'
+  const initialFilters = initialFiltersOf(params)
 
   const repos = await getRepositories()
   const { active, ended } = await loadRows(repos, session.userId)
 
   return (
-    <BidsView initialTab={initialTab} initialActive={active} ended={ended} />
+    <>
+      <UserPageHead
+        title="Minu pakkumised"
+        summary="Ülevaade sinu osalemisest oksjonitel — käimasolevad pakkumised, tulemused ja automaatpakkuja seaded."
+      />
+      <section className="py-6 md:py-8">
+        <BidsView
+          initialFilters={initialFilters}
+          initialActive={active}
+          ended={ended}
+        />
+      </section>
+    </>
   )
 }

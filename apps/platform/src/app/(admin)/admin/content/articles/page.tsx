@@ -1,7 +1,7 @@
-import Link from 'next/link'
 
 import { articleCategoryLabels } from './_lib/article-seo'
 import { deleteArticleAction, setArticleStatusAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import { DataTable } from '../../../_components/DataTable'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import { primaryButtonClass } from '../../../_components/FormField'
@@ -60,10 +60,10 @@ export default async function AdminArticlesPage({
         title="Artiklid"
         description="Uudised ja ajaveebi postitused koos avaliku olekuga."
         actions={
-          <Link href="/admin/content/articles/new" className={primaryButtonClass}>
+          <AdminLink href="/content/articles/new" className={primaryButtonClass}>
             <PlusIcon />
             Uus artikkel
-          </Link>
+          </AdminLink>
         }
       />
       <DataTable
@@ -72,12 +72,12 @@ export default async function AdminArticlesPage({
             key: 'title',
             label: 'Pealkiri',
             render: (row) => (
-              <Link
-                href={`/admin/content/articles/${row.id}`}
+              <AdminLink
+                href={`/content/articles/${row.id}`}
                 className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {row.title}
-              </Link>
+              </AdminLink>
             ),
           },
           {

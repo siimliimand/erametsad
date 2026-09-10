@@ -120,10 +120,10 @@ export function StepProfileType({ onNext, onRequestAccess }: StepProfileTypeProp
   ]
 
   return (
-    <section aria-label="Profiili tüüp" className="mt-md flex flex-col gap-md">
+    <section aria-label="Profiili tüüp" className="flex flex-col gap-md">
       <div className="flex flex-col gap-2xs">
-        <h2 className="font-heading text-h3 text-ink">Vali profiili tüüp</h2>
-        <p className="font-body text-body text-inkMuted">
+        <h2 className="font-heading text-h3 font-bold text-ink">Vali profiili tüüp</h2>
+        <p className="font-body text-bodySm text-inkMuted">
           Kas osaled oksjonitel eraisikuna või müüd ettevõtte nimel?
         </p>
       </div>
@@ -241,7 +241,7 @@ export function StepProfileType({ onNext, onRequestAccess }: StepProfileTypeProp
       )}
 
       {(choice === 'private' || (choice === 'company' && lookup.kind === 'not-found')) && (
-        <Btn onClick={handleContinue}>Jätka</Btn>
+        <Btn variant="cta" onClick={handleContinue}>Jätka</Btn>
       )}
     </section>
   )

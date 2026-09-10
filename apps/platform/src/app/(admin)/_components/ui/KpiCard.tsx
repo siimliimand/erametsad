@@ -1,5 +1,6 @@
-import Link from 'next/link'
 import type { ReactNode } from 'react'
+
+import { AdminLink } from '../AdminLink'
 
 export interface KpiCardProps {
   label: string
@@ -37,9 +38,9 @@ export function KpiCard({ label, value, sub, alert, danger, href }: KpiCardProps
   )
   if (href) {
     return (
-      <Link href={href} className={`${shellClass} text-inherit no-underline`}>
+      <AdminLink href={href} className={`${shellClass} text-inherit no-underline`}>
         {body}
-      </Link>
+      </AdminLink>
     )
   }
   return <div className={shellClass}>{body}</div>

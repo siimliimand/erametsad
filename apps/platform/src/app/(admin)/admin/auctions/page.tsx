@@ -1,5 +1,5 @@
 import { Download as DownloadIcon } from 'lucide-react'
-import Link from 'next/link'
+
 
 import {
   AuctionsTable,
@@ -23,6 +23,7 @@ import {
   endAuctionManuallyAction,
   relistAuctionAction,
 } from '../../_actions/auctions'
+import { AdminLink } from '../../_components/AdminLink'
 import type { DataTableColumnSort } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import {
@@ -378,7 +379,7 @@ export default async function AdminAuctionsPage({
       doc.specialistId ? (specialistNames.get(doc.specialistId) ?? null) : null,
     ),
     portalHref: `/oksjon/${doc.id}`,
-    editHref: `/admin/auctions/${doc.id}/edit`,
+    editHref: `/auctions/${doc.id}/edit`,
     canEnd: roleCanEndManual && doc.status === 'active',
     canArchive: roleCanArchive && isArchivable(doc.status),
     canRelist:
@@ -408,7 +409,7 @@ export default async function AdminAuctionsPage({
       if (value) search.set(key, value)
     }
     const qs = search.toString()
-    return qs === '' ? '/admin/auctions' : `/admin/auctions?${qs}`
+    return qs === '' ? '/auctions' : `/auctions?${qs}`
   }
 
   // asc → desc → asc toggle; an inactive column starts at ascending.
@@ -467,12 +468,12 @@ export default async function AdminAuctionsPage({
       <PageHeader
         breadcrumb={
           <>
-            <Link
-              href="/admin"
+            <AdminLink
+              href="/"
               className="transition-colors duration-hover ease-hover hover:text-primary"
             >
               Töölaud
-            </Link>
+            </AdminLink>
             <span aria-hidden="true">/</span>
             <span aria-current="page">Oksjonid</span>
           </>
@@ -482,7 +483,7 @@ export default async function AdminAuctionsPage({
         actions={
           <>
             {roleCanWrite ? (
-              <Link href="/admin/auctions/new" className={primaryButtonClass}>
+              <AdminLink href="/auctions/new" className={primaryButtonClass}>
                 <PlusIcon />
                 Uus oksjon
                 <kbd
@@ -491,7 +492,7 @@ export default async function AdminAuctionsPage({
                 >
                   ⌘N
                 </kbd>
-              </Link>
+              </AdminLink>
             ) : null}
             {roleCanExport ? (
               <a href={csvHref} className={secondaryButtonClass}>
@@ -510,7 +511,7 @@ export default async function AdminAuctionsPage({
         {LIST_TABS.map((entry) => {
           const active = entry.id === tab.id
           return (
-            <Link
+            <AdminLink
               key={entry.id}
               href={buildUrl({ tab: entry.id, page: undefined })}
               aria-current={active ? 'page' : undefined}
@@ -530,14 +531,14 @@ export default async function AdminAuctionsPage({
               >
                 {String(tabCounts[entry.id] ?? 0)}
               </span>
-            </Link>
+            </AdminLink>
           )
         })}
       </nav>
 
       <form
         method="get"
-        action="/admin/auctions"
+        action="/auctions"
         aria-label="Filtrid"
         className="mb-md flex flex-wrap items-center gap-2 rounded-card border border-border bg-bgPage p-3 shadow-card"
       >
@@ -663,7 +664,7 @@ export default async function AdminAuctionsPage({
         >
           Filtreeri
         </button>
-        <Link
+        <AdminLink
           href={buildUrl({
             status: undefined,
             type: undefined,
@@ -680,7 +681,7 @@ export default async function AdminAuctionsPage({
           <XIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
           Tühjenda
           {activeFilterCount > 0 ? ` (${String(activeFilterCount)})` : ''}
-        </Link>
+        </AdminLink>
       </form>
 
       <AuctionsTable
@@ -704,23 +705,23 @@ export default async function AdminAuctionsPage({
         </span>
         <span className="flex items-center gap-sm">
           {safePage > 1 ? (
-            <Link
+            <AdminLink
               href={buildUrl({ page: String(safePage - 1) })}
               className="font-semibold text-primary hover:text-primary/80"
             >
               ‹ Eelmine
-            </Link>
+            </AdminLink>
           ) : null}
           <span>
             Leht {String(safePage)} / {String(pageCount)}
           </span>
           {safePage < pageCount ? (
-            <Link
+            <AdminLink
               href={buildUrl({ page: String(safePage + 1) })}
               className="font-semibold text-primary hover:text-primary/80"
             >
               Järgmine ›
-            </Link>
+            </AdminLink>
           ) : null}
         </span>
       </div>

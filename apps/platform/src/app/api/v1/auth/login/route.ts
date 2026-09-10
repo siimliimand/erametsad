@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 import { verifyCredentialPassword } from '@/lib/auth/password'
-import { createSession, setSessionCookies } from '@/lib/auth/session'
+import { createSession,
+  sessionCookieDomainFromHost,
+  setSessionCookies,
+} from '@/lib/auth/session'
 import { hash } from '@/lib/crypto'
 import { getRepositories } from '@/lib/data/runtime'
 import { authRateLimiter } from '@/lib/rate-limit'
@@ -104,7 +107,8 @@ export async function POST(request: NextRequest) {
     },
   })
 
-  setSessionCookies(response, accessToken, refreshToken)
+  const cookieDomain = sessionCookieDomainFromHost(request.headers.get('host'))
+  setSessionCookies(response, accessToken, refreshToken, cookieDomain)
 
   return response
 }

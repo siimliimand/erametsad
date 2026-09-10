@@ -1,6 +1,5 @@
 import { EE_COUNTIES, HOOLDUSRAIE_SERVICE_OPTIONS, ISTUTAMINE_SERVICE_OPTIONS } from '@erametsad/types'
 import { Clock as ClockIcon } from 'lucide-react'
-import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import { CopyEmailFallback } from './_components/CopyEmailFallback'
@@ -22,6 +21,7 @@ import {
   markRequestRespondedAction,
   retryRequestForwardAction,
 } from '../../_actions/ops'
+import { AdminLink } from '../../_components/AdminLink'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import { secondaryButtonClass } from '../../_components/FormField'
@@ -404,9 +404,9 @@ export default async function ServiceRequestsPage({
         title="Päringute suunamine"
         description="Turbe päringud partneritele — partnerile edastatakse vaid teenuse osutamiseks vajalikud andmed."
         actions={
-          <Link href="/admin/inquiries/partners" className={secondaryButtonClass}>
+          <AdminLink href="/inquiries/partners" className={secondaryButtonClass}>
             Partnerid
-          </Link>
+          </AdminLink>
         }
       />
 
@@ -443,7 +443,7 @@ export default async function ServiceRequestsPage({
             href: `/admin/inquiries?tuup=${type}`,
           })),
         ].map((tab) => (
-          <Link
+          <AdminLink
             key={tab.label}
             href={tab.href}
             className={`rounded-pill px-3 py-1 text-label font-semibold transition-colors duration-hover ease-hover ${
@@ -453,7 +453,7 @@ export default async function ServiceRequestsPage({
             }`}
           >
             {tab.label}
-          </Link>
+          </AdminLink>
         ))}
       </div>
 
@@ -515,9 +515,9 @@ export default async function ServiceRequestsPage({
           Filtreeri
         </button>
         {olek || maakond || kuupaev || otsing ? (
-          <Link href="/admin/inquiries" className={secondaryButtonClass}>
+          <AdminLink href="/inquiries" className={secondaryButtonClass}>
             Tühjenda
-          </Link>
+          </AdminLink>
         ) : null}
       </form>
 
@@ -527,9 +527,9 @@ export default async function ServiceRequestsPage({
             key: 'client',
             label: 'Klient',
             render: (row) => (
-              <Link href={detailPath(row.id)} className="font-semibold text-primary hover:text-primaryHover">
+              <AdminLink href={detailPath(row.id)} className="font-semibold text-primary hover:text-primaryHover">
                 {row.client}
-              </Link>
+              </AdminLink>
             ),
           },
           { key: 'type', label: 'Tüüp', render: (row) => typeLabels[row.type] },
@@ -545,12 +545,12 @@ export default async function ServiceRequestsPage({
             label: 'Manused',
             render: (row) =>
               row.attachments > 0 ? (
-                <a
-                  href={`/admin/inquiries/attachments-zip?paaring=${encodeURIComponent(row.id)}`}
+                <AdminLink
+                  href={`/inquiries/attachments-zip?paaring=${encodeURIComponent(row.id)}`}
                   className="text-label font-semibold text-primary hover:text-primaryHover"
                 >
                   {String(row.attachments)} · ZIP
-                </a>
+                </AdminLink>
               ) : (
                 '—'
               ),
@@ -596,12 +596,12 @@ export default async function ServiceRequestsPage({
             label: 'Tegevused',
             render: (row) => (
               <div className="flex flex-wrap items-center gap-sm">
-                <Link
+                <AdminLink
                   href={detailPath(row.id)}
                   className="text-label font-semibold text-primary hover:text-primaryHover"
                 >
                   Ava
-                </Link>
+                </AdminLink>
                 {row.status !== 'teostatud' && row.status !== 'suletud' ? (
                   <form action={markRequestDoneAction}>
                     <input type="hidden" name="id" value={row.id} />
@@ -646,9 +646,9 @@ export default async function ServiceRequestsPage({
                 <h2 className="font-heading text-h4 font-bold text-ink">
                   Päring #{detailRequest.id.slice(0, 8)} · {typeLabels[detailRequest.type]}
                 </h2>
-                <Link href="/admin/inquiries" className={secondaryButtonClass}>
+                <AdminLink href="/inquiries" className={secondaryButtonClass}>
                   Sulge detail
-                </Link>
+                </AdminLink>
               </header>
 
               <div className="grid grid-cols-1 gap-sm lg:grid-cols-2">
@@ -692,9 +692,9 @@ export default async function ServiceRequestsPage({
                   {routingCandidates.length === 0 ? (
                     <li className="text-bodySm text-ink-muted">
                       Ühtegi aktiivset partnerit ei kata seda teenust/maakonda —{' '}
-                      <Link href="/admin/inquiries/partners" className="text-primary underline">
+                      <AdminLink href="/inquiries/partners" className="text-primary underline">
                         lisa partner
-                      </Link>
+                      </AdminLink>
                     </li>
                   ) : null}
                   {routingCandidates.map((candidate) => {

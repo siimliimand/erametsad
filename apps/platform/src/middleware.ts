@@ -1,8 +1,10 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
+import { API_ORIGIN, isAllowedApiOrigin } from '@/lib/api/config'
 import { verifyAdminAccessToken } from '@/lib/auth/jwt'
 import { apiRateLimiter, authRateLimiter } from '@/lib/rate-limit'
+import { ADMIN_BASE_HEADER } from '@/lib/routing/admin-base'
 import {
   incrementCmsRedirectHitStatement,
   redirectLookupByFrom,
@@ -11,6 +13,8 @@ import {
 } from '@/lib/routing/cms-redirects'
 import {
   normalizeHostname,
+  resolveAdminHostRewrite,
+  resolveApiHostRedirect,
   resolveDefaultHostRewrite,
   resolveHostRedirect,
   resolveLegacyPathRedirect,
@@ -23,7 +27,9 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  "connect-src 'self'",
+  // The browser calls the API on its own hostname in deployments that set
+  // NEXT_PUBLIC_API_ORIGIN; same-origin deployments keep plain 'self'.
+  `connect-src 'self' ${API_ORIGIN}`.trimEnd(),
   "frame-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -45,10 +51,15 @@ function applySecurityHeaders(headers: Headers) {
 }
 
 function applyCorsHeaders(headers: Headers, origin: string) {
+  // Credentialed CORS demands an exact-origin allowlist: a wildcard or an
+  // unchecked echo would let any site ride the visitor's session cookies.
+  if (!isAllowedApiOrigin(origin)) return
   headers.set('Access-Control-Allow-Origin', origin)
+  headers.set('Access-Control-Allow-Credentials', 'true')
   headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
   headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   headers.set('Access-Control-Max-Age', '86400')
+  headers.append('Vary', 'Origin')
 }
 
 function applyRateLimitHeaders(headers: Headers, result: ReturnType<typeof apiRateLimiter.check>) {
@@ -200,6 +211,15 @@ export function middleware(request: NextRequest) {
     return redirect
   }
 
+  // The API host carries only /api routes; stray page URLs 308 to the
+  // default host before any other mapping applies.
+  const apiHostRedirect = resolveApiHostRedirect(hostname, pathname, search)
+  if (apiHostRedirect) {
+    const redirect = NextResponse.redirect(apiHostRedirect, 308)
+    applySecurityHeaders(redirect.headers)
+    return redirect
+  }
+
   // CMS redirects (admin-managed, task 3.5) run on mapped hosts after the
   // static legacy map: they send the visitor to the stored target with the
   // row's status code and count one hit. Query strings ride along.
@@ -230,6 +250,12 @@ export function middleware(request: NextRequest) {
   const origin = request.headers.get('origin') ?? ''
   const isApiRoute = pathname.startsWith('/api')
 
+  // Prefix-free admin host: unlisted root paths render the admin app via an
+  // internal rewrite. The maintenance gate judges the effective path so the
+  // admin UI stays exempt at its clean URLs too (/auctions → /admin/auctions).
+  const adminRewrite = resolveAdminHostRewrite(hostname, pathname)
+  const effectivePathname = adminRewrite ?? pathname
+
   // Maintenance gate (mapped hosts only, D7): blocks public page routes
   // while settings.maintenance_enabled is on. Admin sessions pass, the
   // admin UI, login flow, shared statics, and every /api route stay up.
@@ -237,7 +263,7 @@ export function middleware(request: NextRequest) {
     scheduleRuntimeRefresh()
     if (
       maintenanceCache.enabled &&
-      !isMaintenanceExempt(pathname) &&
+      !isMaintenanceExempt(effectivePathname) &&
       !isAdminRequest(request)
     ) {
       return maintenanceResponse()
@@ -252,7 +278,7 @@ export function middleware(request: NextRequest) {
 
     if (!result.allowed) {
       const response = NextResponse.json({ error: 'Too many requests' }, { status: 429 })
-      if (origin) applyCorsHeaders(response.headers, origin)
+      applyCorsHeaders(response.headers, origin)
       applyRateLimitHeaders(response.headers, result)
       applySecurityHeaders(response.headers)
       return response
@@ -260,24 +286,35 @@ export function middleware(request: NextRequest) {
 
     if (request.method === 'OPTIONS') {
       const response = new NextResponse(null, { status: 204 })
-      if (origin) applyCorsHeaders(response.headers, origin)
+      applyCorsHeaders(response.headers, origin)
       applySecurityHeaders(response.headers)
       return response
     }
 
     const response = NextResponse.next()
-    if (origin) applyCorsHeaders(response.headers, origin)
+    applyCorsHeaders(response.headers, origin)
     applyRateLimitHeaders(response.headers, result)
     applySecurityHeaders(response.headers)
     return response
   }
 
-  // Default host only: `/` and `/lepingud` render the (marketing) routes
-  // through a rewrite while the URL stays unchanged (D1).
-  const rewritePath = resolveDefaultHostRewrite(hostname, pathname)
-  const response = rewritePath
-    ? NextResponse.rewrite(new URL(`${rewritePath}${search}`, request.url))
-    : NextResponse.next()
+  // Admin host first (its rewrites win over the default host's), then the
+  // default host only: `/` and `/lepingud` render the (marketing) routes
+  // through a rewrite while the URL stays unchanged (D1). The admin rewrite
+  // stamps the request so the app renders prefix-free URLs on that host.
+  let response: NextResponse
+  if (adminRewrite) {
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set(ADMIN_BASE_HEADER, '')
+    response = NextResponse.rewrite(new URL(`${adminRewrite}${search}`, request.url), {
+      request: { headers: requestHeaders },
+    })
+  } else {
+    const rewritePath = resolveDefaultHostRewrite(hostname, pathname)
+    response = rewritePath
+      ? NextResponse.rewrite(new URL(`${rewritePath}${search}`, request.url))
+      : NextResponse.next()
+  }
   applySecurityHeaders(response.headers)
   return response
 }

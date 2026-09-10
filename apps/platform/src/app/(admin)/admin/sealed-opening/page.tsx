@@ -1,5 +1,4 @@
-import Link from 'next/link'
-
+import { AdminLink } from '../../_components/AdminLink'
 import { DataTable, type DataTableColumn } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import { PageHeader } from '../../_components/PageHeader'
@@ -75,12 +74,12 @@ export default async function AdminSealedOpeningPage() {
       key: 'title',
       label: 'Oksjon',
       render: (row) => (
-        <Link
-          href={`/admin/auctions/${row.id}/ceremony`}
+        <AdminLink
+          href={`/auctions/${row.id}/ceremony`}
           className="font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
         >
           {row.title}
-        </Link>
+        </AdminLink>
       ),
     },
     {
@@ -107,12 +106,12 @@ export default async function AdminSealedOpeningPage() {
       key: 'actions',
       label: 'Tegevused',
       render: (row) => (
-        <Link
-          href={`/admin/auctions/${row.id}/ceremony`}
+        <AdminLink
+          href={`/auctions/${row.id}/ceremony`}
           className="whitespace-nowrap font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
         >
           Ava tseremoonia
-        </Link>
+        </AdminLink>
       ),
     },
   ]
@@ -122,12 +121,12 @@ export default async function AdminSealedOpeningPage() {
       <PageHeader
         breadcrumb={
           <>
-            <Link
-              href="/admin"
+            <AdminLink
+              href="/"
               className="transition-colors duration-hover ease-hover hover:text-primary"
             >
               Töölaud
-            </Link>
+            </AdminLink>
             <span aria-hidden="true">/</span>
             <span aria-current="page">Sul. avamine</span>
           </>

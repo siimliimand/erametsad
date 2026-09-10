@@ -27,6 +27,7 @@ import {
   type ContractTemplateSourceFormat,
   type ContractTemplateType,
 } from '@/lib/data/schema'
+import { adminUrl } from '@/lib/routing/admin-base-server'
 
 const contractsPath = '/admin/contracts'
 const templatesPath = '/admin/contracts/templates'
@@ -40,12 +41,12 @@ function readText(formData: FormData, key: string): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function redirectWithError(path: string, message: string): never {
-  redirect(`${path}?viga=${encodeURIComponent(message)}`)
+async function redirectWithError(path: string, message: string): Promise<never> {
+  redirect(await adminUrl(`${path}?viga=${encodeURIComponent(message)}`))
 }
 
-function redirectWithNotice(path: string, message: string): never {
-  redirect(`${path}?teade=${encodeURIComponent(message)}`)
+async function redirectWithNotice(path: string, message: string): Promise<never> {
+  redirect(await adminUrl(`${path}?teade=${encodeURIComponent(message)}`))
 }
 
 function audit(
@@ -65,16 +66,16 @@ function audit(
 }
 
 /** Permission denied becomes an explicit Estonian redirect error, never a silent no-op. */
-function assertPermissionOrRedirect(
+async function assertPermissionOrRedirect(
   role: StaffRole,
   permission: AdminPermission,
   path: string,
-): void {
+): Promise<void> {
   try {
     assertCan(role, permission)
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
-      redirectWithError(path, error.message)
+      return redirectWithError(path, error.message)
     }
     throw error
   }
@@ -106,23 +107,23 @@ export async function updateContractStatusAction(formData: FormData): Promise<vo
   const status = readText(formData, 'status')
   const editPath = `${contractsPath}/${id}`
 
-  if (!id) redirectWithError(contractsPath, 'Lepingu identifikaator puudub.')
-  assertPermissionOrRedirect(session.role, 'contracts:write', contractsPath)
+  if (!id) return redirectWithError(contractsPath, 'Lepingu identifikaator puudub.')
+  await assertPermissionOrRedirect(session.role, 'contracts:write', contractsPath)
   if (!contractStatuses.includes(status as (typeof contractStatuses)[number])) {
-    redirectWithError(editPath, 'Vali sobiv lepingu olek.')
+    return redirectWithError(editPath, 'Vali sobiv lepingu olek.')
   }
   if (status === 'voided') {
-    redirectWithError(
+    return redirectWithError(
       contractsPath,
       'Tühistamine nõuab põhjust ja tulemuse valikut — kasuta loendi "Tühista" vormi.',
     )
   }
 
   const contract = await repositories.findByID({ collection: 'contracts', id })
-  if (!contract) redirectWithError(contractsPath, 'Lepingut ei leitud.')
+  if (!contract) return redirectWithError(contractsPath, 'Lepingut ei leitud.')
 
   if (!allowedTransitions[contract.status]?.includes(status)) {
-    redirectWithError(
+    return redirectWithError(
       editPath,
       `Üleminek olekusse "${status}" pole lubatud praegusest olekust "${contract.status}".`,
     )
@@ -142,12 +143,12 @@ export async function updateContractStatusAction(formData: FormData): Promise<vo
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(editPath, `Lepingu oleku muutmine ebaõnnestus: ${failure}`)
+    return redirectWithError(editPath, `Lepingu oleku muutmine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(contractsPath)
   revalidatePath(editPath)
-  redirect(editPath)
+  redirect(await adminUrl(editPath))
 }
 
 /**
@@ -161,31 +162,31 @@ export async function voidContractAction(formData: FormData): Promise<void> {
   const reason = readText(formData, 'reason')
   const outcome = readText(formData, 'outcome')
 
-  if (!id) redirectWithError(contractsPath, 'Tühistamiseks puudub lepingu identifikaator.')
-  assertPermissionOrRedirect(session.role, 'contracts:write', contractsPath)
+  if (!id) return redirectWithError(contractsPath, 'Tühistamiseks puudub lepingu identifikaator.')
+  await assertPermissionOrRedirect(session.role, 'contracts:write', contractsPath)
   if (reason.length < MIN_REASON_LENGTH) {
-    redirectWithError(
+    return redirectWithError(
       contractsPath,
       `Tühistamise põhjus on kohustuslik (vähemalt ${String(MIN_REASON_LENGTH)} tähemärki).`,
     )
   }
   if (outcome !== 'contract' && outcome !== 'contract-and-result') {
-    redirectWithError(contractsPath, 'Vali tühistamise tulemus: ainult leping või leping ja tulemus.')
+    return redirectWithError(contractsPath, 'Vali tühistamise tulemus: ainult leping või leping ja tulemus.')
   }
   if (outcome === 'contract-and-result' && session.role !== 'superadmin') {
-    redirectWithError(
+    return redirectWithError(
       contractsPath,
       'Lepingu ja oksjoni tulemuse tühistamise peab tegema superadmin.',
     )
   }
 
   const contract = await repositories.findByID({ collection: 'contracts', id })
-  if (!contract) redirectWithError(contractsPath, 'Lepingut ei leitud.')
+  if (!contract) return redirectWithError(contractsPath, 'Lepingut ei leitud.')
   if (contract.status === 'signed') {
-    redirectWithError(`${contractsPath}/${id}`, 'Allkirjastatud lepingut tühistada ei saa.')
+    return redirectWithError(`${contractsPath}/${id}`, 'Allkirjastatud lepingut tühistada ei saa.')
   }
   if (contract.status === 'voided') {
-    redirectWithError(`${contractsPath}/${id}`, 'Leping on juba tühistatud.')
+    return redirectWithError(`${contractsPath}/${id}`, 'Leping on juba tühistatud.')
   }
 
   const auction = await repositories.findByID({ collection: 'auctions', id: contract.lotId })
@@ -223,12 +224,12 @@ export async function voidContractAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(contractsPath, `Lepingu tühistamine ebaõnnestus: ${failure}`)
+    return redirectWithError(contractsPath, `Lepingu tühistamine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(contractsPath)
   revalidatePath(`${contractsPath}/${id}`)
-  redirectWithNotice(
+  return redirectWithNotice(
     contractsPath,
     auctionReverted
       ? 'Leping tühistatud; oksjoni tulemus tühistatud ja lot tagasi olekus "lõppenud".'
@@ -241,13 +242,13 @@ export async function resendContractAction(formData: FormData): Promise<void> {
   const { session, repositories } = await requireAdminRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(contractsPath, 'Uuesti saatmiseks puudub lepingu identifikaator.')
-  assertPermissionOrRedirect(session.role, 'contracts:write', contractsPath)
+  if (!id) return redirectWithError(contractsPath, 'Uuesti saatmiseks puudub lepingu identifikaator.')
+  await assertPermissionOrRedirect(session.role, 'contracts:write', contractsPath)
 
   const contract = await repositories.findByID({ collection: 'contracts', id })
-  if (!contract) redirectWithError(contractsPath, 'Lepingut ei leitud.')
+  if (!contract) return redirectWithError(contractsPath, 'Lepingut ei leitud.')
   if (contract.status !== 'sent') {
-    redirectWithError(contractsPath, 'Uuesti saab saata ainult saadetud (ootel) lepingut.')
+    return redirectWithError(contractsPath, 'Uuesti saab saata ainult saadetud (ootel) lepingut.')
   }
 
   const previous = await repositories.find({
@@ -266,7 +267,7 @@ export async function resendContractAction(formData: FormData): Promise<void> {
     const elapsed = Date.now() - Date.parse(lastResend.createdAt)
     if (Number.isFinite(elapsed) && elapsed < RESEND_THROTTLE_MS) {
       const remainingMinutes = Math.max(1, Math.ceil((RESEND_THROTTLE_MS - elapsed) / 60000))
-      redirectWithError(
+      return redirectWithError(
         contractsPath,
         `Saada uuesti saab ainult üks kord tunnis. Proovi uuesti umbes ${String(remainingMinutes)} min pärast.`,
       )
@@ -298,11 +299,11 @@ export async function resendContractAction(formData: FormData): Promise<void> {
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(contractsPath, `Uuesti saatmine ebaõnnestus: ${failure}`)
+    return redirectWithError(contractsPath, `Uuesti saatmine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(contractsPath)
-  redirectWithNotice(contractsPath, 'Allkirjastamise kutse saadetud uuesti.')
+  return redirectWithNotice(contractsPath, 'Allkirjastamise kutse saadetud uuesti.')
 }
 
 export interface ContractDocumentPayload {
@@ -431,19 +432,19 @@ export async function uploadContractTemplateAction(formData: FormData): Promise<
   const name = readText(formData, 'name')
   const type = readText(formData, 'type')
 
-  assertPermissionOrRedirect(session.role, 'contracts:write', templatesPath)
-  if (name.length < 2) redirectWithError(templatesPath, 'Sisesta malli nimi (vähemalt 2 tähemärki).')
+  await assertPermissionOrRedirect(session.role, 'contracts:write', templatesPath)
+  if (name.length < 2) return redirectWithError(templatesPath, 'Sisesta malli nimi (vähemalt 2 tähemärki).')
   if (!contractTemplateTypes.includes(type as ContractTemplateType)) {
-    redirectWithError(templatesPath, 'Vali malli tüüp: raamleping või oksjonileping.')
+    return redirectWithError(templatesPath, 'Vali malli tüüp: raamleping või oksjonileping.')
   }
   const templateType = type as ContractTemplateType
 
   const file = formData.get('file')
   if (!(file instanceof File) || file.size === 0) {
-    redirectWithError(templatesPath, 'Vali üleslaaditav DOCX- või HTML-fail.')
+    return redirectWithError(templatesPath, 'Vali üleslaaditav DOCX- või HTML-fail.')
   }
   if (file.size > MAX_UPLOAD_BYTES) {
-    redirectWithError(templatesPath, 'Fail on liiga suur (lubatud kuni 10 MB).')
+    return redirectWithError(templatesPath, 'Fail on liiga suur (lubatud kuni 10 MB).')
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer())
@@ -452,7 +453,7 @@ export async function uploadContractTemplateAction(formData: FormData): Promise<
     try {
       source = docxXmlToHtml(extractDocxDocumentXml(bytes))
     } catch (error) {
-      redirectWithError(
+      return redirectWithError(
         templatesPath,
         `DOCX-faili lugemine ebaõnnestus: ${error instanceof Error ? error.message : String(error)}`,
       )
@@ -460,7 +461,7 @@ export async function uploadContractTemplateAction(formData: FormData): Promise<
   } else {
     const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
     if (!text.includes('{{') && !/<[a-z!]/i.test(text)) {
-      redirectWithError(
+      return redirectWithError(
         templatesPath,
         'Toetame DOCX- ja HTML-malle; muud failivormid ei ole lubatud.',
       )
@@ -471,7 +472,7 @@ export async function uploadContractTemplateAction(formData: FormData): Promise<
   const tokens = extractTemplateTokens(source)
   const validation = validateTemplateTokens(templateType, tokens)
   const validationMessage = buildValidationMessage(validation)
-  if (validationMessage) redirectWithError(templatesPath, validationMessage)
+  if (validationMessage) return redirectWithError(templatesPath, validationMessage)
 
   const existing = await repositories.find({
     collection: 'contract-templates',
@@ -506,12 +507,12 @@ export async function uploadContractTemplateAction(formData: FormData): Promise<
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure || !createdId) {
-    redirectWithError(templatesPath, `Malli üleslaadimine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
+    return redirectWithError(templatesPath, `Malli üleslaadimine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
   }
 
   revalidatePath(templatesPath)
   revalidatePath(contractsPath)
-  redirectWithNotice(templatesPath, `Mall loodud mustandina (versioon ${version}).`)
+  return redirectWithNotice(templatesPath, `Mall loodud mustandina (versioon ${version}).`)
 }
 
 /**
@@ -522,12 +523,12 @@ export async function activateContractTemplateAction(formData: FormData): Promis
   const { session, repositories } = await requireAdminRepositories()
 
   const id = readText(formData, 'id')
-  if (!id) redirectWithError(templatesPath, 'Aktiveerimiseks puudub malli identifikaator.')
-  assertPermissionOrRedirect(session.role, 'contracts:write', templatesPath)
+  if (!id) return redirectWithError(templatesPath, 'Aktiveerimiseks puudub malli identifikaator.')
+  await assertPermissionOrRedirect(session.role, 'contracts:write', templatesPath)
 
   const template = await repositories.findByID({ collection: 'contract-templates', id })
-  if (!template) redirectWithError(templatesPath, 'Malli ei leitud.')
-  if (template.active) redirectWithError(templatesPath, 'Mall on juba aktiivne.')
+  if (!template) return redirectWithError(templatesPath, 'Malli ei leitud.')
+  if (template.active) return redirectWithError(templatesPath, 'Mall on juba aktiivne.')
 
   const previousActive = await repositories.find({
     collection: 'contract-templates',
@@ -577,12 +578,12 @@ export async function activateContractTemplateAction(formData: FormData): Promis
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(templatesPath, `Malli aktiveerimine ebaõnnestus: ${failure}`)
+    return redirectWithError(templatesPath, `Malli aktiveerimine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(templatesPath)
   revalidatePath(contractsPath)
-  redirectWithNotice(
+  return redirectWithNotice(
     templatesPath,
     previous
       ? `Mall aktiivne (v${template.version}); eelmine versioon läks arhiivi.`
@@ -597,18 +598,18 @@ export async function deactivateContractTemplateAction(formData: FormData): Prom
   const id = readText(formData, 'id')
   const reason = readText(formData, 'reason')
 
-  if (!id) redirectWithError(templatesPath, 'Deaktiveerimiseks puudub malli identifikaator.')
-  assertPermissionOrRedirect(session.role, 'contracts:write', templatesPath)
+  if (!id) return redirectWithError(templatesPath, 'Deaktiveerimiseks puudub malli identifikaator.')
+  await assertPermissionOrRedirect(session.role, 'contracts:write', templatesPath)
   if (reason.length < MIN_REASON_LENGTH) {
-    redirectWithError(
+    return redirectWithError(
       templatesPath,
       `Deaktiveerimise põhjus on kohustuslik (vähemalt ${String(MIN_REASON_LENGTH)} tähemärki).`,
     )
   }
 
   const template = await repositories.findByID({ collection: 'contract-templates', id })
-  if (!template) redirectWithError(templatesPath, 'Malli ei leitud.')
-  if (!template.active) redirectWithError(templatesPath, 'Mall ei ole aktiivne.')
+  if (!template) return redirectWithError(templatesPath, 'Malli ei leitud.')
+  if (!template.active) return redirectWithError(templatesPath, 'Mall ei ole aktiivne.')
 
   let failure: string | null = null
   try {
@@ -628,12 +629,12 @@ export async function deactivateContractTemplateAction(formData: FormData): Prom
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure) {
-    redirectWithError(templatesPath, `Malli deaktiveerimine ebaõnnestus: ${failure}`)
+    return redirectWithError(templatesPath, `Malli deaktiveerimine ebaõnnestus: ${failure}`)
   }
 
   revalidatePath(templatesPath)
   revalidatePath(contractsPath)
-  redirectWithNotice(templatesPath, 'Mall deaktiveeritud.')
+  return redirectWithNotice(templatesPath, 'Mall deaktiveeritud.')
 }
 
 export interface TemplateTestRenderPayload {
@@ -692,23 +693,23 @@ export async function saveTemplateDraftAction(formData: FormData): Promise<void>
   const sourceFormat = readText(formData, 'sourceFormat')
   const version = readText(formData, 'version')
 
-  if (!id) redirectWithError(templatesPath, 'Salvestamiseks puudub malli identifikaator.')
-  assertPermissionOrRedirect(session.role, 'contracts:write', templatesPath)
+  if (!id) return redirectWithError(templatesPath, 'Salvestamiseks puudub malli identifikaator.')
+  await assertPermissionOrRedirect(session.role, 'contracts:write', templatesPath)
   if (version.length === 0) {
-    redirectWithError(templatesPath, 'Sisesta versiooninumber.')
+    return redirectWithError(templatesPath, 'Sisesta versiooninumber.')
   }
   if (!contractTemplateSourceFormats.includes(sourceFormat as ContractTemplateSourceFormat)) {
-    redirectWithError(templatesPath, 'Vali lähtevorming: HTML või TXT.')
+    return redirectWithError(templatesPath, 'Vali lähtevorming: HTML või TXT.')
   }
 
   const template = await repositories.findByID({ collection: 'contract-templates', id })
-  if (!template) redirectWithError(templatesPath, 'Malli ei leitud.')
+  if (!template) return redirectWithError(templatesPath, 'Malli ei leitud.')
 
   const { docs: versions } = await findTemplateVersionsByName(repositories, template)
   const head = [...versions].sort(byNewestVersion)[0]
-  if (!head) redirectWithError(templatesPath, 'Malli ei leitud.')
+  if (!head) return redirectWithError(templatesPath, 'Malli ei leitud.')
   if (versions.some((row) => row.version === version)) {
-    redirectWithError(templatesPath, `Versioon "${version}" on selle malli jaoks juba kasutusel.`)
+    return redirectWithError(templatesPath, `Versioon "${version}" on selle malli jaoks juba kasutusel.`)
   }
 
   let failure: string | null = null
@@ -745,10 +746,10 @@ export async function saveTemplateDraftAction(formData: FormData): Promise<void>
     failure = error instanceof Error ? error.message : String(error)
   }
   if (failure || !createdId) {
-    redirectWithError(templatesPath, `Mustandi salvestamine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
+    return redirectWithError(templatesPath, `Mustandi salvestamine ebaõnnestus: ${failure ?? 'tundmatu viga'}`)
   }
 
   revalidatePath(templatesPath)
   revalidatePath(contractsPath)
-  redirectWithNotice(templatesPath, `Mustand salvestatud (versioon ${version}).`)
+  return redirectWithNotice(templatesPath, `Mustand salvestatud (versioon ${version}).`)
 }

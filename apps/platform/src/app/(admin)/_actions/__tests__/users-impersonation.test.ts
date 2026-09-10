@@ -54,6 +54,7 @@ vi.mock('next/cache', () => ({
 }))
 
 vi.mock('next/headers', () => ({
+  headers: vi.fn(() => ({ get: () => null })),
   cookies: vi.fn(() => {
     const jar = cookieJar
     const store = {
@@ -88,6 +89,7 @@ const sessionMocks = vi.hoisted(() => ({
   revokeUserSessions: vi.fn(),
   writeSessionCookies: vi.fn(),
   clearSessionCookiesOnStore: vi.fn(),
+  sessionCookieDomainFromHost: vi.fn(() => ''),
 }))
 vi.mock('@/lib/auth/session', () => sessionMocks)
 
@@ -284,7 +286,8 @@ describe('startImpersonationAction (audited view session)', () => {
     expect((audit?.data.after as { expiresAt?: string }).expiresAt).toBe(expiresAt)
 
     expect(sessionMocks.writeSessionCookies).toHaveBeenCalledTimes(1)
-    expect(cookieStores).toHaveLength(1)
+    // one store for the audit request context, one for the session write
+    expect(cookieStores).toHaveLength(2)
     expect(url.pathname).toBe('/user')
   })
 
@@ -409,6 +412,7 @@ describe('stopImpersonationAction (operator-bound stop)', () => {
       entityType: 'user',
       entityId: 'user-9',
       after: { phase: 'stop', reason: null, sessionId: 'view-session-1' },
+      sessionId: 'view-session-1',
     })
 
     expect(repos.order).toEqual(['create:user.impersonate', 'revoke:view-session-1'])
@@ -421,6 +425,7 @@ describe('stopImpersonationAction (operator-bound stop)', () => {
       expect.anything(),
       'admin-access-token',
       'admin-refresh-token',
+      '',
     )
 
     expect(url.pathname).toBe('/admin/users/user-9')

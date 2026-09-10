@@ -1,4 +1,3 @@
-import Link from 'next/link'
 
 import { OpenUserDrawerButton, UserDrawerProvider } from './_components/UserDrawer'
 import {
@@ -11,6 +10,7 @@ import {
   SHILL_FLAG_AUDIT_ACTION,
   sortUserRows,
 } from './_components/user-search'
+import { AdminLink } from '../../_components/AdminLink'
 import { DataTable } from '../../_components/DataTable'
 import type { DataTableColumnSort } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
@@ -329,7 +329,7 @@ export default async function AdminUsersPage({
       if (value) search.set(key, value)
     }
     const queryString = search.toString()
-    return queryString === '' ? '/admin/users' : `/admin/users?${queryString}`
+    return queryString === '' ? '/users' : `/users?${queryString}`
   }
 
   // asc → desc → asc toggle; the list opens on last login descending.
@@ -411,9 +411,9 @@ export default async function AdminUsersPage({
           Otsi
         </button>
         {q || filters.role || filters.status || filters.right || filters.marked ? (
-          <Link href="/admin/users" className={secondaryButtonClass}>
+          <AdminLink href="/users" className={secondaryButtonClass}>
             Tühjenda
-          </Link>
+          </AdminLink>
         ) : null}
       </form>
 
@@ -488,12 +488,12 @@ export default async function AdminUsersPage({
               render: (row) => (
                 <span className="inline-flex items-center gap-sm">
                   <OpenUserDrawerButton user={row} />
-                  <Link
-                    href={`/admin/users/${row.id}`}
+                  <AdminLink
+                    href={`/users/${row.id}`}
                     className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
                   >
                     Ava
-                  </Link>
+                  </AdminLink>
                 </span>
               ),
             },

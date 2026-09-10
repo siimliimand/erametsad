@@ -24,15 +24,17 @@ export default async function ResetPasswordPage({
   const next = safeNext((await searchParams).next)
 
   return (
-    <div className="mx-auto w-full max-w-container-sm">
-      <div className="rounded-card border border-border bg-bgPage p-md shadow-card md:p-lg">
-        <h1 className="font-heading text-h2 text-ink">Parooli taastamine</h1>
-        <p className="mt-2xs font-body text-body text-inkMuted">
+    <div className="flex w-full justify-center">
+      <div className="w-full max-w-[480px] rounded-card border border-border bg-bgPage p-md shadow-card md:p-lg">
+        <h1 className="font-heading text-[2rem] font-extrabold leading-tight text-ink">
+          Parooli taastamine
+        </h1>
+        <p className="mt-1.5 font-body text-bodySm text-inkMuted">
           Unustasid parooli? Sisesta isikukood või e-posti aadress ja saadame
           sulle taastamislingi.
         </p>
 
-        <div className="mt-md">
+        <div className="mt-6">
           <PasswordResetRequestForm next={next} />
         </div>
       </div>

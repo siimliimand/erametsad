@@ -1,8 +1,10 @@
 'use client'
 
-import { Btn, FormInput } from '@erametsad/ui'
+import { Btn } from '@erametsad/ui'
 import Link from 'next/link'
 import { useState, type SyntheticEvent } from 'react'
+
+import { AuthField } from './AuthField'
 
 interface PasswordFormProps {
   next: string | null
@@ -10,6 +12,8 @@ interface PasswordFormProps {
   onSubmit: (identifier: string, password: string) => Promise<string | null>
 }
 
+// Demo 05 fallback form: isikukood + password, full-width outline submit and
+// the centered "Unustasid salasõna?" link.
 export function PasswordForm({ next, disabled, onSubmit }: PasswordFormProps) {
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -38,12 +42,13 @@ export function PasswordForm({ next, disabled, onSubmit }: PasswordFormProps) {
       className="flex flex-col gap-sm"
       noValidate
     >
-      <h2 className="font-heading text-h4 text-ink">Või logi sisse parooliga</h2>
-
-      <FormInput
-        label="Isikukood või e-post"
+      <AuthField
+        label="Isikukood"
         name="identifier"
+        inputMode="numeric"
+        maxLength={11}
         autoComplete="username"
+        placeholder="38001010000"
         required
         disabled={disabled || busy}
         value={identifier}
@@ -52,11 +57,12 @@ export function PasswordForm({ next, disabled, onSubmit }: PasswordFormProps) {
         }}
       />
 
-      <FormInput
+      <AuthField
         label="Parool"
         name="password"
         type="password"
         autoComplete="current-password"
+        placeholder="••••••••"
         required
         disabled={disabled || busy}
         value={password}
@@ -71,16 +77,17 @@ export function PasswordForm({ next, disabled, onSubmit }: PasswordFormProps) {
         </p>
       )}
 
-      <Btn type="submit" isLoading={busy} disabled={disabled}>
-        Logi sisse
-      </Btn>
+      <div className="mt-1 [&_button]:w-full">
+        <Btn type="submit" variant="outline" isLoading={busy} disabled={disabled}>
+          Logi sisse parooliga
+        </Btn>
+      </div>
 
-      <Link
-        href={resetHref}
-        className="font-body text-bodySm text-primary underline-offset-2 hover:underline"
-      >
-        Unustasid parooli?
-      </Link>
+      <p className="text-center font-body text-bodySm">
+        <Link href={resetHref} className="text-primary underline-offset-2 hover:underline">
+          Unustasid salasõna?
+        </Link>
+      </p>
     </form>
   )
 }

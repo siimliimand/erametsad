@@ -1,6 +1,5 @@
-import Link from 'next/link'
-
 import { WorkspaceCard } from './WorkspaceCard'
+import { AdminLink } from '../../_components/AdminLink'
 import { workspaceCardLabels } from '../_lib/workspace'
 import type { RecentLeadRow } from '../_lib/workspace'
 
@@ -33,7 +32,7 @@ export function RecentLeads({ rows }: { rows: readonly RecentLeadRow[] }) {
         <ul className="divide-y divide-border">
           {rows.map((row) => (
             <li key={row.id}>
-              <Link
+              <AdminLink
                 href={row.href}
                 className="flex items-center gap-2.5 px-5 py-3 transition-colors duration-hover ease-hover hover:bg-bgMist"
               >
@@ -58,7 +57,7 @@ export function RecentLeads({ rows }: { rows: readonly RecentLeadRow[] }) {
                 {row.source !== null ? (
                   <span className={chipClass}>{row.source}</span>
                 ) : null}
-              </Link>
+              </AdminLink>
             </li>
           ))}
         </ul>

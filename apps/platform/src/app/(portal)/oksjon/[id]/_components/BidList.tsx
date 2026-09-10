@@ -1,5 +1,6 @@
 'use client'
 
+import { TrendingUp } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { OutbidBanner } from './OutbidBanner'
@@ -11,16 +12,24 @@ import {
 import type { AuctionBidView } from '@/lib/auction/queries'
 
 // ── Role-shaped bid list (task 4.5, portal-lot-detail spec) ─────────────
-// Authed viewers get "#N {amount} € · Pakkuja #k · relative time" rows in
-// descending order with own-bid highlight and autobid marker; guests get
-// the count and latest time only (the API enforces the split, task 1.3).
-// bid:created SSE frames carry no amount, so authed viewers reconcile new
-// bids through a quiet refetch; guests bump the optimistic count.
+// Authed viewers get the demo history table (Aeg / Summa / Pakkuja / Viis)
+// in descending amount order: mono relative times, the leading row in the
+// demo primary-light style with the inset bar and the "Liidab" chip, and a
+// Käsitsi/Automaat source chip per row. Anonymity holds — only the server's
+// "Pakkuja #k" labels, never identities. Guests get the count and latest
+// time only (the API enforces the split, task 1.3). bid:created SSE frames
+// carry no amount, so authed viewers reconcile new bids through a quiet
+// refetch; guests bump the optimistic count.
 
 // ── Formatting ──────────────────────────────────────────────────────────
 
 function eur(value: number): string {
-  return value.toLocaleString('et-EE', { style: 'currency', currency: 'EUR' })
+  return value.toLocaleString('et-EE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
 }
 
 /** Estonian relative time ("5 minutit tagasi"); `now` injectable for the ticker. */
@@ -88,6 +97,24 @@ interface DisplayRow {
 
 const PANEL_CLASSES =
   'flex flex-col gap-sm rounded-card border border-border bg-bgPage p-md shadow-card'
+
+const TH_CLASSES =
+  'bg-bgMist border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.04em] text-inkMuted'
+
+const TD_CLASSES = 'border-b border-border px-4 py-3 align-middle'
+
+/** Demo .src-chip: muted for manual bids, info-toned for autobidder bids. */
+function SourceChip({ isAutobid }: { isAutobid: boolean }) {
+  return (
+    <span
+      className={`inline-block rounded-pill px-2.5 py-0.5 text-xs font-semibold ${
+        isAutobid ? 'bg-infoLight text-info' : 'bg-bgMist text-inkMuted'
+      }`}
+    >
+      {isAutobid ? 'Automaat' : 'Käsitsi'}
+    </span>
+  )
+}
 
 export interface BidListProps {
   auctionId: string
@@ -221,50 +248,90 @@ export function BidList({ auctionId, initialView }: BidListProps) {
     )
   }
 
-  // ── Authed variant: descending amount rows ─────────────────────────────
+  // ── Authed variant: demo history table ────────────────────────────────
 
   return (
     <section className={PANEL_CLASSES}>
       {outbid && <OutbidBanner />}
-      <h2 className="font-heading text-h4 text-ink">Pakkumised</h2>
+      <h2 className="font-heading text-h4 text-ink">Pakkumiste ajalugu</h2>
+      <p className="text-bodySm text-inkMuted">
+        Uusimad eespool. Pakkujad on anonüümsed — näidame ainult numbri ja
+        pakkumise viisi.
+      </p>
       {rows.length === 0 ? (
         <p className="text-body text-inkMuted">Pakkumisi veel pole.</p>
       ) : (
-        <ol className="flex flex-col gap-2xs">
-          {rows.map((row, index) => (
-            <li
-              key={row.key}
-              className={`flex flex-wrap items-baseline gap-x-2xs rounded-input px-2xs py-2xs ${
-                row.isOwn ? 'bg-primaryLight' : ''
-              }`}
-            >
-              <span className="font-mono text-bodySm text-inkMuted">{`#${String(index + 1)}`}</span>
-              <span className="text-body font-semibold text-ink">
-                {eur(row.amount)}
-              </span>
-              {row.label !== null && (
-                <>
-                  <span className="text-bodySm text-inkMuted">·</span>
-                  <span className="text-bodySm text-inkMuted">{row.label}</span>
-                </>
-              )}
-              {row.isAutobid && (
-                <span className="inline-flex items-center rounded-pill bg-infoLight px-2 py-0.5 text-xs font-medium text-info">
-                  Automaatpakkuja
-                </span>
-              )}
-              {row.isOwn && (
-                <span className="inline-flex items-center rounded-pill bg-primaryLight px-2 py-0.5 text-xs font-medium text-primaryDark">
-                  Sinu pakkumine
-                </span>
-              )}
-              <span className="ml-auto text-bodySm text-inkMuted">
-                {row.label !== null || row.isAutobid ? '· ' : ''}
-                {relativeTime(row.createdAt, now)}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <>
+          <div className="overflow-x-auto rounded-card border border-border bg-bgPage">
+            <table className="w-full min-w-[600px] border-collapse text-bodySm">
+              <thead>
+                <tr>
+                  <th scope="col" className={TH_CLASSES}>
+                    Aeg
+                  </th>
+                  <th scope="col" className={TH_CLASSES}>
+                    Summa
+                  </th>
+                  <th scope="col" className={TH_CLASSES}>
+                    Pakkuja
+                  </th>
+                  <th scope="col" className={TH_CLASSES}>
+                    Viis
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const isLeading =
+                    view.leadingBidAmount !== null &&
+                    row.amount === view.leadingBidAmount
+                  return (
+                    <tr
+                      key={row.key}
+                      className={isLeading || row.isOwn ? 'bg-primaryLight' : ''}
+                    >
+                      <td
+                        className={`${TD_CLASSES} font-mono text-xs text-inkMuted ${
+                          isLeading
+                            ? 'shadow-[inset_3px_0_0_var(--color-primary)]'
+                            : ''
+                        }`}
+                      >
+                        {relativeTime(row.createdAt, now)}
+                      </td>
+                      <td className={`${TD_CLASSES} font-mono font-semibold text-ink`}>
+                        {eur(row.amount)}
+                        {isLeading && (
+                          <span className="ml-2 inline-flex items-center gap-1 rounded-pill bg-primary px-2 py-0.5 align-middle text-[11px] font-bold uppercase tracking-[0.04em] text-white">
+                            <TrendingUp className="h-3 w-3" aria-hidden="true" />
+                            Liidab
+                          </span>
+                        )}
+                      </td>
+                      <td className={`${TD_CLASSES} text-ink`}>
+                        {row.label ?? '—'}
+                        {row.isOwn && (
+                          <span className="ml-2 inline-block rounded-pill bg-primaryDark px-2 py-0.5 align-middle text-[11px] font-semibold text-white">
+                            Sinu pakkumine
+                          </span>
+                        )}
+                      </td>
+                      <td className={TD_CLASSES}>
+                        <SourceChip isAutobid={row.isAutobid} />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-bodySm text-inkMuted">
+            Kuvame{' '}
+            <span className="font-mono">{String(rows.length)}</span> viimast
+            pakkumist kokku{' '}
+            <span className="font-mono">{String(view.bidCount)}</span>-st.
+          </p>
+        </>
       )}
     </section>
   )

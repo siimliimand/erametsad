@@ -94,7 +94,10 @@ export default async function RaamlepingPage({ searchParams }: RaamlepingPagePro
   }
 
   return (
-    <SigningShell>
+    <SigningShell
+      title="Raamlepingu allkirjastamine"
+      summary="Tutvu raamlepinguga ja allkirjasta see elektrooniliselt — pärast allkirjastamist saad oksjonitel pakkumisi esitada."
+    >
       <div className="flex flex-col gap-md">
         {gateMessage !== null && (
           <p
@@ -107,7 +110,7 @@ export default async function RaamlepingPage({ searchParams }: RaamlepingPagePro
 
         {blocked ? (
           <div className="rounded-card border border-border bg-white p-lg shadow-card">
-            <h1 className="font-heading text-h3 text-ink">Raamleping</h1>
+            <h2 className="font-heading text-h3 text-ink">Raamleping</h2>
             <p className="mt-2xs font-body text-body text-inkMuted">
               Ettevõtte profiil pole veel kinnitatud. Allkirjastamine avaneb pärast kinnitamist.
             </p>
@@ -130,6 +133,7 @@ export default async function RaamlepingPage({ searchParams }: RaamlepingPagePro
             identity={identity}
             nextPath={nextPath}
             deadlineIso={null}
+            context={null}
           />
         )}
       </div>

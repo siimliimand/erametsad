@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
@@ -20,6 +21,7 @@ import {
   type ListingTabId,
 } from './_lib/summary'
 import { AuctionStreamProvider } from './_lib/use-auction-stream'
+import { isMapView } from './_lib/view-param'
 
 import {
   DEFAULT_AUCTION_LIST_LIMIT,
@@ -102,32 +104,75 @@ interface ListingPaginationProps {
   params: RawSearchParams
 }
 
+/**
+ * Demo .page-head band: full-width mist strip holding the active tab's H1 and
+ * summary. Negative margins cancel the (portal) layout main padding
+ * (px-md py-lg md:px-lg) so the band runs edge to edge at container widths.
+ */
+function ListingPageHead({ heading, summary }: { heading: string; summary: string }) {
+  return (
+    <section
+      aria-labelledby="page-title"
+      className="-mx-md -mt-lg bg-bgMist px-md pb-[28px] pt-[32px] md:-mx-lg md:px-lg md:pb-[40px] md:pt-[48px]"
+    >
+      <h1 id="page-title" className="mb-[10px] font-heading text-h1 font-extrabold text-ink">
+        {heading}
+      </h1>
+      <p className="max-w-[52em] font-body text-body text-inkMuted md:text-[18px]">{summary}</p>
+    </section>
+  )
+}
+
+const PAGE_LINK_CLASS =
+  'flex h-10 min-w-10 items-center justify-center rounded-button border border-border bg-white px-2.5 font-body text-[15px] font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary motion-reduce:transition-none'
+
+/**
+ * Demo .pagination: centered 40px square buttons with 6px gaps, chevron
+ * prev/next, current page highlighted. Links stay shareable via buildListingHref.
+ */
 function ListingPagination({ tab, page, totalPages, params }: ListingPaginationProps) {
   if (totalPages <= 1) return null
   return (
-    <nav aria-label="Lehitsemine" className="flex flex-wrap items-center justify-center gap-xs">
+    <nav aria-label="Leheküljed" className="mt-2 flex items-center justify-center gap-[6px]">
+      {page > 1 ? (
+        <Link href={buildListingHref(tab, params, page - 1)} aria-label="Eelmine leht" className={PAGE_LINK_CLASS}>
+          <ChevronLeft size={14} aria-hidden="true" />
+        </Link>
+      ) : (
+        <span aria-disabled="true" className={`${PAGE_LINK_CLASS} text-inkMuted`}>
+          <ChevronLeft size={14} aria-hidden="true" />
+        </span>
+      )}
       {paginationPages(page, totalPages).map((entry, index) =>
         entry === '…' ? (
-          <span key={`gap-${String(index)}`} className="px-2 font-body text-bodySm text-inkMuted">
+          <span
+            key={`gap-${String(index)}`}
+            className="px-0.5 font-body text-[15px] text-inkMuted"
+          >
             …
           </span>
         ) : entry === page ? (
           <span
             key={entry}
             aria-current="page"
-            className="flex h-9 min-w-9 items-center justify-center rounded-button bg-primary px-2 font-mono text-bodySm font-semibold text-white"
+            className="flex h-10 min-w-10 items-center justify-center rounded-button border border-primary bg-primary px-2.5 font-body text-[15px] font-semibold text-inkInverse"
           >
             {entry}
           </span>
         ) : (
-          <Link
-            key={entry}
-            href={buildListingHref(tab, params, entry)}
-            className="flex h-9 min-w-9 items-center justify-center rounded-button border border-border px-2 font-mono text-bodySm font-semibold text-ink transition-colors duration-hover ease-hover hover:border-primary hover:text-primary"
-          >
+          <Link key={entry} href={buildListingHref(tab, params, entry)} className={PAGE_LINK_CLASS}>
             {entry}
           </Link>
         ),
+      )}
+      {page < totalPages ? (
+        <Link href={buildListingHref(tab, params, page + 1)} aria-label="Järgmine leht" className={PAGE_LINK_CLASS}>
+          <ChevronRight size={14} aria-hidden="true" />
+        </Link>
+      ) : (
+        <span aria-disabled="true" className={`${PAGE_LINK_CLASS} text-inkMuted`}>
+          <ChevronRight size={14} aria-hidden="true" />
+        </span>
       )}
     </nav>
   )
@@ -154,7 +199,8 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
   const listingQuery = buildTabQuery(tab, page, params)
   const hasTypes = tabDef.allTypes ?? tabDef.objectTypes.length > 0
 
-  // Legacy ?view=kart links land here too: the param is accepted and ignored (D3).
+  // Legacy ?view=kart links land here too: isMapView accepts them (D3).
+  const mapView = isMapView(params.view)
   const [typeStats, result, mapPoints] = await Promise.all([
     activeStatsByObjectType(repos),
     hasTypes ? listAuctions(repos, listingQuery) : Promise.resolve(EMPTY_RESULT),
@@ -171,22 +217,18 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
 
   return (
     <AuctionStreamProvider>
-      <div className="grid grid-cols-12 gap-lg">
-        <aside className="col-span-12 lg:col-span-3">
-          <ListingFilters tab={tab} />
-        </aside>
+      <ListingPageHead heading={tabDef.heading} summary={summary} />
 
-        <div className="col-span-12 flex flex-col gap-lg lg:col-span-9">
-          <h1 className="font-heading text-h2 text-ink">{tabDef.heading}</h1>
+      <ListingTabs activeTab={tab} counts={counts} params={params} />
 
-          <ListingTabs activeTab={tab} counts={counts} params={params} />
-
-          <p className="font-body text-body text-inkMuted">{summary}</p>
-
-          <ListingMap lots={mapPoints} />
-
-          <ListingResultsBar tab={tab} total={result.total} />
-
+      <div className="grid grid-cols-12 gap-lg pt-lg">
+        <ListingResultsBar
+          tab={tab}
+          total={result.total}
+          mapView={mapView}
+          filtersSlot={<ListingFilters tab={tab} />}
+          mapSlot={<ListingMap lots={mapPoints} />}
+        >
           {result.auctions.length === 0 ? (
             <div className="rounded-card border border-border bg-white p-lg text-center">
               <p className="font-body text-body text-inkMuted">
@@ -200,7 +242,7 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
           )}
 
           <ListingPagination tab={tab} page={result.page} totalPages={result.totalPages} params={params} />
-        </div>
+        </ListingResultsBar>
       </div>
     </AuctionStreamProvider>
   )

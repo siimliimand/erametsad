@@ -1,6 +1,5 @@
-import Link from 'next/link'
-
 import { deletePageAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import { DataTable } from '../../../_components/DataTable'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import { primaryButtonClass } from '../../../_components/FormField'
@@ -49,10 +48,10 @@ export default async function AdminContentPagesPage({
         title="Lehed"
         description="Staatilised lehed koos SEO andmete ja paigutusega."
         actions={
-          <Link href="/admin/content/pages/new" className={primaryButtonClass}>
+          <AdminLink href="/content/pages/new" className={primaryButtonClass}>
             <PlusIcon />
             Uus leht
-          </Link>
+          </AdminLink>
         }
       />
       <DataTable
@@ -61,12 +60,12 @@ export default async function AdminContentPagesPage({
             key: 'title',
             label: 'Pealkiri',
             render: (row) => (
-              <Link
-                href={`/admin/content/pages/${row.id}`}
+              <AdminLink
+                href={`/content/pages/${row.id}`}
                 className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {row.title}
-              </Link>
+              </AdminLink>
             ),
           },
           { key: 'slug', label: 'URL' },

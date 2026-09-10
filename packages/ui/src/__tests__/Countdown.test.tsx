@@ -140,3 +140,55 @@ describe('Countdown', () => {
     expect(screen.getByText(/2s/)).toBeDefined()
   })
 })
+
+describe('Countdown portal format', () => {
+  it('renders a zero-padded day prefix with HH:MM:SS', () => {
+    const endsAt = new Date('2026-08-30T16:12:00Z')
+    render(<Countdown endsAt={endsAt} format="portal" />)
+    expect(screen.getByText('3p 04:12:00')).toBeDefined()
+  })
+
+  it('renders only HH:MM:SS under 24h remaining', () => {
+    const endsAt = new Date('2026-08-27T15:30:00Z')
+    render(<Countdown endsAt={endsAt} format="portal" />)
+    expect(screen.getByText('03:30:00')).toBeDefined()
+  })
+
+  it('keeps the default {d}p {h}h {m}m {s}s output without the format prop', () => {
+    const endsAt = new Date('2026-08-30T16:12:00Z')
+    render(<Countdown endsAt={endsAt} />)
+    expect(screen.getByText(/3p 4h 12m 0s/)).toBeDefined()
+  })
+
+  it('swaps to "Lõpeb varsti" under one hour remaining', () => {
+    const endsAt = new Date('2026-08-27T12:45:00Z')
+    render(<Countdown endsAt={endsAt} format="portal" />)
+    expect(screen.getByText('Lõpeb varsti')).toBeDefined()
+    expect(screen.queryByText(/45m/)).toBeNull()
+  })
+
+  it('keeps ticking text above one hour in portal format', () => {
+    const endsAt = new Date('2026-08-27T13:00:00Z')
+    render(<Countdown endsAt={endsAt} format="portal" />)
+    expect(screen.getByText('01:00:00')).toBeDefined()
+    expect(screen.queryByText('Lõpeb varsti')).toBeNull()
+  })
+
+  it('uses the warn tier between 5 and 60 minutes', () => {
+    const endsAt = new Date('2026-08-27T12:45:00Z')
+    render(<Countdown endsAt={endsAt} format="portal" />)
+    expect(screen.getByText('Lõpeb varsti')).toHaveClass('text-statusEndingSoon')
+  })
+
+  it('uses the critical tier under 5 minutes', () => {
+    const endsAt = new Date('2026-08-27T12:03:00Z')
+    render(<Countdown endsAt={endsAt} format="portal" />)
+    expect(screen.getByText('Lõpeb varsti')).toHaveClass('text-statusCritical')
+  })
+
+  it('still shows "Lõppenud" after the deadline in portal format', () => {
+    const endsAt = new Date('2026-08-27T11:00:00Z')
+    render(<Countdown endsAt={endsAt} format="portal" />)
+    expect(screen.getByText('Lõppenud')).toBeDefined()
+  })
+})

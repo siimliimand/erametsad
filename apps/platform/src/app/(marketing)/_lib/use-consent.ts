@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 
 import { track } from '@/lib/analytics/track'
+import { apiFetch } from '@/lib/api/client'
 
 export const CONSENT_COOKIE = 'erametsad_consent'
 export const CONSENT_CHANGE_EVENT = 'erametsad:consent-change'
@@ -80,7 +81,7 @@ function writeConsentCookie(consent: ConsentState): void {
 }
 
 function logConsent(choice: ConsentChoice, consent: ConsentState): void {
-  void fetch('/api/v1/consent', {
+  void apiFetch('/api/v1/consent', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ choice, categories: consent }),

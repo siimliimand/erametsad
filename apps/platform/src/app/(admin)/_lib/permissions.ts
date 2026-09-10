@@ -298,21 +298,26 @@ export interface AdminModuleDefinition {
   href: string
 }
 
-/** The 13 admin modules in sidebar order; labels are user-facing Estonian. */
+/**
+ * The 13 admin modules in sidebar order; labels are user-facing Estonian.
+ * Hrefs are base-relative (the /admin prefix is joined at render time by
+ * the admin base provider): '/auctions' renders (admin)/admin/auctions on
+ * every host, prefix-free on the dedicated admin host.
+ */
 export const ADMIN_MODULES: readonly AdminModuleDefinition[] = [
-  { id: 'workspace', label: 'Töölaud', href: '/admin' },
-  { id: 'auctions', label: 'Oksjonid', href: '/admin/auctions' },
-  { id: 'bids', label: 'Pakkumised', href: '/admin/bids' },
-  { id: 'sealed-opening', label: 'Sul. avamine', href: '/admin/sealed-opening' },
-  { id: 'users', label: 'Kasutajad', href: '/admin/users' },
-  { id: 'companies', label: 'Ettevõtted', href: '/admin/companies' },
-  { id: 'contracts', label: 'Lepingud', href: '/admin/contracts' },
-  { id: 'leads', label: 'Juhtlõimed', href: '/admin/leads' },
-  { id: 'inquiries', label: 'Päringud', href: '/admin/inquiries' },
-  { id: 'content', label: 'Sisuhaldus', href: '/admin/content' },
-  { id: 'statistics', label: 'Statistika', href: '/admin/statistics' },
-  { id: 'settings', label: 'Seaded', href: '/admin/settings' },
-  { id: 'audit-log', label: 'Auditlogi', href: '/admin/audit' },
+  { id: 'workspace', label: 'Töölaud', href: '/' },
+  { id: 'auctions', label: 'Oksjonid', href: '/auctions' },
+  { id: 'bids', label: 'Pakkumised', href: '/bids' },
+  { id: 'sealed-opening', label: 'Sul. avamine', href: '/sealed-opening' },
+  { id: 'users', label: 'Kasutajad', href: '/users' },
+  { id: 'companies', label: 'Ettevõtted', href: '/companies' },
+  { id: 'contracts', label: 'Lepingud', href: '/contracts' },
+  { id: 'leads', label: 'Juhtlõimed', href: '/leads' },
+  { id: 'inquiries', label: 'Päringud', href: '/inquiries' },
+  { id: 'content', label: 'Sisuhaldus', href: '/content' },
+  { id: 'statistics', label: 'Statistika', href: '/statistics' },
+  { id: 'settings', label: 'Seaded', href: '/settings' },
+  { id: 'audit-log', label: 'Auditlogi', href: '/audit' },
 ]
 
 const MODULE_READ_PERMISSION: Record<AdminModuleId, AdminPermission> = {

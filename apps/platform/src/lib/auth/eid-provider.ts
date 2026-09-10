@@ -313,6 +313,7 @@ export function getEidProvider(method: EidMethod): EidProvider {
 export async function completeEidLogin(
   method: EidMethod,
   sessionRef: string,
+  cookieDomain = '',
 ): Promise<NextResponse> {
   let isikukood: string
   try {
@@ -359,7 +360,7 @@ export async function completeEidLogin(
     },
   })
 
-  setSessionCookies(response, accessToken, refreshToken)
+  setSessionCookies(response, accessToken, refreshToken, cookieDomain)
 
   return response
 }

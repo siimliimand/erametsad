@@ -13,3 +13,12 @@ export function formatDate(value: string | null | undefined): string {
     ? value
     : date.toLocaleDateString('et-EE', { dateStyle: 'medium' })
 }
+
+/**
+ * Demo .mono mask for the personal code: first 7 characters plus a fixed
+ * 5-star tail, matching the demo string "3870516*****".
+ */
+export function maskIsikukood(value: string): string {
+  if (value.length <= 7) return '*'.repeat(5)
+  return `${value.slice(0, 7)}*****`
+}

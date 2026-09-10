@@ -1,5 +1,6 @@
 'use client'
 
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 export interface GalleryImage {
@@ -7,23 +8,33 @@ export interface GalleryImage {
   alt: string
 }
 
+const LIGHTBOX_BACKDROP = 'bg-[rgba(22,56,42,0.92)]'
+const LIGHTBOX_BUTTON =
+  'flex h-11 w-11 items-center justify-center rounded-full border border-white/35 bg-[rgba(22,56,42,0.45)] text-white transition-colors duration-hover hover:bg-[rgba(22,56,42,0.75)]'
+
+// Demo gallery anatomy (docs/design/demo/portal/02-lot-detail-open.html):
+// thumbnails swap the main image, the main image opens a lightbox dialog with
+// prev/next arrows, Escape closes and the arrow keys navigate.
 export function Gallery({ images }: { images: GalleryImage[] }) {
-  const [openIndex, setOpenIndex] = useState<number | null>(null)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   const close = useCallback(() => {
-    setOpenIndex(null)
+    setLightboxIndex(null)
   }, [])
   const showPrev = useCallback(() => {
-    setOpenIndex((current) =>
+    setLightboxIndex((current) =>
       current === null ? null : (current - 1 + images.length) % images.length,
     )
   }, [images.length])
   const showNext = useCallback(() => {
-    setOpenIndex((current) => (current === null ? null : (current + 1) % images.length))
+    setLightboxIndex((current) =>
+      current === null ? null : (current + 1) % images.length,
+    )
   }, [images.length])
 
   useEffect(() => {
-    if (openIndex === null) return
+    if (lightboxIndex === null) return
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') close()
       if (event.key === 'ArrowLeft') showPrev()
@@ -33,7 +44,7 @@ export function Gallery({ images }: { images: GalleryImage[] }) {
     return () => {
       window.removeEventListener('keydown', onKey)
     }
-  }, [openIndex, close, showPrev, showNext])
+  }, [lightboxIndex, close, showPrev, showNext])
 
   const first = images[0] ?? null
   if (first === null) {
@@ -52,93 +63,122 @@ export function Gallery({ images }: { images: GalleryImage[] }) {
     )
   }
 
-  const activeIndex = openIndex
-  const active = activeIndex === null ? null : (images[activeIndex] ?? null)
+  const bounded = Math.min(activeIndex, images.length - 1)
+  const current = images[bounded] ?? first
+  const lightboxImage =
+    lightboxIndex === null ? null : (images[lightboxIndex] ?? null)
 
   return (
     <div>
       <button
         type="button"
-        className="block w-full cursor-zoom-in overflow-hidden rounded-card border border-border"
+        className="block w-full cursor-zoom-in overflow-hidden rounded-hero border border-border bg-bgMist shadow-card"
         onClick={() => {
-          setOpenIndex(0)
+          setLightboxIndex(bounded)
         }}
-        aria-label="Ava pildigalerii"
+        aria-label="Ava pilt suurendatult"
       >
         <img
-          src={first.src}
-          alt={first.alt}
+          src={current.src}
+          alt={current.alt}
           className="aspect-[16/10] w-full object-cover"
         />
       </button>
       {images.length > 1 && (
-        <div className="mt-xs flex gap-xs overflow-x-auto">
-          {images.map((image, index) => (
-            <button
-              key={image.src}
-              type="button"
-              className="h-20 w-32 shrink-0 cursor-zoom-in overflow-hidden rounded-button border border-border"
-              onClick={() => {
-                setOpenIndex(index)
-              }}
-              aria-label={`Ava pilt ${String(index + 1)}`}
-            >
-              <img src={image.src} alt={image.alt} className="h-full w-full object-cover" />
-            </button>
-          ))}
+        <div
+          role="group"
+          aria-label="Galerii pisipildid"
+          className="mt-3 grid grid-cols-3 gap-3"
+        >
+          {images.map((image, index) => {
+            const isActive = index === bounded
+            return (
+              <button
+                key={image.src}
+                type="button"
+                className={`overflow-hidden rounded-button border-2 bg-bgMist transition-colors duration-hover ${
+                  isActive
+                    ? 'border-primary'
+                    : 'border-border hover:border-primary'
+                }`}
+                onClick={() => {
+                  setActiveIndex(index)
+                }}
+                aria-label={`Näita peapildil: ${image.alt}`}
+                aria-current={isActive ? 'true' : undefined}
+              >
+                <img
+                  src={image.src}
+                  alt=""
+                  className="aspect-[16/10] w-full object-cover"
+                  loading="lazy"
+                />
+              </button>
+            )
+          })}
         </div>
       )}
 
-      {active !== null && activeIndex !== null && (
+      {lightboxImage !== null && lightboxIndex !== null && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-label={active.alt}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-md"
+          aria-label="Galerii suurendatult"
+          className={`fixed inset-0 z-50 flex items-center justify-center p-6 md:p-12 ${LIGHTBOX_BACKDROP}`}
           onClick={close}
         >
-          <div
-            className="relative flex max-h-full w-full max-w-4xl flex-col items-center gap-sm"
+          <button
+            type="button"
+            className={`absolute right-4 top-4 ${LIGHTBOX_BUTTON}`}
+            aria-label="Sulge vaade"
+            onClick={(event) => {
+              event.stopPropagation()
+              close()
+            }}
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+          {images.length > 1 && (
+            <button
+              type="button"
+              className={`absolute left-4 top-1/2 -translate-y-1/2 ${LIGHTBOX_BUTTON}`}
+              aria-label="Eelmine pilt"
+              onClick={(event) => {
+                event.stopPropagation()
+                showPrev()
+              }}
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+            </button>
+          )}
+          <figure
+            className="m-0 w-auto max-w-full"
             onClick={(event) => {
               event.stopPropagation()
             }}
           >
             <img
-              src={active.src}
-              alt={active.alt}
-              className="max-h-[80vh] w-auto rounded-card object-contain"
+              src={lightboxImage.src}
+              alt={lightboxImage.alt}
+              className="max-h-[78vh] w-auto max-w-full rounded-card object-contain shadow-modal"
             />
-            <div className="flex items-center gap-sm">
-              {images.length > 1 && (
-                <button
-                  type="button"
-                  className="rounded-button bg-bgPage px-sm py-2xs text-bodySm font-semibold text-ink"
-                  onClick={showPrev}
-                >
-                  ‹ Eelmine
-                </button>
-              )}
-              <span className="text-bodySm text-bgPage">
-                {`${String(activeIndex + 1)} / ${String(images.length)}`}
-              </span>
-              {images.length > 1 && (
-                <button
-                  type="button"
-                  className="rounded-button bg-bgPage px-sm py-2xs text-bodySm font-semibold text-ink"
-                  onClick={showNext}
-                >
-                  Järgmine ›
-                </button>
-              )}
-              <button
-                type="button"
-                className="ml-auto rounded-button bg-bgPage px-sm py-2xs text-bodySm font-semibold text-ink"
-                onClick={close}
-              >
-                Sulge
-              </button>
-            </div>
-          </div>
+            <figcaption className="mt-3 text-center text-bodySm text-white">
+              {lightboxImage.alt}
+            </figcaption>
+          </figure>
+          {images.length > 1 && (
+            <button
+              type="button"
+              className={`absolute right-4 top-1/2 -translate-y-1/2 ${LIGHTBOX_BUTTON}`}
+              aria-label="Järgmine pilt"
+              onClick={(event) => {
+                event.stopPropagation()
+                showNext()
+              }}
+            >
+              <ChevronRight className="h-5 w-5" aria-hidden="true" />
+            </button>
+          )}
         </div>
       )}
     </div>

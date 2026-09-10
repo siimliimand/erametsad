@@ -15,6 +15,9 @@ const NO_UPPER_10 = 'aa1!bbbbbb'
 const NO_NUMBER_10 = 'Aa!bbbbbbb'
 const NO_SYMBOL_10 = 'Aa1bbbbbbb'
 const TOO_SHORT_9 = 'Aa1!bbbbb'
+// 10 characters with only length, number and isikukood rules satisfied:
+// exactly three rules -> the demo "Keskmine" tier.
+const THREE_RULES_10 = 'aaaaaaaaaa1'
 
 describe('evaluatePassword rules', () => {
   it('accepts a password that meets every rule', () => {
@@ -86,38 +89,30 @@ describe('evaluatePassword rules', () => {
 })
 
 describe('evaluatePassword tiers', () => {
-  it('maps any invalid password to weak', () => {
-    expect(evaluatePassword(TOO_SHORT_9).tier).toBe('weak')
-    expect(evaluatePassword(NO_UPPER_10).tier).toBe('weak')
-    expect(evaluatePassword(NO_NUMBER_10).tier).toBe('weak')
-    expect(evaluatePassword(NO_SYMBOL_10).tier).toBe('weak')
+  it('maps fewer than three satisfied rules to weak', () => {
+    // With no isikukood given, the notIsikukood rule always counts as met,
+    // so '123' sits at two satisfied rules.
     expect(evaluatePassword('').tier).toBe('weak')
+    expect(evaluatePassword('123').tier).toBe('weak')
   })
 
-  it('maps a valid password of length 10-11 to medium', () => {
-    expect(evaluatePassword(VALID_10).tier).toBe('medium')
-    expect(evaluatePassword('Aa1!bbbbbbb').tier).toBe('medium') // 11 chars
+  it('maps exactly three satisfied rules to medium', () => {
+    expect(evaluatePassword(THREE_RULES_10).tier).toBe('medium')
   })
 
-  it('maps a valid password of length 12+ to strong', () => {
-    expect(evaluatePassword('Aa1!bbbbbbbb').tier).toBe('strong') // 12 chars
-    expect(evaluatePassword('Aa1!bbbbbbbbbbbb').tier).toBe('strong')
+  it('maps four and five satisfied rules to strong', () => {
+    expect(evaluatePassword(TOO_SHORT_9).tier).toBe('strong') // 4 rules
+    expect(evaluatePassword(NO_SYMBOL_10).tier).toBe('strong')
+    expect(evaluatePassword(VALID_10).tier).toBe('strong')
   })
 
-  it('keeps the submit gate closed exactly while the password is invalid', () => {
-    // Submit gate = at least medium; invalid passwords are weak.
-    const cases = [
-      VALID_10,
-      NO_UPPER_10,
-      NO_NUMBER_10,
-      NO_SYMBOL_10,
-      TOO_SHORT_9,
-      'Aa1!bbbbbbbb',
-    ]
-    for (const password of cases) {
-      const { valid, tier } = evaluatePassword(password)
-      expect(tier !== 'weak').toBe(valid)
-    }
+  it('keeps the submit gate tied to every rule, not the meter label', () => {
+    // Four satisfied rules read "Tugev" on the meter but the password stays
+    // invalid, so the PasswordForm gate (valid) still blocks submit.
+    const fourRules = evaluatePassword(NO_SYMBOL_10)
+    expect(fourRules.tier).toBe('strong')
+    expect(fourRules.valid).toBe(false)
+    expect(evaluatePassword(VALID_10).valid).toBe(true)
   })
 
   it('exports PASSWORD_MIN_LENGTH as 10', () => {
@@ -126,33 +121,36 @@ describe('evaluatePassword tiers', () => {
 })
 
 describe('PasswordStrengthMeter markup', () => {
-  it('shows the medium tier label when all rules pass', () => {
+  it('renders five meter segments', () => {
     const html = renderToString(createElement(PasswordStrengthMeter, { password: VALID_10 }))
-    expect(html).toContain('Kesine')
+    expect(html.match(/h-1\.5 flex-1 rounded-pill/g)).toHaveLength(5)
+  })
+
+  it('shows the strong tier label and ticks every rule when all rules pass', () => {
+    const html = renderToString(createElement(PasswordStrengthMeter, { password: VALID_10 }))
+    expect(html).toContain('Tugev')
     expect(html).toContain('aria-live="polite"')
     expect(html).not.toContain('Täitmata')
   })
 
-  it('shows the weak tier label and unticked rules when a rule fails', () => {
+  it('shows the medium tier label when exactly three rules pass', () => {
     const html = renderToString(
-      createElement(PasswordStrengthMeter, { password: NO_UPPER_10 }),
+      createElement(PasswordStrengthMeter, { password: THREE_RULES_10 }),
     )
-    expect(html).toContain('Nõrk')
-    expect(html).toContain('Täitmata')
-    expect(html).toContain('Vähemalt üks suurtäht')
+    expect(html).toContain('Keskmine')
   })
 
-  it('shows the strong tier label for 12+ characters', () => {
-    const html = renderToString(
-      createElement(PasswordStrengthMeter, { password: 'Aa1!bbbbbbbb' }),
-    )
-    expect(html).toContain('Tugev')
+  it('shows the weak tier label and unticked rules when fewer than three rules pass', () => {
+    const html = renderToString(createElement(PasswordStrengthMeter, { password: '123' }))
+    expect(html).toContain('Nõrk')
+    expect(html).toContain('Täitmata')
+    expect(html).toContain(`Vähemalt ${String(PASSWORD_MIN_LENGTH)} tähemärki`)
   })
 
   it('shows the placeholder label for an empty password', () => {
     const html = renderToString(createElement(PasswordStrengthMeter, { password: '' }))
     expect(html).toContain('Parooli tugevus')
-    expect(html).not.toContain('Kesine')
+    expect(html).not.toContain('Keskmine')
   })
 
   it('lists the minimum length rule with the configured length', () => {
@@ -165,15 +163,15 @@ describe('PasswordStrengthMeter markup', () => {
     const html = renderToString(
       createElement(PasswordStrengthMeter, { password: isikukood, isikukood }),
     )
-    expect(html).toContain('Ei tohi olla sinu isikukood')
+    expect(html).toContain('Ei tohi kattuda isikukoodiga')
     expect(html).toContain('Nõrk')
   })
 
   it('renders every rule label', () => {
     const html = renderToString(createElement(PasswordStrengthMeter, { password: VALID_10 }))
-    expect(html).toContain('Vähemalt üks suurtäht')
-    expect(html).toContain('Vähemalt üks number')
-    expect(html).toContain('Vähemalt üks sümbol')
-    expect(html).toContain('Ei tohi olla sinu isikukood')
+    expect(html).toContain('Üks suur täht')
+    expect(html).toContain('Üks number')
+    expect(html).toContain('Üks sümbol')
+    expect(html).toContain('Ei tohi kattuda isikukoodiga')
   })
 })

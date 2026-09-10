@@ -1,8 +1,8 @@
-import Link from 'next/link'
 
 import { CheckboxField } from './CheckboxField'
 import { redirectPathsForSlugChange, utcIsoToTallinnInputValue } from './scheduled-publish'
 import { savePageAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import {
   FormField,
   FormSelectField,
@@ -87,9 +87,9 @@ export function PageForm({ page }: { page?: PageDoc }) {
         <button type="submit" className={primaryButtonClass}>
           Salvesta
         </button>
-        <Link href="/admin/content/pages" className={secondaryButtonClass}>
+        <AdminLink href="/content/pages" className={secondaryButtonClass}>
           Tühista
-        </Link>
+        </AdminLink>
       </div>
     </form>
   )

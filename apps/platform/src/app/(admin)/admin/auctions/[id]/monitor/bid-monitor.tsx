@@ -13,7 +13,6 @@ import {
   TriangleAlert,
   UserPlus,
 } from 'lucide-react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type UIEvent } from 'react'
 
@@ -31,6 +30,7 @@ import {
   revealBidderIdentityAction,
   type BidderIdentityView,
 } from '../../../../_actions/auctions'
+import { AdminLink } from '../../../../_components/AdminLink'
 import {
   bidSourceLabels,
   bidStatusLabels,
@@ -39,6 +39,7 @@ import {
   formatRelativeTime,
 } from '../../../../_lib/labels'
 
+import { apiUrl } from '@/lib/api/client'
 import type { BidSource, BidStatus } from '@/lib/data/schema'
 
 export interface MonitorBidRow {
@@ -598,12 +599,12 @@ function UnderbidsPanel({
         <h2 className="text-label font-semibold text-ink-muted">
           Alapakkumised ({String(rows.length)} ootel)
         </h2>
-        <Link
-          href="/admin/bids"
+        <AdminLink
+          href="/bids"
           className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primary/80"
         >
           Vaata kõik
-        </Link>
+        </AdminLink>
       </div>
       {rows.length === 0 ? (
         <p className="mt-sm text-bodySm text-ink-muted">Ootel alapakkumisi ei ole.</p>
@@ -783,12 +784,12 @@ function BidderRevealChip({
       <span className="inline-flex flex-wrap items-center gap-x-1">
         {flagged ? <FlagMark /> : null}
         {canViewUsers && bidderId !== null ? (
-          <Link
-            href={`/admin/users/${encodeURIComponent(bidderId)}`}
+          <AdminLink
+            href={`/users/${encodeURIComponent(bidderId)}`}
             className="text-label font-semibold text-ink underline-offset-2 transition-colors duration-hover ease-hover hover:text-primary hover:underline"
           >
             {name}
-          </Link>
+          </AdminLink>
         ) : (
           <span className="text-label font-semibold text-ink">{name}</span>
         )}
@@ -962,7 +963,7 @@ function FeedBurstRow({
 /**
  * Live bid monitor. Subscribes to the same AuctionDO stream as the portal
  * (`/api/v1/auctions/stream?auction=<id>`); the admin session cookie rides
- * along with the same-origin EventSource request. Public stream frames
+ * along via the credentialed cross-origin EventSource request. Public stream frames
  * carry no amounts, so each incoming bid reconciles against the
  * repository through a router refresh, and a reconnected stream backfills
  * everything since the disconnect and marks those rows "laaditud hiljem".
@@ -1148,7 +1149,8 @@ export function BidMonitor({
       if (disposed) return
       setConnection('connecting')
       const next = new EventSource(
-        `/api/v1/auctions/stream?auction=${encodeURIComponent(auctionId)}`,
+        apiUrl(`/api/v1/auctions/stream?auction=${encodeURIComponent(auctionId)}`),
+        { withCredentials: true },
       )
       source = next
 
@@ -1318,13 +1320,13 @@ export function BidMonitor({
           <div className="flex flex-col gap-1 rounded-card border border-border bg-bgPage px-md py-sm">
             <span className="text-label font-semibold text-ink-muted">Suletud pakkumised</span>
             {canViewCeremony ? (
-              <Link
-                href={`/admin/auctions/${encodeURIComponent(auctionId)}/ceremony`}
+              <AdminLink
+                href={`/auctions/${encodeURIComponent(auctionId)}/ceremony`}
                 title="Ava avamistseremoonia"
                 className="w-fit font-heading text-h3 font-bold text-ink transition-colors duration-hover ease-hover hover:text-primary"
               >
                 {sealedCount === null ? '—' : String(sealedCount)}
-              </Link>
+              </AdminLink>
             ) : (
               <span className="font-heading text-h3 font-bold text-ink">
                 {sealedCount === null ? '—' : String(sealedCount)}

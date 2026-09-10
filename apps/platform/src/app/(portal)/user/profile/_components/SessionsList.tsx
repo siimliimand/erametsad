@@ -1,6 +1,7 @@
 'use client'
 
 import { Btn } from '@erametsad/ui'
+import { LogOut, Monitor } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -34,9 +35,12 @@ export function SessionsList() {
     setBusyId(session.id)
     setError(null)
     try {
-      await requestJson(`/api/v1/my/sessions?id=${encodeURIComponent(session.id)}`, {
-        method: 'DELETE',
-      })
+      await requestJson(
+        `/api/v1/my/sessions?id=${encodeURIComponent(session.id)}`,
+        {
+          method: 'DELETE',
+        },
+      )
       if (session.current) {
         // Revoking the current session clears the auth cookies server-side.
         router.push('/login')
@@ -44,7 +48,11 @@ export function SessionsList() {
       }
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sessiooni lõpetamine ebaõnnestus.')
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Sessiooni lõpetamine ebaõnnestus.',
+      )
     } finally {
       setBusyId(null)
     }
@@ -58,9 +66,12 @@ export function SessionsList() {
     // No bulk endpoint exists; revoke the other sessions one by one.
     const results = await Promise.allSettled(
       others.map((session) =>
-        requestJson(`/api/v1/my/sessions?id=${encodeURIComponent(session.id)}`, {
-          method: 'DELETE',
-        }),
+        requestJson(
+          `/api/v1/my/sessions?id=${encodeURIComponent(session.id)}`,
+          {
+            method: 'DELETE',
+          },
+        ),
       ),
     )
     setRevokingOthers(false)
@@ -70,60 +81,75 @@ export function SessionsList() {
     load()
   }
 
-  const othersCount = sessions?.filter((session) => !session.current).length ?? 0
+  const othersCount =
+    sessions?.filter((session) => !session.current).length ?? 0
 
   return (
-    <div className="flex flex-col gap-xs border-t border-border pt-sm">
-      <div className="flex items-center justify-between gap-sm">
-        <p className="text-bodySm font-semibold text-ink">Sessioonid</p>
-        {othersCount > 0 && (
+    <div className="flex flex-col">
+      {sessions === null ? (
+        <p className="text-bodySm text-inkMuted">Laadin sessioone…</p>
+      ) : sessions.length === 0 ? (
+        <p className="text-bodySm text-inkMuted">
+          Aktiivseid sessioone ei leitud.
+        </p>
+      ) : (
+        <ul className="m-0 flex list-none flex-col p-0">
+          {sessions.map((session) => (
+            <li
+              key={session.id}
+              className="flex flex-wrap items-center gap-sm border-b border-border py-3.5 last:border-b-0"
+            >
+              <span className="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-button bg-bgMist text-primary">
+                <Monitor size={17} aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1 basis-[240px]">
+                <p className="m-0 flex items-center gap-2 text-bodySm font-semibold text-ink">
+                  <span className="truncate">
+                    Sessioon {session.id.slice(0, 8)}
+                  </span>
+                </p>
+                <p className="m-0 mt-0.5 text-bodySm text-inkMuted">
+                  Alates {formatDateTime(session.createdAt)}
+                </p>
+              </div>
+              {session.current ? (
+                <span className={pillActive}>See seanss</span>
+              ) : (
+                <Btn
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  isLoading={busyId === session.id}
+                  onClick={() => {
+                    void revoke(session)
+                  }}
+                >
+                  Lõpeta
+                </Btn>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {othersCount > 0 && (
+        <div className="mt-2 flex flex-wrap justify-end">
           <Btn
-            variant="ghost"
+            variant="outline"
             size="sm"
+            type="button"
             disabled={revokingOthers}
             onClick={() => {
               void revokeOthers()
             }}
           >
-            Logi kõik teised välja
+            <LogOut size={15} aria-hidden="true" />
+            Logi välja teistest seanssidest
           </Btn>
-        )}
-      </div>
-      {sessions === null ? (
-        <p className="text-bodySm text-inkMuted">Laadin sessioone…</p>
-      ) : sessions.length === 0 ? (
-        <p className="text-bodySm text-inkMuted">Aktiivseid sessioone ei leitud.</p>
-      ) : (
-        <ul className="flex flex-col gap-2xs">
-          {sessions.map((session) => (
-            <li
-              key={session.id}
-              className="flex items-center justify-between gap-sm rounded-input border border-border px-sm py-xs"
-            >
-              <div className="min-w-0">
-                <p className="flex items-center gap-2xs text-bodySm font-semibold text-ink">
-                  <span className="truncate">Sessioon {session.id.slice(0, 8)}</span>
-                  {session.current && <span className={pillActive}>See seade</span>}
-                </p>
-                <p className="text-bodySm text-inkMuted">
-                  Alates {formatDateTime(session.createdAt)}
-                </p>
-              </div>
-              <Btn
-                variant="outline"
-                size="sm"
-                isLoading={busyId === session.id}
-                onClick={() => {
-                  void revoke(session)
-                }}
-              >
-                Lõpeta
-              </Btn>
-            </li>
-          ))}
-        </ul>
+        </div>
       )}
-      {error && (
+
+      {error !== null && (
         <p role="alert" className="text-bodySm text-danger">
           {error}
         </p>

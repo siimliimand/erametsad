@@ -1,12 +1,12 @@
 'use client'
 
-import Link from 'next/link'
 import { useState, useTransition } from 'react'
 
 import {
   revealBidderIdentityAction,
   type BidderIdentityView,
 } from '../../../_actions/auctions'
+import { AdminLink } from '../../../_components/AdminLink'
 
 type RevealState =
   | { ok: true; identity: BidderIdentityView }
@@ -48,12 +48,12 @@ export function IdentityRevealChip({
     return (
       <span className="text-label font-semibold text-ink">
         {canViewUsers && bidderId !== null && bidderId !== '' ? (
-          <Link
-            href={`/admin/users/${encodeURIComponent(bidderId)}`}
+          <AdminLink
+            href={`/users/${encodeURIComponent(bidderId)}`}
             className="underline-offset-2 transition-colors duration-hover ease-hover hover:text-primary hover:underline"
           >
             {name}
-          </Link>
+          </AdminLink>
         ) : (
           name
         )}

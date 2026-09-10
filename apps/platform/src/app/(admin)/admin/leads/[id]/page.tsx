@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import {
@@ -9,6 +8,7 @@ import {
   setLeadNextActionAction,
   softDeleteLeadAction,
 } from '../../../_actions/ops'
+import { AdminLink } from '../../../_components/AdminLink'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import {
   FormField,
@@ -237,9 +237,9 @@ export default async function LeadDetailPage({
       {lifecycle.mergedIntoId && lifecycleTargetShortId ? (
         <div className="mb-md rounded-input border border-info bg-info-light px-md py-sm text-bodySm text-info">
           See juhtlõige on ühendatud juhtlõimega{' '}
-          <Link href={`/admin/leads/${lifecycle.mergedIntoId}`} className="underline">
+          <AdminLink href={`/leads/${lifecycle.mergedIntoId}`} className="underline">
             {lifecycleTargetShortId}
-          </Link>
+          </AdminLink>
           .
         </div>
       ) : null}
@@ -495,9 +495,9 @@ export default async function LeadDetailPage({
         )}
         <p className="mt-xs text-bodySm text-ink-muted">
           Ajajoon on lõppematu — kirjeid ei saa muuta ega kustutada.{' '}
-          <Link href="/admin/leads" className="text-primary underline">
+          <AdminLink href="/leads" className="text-primary underline">
             Tagasi loendisse
-          </Link>
+          </AdminLink>
         </p>
       </section>
     </div>

@@ -45,6 +45,7 @@ export function LiveCountdown({
   return (
     <Countdown
       endsAt={deadline}
+      format="portal"
       {...(serverNow !== undefined ? { serverNow } : {})}
       {...(className !== undefined ? { className } : {})}
       onEnd={() => {

@@ -1,11 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { AuditDiff } from './AuditDiff'
 import { auditEntryDenies, entityTypeLabel, groupLabel, userAgentFamily } from './action-registry'
+import { AdminLink } from '../../../_components/AdminLink'
 import { Drawer } from '../../../_components/ui/Drawer'
 import { formatAuditDateTime, userRoleLabels } from '../../../_lib/labels'
 
@@ -73,12 +73,12 @@ function RelatedRow({ related }: { related: AuditDrawerRelatedEntry }) {
   const openControl = related.inList ? (
     <OpenAuditEntryButton entryId={related.id} />
   ) : (
-    <Link
-      href={`/admin/audit?entry=${encodeURIComponent(related.id)}`}
+    <AdminLink
+      href={`/audit?entry=${encodeURIComponent(related.id)}`}
       className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
     >
       Vaata
-    </Link>
+    </AdminLink>
   )
   return (
     <li className="flex items-center gap-3 border-b border-border py-2 last:border-b-0">

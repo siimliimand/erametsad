@@ -1,6 +1,5 @@
-import Link from 'next/link'
-
 import { deleteLegalDocumentAction } from '../../../_actions/content'
+import { AdminLink } from '../../../_components/AdminLink'
 import { DataTable } from '../../../_components/DataTable'
 import { ErrorNotice } from '../../../_components/ErrorNotice'
 import {
@@ -68,10 +67,10 @@ export default async function AdminLegalDocumentsPage({
         description="Kasutustingimused, privaatsus- ja küpsisepoliitika."
         backHref="/admin/content"
         actions={
-          <Link href="/admin/content/legal-documents/new" className={primaryButtonClass}>
+          <AdminLink href="/content/legal-documents/new" className={primaryButtonClass}>
             <PlusIcon />
             Uus dokument
-          </Link>
+          </AdminLink>
         }
       />
       <form className="mb-md flex flex-wrap items-end gap-sm">
@@ -93,12 +92,12 @@ export default async function AdminLegalDocumentsPage({
             key: 'title',
             label: 'Pealkiri',
             render: (row) => (
-              <Link
-                href={`/admin/content/legal-documents/${row.id}`}
+              <AdminLink
+                href={`/content/legal-documents/${row.id}`}
                 className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
               >
                 {row.title}
-              </Link>
+              </AdminLink>
             ),
           },
           {

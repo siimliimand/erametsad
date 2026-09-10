@@ -1,8 +1,8 @@
-import Link from 'next/link'
 
 import { LeadsKanban, type KanbanCardView } from './_components/LeadsKanban'
 import { findDuplicateLead, leadSlaBadge, resolveLeadLifecycleFlags, type LeadLifecycleFlags } from './_components/lead-flow'
 import { createLeadAction, mergeLeadAction } from '../../_actions/ops'
+import { AdminLink } from '../../_components/AdminLink'
 import { DataTable } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import {
@@ -171,9 +171,9 @@ export default async function AdminLeadsPage({
     }
     const query = search.toString()
     return (
-      <Link
+      <AdminLink
         key={label}
-        href={query ? `/admin/leads?${query}` : '/admin/leads'}
+        href={query ? `/leads?${query}` : '/leads'}
         className={`rounded-pill px-3 py-1 text-label font-semibold transition-colors duration-hover ease-hover ${
           label.startsWith('•')
             ? 'bg-primaryLight text-primaryDark'
@@ -181,7 +181,7 @@ export default async function AdminLeadsPage({
         }`}
       >
         {label.replace('• ', '')}
-      </Link>
+      </AdminLink>
     )
   }
 
@@ -252,7 +252,7 @@ export default async function AdminLeadsPage({
         })}
       </div>
 
-      <form method="get" action="/admin/leads" className="mb-sm flex flex-wrap items-end gap-xs">
+      <form method="get" action="/leads" className="mb-sm flex flex-wrap items-end gap-xs">
         {([
           ['vaade', view === 'tabel' ? 'tabel' : undefined],
           ['allikas', allikas],
@@ -319,12 +319,12 @@ export default async function AdminLeadsPage({
               key: 'contactName',
               label: 'Nimi',
               render: (row) => (
-                <Link
-                  href={`/admin/leads/${row.id}`}
+                <AdminLink
+                  href={`/leads/${row.id}`}
                   className="font-semibold text-primary hover:text-primaryHover"
                 >
                   {row.contactName}
-                </Link>
+                </AdminLink>
               ),
             },
             { key: 'phone', label: 'Telefon', render: (row) => row.phone ?? '—' },
@@ -377,12 +377,12 @@ export default async function AdminLeadsPage({
               render: (row) =>
                 row.duplicateOfId ? (
                   <div className="flex flex-col items-start gap-1">
-                    <Link
-                      href={`/admin/leads/${row.duplicateOfId}`}
+                    <AdminLink
+                      href={`/leads/${row.duplicateOfId}`}
                       className="text-info underline"
                     >
                       võimalik duplikaat
-                    </Link>
+                    </AdminLink>
                     <form action={mergeLeadAction}>
                       <input type="hidden" name="id" value={row.id} />
                       <input type="hidden" name="targetId" value={row.duplicateOfId} />

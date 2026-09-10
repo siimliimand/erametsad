@@ -9,7 +9,10 @@ export class ApiError extends Error {
 }
 
 /** JSON fetch helper that surfaces the API's Estonian error messages. */
-export async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
+export async function requestJson<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<T> {
   const headers = new Headers(init?.headers)
   if (!headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')

@@ -28,6 +28,10 @@ jobs:
 
       - name: Build Worker (OpenNext)
         run: pnpm --filter @erametsad/platform build:cf
+        env:
+          # Baked into the client bundle and the middleware CSP at build
+          # time: browser API calls go to the dedicated api. hostname.
+          NEXT_PUBLIC_API_ORIGIN: https://api.erametsad.ww0.dev
 
       # Deploy must go through `wrangler deploy` with the repo's
       # apps/platform/wrangler.jsonc (main: src/do/index.ts shim) so the

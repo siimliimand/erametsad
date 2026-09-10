@@ -1,5 +1,4 @@
 import { Download as DownloadIcon } from 'lucide-react'
-import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import {
@@ -22,6 +21,7 @@ import {
   type StatisticsPeriod,
   type TopAuctionRow,
 } from './_lib/statistics'
+import { AdminLink } from '../../_components/AdminLink'
 import { DataTable, type DataTableColumn } from '../../_components/DataTable'
 import { ErrorNotice } from '../../_components/ErrorNotice'
 import {
@@ -72,7 +72,7 @@ function statisticsHref(period: StatisticsPeriod, type: string, county: string):
   if (type !== '') search.set('type', type)
   if (county !== '') search.set('county', county)
   const queryString = search.toString()
-  return queryString === '' ? '/admin/statistics' : `/admin/statistics?${queryString}`
+  return queryString === '' ? '/statistics' : `/statistics?${queryString}`
 }
 
 function percentValue(percent: number | null): string {
@@ -184,12 +184,12 @@ export default async function AdminStatisticsPage({
         description="Müügi ja tegevuse näitajad valitud perioodil."
         breadcrumb={
           <>
-            <Link
-              href="/admin"
+            <AdminLink
+              href="/"
               className="transition-colors duration-hover ease-hover hover:text-primary"
             >
               Töölaud
-            </Link>
+            </AdminLink>
             <span aria-hidden="true">/</span>
             <span aria-current="page">Statistika</span>
           </>
@@ -200,7 +200,7 @@ export default async function AdminStatisticsPage({
               {STATISTICS_PERIODS.map((option) => {
                 const active = option === data.period
                 return (
-                  <Link
+                  <AdminLink
                     key={option}
                     href={statisticsHref(option, typeParam, countyParam)}
                     aria-current={active ? 'page' : undefined}
@@ -211,12 +211,12 @@ export default async function AdminStatisticsPage({
                     }`}
                   >
                     {PERIOD_LABELS[option]}
-                  </Link>
+                  </AdminLink>
                 )
               })}
             </nav>
             <a
-              href={`/admin/statistics/export?period=${String(data.period)}`}
+              href={`/statistics/export?period=${String(data.period)}`}
               className={secondaryButtonClass}
             >
               <DownloadIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -229,7 +229,7 @@ export default async function AdminStatisticsPage({
       {/* Tüüp + Maakond view filters, searchParams-driven like other admin lists */}
       <form
         method="get"
-        action="/admin/statistics"
+        action="/statistics"
         aria-label="Statistika filtrid"
         className="mb-lg flex max-w-container-sm flex-wrap items-end gap-sm rounded-card border border-border bg-bgPage p-md"
       >
@@ -267,12 +267,12 @@ export default async function AdminStatisticsPage({
           Otsi
         </button>
         {filtersOn ? (
-          <Link
+          <AdminLink
             href={statisticsHref(data.period, '', '')}
             className={secondaryButtonClass}
           >
             Tühjenda
-          </Link>
+          </AdminLink>
         ) : null}
       </form>
 
