@@ -1,5 +1,3 @@
-'use client'
-
 import { DataTable, type Column } from '@erametsad/ui'
 import { Fragment } from 'react'
 
@@ -7,39 +5,41 @@ import { Fragment } from 'react'
 export interface DossierRow {
   label: string
   value: string
-  [key: string]: string
+  /** Numeric/registry values render in the demo's mono column style. */
+  mono?: boolean
 }
 
-const columns: Column<DossierRow>[] = [
-  {
-    key: 'label',
-    label: 'Nimi',
-    sortable: false,
-    width: '40%',
-    render: (row) => <span className="font-semibold text-inkMuted">{row.label}</span>,
-  },
-  {
-    key: 'value',
-    label: 'Väärtus',
-    sortable: false,
-    render: (row) =>
-      row.label === 'Puuliigid' ? (
-        <SpeciesListCell value={row.value} />
-      ) : (
-        <span className="whitespace-normal text-ink">{row.value}</span>
-      ),
-  },
-]
-
+// Demo facts table (docs/design/demo/portal/02-lot-detail-open.html .facts):
+// zebra-striped definition list with a 230px label column that collapses to
+// one column on mobile.
 export function DossierTable({ rows }: { rows: DossierRow[] }) {
   if (rows.length === 0) return null
   return (
-    <DataTable<DossierRow>
-      columns={columns}
-      data={rows}
-      sortable={false}
-      className="rounded-card border border-border bg-bgPage px-sm py-xs"
-    />
+    <dl className="m-0 overflow-hidden rounded-card border border-border">
+      {rows.map((row, index) => (
+        <div
+          key={row.label}
+          className={`grid grid-cols-1 gap-0.5 px-[18px] py-3 text-bodySm sm:grid-cols-[230px_minmax(0,1fr)] sm:gap-4 ${
+            index > 0 ? 'border-t border-border' : ''
+          } ${index % 2 === 1 ? 'bg-bgMist' : ''}`}
+        >
+          <dt className="text-inkMuted">{row.label}</dt>
+          <dd
+            className={`m-0 text-ink ${
+              row.mono === true
+                ? 'font-mono font-medium'
+                : 'font-semibold'
+            }`}
+          >
+            {row.label === 'Puuliigid' ? (
+              <SpeciesCodes value={row.value} />
+            ) : (
+              row.value
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 
@@ -106,15 +106,14 @@ function SpeciesCell({ value, species }: { value: string; species: boolean }) {
   )
 }
 
-/** Dossier species row: page.tsx passes codes comma-joined, so split and
- * tooltip each token instead of rendering the joined text bare. */
-function SpeciesListCell({ value }: { value: string }) {
+/** Comma-separated species codes with full names as native tooltips. */
+export function SpeciesCodes({ value }: { value: string }) {
   const tokens = value
     .split(',')
     .map((token) => token.trim())
     .filter((token) => token !== '')
   return (
-    <span className="whitespace-normal text-ink">
+    <span className="whitespace-normal">
       {tokens.map((token, index) => (
         <Fragment key={`${token}-${String(index)}`}>
           {index > 0 ? ', ' : ''}
