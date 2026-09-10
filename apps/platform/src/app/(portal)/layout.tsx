@@ -4,6 +4,7 @@ import { Manrope } from 'next/font/google'
 import './portal.css'
 
 import { AccountDeletionNotice } from './_components/AccountDeletionNotice'
+import { CookieBanner } from './_components/CookieBanner'
 import { ImpersonationBanner } from './_components/ImpersonationBanner'
 import { PortalFooter } from './_components/PortalFooter'
 import { PortalHeader } from './_components/PortalHeader'
@@ -40,6 +41,7 @@ export default async function PortalLayout({ children }: { children: React.React
         {children}
       </main>
       <PortalFooter />
+      <CookieBanner />
     </div>
   )
 }
