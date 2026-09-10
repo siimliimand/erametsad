@@ -3,8 +3,8 @@
 import { Btn, FormInput } from '@erametsad/ui'
 import { useEffect, useRef, useState } from 'react'
 
+import { EidCards } from './EidCards'
 import { ControlCodeScreen } from '../../login/_components/ControlCodeScreen'
-import { EidMethodCards, METHOD_LABELS } from '../../login/_components/EidMethodCards'
 import {
   completeEid,
   pollEidStatus,
@@ -152,7 +152,7 @@ export function StepIdentify({ onExistingAccount, onFallbackContinue }: StepIden
   if (eid) {
     return (
       <ControlCodeScreen
-        methodLabel={METHOD_LABELS[eid.method]}
+        method={eid.method}
         controlCode={eid.controlCode}
         state={eid.state}
         onCancel={handleCancelEid}
@@ -164,19 +164,17 @@ export function StepIdentify({ onExistingAccount, onFallbackContinue }: StepIden
   }
 
   return (
-    <section aria-label="Isiku tuvastamine" className="mt-md flex flex-col gap-md">
+    <section aria-label="Isiku tuvastamine" className="flex flex-col gap-md">
       <div className="flex flex-col gap-2xs">
-        <h2 className="font-heading text-h3 text-ink">Tuvasta enda isik</h2>
-        <p className="font-body text-body text-inkMuted">
-          Vali eID autentimisviis või jätka e-posti ja isikukoodiga.
+        <h2 className="font-heading text-h3 font-bold text-ink">Tuvasta end</h2>
+        <p className="font-body text-bodySm text-inkMuted">
+          Vali sobiv eID-vahend. Tuvastus lõpuleviib konto loomise.
         </p>
       </div>
 
       <div className="flex flex-col gap-sm">
-        <h3 className="font-heading text-h4 text-ink">Tuvastu eID-ga</h3>
-        <EidMethodCards
+        <EidCards
           selected={method}
-          disabled={false}
           onSelect={(selected) => {
             setMethod(selected)
             setStartError(null)
@@ -198,6 +196,7 @@ export function StepIdentify({ onExistingAccount, onFallbackContinue }: StepIden
         />
 
         <Btn
+          variant="cta"
           onClick={() => void handleStartEid()}
           disabled={method === null}
         >

@@ -50,8 +50,16 @@ export function StepContactConsents({
   const [phoneError, setPhoneError] = useState<string | null>(null)
   const [termsError, setTermsError] = useState<string | null>(null)
   const [privacyError, setPrivacyError] = useState<string | null>(null)
+  const [honeypot, setHoneypot] = useState('')
+  const [honeypotError, setHoneypotError] = useState<string | null>(null)
 
   function handleSubmit() {
+    // Honeypot tripped: bots fill the hidden field, so fail neutrally and
+    // never reach the registration call (demo 06-register.html behavior).
+    if (honeypot.trim() !== '') {
+      setHoneypotError('Registreerimine ebaõnnestus. Proovi uuesti.')
+      return
+    }
     const nextNameError = fullName.trim() ? null : 'Sisesta ees- ja perekonnanimi.'
     const nextEmailError = EMAIL_RE.test(email.trim())
       ? null
@@ -61,10 +69,10 @@ export function StepContactConsents({
       : 'Palun sisesta kehtiv Eesti telefoninumber (+372XXXXXXXX).'
     const nextTermsError = consents.terms
       ? null
-      : 'Nõusolek on registreerimiseks kohustuslik.'
+      : 'Palun nõustu kasutustingimustega.'
     const nextPrivacyError = consents.privacy
       ? null
-      : 'Nõusolek on registreerimiseks kohustuslik.'
+      : 'Palun nõustu privaatsuspoliitikaga.'
     setNameError(nextNameError)
     setEmailError(nextEmailError)
     setPhoneError(nextPhoneError)
@@ -83,10 +91,10 @@ export function StepContactConsents({
   }
 
   return (
-    <section aria-label="Kontaktandmed ja nõusolekud" className="mt-md flex flex-col gap-md">
+    <section aria-label="Kontaktandmed ja nõusolekud" className="flex flex-col gap-md">
       <div className="flex flex-col gap-2xs">
-        <h2 className="font-heading text-h3 text-ink">Kontaktandmed ja nõusolekud</h2>
-        <p className="font-body text-body text-inkMuted">
+        <h2 className="font-heading text-h3 font-bold text-ink">Sisesta oma andmed</h2>
+        <p className="font-body text-bodySm text-inkMuted">
           {profileType === 'company'
             ? `Ettevõte ${company?.companyName ?? ''} (registrikood ${company?.regCode ?? ''}). Sisesta oma kontaktandmed.`
             : 'Sisesta oma kontaktandmed ja anna nõusolekud.'}
@@ -109,6 +117,12 @@ export function StepContactConsents({
       {serverError && (
         <p role="alert" className="font-body text-bodySm text-danger">
           {serverError}
+        </p>
+      )}
+
+      {honeypotError && (
+        <p role="alert" className="font-body text-bodySm text-danger">
+          {honeypotError}
         </p>
       )}
 
@@ -162,7 +176,7 @@ export function StepContactConsents({
       <div className="mt-2xs flex flex-col gap-sm">
         <ConsentCheck
           name="consent-terms"
-          label="Nõustun oksjonikeskkonna kasutustingimustega"
+          label="Nõustun kasutustingimustega. (kohustuslik)"
           {...(termsError ? { error: termsError } : {})}
           onChange={(checked) => {
             setConsents((current) => ({ ...current, terms: checked }))
@@ -172,7 +186,7 @@ export function StepContactConsents({
 
         <ConsentCheck
           name="consent-privacy"
-          label="Nõustun isikuandmete töötlemise põhimõtetega"
+          label="Nõustun privaatsuspoliitikaga. (kohustuslik)"
           {...(privacyError ? { error: privacyError } : {})}
           onChange={(checked) => {
             setConsents((current) => ({ ...current, privacy: checked }))
@@ -182,14 +196,30 @@ export function StepContactConsents({
 
         <ConsentCheck
           name="consent-marketing"
-          label="Soovin teavitusi uutest oksjonitest (valikuline)"
+          label="Soovin teavitusi uutest oksjonitest (valikuline)."
           onChange={(checked) => {
             setConsents((current) => ({ ...current, marketing: checked }))
           }}
         />
       </div>
 
-      <Btn onClick={handleSubmit} isLoading={busy}>
+      {/* Honeypot: bots fill this, humans never see it (demo .hp-field). */}
+      <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+        <label htmlFor="register-website">Ära täida seda välja</label>
+        <input
+          id="register-website"
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={honeypot}
+          onChange={(event) => {
+            setHoneypot(event.target.value)
+          }}
+        />
+      </div>
+
+      <Btn variant="cta" onClick={handleSubmit} isLoading={busy}>
         Loo konto
       </Btn>
     </section>

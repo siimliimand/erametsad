@@ -1,9 +1,10 @@
 'use client'
 
-import { Steps, type StepItem } from '@erametsad/ui'
+import Link from 'next/link'
 import { useState } from 'react'
 
 import { AccessRequestFlow } from './AccessRequestFlow'
+import { StepBar, type StepBarItem } from './StepBar'
 import { StepContactConsents, type ContactConsentsData } from './StepContactConsents'
 import { StepDone } from './StepDone'
 import { StepIdentify } from './StepIdentify'
@@ -35,17 +36,11 @@ export function RegisterWizard({ next }: RegisterWizardProps) {
   // so it survives every step without touching the URL.
   const loginHref = next ? `/login?next=${encodeURIComponent(next)}` : '/login'
 
-  function stepStatus(index: number): StepItem['status'] {
-    if (index < step) return 'completed'
-    if (index === step) return 'current'
-    return 'upcoming'
-  }
-
-  const stepItems: StepItem[] = [
-    { id: 'identify', label: 'Tuvastus', status: stepStatus(1) },
-    { id: 'profile', label: 'Profiili tüüp', status: stepStatus(2) },
-    { id: 'contact', label: 'Andmed ja nõusolekud', status: stepStatus(3) },
-    { id: 'done', label: 'Valmis', status: stepStatus(4) },
+  const stepItems: StepBarItem[] = [
+    { id: 'identify', label: 'Tuvastus' },
+    { id: 'profile', label: 'Profiili tüüp' },
+    { id: 'contact', label: 'Andmed ja nõusolekud' },
+    { id: 'done', label: 'Valmis' },
   ]
 
   function handleIdentified(identified: { email: string; isikukood: string }) {
@@ -99,17 +94,21 @@ export function RegisterWizard({ next }: RegisterWizardProps) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-container-sm">
-      <div className="rounded-card border border-border bg-bgPage p-md shadow-card md:p-lg">
-        <h1 className="font-heading text-h2 text-ink">Loo konto</h1>
-        <p className="mt-2xs font-body text-body text-inkMuted">
-          Nelja sammuga registreerimine oksjonikeskkonda.
+    <div className="mx-auto w-full max-w-[600px]">
+      <div className="text-center">
+        <h1 className="font-heading text-[1.75rem] font-extrabold leading-tight text-ink md:text-h2">
+          Loo konto
+        </h1>
+        <p className="mt-1.5 font-body text-body text-inkMuted">
+          Üks konto kõigiks Erametsadi oksjoniteks.
         </p>
+      </div>
 
-        <div className="mt-md">
-          <Steps steps={stepItems} orientation="horizontal" />
-        </div>
+      <div className="mb-6 mt-6">
+        <StepBar steps={stepItems} current={step} />
+      </div>
 
+      <div className="rounded-card border border-border bg-bgPage p-6 shadow-card md:p-8">
         {deadEndCompany ? (
           <AccessRequestFlow
             company={deadEndCompany}
@@ -141,7 +140,7 @@ export function RegisterWizard({ next }: RegisterWizardProps) {
         ) : (
           done && (
             <StepDone
-              target={next ?? '/'}
+              next={next}
               displayName={done.displayName}
               profileType={profileType}
               approvalStatus={done.approvalStatus}
@@ -149,6 +148,16 @@ export function RegisterWizard({ next }: RegisterWizardProps) {
           )
         )}
       </div>
+
+      <p className="mt-[18px] text-center font-body text-bodySm text-inkMuted">
+        Juba kasutaja?{' '}
+        <Link
+          href={loginHref}
+          className="font-semibold text-primary underline-offset-2 hover:underline"
+        >
+          Logi sisse
+        </Link>
+      </p>
     </div>
   )
 }
