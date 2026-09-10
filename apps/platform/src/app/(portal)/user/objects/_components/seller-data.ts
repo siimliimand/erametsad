@@ -4,11 +4,15 @@ import type { AuctionDoc } from '@/lib/data/repositories/registry'
 import type { Bid } from '@/lib/data/schema'
 
 // Mirrors the STATUS_TABS mapping in /api/v1/my-auctions; the page and the
-// API must agree on which auction statuses each seller tab covers.
-export type StatusTab = 'all' | 'draft' | 'scheduled' | 'active' | 'ended'
+// API must agree on which auction statuses each seller tab covers. 'ongoing'
+// is a page-level composite (design D9): the demo chip "Käimasolevad" folds
+// the pre-end states scheduled + active into one chip, while the legacy
+// ?status=scheduled|active values keep resolving for URL stability.
+export type StatusTab = 'all' | 'ongoing' | 'draft' | 'scheduled' | 'active' | 'ended'
 
 export const STATUS_TABS: readonly StatusTab[] = [
   'all',
+  'ongoing',
   'draft',
   'scheduled',
   'active',
@@ -17,13 +21,12 @@ export const STATUS_TABS: readonly StatusTab[] = [
 
 const STATUS_TAB_FILTERS: Record<StatusTab, readonly string[]> = {
   all: [],
+  ongoing: ['scheduled', 'active'],
   draft: ['draft'],
   scheduled: ['scheduled'],
   active: ['active'],
   ended: ['ended', 'appraised', 'unsold', 'contract', 'completed', 'archived'],
 }
-
-export type StatusTabCounts = Record<StatusTab, number>
 
 export interface BidLogEntry {
   bidId: string
@@ -53,7 +56,9 @@ export interface SellerAuctionRow {
   leadingPrice: number | null
   bidCount: number
   pendingApprovalCount: number
-  views: null
+  views: number | null
+  countyName: string | null
+  areaHa: number | null
   startsAt: string | null
   endsAt: string | null
   createdAt: string
@@ -84,7 +89,11 @@ function byNewestFirst(a: Bid, b: Bid): number {
   return a.id < b.id ? 1 : -1
 }
 
-function buildRow(doc: AuctionDoc, bids: Bid[]): SellerAuctionRow {
+function buildRow(
+  doc: AuctionDoc,
+  bids: Bid[],
+  countyName: string | null,
+): SellerAuctionRow {
   const liveBids = bids.filter((bid) => bid.status !== 'rejected')
   const leading =
     doc.type === 'open'
@@ -121,6 +130,8 @@ function buildRow(doc: AuctionDoc, bids: Bid[]): SellerAuctionRow {
     bidCount: liveBids.length,
     pendingApprovalCount: pending.length,
     views: null,
+    countyName,
+    areaHa: doc.areaHa,
     startsAt: doc.startsAt,
     endsAt: doc.endsAt,
     createdAt: doc.createdAt,
@@ -142,6 +153,22 @@ export async function loadSellerOverview(
   })
   const auctions = auctionsResult.docs
 
+  // County names for the demo card sub line ("<county> · <area> · <type>");
+  // lots without a county simply omit the part.
+  const countyIds = [
+    ...new Set(auctions.map((auction) => auction.countyId).filter((id) => id !== null)),
+  ]
+  const countyNames = new Map<string, string>()
+  if (countyIds.length > 0) {
+    const countiesResult = await repositories.find({
+      collection: 'counties',
+      pagination: false,
+    })
+    for (const county of countiesResult.docs) {
+      if (countyIds.includes(county.id)) countyNames.set(county.id, county.name)
+    }
+  }
+
   const bidsByAuction = new Map<string, Bid[]>()
   if (auctions.length > 0) {
     const bidsResult = await repositories.find({
@@ -156,7 +183,13 @@ export async function loadSellerOverview(
     }
   }
 
-  return auctions.map((doc) => buildRow(doc, bidsByAuction.get(doc.id) ?? []))
+  return auctions.map((doc) =>
+    buildRow(
+      doc,
+      bidsByAuction.get(doc.id) ?? [],
+      doc.countyId === null ? null : (countyNames.get(doc.countyId) ?? null),
+    ),
+  )
 }
 
 export function parseStatusTab(raw: string | null): StatusTab {
@@ -173,21 +206,4 @@ export function filterRowsByStatus(
   if (tab === 'all') return rows
   const allowed = STATUS_TAB_FILTERS[tab]
   return rows.filter((row) => allowed.includes(row.status))
-}
-
-export function countRowsByStatus(rows: SellerAuctionRow[]): StatusTabCounts {
-  const counts: StatusTabCounts = {
-    all: rows.length,
-    draft: 0,
-    scheduled: 0,
-    active: 0,
-    ended: 0,
-  }
-  for (const [tab, statuses] of Object.entries(STATUS_TAB_FILTERS)) {
-    if (tab === 'all') continue
-    counts[tab as Exclude<StatusTab, 'all'>] = rows.filter((row) =>
-      statuses.includes(row.status),
-    ).length
-  }
-  return counts
 }
