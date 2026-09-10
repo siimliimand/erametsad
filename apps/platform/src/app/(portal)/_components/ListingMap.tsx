@@ -96,10 +96,10 @@ function popupRow(label: string, valueHtml: string, valueClass: string): string 
 export function buildPopupHtml(lot: ListingMapLot): string {
   const rows: string[] = []
   if (lot.area !== null) {
-    rows.push(popupRow('Pindala', `${escapeHtml(lot.area.toLocaleString('et'))} ha`, ''))
+    rows.push(popupRow('Pindala', `${escapeHtml(lot.area.toLocaleString('et-EE'))} ha`, ''))
   }
   rows.push(
-    popupRow('Alghind', `${escapeHtml(lot.minBid.toLocaleString('et'))} €`, 'font-mono tabular-nums tracking-tight text-ctaHover'),
+    popupRow('Alghind', `${escapeHtml(lot.minBid.toLocaleString('et-EE'))} €`, 'font-mono tabular-nums tracking-tight text-ctaHover'),
   )
   if (lot.registryNumber !== null && lot.registryNumber !== undefined && lot.registryNumber !== '') {
     rows.push(popupRow('Katastritunnus', escapeHtml(lot.registryNumber), 'font-mono'))

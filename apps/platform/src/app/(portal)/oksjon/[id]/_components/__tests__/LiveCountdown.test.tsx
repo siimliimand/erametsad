@@ -104,7 +104,7 @@ describe('LiveCountdown', () => {
   it('renders the server-supplied deadline on mount', async () => {
     await mount({ endsAt: '2026-08-30T12:00:00.000Z' })
     expect(text()).toContain('Aega jäänud')
-    expect(text()).toContain('3p 0h 0m 0s')
+    expect(text()).toContain('3p 00:00:00')
   })
 
   it('moves the rendered deadline on auction:extended without a refresh', async () => {
@@ -119,8 +119,8 @@ describe('LiveCountdown', () => {
       await Promise.resolve()
     })
 
-    expect(text()).toContain('4p 0h 0m 0s')
-    expect(text()).not.toContain('3p 0h 0m 0s')
+    expect(text()).toContain('4p 00:00:00')
+    expect(text()).not.toContain('3p 00:00:00')
     // Moving the deadline is in-place; no router.refresh is involved.
     expect(nav.refresh).not.toHaveBeenCalled()
   })
@@ -137,7 +137,7 @@ describe('LiveCountdown', () => {
       await Promise.resolve()
     })
 
-    expect(text()).toContain('3p 0h 0m 0s')
+    expect(text()).toContain('3p 00:00:00')
   })
 
   it('adopts the server endsAt again when the prop changes after a local move', async () => {
@@ -150,10 +150,10 @@ describe('LiveCountdown', () => {
       })
       await Promise.resolve()
     })
-    expect(text()).toContain('4p 0h 0m 0s')
+    expect(text()).toContain('4p 00:00:00')
 
     await rerender({ endsAt: '2026-09-01T12:00:00.000Z' })
-    expect(text()).toContain('5p 0h 0m 0s')
+    expect(text()).toContain('5p 00:00:00')
   })
 
   it('refreshes bid state through router.refresh at the zero crossing', async () => {

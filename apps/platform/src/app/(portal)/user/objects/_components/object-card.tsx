@@ -159,7 +159,7 @@ export function ObjectCard({
 
   const subParts: string[] = []
   if (row.countyName !== null) subParts.push(row.countyName)
-  if (row.areaHa !== null) subParts.push(`${row.areaHa.toLocaleString('et')} ha`)
+  if (row.areaHa !== null) subParts.push(`${row.areaHa.toLocaleString('et-EE')} ha`)
   subParts.push(OBJECT_TYPE_LABELS[row.objectType] ?? row.objectType)
   if (isDraft) subParts.push('veel avaldamata')
 

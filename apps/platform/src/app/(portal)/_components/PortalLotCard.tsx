@@ -34,8 +34,8 @@ export function PortalLotCard({ lot, className }: PortalLotCardProps) {
   const ended = lot.status === 'ended'
 
   const meta: string[] = []
-  if (lot.area !== null) meta.push(`${lot.area.toLocaleString('et')} ha`)
-  if (lot.volume !== null) meta.push(`${lot.volume.toLocaleString('et')} m³`)
+  if (lot.area !== null) meta.push(`${lot.area.toLocaleString('et-EE')} ha`)
+  if (lot.volume !== null) meta.push(`${lot.volume.toLocaleString('et-EE')} m³`)
   if (lot.parish !== null) meta.push(`${lot.parish.name} vald`)
   if (lot.county !== null) meta.push(lot.county.name)
 
@@ -93,7 +93,7 @@ export function PortalLotCard({ lot, className }: PortalLotCardProps) {
             className="font-mono text-xl font-medium tracking-tight text-ctaHover"
             style={{ fontFeatureSettings: '"tnum" 1' }}
           >
-            {lot.minBid.toLocaleString('et')} €
+            {lot.minBid.toLocaleString('et-EE')} €
           </span>
         </p>
 
