@@ -54,6 +54,6 @@
 
 ## 9. Verification and docs
 
-- [ ] 9.1 Formatting sweep across portal (euro, countdown `2p HH:MM:SS`, dates D.M.YYYY, pill labels); run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`; confirm marketing/admin render unchanged <!-- agent: fullstack-engineer.fast, depends_on: [2.5, 3.2, 4.2, 5.2, 6.5, 7.2, 7.3, 7.4, 7.5, 8.1, 8.2], touches: [] -->
+- [x] 9.1 Formatting sweep across portal (euro, countdown `2p HH:MM:SS`, dates D.M.YYYY, pill labels); run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`; confirm marketing/admin render unchanged <!-- agent: fullstack-engineer.fast, depends_on: [2.5, 3.2, 4.2, 5.2, 6.5, 7.2, 7.3, 7.4, 7.5, 8.1, 8.2], touches: [] -->
 - [ ] 9.2 Update DESIGN.md: portal token section + rewritten Mockup deviations section (parity baseline + remaining functional deviations) <!-- agent: fullstack-engineer.fast, depends_on: [9.1], touches: [DESIGN.md] -->
 - [ ] 9.3 Visual comparison: screenshot each portal page (`/`, `/oksjon/:id` open + sealed, `/ajalugu`, `/login`, `/register`, `/select-profile`, `/update-password`, `/user/*`, `/lepingud`, signing flow) against its demo HTML and fix remaining deltas <!-- agent: fullstack-engineer.build, depends_on: [9.1], touches: [] -->
