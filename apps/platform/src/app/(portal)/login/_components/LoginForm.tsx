@@ -1,13 +1,14 @@
 'use client'
 
-import { Btn, FormInput } from '@erametsad/ui'
+import { Btn } from '@erametsad/ui'
+import { ArrowLeft, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
-
+import { AuthField } from './AuthField'
 import { PendingCompanyBanner, SuspendedBanner } from './Banners'
 import { ControlCodeScreen } from './ControlCodeScreen'
-import { EidMethodCards, METHOD_LABELS } from './EidMethodCards'
+import { EidMethodCards } from './EidMethodCards'
 import { PasswordForm } from './PasswordForm'
 import {
   completeEid,
@@ -29,14 +30,15 @@ interface EidSessionState {
   method: EidMethod
   sessionRef: string
   controlCode: string | null
-  state: 'pending' | 'failed'
+  state: 'pending' | 'success' | 'failed'
 }
 
 interface LoginFormProps {
   next: string | null
+  privacyHref: string
 }
 
-export function LoginForm({ next }: LoginFormProps) {
+export function LoginForm({ next, privacyHref }: LoginFormProps) {
   const [method, setMethod] = useState<EidMethod | null>(null)
   const [isikukood, setIsikukood] = useState('')
   const [startError, setStartError] = useState<string | null>(null)
@@ -97,6 +99,8 @@ export function LoginForm({ next }: LoginFormProps) {
     const result = await completeEid(session.method, session.sessionRef)
     if (cancelledRef.current) return
     if (result.ok) {
+      // Demo success view: keep it up while the redirect is being prepared.
+      setEid({ ...session, state: 'success' })
       await routeAfterAuth()
       return
     }
@@ -189,24 +193,12 @@ export function LoginForm({ next }: LoginFormProps) {
     : '/register'
 
   return (
-    <div className="mx-auto w-full max-w-container-sm">
-      <div className="rounded-card border border-border bg-bgPage p-md shadow-card md:p-lg">
-        <h1 className="font-heading text-h2 text-ink">Logi sisse</h1>
-        <p className="mt-2xs font-body text-body text-inkMuted">
-          Vali sobiv autentimisviis.
-        </p>
-
-        {banner !== null && (
-          <div className="mt-md flex flex-col gap-md">
-            {banner === 'suspended' && <SuspendedBanner />}
-            {banner === 'pendingCompany' && <PendingCompanyBanner />}
-          </div>
-        )}
-
-        {eid ? (
-          <div className="mt-md">
+    <div className="flex w-full justify-center">
+      <div className="w-full max-w-[440px]">
+        <div className="rounded-card border border-border bg-bgPage p-md shadow-card md:p-lg">
+          {eid ? (
             <ControlCodeScreen
-              methodLabel={METHOD_LABELS[eid.method]}
+              method={eid.method}
               controlCode={eid.controlCode}
               state={eid.state}
               onCancel={handleCancelEid}
@@ -214,62 +206,110 @@ export function LoginForm({ next }: LoginFormProps) {
                 void handleStartEid()
               }}
             />
-          </div>
-        ) : (
-          <>
-            <section aria-label="eID autentimine" className="mt-md flex flex-col gap-sm">
-              <h2 className="font-heading text-h4 text-ink">Logi sisse eID-ga</h2>
-              <EidMethodCards
-                selected={method}
+          ) : (
+            <>
+              <h1 className="font-heading text-[2rem] font-extrabold leading-tight text-ink">
+                Logi sisse
+              </h1>
+              <p className="mt-1.5 font-body text-bodySm text-inkMuted">
+                Vali turvaline tuvastusmeetod — sama konto kehtib nii pakkumiseks kui
+                oma metsa müümiseks.
+              </p>
+
+              {banner !== null && (
+                <div className="mt-md flex flex-col gap-md">
+                  {banner === 'suspended' && <SuspendedBanner />}
+                  {banner === 'pendingCompany' && <PendingCompanyBanner />}
+                </div>
+              )}
+
+              <section aria-label="eID autentimine" className="mt-md flex flex-col gap-sm">
+                <EidMethodCards
+                  selected={method}
+                  disabled={busy}
+                  onSelect={(selected) => {
+                    setMethod(selected)
+                    setStartError(null)
+                  }}
+                />
+
+                <AuthField
+                  label="Isikukood"
+                  name="eid-isikukood"
+                  inputMode="numeric"
+                  maxLength={11}
+                  autoComplete="username"
+                  placeholder="38001010000"
+                  disabled={busy || method === null}
+                  error={startError}
+                  value={isikukood}
+                  onChange={(event) => {
+                    setIsikukood(event.target.value)
+                  }}
+                />
+
+                <div className="mt-1 [&_button]:w-full">
+                  <Btn
+                    onClick={() => void handleStartEid()}
+                    isLoading={busy}
+                    disabled={method === null}
+                  >
+                    Jätka
+                  </Btn>
+                </div>
+              </section>
+
+              <div className="my-md flex items-center gap-sm" aria-hidden="true">
+                <span className="h-px flex-1 bg-border" />
+                <span className="font-label font-semibold uppercase tracking-widest text-inkMuted">
+                  või
+                </span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+
+              <PasswordForm
+                next={next}
                 disabled={busy}
-                onSelect={(selected) => {
-                  setMethod(selected)
-                  setStartError(null)
-                }}
+                onSubmit={handlePasswordSubmit}
               />
 
-              <FormInput
-                label="Isikukood"
-                name="eid-isikukood"
-                inputMode="numeric"
-                maxLength={11}
-                autoComplete="off"
-                disabled={busy || method === null}
-                {...(startError ? { error: startError } : {})}
-                value={isikukood}
-                onChange={(event) => {
-                  setIsikukood(event.target.value)
-                }}
-              />
+              <p className="mt-md border-t border-border pt-md text-center font-body text-bodySm text-inkMuted">
+                Pole veel kasutajat?{' '}
+                <Link
+                  href={registerHref}
+                  className="font-semibold text-primary underline-offset-2 hover:underline"
+                >
+                  Loo konto
+                </Link>
+              </p>
+            </>
+          )}
+        </div>
 
-              <Btn onClick={() => void handleStartEid()} isLoading={busy} disabled={method === null}>
-                Jätka
-              </Btn>
-            </section>
+        <p className="mt-xs flex items-start justify-center gap-xs text-center font-body text-bodySm text-inkMuted">
+          <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+          <span>
+            Turvaline sisselogimine EU eIDAS tasemega. Isikuandmeid töödeldakse
+            vastavalt GDPR-ile — vaata{' '}
+            <a
+              href={privacyHref}
+              className="text-primary underline-offset-2 hover:underline"
+            >
+              privaatsuspoliitikat
+            </a>
+            .
+          </span>
+        </p>
 
-            <div className="my-md flex items-center gap-sm" aria-hidden="true">
-              <span className="h-px flex-1 bg-border" />
-              <span className="font-label text-inkMuted">või</span>
-              <span className="h-px flex-1 bg-border" />
-            </div>
-
-            <PasswordForm
-              next={next}
-              disabled={busy}
-              onSubmit={handlePasswordSubmit}
-            />
-
-            <p className="mt-md font-body text-bodySm text-inkMuted">
-              Pole veel kasutajat?{' '}
-              <Link
-                href={registerHref}
-                className="font-semibold text-primary underline-offset-2 hover:underline"
-              >
-                Loo konto
-              </Link>
-            </p>
-          </>
-        )}
+        <p className="mt-sm text-center font-body text-bodySm">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-xs text-primary underline-offset-2 hover:underline"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Tagasi oksjonitele
+          </Link>
+        </p>
       </div>
     </div>
   )

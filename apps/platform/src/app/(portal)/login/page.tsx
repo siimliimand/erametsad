@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 
 import { LoginForm } from './_components/LoginForm'
 
+import { marketingUrl } from '@/app/(marketing)/_lib/base-url'
+
 export const metadata: Metadata = {
   title: 'Logi sisse',
 }
@@ -23,5 +25,8 @@ export default async function LoginPage({
 }) {
   const next = safeNext((await searchParams).next)
 
-  return <LoginForm next={next} />
+  // Same destination as the portal footer's "Privaatsuspoliitika" link.
+  const privacyHref = marketingUrl('/lepingud/dokumendid')
+
+  return <LoginForm next={next} privacyHref={privacyHref} />
 }
