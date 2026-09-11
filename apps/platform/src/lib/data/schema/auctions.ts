@@ -49,6 +49,10 @@ export const auctions = sqliteTable(
     // migration 0018; the JSON copies stay for legacy readers.
     areaHa: real('area_ha'),
     volumeM3: real('volume_m3'),
+    // Filterable year derived from the deadlines JSON logging deadline
+    // (D1); backfilled by migration 0028 and recomputed on the repository
+    // write path. A plain json_extract in WHERE would have no index.
+    cutDeadlineYear: integer('cut_deadline_year'),
     minBidCents: integer('min_bid_cents').notNull(),
     bidStepCents: integer('bid_step_cents'),
     reservePriceCents: integer('reserve_price_cents'),
@@ -85,6 +89,7 @@ export const auctions = sqliteTable(
     index('auctions_status_ends_at_idx').on(t.status, t.endsAt),
     index('auctions_object_type_idx').on(t.objectType),
     index('auctions_seller_idx').on(t.sellerId),
+    index('auctions_cut_deadline_year_idx').on(t.cutDeadlineYear),
     check('auctions_status_check', sql`${t.status} IN ${sql.raw(inList(auctionStatuses))}`),
     check(
       'auctions_object_type_check',

@@ -19,8 +19,10 @@ import {
 } from '../../_lib/filter-params'
 import { ListingFilters } from '../ListingFilters'
 
-function render(tab: string): string {
-  return renderToString(createElement(ListingFilters, { tab }))
+function render(tab: string, cutDeadlineYears: number[] = []): string {
+  return renderToString(
+    createElement(ListingFilters, { tab, cutDeadlineYears }),
+  )
 }
 
 function renderWithQuery(tab: string, query: string): string {
@@ -74,6 +76,22 @@ describe('ListingFilters demo structure', () => {
     const year = new Date().getFullYear()
     expect(html).toContain(`>${String(year)}</option>`)
     expect(html).toContain(`>${String(year + 2)}</option>`)
+  })
+
+  it('offers Kõik plus the stored years of the active set, ascending', () => {
+    const html = render('mets', [2028, 2026, 2028])
+    const yearSelect = html.split('name="cutDeadlineYear"')[1] ?? ''
+    const options = [...yearSelect.matchAll(/<option[^>]*>([^<]*)<\/option>/g)].map(
+      (match) => match[1],
+    )
+    expect(options).toEqual(['Kõik', '2026', '2028'])
+  })
+
+  it('falls back to the current-year window when the active set holds no years', () => {
+    const html = render('mets', [])
+    const year = new Date().getFullYear()
+    expect(html).toContain(`>${String(year)}</option>`)
+    expect(html).toContain(`>Kõik</option>`)
   })
 
   it('keeps the count badge out of the URL-free render', () => {

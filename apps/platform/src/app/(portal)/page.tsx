@@ -25,6 +25,7 @@ import { isMapView } from './_lib/view-param'
 
 import {
   DEFAULT_AUCTION_LIST_LIMIT,
+  activeCutDeadlineYears,
   activeStatsByObjectType,
   listAuctionMapPoints,
   listAuctions,
@@ -65,7 +66,16 @@ function buildTabQuery(
     search.set('objectType', objectTypes.join(','))
   }
   search.set('auctionStatus', 'active')
-  for (const key of ['county', 'parish', 'species', 'loggingType', 'sort', 'order', 'q']) {
+  for (const key of [
+    'county',
+    'parish',
+    'species',
+    'loggingType',
+    'cutDeadlineYear',
+    'sort',
+    'order',
+    'q',
+  ]) {
     const value = params[key]
     if (value === undefined) continue
     for (const entry of Array.isArray(value) ? value : [value]) search.append(key, entry)
@@ -201,8 +211,9 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
 
   // Legacy ?view=kart links land here too: isMapView accepts them (D3).
   const mapView = isMapView(params.view)
-  const [typeStats, result, mapPoints] = await Promise.all([
+  const [typeStats, cutDeadlineYears, result, mapPoints] = await Promise.all([
     activeStatsByObjectType(repos),
+    activeCutDeadlineYears(),
     hasTypes ? listAuctions(repos, listingQuery) : Promise.resolve(EMPTY_RESULT),
     hasTypes
       ? listAuctionMapPoints(repos, listingQuery)
@@ -226,7 +237,9 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
           tab={tab}
           total={result.total}
           mapView={mapView}
-          filtersSlot={<ListingFilters tab={tab} />}
+          filtersSlot={
+            <ListingFilters tab={tab} cutDeadlineYears={cutDeadlineYears} />
+          }
           mapSlot={<ListingMap lots={mapPoints} />}
         >
           {result.auctions.length === 0 ? (

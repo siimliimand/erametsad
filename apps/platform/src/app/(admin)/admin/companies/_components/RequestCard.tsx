@@ -21,6 +21,7 @@ import {
   TriangleAlertIcon,
   TreePineIcon,
   UsersIcon,
+  WheatIcon,
   XIcon,
   ZapIcon,
 } from '../../../_components/icons'
@@ -97,6 +98,7 @@ const auctionObjectTypeRows = [
   { value: 'kinnistu', label: 'Kinnistu', Icon: MapPinHouseIcon },
   { value: 'kiire', label: 'Kiire oksjon', Icon: ZapIcon },
   { value: 'pakett', label: 'Pakett', Icon: PackageIcon },
+  { value: 'pollumaa', label: 'Põllumaa', Icon: WheatIcon },
 ] as const
 
 type AuctionObjectTypeValue = (typeof auctionObjectTypeRows)[number]['value']

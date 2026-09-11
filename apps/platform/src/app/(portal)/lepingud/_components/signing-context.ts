@@ -7,6 +7,7 @@ const OBJECT_TYPE_LABELS: Record<AuctionDoc['objectType'], string> = {
   kinnistu: 'Metskinnistu',
   kiire: 'Kiiroksjon',
   pakett: 'Pakett',
+  pollumaa: 'Põllumaa',
 }
 
 const LOGGING_DEADLINE_KEYS = ['loggingDeadline', 'logging', 'raie'] as const

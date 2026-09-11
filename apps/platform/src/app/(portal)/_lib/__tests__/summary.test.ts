@@ -13,13 +13,14 @@ const STATS: ActiveStatsByObjectType = {
   kinnistu: { count: 2, areaHa: 5, volumeM3: 0, minBidEur: 20000 },
   kiire: { count: 4, areaHa: 8, volumeM3: 0, minBidEur: 600 },
   pakett: { count: 1, areaHa: 30, volumeM3: 0, minBidEur: 31000 },
+  pollumaa: { count: 2, areaHa: 6, volumeM3: 0, minBidEur: 4000 },
 }
 
 const ALL_TOTALS: ActiveListingStats = {
-  count: 10,
-  areaHa: 55,
+  count: 12,
+  areaHa: 61,
   volumeM3: 450,
-  minBidEur: 53100,
+  minBidEur: 57100,
 }
 
 describe('sumStats', () => {
@@ -48,7 +49,7 @@ describe('sumStats', () => {
 describe('buildActiveSummary', () => {
   it('omits the volume clause for Kõik and reports count, area, and value', () => {
     expect(buildActiveSummary('koik', ALL_TOTALS)).toBe(
-      'Hetkel on aktiivseid oksjoneid 10, kokku 55 ha ja 53 100 € väärtuses.',
+      'Hetkel on aktiivseid oksjoneid 12, kokku 61 ha ja 57 100 € väärtuses.',
     )
   })
 

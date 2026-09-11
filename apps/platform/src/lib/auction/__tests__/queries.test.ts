@@ -11,6 +11,7 @@ import {
   ARCHIVE_SORT_OPTIONS,
   AuctionQueryError,
   DEFAULT_AUCTION_LIST_LIMIT,
+  activeCutDeadlineYears,
   archivedStatsByObjectType,
   getAuctionBids,
   getAuctionDossier,
@@ -144,6 +145,143 @@ describe('parseAuctionSearchParams', () => {
   it('reads a trimmed free-text q and defaults to empty', () => {
     expect(parseAuctionSearchParams(new URLSearchParams('q=%20metskits%20')).q).toBe('metskits')
     expect(parseAuctionSearchParams(new URLSearchParams('')).q).toBe('')
+  })
+
+  it('reads the cutDeadlineYear filter and defaults to undefined', () => {
+    expect(parseAuctionSearchParams(new URLSearchParams('cutDeadlineYear=2027')).cutDeadlineYear).toBe(2027)
+    expect(parseAuctionSearchParams(new URLSearchParams('')).cutDeadlineYear).toBeUndefined()
+    expect(parseAuctionSearchParams(new URLSearchParams('cutDeadlineYear=')).cutDeadlineYear).toBeUndefined()
+  })
+
+  it('rejects a non-integer or out-of-range cutDeadlineYear', () => {
+    expect(() =>
+      parseAuctionSearchParams(new URLSearchParams('cutDeadlineYear=2026.5')),
+    ).toThrow(AuctionQueryError)
+    expect(() =>
+      parseAuctionSearchParams(new URLSearchParams('cutDeadlineYear=mets')),
+    ).toThrow(AuctionQueryError)
+    expect(() =>
+      parseAuctionSearchParams(new URLSearchParams('cutDeadlineYear=1969')),
+    ).toThrow(AuctionQueryError)
+  })
+})
+
+describe('listAuctions cutDeadlineYear filter', () => {
+  beforeEach(async () => {
+    await seedUser('seller-1')
+    await seedAuction('a-cut-2031', {
+      status: 'active',
+      deadlines: { loggingDeadline: '2031-04-30' },
+      endsAt: '2026-09-10T00:00:00.000Z',
+    })
+    await seedAuction('a-cut-2028', {
+      status: 'active',
+      deadlines: { logging: '2028-11-30' },
+      endsAt: '2026-09-05T00:00:00.000Z',
+    })
+    await seedAuction('a-cut-none', {
+      status: 'active',
+      endsAt: '2026-09-01T00:00:00.000Z',
+    })
+  })
+
+  it('keeps only auctions whose cut deadline falls in the requested year', async () => {
+    const result = await listAuctions(repos, new URLSearchParams('cutDeadlineYear=2031'))
+    expect(result.auctions.map((a) => a.id)).toEqual(['a-cut-2031'])
+
+    const result2028 = await listAuctions(repos, new URLSearchParams('cutDeadlineYear=2028'))
+    expect(result2028.auctions.map((a) => a.id)).toEqual(['a-cut-2028'])
+  })
+
+  it('returns every auction when the year filter is absent', async () => {
+    const result = await listAuctions(repos, new URLSearchParams(''))
+    expect(result.total).toBe(3)
+  })
+})
+
+describe('listAuctions loggingType code matching', () => {
+  beforeEach(async () => {
+    await seedUser('seller-1')
+    // Canonical uppercase string code, chip sends lowercase.
+    await seedAuction('a-code-upper', {
+      status: 'active',
+      loggingTypes: ['LR'],
+    })
+    // Lowercase object-shaped code, chip sends uppercase.
+    await seedAuction('a-code-lower', {
+      status: 'active',
+      loggingTypes: [{ code: 'lr' }],
+    })
+    await seedAuction('a-code-other', {
+      status: 'active',
+      loggingTypes: [{ code: 'SR' }],
+    })
+  })
+
+  it('matches an LR chip against stored lr and LR in both entry shapes', async () => {
+    const result = await listAuctions(repos, new URLSearchParams('loggingType=LR'))
+    expect(result.auctions.map((a) => a.id).sort()).toEqual(['a-code-lower', 'a-code-upper'])
+    const lowerQuery = await listAuctions(repos, new URLSearchParams('loggingType=lr'))
+    expect(lowerQuery.auctions.map((a) => a.id).sort()).toEqual([
+      'a-code-lower',
+      'a-code-upper',
+    ])
+  })
+
+  it('still excludes auctions storing a different code', async () => {
+    const result = await listAuctions(repos, new URLSearchParams('loggingType=VR'))
+    expect(result.total).toBe(0)
+  })
+})
+
+describe('listAuctions pollumaa tab query', () => {
+  beforeEach(async () => {
+    await seedUser('seller-1')
+    await seedAuction('a-pollu-1', { status: 'active', objectType: 'pollumaa' })
+    await seedAuction('a-pollu-2', { status: 'active', objectType: 'pollumaa' })
+    await seedAuction('a-raie', { status: 'active', objectType: 'raieoigus' })
+  })
+
+  it('lists the active pollumaa auctions the Põllumaad tab queries', async () => {
+    const result = await listAuctions(repos, new URLSearchParams('objectType=pollumaa'))
+    expect(result.total).toBe(2)
+    expect(result.auctions.map((a) => a.id).sort()).toEqual(['a-pollu-1', 'a-pollu-2'])
+  })
+
+  it('renders an empty result when no pollumaa auction is active', async () => {
+    testDb.raw
+      .prepare("UPDATE auctions SET status = 'ended' WHERE object_type = 'pollumaa'")
+      .run()
+    // Same query shape the Põllumaad tab sends: objectType + active status.
+    const result = await listAuctions(
+      repos,
+      new URLSearchParams('objectType=pollumaa&auctionStatus=active'),
+    )
+    expect(result.total).toBe(0)
+    expect(result.auctions).toEqual([])
+  })
+})
+
+describe('activeCutDeadlineYears', () => {
+  beforeEach(async () => {
+    await seedUser('seller-1')
+  })
+
+  it('returns the sorted distinct years of active auctions only', async () => {
+    setD1ForTests(testDb.d1)
+    await seedAuction('a-y2031', { status: 'active', deadlines: { loggingDeadline: '2031-04-30' } })
+    await seedAuction('a-y2026', { status: 'active', deadlines: { raie: '2026-06-30' } })
+    await seedAuction('a-y-dup', { status: 'active', deadlines: { loggingDeadline: '2026-05-01' } })
+    await seedAuction('a-y-ended', { status: 'ended', deadlines: { loggingDeadline: '2025-01-31' } })
+    await seedAuction('a-y-null', { status: 'active' })
+
+    expect(await activeCutDeadlineYears()).toEqual([2026, 2031])
+  })
+
+  it('returns an empty list when no active auction carries a deadline', async () => {
+    setD1ForTests(testDb.d1)
+    await seedAuction('a-no-deadline', { status: 'active' })
+    expect(await activeCutDeadlineYears()).toEqual([])
   })
 })
 

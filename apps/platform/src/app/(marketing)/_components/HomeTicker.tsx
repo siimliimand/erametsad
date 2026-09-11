@@ -25,11 +25,12 @@ export interface TickerLotSummary {
   image: string | null;
 }
 
-const OBJECT_TYPE_LABELS: Record<'raieoigus' | 'kinnistu' | 'kiire' | 'pakett', string> = {
+const OBJECT_TYPE_LABELS: Record<'raieoigus' | 'kinnistu' | 'kiire' | 'pakett' | 'pollumaa', string> = {
   raieoigus: 'Raieõigus',
   kinnistu: 'Metskinnistu',
   kiire: 'Kiiroksjon',
   pakett: 'Pakett',
+  pollumaa: 'Põllumaa',
 };
 
 // LotCard requires an image; lots without media get a quiet placeholder.

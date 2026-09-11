@@ -78,9 +78,22 @@ const LOGGING_TYPE_OPTIONS = [
   { value: 'rd', label: 'RD', title: 'Rekonstruktsiooniraie' },
 ] as const
 
-// The data layer stores no cut-deadline year, so the select renders the
-// demo window (current year plus two) instead of stored values.
-const CUT_DEADLINE_YEARS = [0, 1, 2].map((offset) => new Date().getFullYear() + offset)
+// Fallback Raietähtaeg window (current year plus two) for the case where
+// the active set holds no cutting-deadline years at all.
+const CUT_DEADLINE_FALLBACK_YEARS = [0, 1, 2].map((offset) => new Date().getFullYear() + offset)
+
+/**
+ * Kõik plus the years the active set holds, ascending; the demo window
+ * replaces an empty set so the select never renders without options.
+ */
+function cutDeadlineYearOptions(years: readonly number[]): { value: string; label: string }[] {
+  const stored = [...new Set(years)].sort((a, b) => a - b)
+  const offered = stored.length > 0 ? stored : CUT_DEADLINE_FALLBACK_YEARS
+  return [
+    { value: '', label: 'Kõik' },
+    ...offered.map((year) => ({ value: String(year), label: String(year) })),
+  ]
+}
 
 // Demo consent wording for the guest inline sub-form.
 const SUBSCRIBE_CONSENT_LABEL =
@@ -146,7 +159,13 @@ function FilterChips({ options, selected, labelledby, onToggle }: FilterChipsPro
   )
 }
 
-export function ListingFilters({ tab }: { tab: string }) {
+interface ListingFiltersProps {
+  tab: string
+  /** Stored years in the active set; the page queries them server-side. */
+  cutDeadlineYears?: readonly number[]
+}
+
+export function ListingFilters({ tab, cutDeadlineYears = [] }: ListingFiltersProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -394,13 +413,7 @@ export function ListingFilters({ tab }: { tab: string }) {
                     event.target.value === '' ? undefined : Number(event.target.value),
                 }); }
               }
-              options={[
-                { value: '', label: 'Kõik' },
-                ...CUT_DEADLINE_YEARS.map((year) => ({
-                  value: String(year),
-                  label: String(year),
-                })),
-              ]}
+              options={cutDeadlineYearOptions(cutDeadlineYears)}
             />
           </div>
 

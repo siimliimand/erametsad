@@ -13,6 +13,7 @@ const OBJECT_TYPE_LABELS: Record<string, string> = {
   kinnistu: 'Metskinnistu',
   pakett: 'Pakett',
   kiire: 'Kiiroksjon',
+  pollumaa: 'Põllumaa',
 }
 
 // Demo pill tones (.pill-active/.pill-soon/.pill-muted/.pill-done).

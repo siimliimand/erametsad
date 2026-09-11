@@ -14,6 +14,7 @@ const objectTypeLabels: Record<ObjectTypeView, string> = {
   kinnistu: 'Kinnistu',
   kiire: 'Kiire oksjon',
   pakett: 'Pakett',
+  pollumaa: 'Põllumaa',
 }
 
 const rightChipBase =

@@ -5,6 +5,7 @@ import { seedBids } from './bids'
 import { seedCms } from './cms'
 import { seedContractTemplates } from './contracts'
 import { seedLeads } from './leads'
+import { seedMedia } from './media'
 import { seedPartners } from './partners'
 import { seedServiceRequests } from './service-requests'
 import { seedSpecialists } from './specialists'
@@ -41,7 +42,10 @@ export async function seed(repos: CoreRepositories): Promise<void> {
   await seedUsers(repos)
   await seedSpecialists(repos)
   await seedTaxonomies(repos)
-  await seedAuctions(repos)
+  // Media rows precede auctions: seedAuctions attaches 1-3 of these photos
+  // to every lot's media JSON.
+  const lotPhotos = await seedMedia(repos)
+  await seedAuctions(repos, lotPhotos)
   await seedBids(repos)
   await seedCms(repos)
   await seedContractTemplates(repos)

@@ -29,11 +29,15 @@ oksjonid, Tulemused; Erametsad: Metsa müümine, Hindamisaktid,
 Metsateatis, Metsaspetsialistid, KKK; Jälgi meid: Facebook, Instagram,
 YouTube) and a bottom bar with "© <year> Erametsad OÜ",
 Privaatsuspoliitika, and "Küpsisesätted" which reopens the cookie
-banner. The portal SHALL render a cookie banner on first visit with the
-demo copy ("Kasutame küpsiseid." plus the explanation) and three
-actions: "Nõustun kõigiga", "Ainult vajalikud", and "Sätete muutmine".
-Each choice SHALL persist to the `erametsad_consent` cookie and POST to
-`/api/v1/consent`.
+banner. The social links SHALL come from the settings keys
+`social.facebook_url`, `social.instagram_url`, and
+`social.youtube_url`; an unset URL SHALL drop its icon, and the
+"Jälgi meid" column SHALL render only when at least one URL is set, so
+the footer never shows fabricated targets. The portal SHALL render a
+cookie banner on first visit with the demo copy ("Kasutame küpsiseid."
+plus the explanation) and three actions: "Nõustun kõigiga", "Ainult
+vajalikud", and "Sätete muutmine". Each choice SHALL persist to the
+`erametsad_consent` cookie and POST to `/api/v1/consent`.
 
 #### Scenario: Guest header
 - **WHEN** an anonymous user opens `/`
@@ -48,6 +52,16 @@ Each choice SHALL persist to the `erametsad_consent` cookie and POST to
 #### Scenario: Sticky header shrink
 - **WHEN** the user scrolls more than 8px
 - **THEN** the header shrinks from 72px to 60px and gains a shadow
+
+#### Scenario: Social links come from settings
+- **WHEN** only `social.facebook_url` is set in settings
+- **THEN** the "Jälgi meid" column shows the Facebook icon only, and
+  Instagram and YouTube icons are absent
+
+#### Scenario: Social column hides when all unset
+- **WHEN** all three social settings keys are empty
+- **THEN** the footer renders three link columns and no "Jälgi meid"
+  column
 
 #### Scenario: Cookie consent persists
 - **WHEN** the visitor clicks "Ainult vajalikud" in the cookie banner

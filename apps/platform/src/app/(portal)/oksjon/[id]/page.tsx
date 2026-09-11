@@ -92,6 +92,11 @@ const OBJECT_TYPE_LABELS: Record<
     tab: 'kiiroksjonid',
   },
   pakett: { singular: 'Pakett', plural: 'Paketid', tab: 'paketid' },
+  pollumaa: {
+    singular: 'Põllumaa',
+    plural: 'Põllumaad',
+    tab: 'polumaad',
+  },
 }
 
 // ── Media / files ───────────────────────────────────────────────────────

@@ -40,9 +40,9 @@ const EMPTY_RESULT: AuctionListResult = {
   totalPages: 1,
 }
 
-// Demo Tüüp chips (04-ajalugu). Põllumaa has no objectType in the schema
-// yet (same gap as the Põllumaad tab), so its selection reduces to an empty
-// result set until the data layer adopts the type.
+// Demo Tüüp chips (04-ajalugu). Põllumaa filters the `pollumaa` object type
+// (design D3); pollumaa rows carry area and price but no volume, which the
+// summary columns already handle.
 const ARCHIVE_TYPE_OPTIONS = [
   { value: 'raieoigus', label: 'Raieõigus' },
   { value: 'kinnistu', label: 'Kinnistu' },
@@ -50,12 +50,18 @@ const ARCHIVE_TYPE_OPTIONS = [
   { value: 'pakett', label: 'Pakett' },
 ] as const
 
-const CHIP_TYPES: readonly AuctionObjectType[] = ['raieoigus', 'kinnistu', 'pakett']
+const CHIP_TYPES: readonly AuctionObjectType[] = [
+  'raieoigus',
+  'kinnistu',
+  'pollumaa',
+  'pakett',
+]
 
 /** Demo type-chip colors: raie green, kinnistu blue, pollumaa amber, rest muted. */
 const TYPE_CHIPS: Record<AuctionObjectType, { label: string; className: string }> = {
   raieoigus: { label: 'Raieõigus', className: 'bg-primaryLight text-primaryHover' },
   kinnistu: { label: 'Kinnistu', className: 'bg-infoLight text-info' },
+  pollumaa: { label: 'Põllumaa', className: 'bg-[rgba(242,169,59,0.14)] text-ctaHover' },
   pakett: { label: 'Pakett', className: 'bg-[#EDEFEA] text-inkMuted' },
   kiire: { label: 'Kiiroksjon', className: 'bg-[#EDEFEA] text-inkMuted' },
 }
@@ -168,9 +174,8 @@ async function loadTabArchive(
   if (!allTypes && tabTypes.length === 0) return EMPTY_RESULT
   const search = new URLSearchParams()
 
-  // Tüüp chips intersect with the tab's objectTypes; a selection that
-  // reduces to nothing (Põllumaa alone, or a chip outside the tab) has no
-  // archived rows.
+  // Tüüp chips intersect with the tab's objectTypes; a selection outside
+  // the tab (Põllumaa on Raieõigused) still reduces to no archived rows.
   const typeTokens = csvValues(params, 'type')
   const chipTypes = typeTokens.filter((value): value is AuctionObjectType =>
     (CHIP_TYPES as readonly string[]).includes(value),

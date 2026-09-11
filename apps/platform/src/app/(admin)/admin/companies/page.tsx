@@ -41,6 +41,7 @@ const auctionObjectTypeLabels: Record<(typeof auctionObjectTypes)[number], strin
   kinnistu: 'Kinnistu',
   kiire: 'Kiire oksjon',
   pakett: 'Pakett',
+  pollumaa: 'Põllumaa',
 }
 
 const statusChipVariant: Record<CompanyAccessRequestStatus, StatusChipVariant> = {

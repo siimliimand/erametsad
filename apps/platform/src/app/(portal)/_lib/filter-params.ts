@@ -7,10 +7,8 @@
 // Demo parity (design Decision 6): the panel dropped the Maht (m³) range
 // and gained Raietähtaeg (aasta). volumeMin/volumeMax stay parsed and
 // serialized so shared legacy links keep applying server-side, but the
-// panel no longer edits or counts them. cutDeadlineYear has no server
-// counterpart yet (the schema stores no cut-deadline year); the param is
-// kept in the URL so the query layer can adopt it without a contract
-// change.
+// panel no longer edits or counts them. cutDeadlineYear applies
+// server-side against auctions.cut_deadline_year (migration 0028).
 
 export const LISTING_SORT_FIELDS = ['startPrice', 'endPrice', 'endTime'] as const
 

@@ -12,13 +12,15 @@ import {
 import { PORTAL_HOSTNAME } from '@/lib/routing/host-areas'
 
 // Mirrors the portal listing tabs (ListingTabs.tsx); keyed by the auctions
-// schema's objectType so a schema change fails the typecheck here. Tabs
-// without a schema type (põllumaad) stay out of the footer.
+// schema's objectType so a schema change fails the typecheck here. The
+// Põllumaad tab ships with the schema type but its listing query is still
+// unwired (portal task 3.1).
 const AUCTION_NAV: Record<AuctionObjectType, { label: string; tab: string }> = {
   raieoigus: { label: 'Raieõigused', tab: 'raieoigused' },
   kinnistu: { label: 'Metskinnistud', tab: 'metskinnistud' },
   kiire: { label: 'Kiiroksjonid', tab: 'kiiroksjonid' },
   pakett: { label: 'Paketid', tab: 'paketid' },
+  pollumaa: { label: 'Põllumaad', tab: 'polumaad' },
 }
 
 // Contract for task 2.4: the admin uploads the usage-guide PDF to media

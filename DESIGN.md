@@ -150,13 +150,13 @@ Core interactive components include `Btn` in three styles (solid primary green, 
 
 `LotCard` has two presentations. The enhanced listing card shows the photo with two overlays: an object-type badge at the top left and a countdown pill at the top right. Under the title sits a two-by-two metadata grid with a Lucide icon per cell: `MapPin` for the parish and county, `Ruler` for the area in hectares, `Trees` for the species list, and `Package` for the volume in cubic metres. Cells without data collapse. A divider separates the Alghind (or archive Lõpphind) price block from a "Vaata lähemalt" pill. The whole card is one link, and the call to action is a styled span inside it, so no nested interactive elements appear. Without the optional props the card renders the minimal presentation, which `AuctionTicker` and `ArchiveCard` still use.
 
-The listing filters live in a sidebar aside on desktop. They keep chip selects for species (Puuliik) and logging type (Raieliik), range sliders for area (Pindala) and price (Hind), a Raietähtaeg (aasta) select, and the "Telli teavitus" and "Tühjenda" actions. The Maht (m³) range left the panel with the demo parity change, and legacy `volumeMin`/`volumeMax` URL parameters still apply server-side. The sort control moved to the results bar. On mobile the filters collapse behind a disclosure above the map.
+The listing filters live in a sidebar aside on desktop. They keep chip selects for species (Puuliik) and logging type (Raieliik), range sliders for area (Pindala) and price (Hind), a Raietähtaeg (aasta) select whose options are the cut-deadline years found in the active set (the current-year window when none are stored), and the "Telli teavitus" and "Tühjenda" actions. The Maht (m³) range left the panel with the demo parity change, and legacy `volumeMin`/`volumeMax` URL parameters still apply server-side. The sort control moved to the results bar. On mobile the filters collapse behind a disclosure above the map.
 
 A slim server-rendered results bar sits above the card grid. It shows the found count as "Leitud N oksjonit" with Estonian pluralization, next to a "Sorteeri" select. The select posts the same `sort` and `order` URL parameters the filter panel used, so shared links keep working.
 
 `MapEstonia` wraps Leaflet with Maa-amet orthophoto tiles and county GeoJSON overlays. On the listing page the map is a toggle: the toolbar's Kaardivaade and Loendivaade pair switches between the pin map and the card grid, and `view=kaart` (legacy `view=kart` still parses) selects the map view in the URL. The map runs 400 pixels tall at desktop and about 240 pixels on mobile, with a demo popup card showing Pindala, Alghind, Katastritunnus, Aega jäänud, and a "Vaata" action. Clustering stays as built.
 
-`Countdown` synchronises with the server and uses the status colour phases: neutral, amber below one hour, red below five minutes, with optional pulse. The listing tabs row holds six tabs: Kõik objektid, Raieõigused, Metskinnistud, Põllumaad, Paketid, and Kiiroksjonid. Kõik objektid comes first and is the default view, under the heading "Aktiivsed oksjonid". Each tab carries a live count pill. Põllumaad renders its empty state until the schema stores its object type.
+`Countdown` synchronises with the server and uses the status colour phases: neutral, amber below one hour, red below five minutes, with optional pulse. The listing tabs row holds six tabs: Kõik objektid, Raieõigused, Metskinnistud, Põllumaad, Paketid, and Kiiroksjonid. Kõik objektid comes first and is the default view, under the heading "Aktiivsed oksjonid". Each tab carries a live count pill. Põllumaad lists auctions of the `pollumaa` object type.
 
 The bidding panel (`BidPanel`) handles step-based and sealed input, auto-bidder toggle, and under-bid mode. `DataTable` renders inside the admin demo card treatment (white card with mist header row and 13px/18px cells) and takes optional per-column sort descriptors that render `aria-sort` header links; non-sortable columns render plain. `Accordion`, `Tabs`, `Steps`, `EmptyState`, `Toast`, `Modal`, and `Drawer` cover the usual interaction patterns on the marketing site and portal. The admin ships its own overlay and feedback set under `(admin)/_components/ui/`, described in the admin section below.
 
@@ -210,7 +210,7 @@ Lucide React is the only icon set. Key icons map to product concepts: `TreePine`
 
 ## Mockup deviations
 
-The demo mockups in `docs/design/demo/portal/` are the design baseline for the auction portal. Every portal page matches its demo page in tokens and layout. The five deviations recorded earlier came from an older mockup round and no longer apply. Two deviation groups remain: working features the static mockups lack, and small implementation gaps recorded during the build.
+The demo mockups in `docs/design/demo/portal/` are the design baseline for the auction portal. Every portal page matches its demo page in tokens and layout. The five deviations recorded earlier came from an older mockup round and no longer apply. One deviation group remains: working features the static mockups lack.
 
 Functional deviations, kept on purpose and styled in the demo design language:
 
@@ -222,18 +222,10 @@ Functional deviations, kept on purpose and styled in the demo design language:
 - The notifications page keeps a third panel, Otsingute tellimused (saved searches), below the demo's two panels.
 - The free-text `q` filter keeps working as a URL parameter. The visible search box went with the old shell header, and the demo has no search UI.
 - Registration keeps its functional 4-step flow (Tuvastus, Profiili tüüp, Andmed ja nõusolekud, Valmis) under the demo step-bar visuals. The demo shows 3 steps.
-
-Implementation gaps, recorded during the build:
-
-- The listing's Raietähtaeg (aasta) select writes only the `cutDeadlineYear` URL parameter. The query layer has no matching filter, because the schema stores no cut-deadline year. The select renders the demo window (current year plus two) instead of stored values.
-- The cut-type chips carry the demo codes VR, HR, SR, LR, and RD. The seed data still stores the older U/H/T/L/R codes, so the chips match nothing until the data layer adopts the demo taxonomy.
-- The "Saada test-teavitus" button on the notification preference matrix shows a confirmation toast only. No test-notification endpoint exists yet.
-- The GDPR export ("Ekspordi mu andmed (ZIP)") and Kustuta konto buttons are placeholders that point to the support channel. Self-service endpoints do not exist yet.
-- The archive Tüüp chip Põllumaa has no object type in the schema, so its selection returns an empty result set.
-- The portal footer social links point at demo targets. The CMS social columns do not exist yet.
+- The Jälgi meid footer column reads its links from the settings social keys (`social.facebook_url`, `social.instagram_url`, `social.youtube_url`) and hides the whole column when none are set. The demo hardcodes the targets.
 
 ## Brand voice
 
 The voice in Estonian follows four traits: clear (short sentences, no jargon), honest (fees upfront, no hidden conditions), matter-of-fact (friendly but not chatty), and human (real names, real phone numbers, the tone of a trusted forester).
 
-<!-- Last updated: 2026-09-10 -->
+<!-- Last updated: 2026-09-11 -->

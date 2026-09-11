@@ -70,7 +70,7 @@ license: MIT
 
 ## Dependencies
 
-- Next.js 15 (App Router), React, TypeScript, Tailwind CSS, Cloudflare D1, Drizzle ORM, Durable Objects (AuctionDO, RateLimiterDO), Cloudflare queues, Cloudflare Email Service, Cloudflare R2, Lucide React, Leaflet, and the eID Easy SDK. nodemailer stays as SMTP/Mailpit fallback for local dev.
+- Next.js 15 (App Router), React, TypeScript, Tailwind CSS, Cloudflare D1, Drizzle ORM, Durable Objects (AuctionDO, RateLimiterDO), Cloudflare queues, Cloudflare Email Service, Cloudflare R2, Lucide React, Leaflet, fflate (ZIP streaming in Workers), and the eID Easy SDK. nodemailer stays as SMTP/Mailpit fallback for local dev.
 - Do not add jQuery, Bootstrap, or any UI framework that duplicates Tailwind's role.
 - Do not add a WebSocket library unless realtime collaboration features (chat, multiplayer) are explicitly scoped. SSE is the chosen realtime transport.
 

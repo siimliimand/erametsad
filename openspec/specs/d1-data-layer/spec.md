@@ -10,7 +10,13 @@ schema in SQLite dialect, split into core (transactional) and content
 no exceptions: money as INTEGER cents, enums as TEXT with
 `CHECK (col IN (...))`, `jsonb` as TEXT parsed in the repository layer,
 UUIDs as app-generated TEXT via `crypto.randomUUID()`, and timestamps as
-TEXT ISO-8601 UTC.
+TEXT ISO-8601 UTC. The `auctions` table SHALL carry an indexed nullable
+`cut_deadline_year` INTEGER column derived from the `deadlines` JSON
+`loggingDeadline` value, backfilled by migration and recomputed on the
+repository write path. The auction object-type enum SHALL include
+`pollumaa`. The user status enum SHALL include `deleted`. Every enum
+change SHALL ship as a CHECK-constraint migration that preserves
+existing rows.
 
 #### Scenario: Money column stored as cents
 - **WHEN** the schema for `bids` is generated
@@ -21,6 +27,23 @@ TEXT ISO-8601 UTC.
 - **WHEN** an enum-like column such as auction status is defined
 - **THEN** the column is TEXT and the table DDL includes a CHECK
   constraint with the allowed values
+
+#### Scenario: Cut-deadline year backfills from the JSON
+- **WHEN** the migration runs on an auction whose `deadlines` JSON
+  holds `loggingDeadline: "2031-12-31"`
+- **THEN** `cut_deadline_year` is 2031 and an index covers the column
+
+#### Scenario: Cut-deadline year syncs on write
+- **WHEN** an admin saves an auction with a new `loggingDeadline`
+- **THEN** `cut_deadline_year` is recomputed in the same write
+
+#### Scenario: pollumaa passes the CHECK constraint
+- **WHEN** an auction row is inserted with `object_type = 'pollumaa'`
+- **THEN** the insert succeeds under the updated CHECK constraint
+
+#### Scenario: deleted user status passes the CHECK constraint
+- **WHEN** a user row is updated to `status = 'deleted'`
+- **THEN** the update succeeds under the updated CHECK constraint
 
 ### Requirement: Repository layer
 App code SHALL read and write data through a first-party repository layer
@@ -73,3 +96,4 @@ or when an enum-like TEXT column lacks a CHECK constraint.
 - **WHEN** a schema change declares a money column as `REAL`
 - **THEN** the lint fails with a message that cites the integer-cents
   rule
+

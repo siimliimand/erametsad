@@ -324,5 +324,29 @@ export async function seedCms(repos: CoreRepositories): Promise<void> {
     })
   }
 
+  // ── SOCIAL LINK SETTINGS (task 5.1) ──
+  // The portal footer reads the three social URL keys from the settings row;
+  // the seed leaves them empty so no fabricated targets render until an
+  // admin fills them. Merged into featureFlags so keys written by the
+  // settings seed (requireFrameworkContract) survive.
+  const settingsResult = await repos.find({ collection: 'settings', limit: 1 })
+  const settingsRow = settingsResult.docs[0]
+  const flags =
+    typeof settingsRow?.featureFlags === 'object' && settingsRow.featureFlags !== null
+      ? { ...(settingsRow.featureFlags as Record<string, unknown>) }
+      : {}
+  for (const key of ['social.facebook_url', 'social.instagram_url', 'social.youtube_url']) {
+    flags[key] = ''
+  }
+  if (settingsRow) {
+    await repos.update({
+      collection: 'settings',
+      id: settingsRow.id,
+      data: { featureFlags: flags },
+    })
+  } else {
+    await repos.create({ collection: 'settings', data: { featureFlags: flags } })
+  }
+
   console.log(`Seeded 1 homepage, ${String(services.length)} service pages, ${String(FAQ_CATEGORIES.length)} FAQ categories, ${String(FAQ_ITEMS.length)} FAQ items, ${String(ARTICLES.length)} articles, ${String(TESTIMONIALS.length)} testimonials, ${String(LEGAL_DOCS.length)} legal documents`)
 }

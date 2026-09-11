@@ -2,7 +2,7 @@
 import { encryptSealedData } from '../../encryption'
 import { eurosToCents, type AuctionDoc, type CoreRepositories } from '../repositories'
 
-const OBJECT_TYPES = ['raieoigus', 'kinnistu', 'kiire', 'pakett'] as const
+const OBJECT_TYPES = ['raieoigus', 'kinnistu', 'kiire', 'pakett', 'pollumaa'] as const
 
 // Plaintext identity snapshots encrypted into each sealed bid; must match
 // the isikukood values seeded in users.ts so the ceremony shows the demo
@@ -346,6 +346,7 @@ export async function seedBids(repos: CoreRepositories): Promise<void> {
   //   raieoigus-voru-ended (minBid 5500, reserve 7000): guest 5600, company 6900, private 6800 -> 7200 (1 revision) -> winner private 7200
   //   kiire-kehtna-ended (minBid 700, reserve 900): guest 750, company 900, private 950 -> winner private 950
   //   pakett-ida-viru-ended (minBid 9500, reserve 12000): private 11500, company 12500 -> winner company 12500
+  //   pollumaa-jogeva-ended (minBid 7500, reserve 9000): guest 7800, private 8600, company 9200 -> winner company 9200
   const endedSealed: { slug: string; bids: { user: string; amount: number; status: 'leading' | 'outbid' }[] }[] = [
     {
       slug: 'kinnistu-muhu-ended',
@@ -377,6 +378,14 @@ export async function seedBids(repos: CoreRepositories): Promise<void> {
       bids: [
         { user: privateUser.id, amount: 11500, status: 'leading' },
         { user: companyUser.id, amount: 12500, status: 'leading' },
+      ],
+    },
+    {
+      slug: 'pollumaa-jogeva-ended',
+      bids: [
+        { user: guestUser.id, amount: 7800, status: 'leading' },
+        { user: privateUser.id, amount: 8600, status: 'leading' },
+        { user: companyUser.id, amount: 9200, status: 'leading' },
       ],
     },
   ]

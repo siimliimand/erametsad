@@ -9,6 +9,7 @@ import type {
   BidSource,
 } from '@/lib/data/schema'
 import { auctionObjectTypes, auctionStatuses } from '@/lib/data/schema'
+import { db } from '@/lib/db'
 
 // Shared read-side shaping for the public auction APIs. Server components
 // (tasks 3.1, 4.1, 5.1) and the REST routes import the same helpers so role
@@ -58,6 +59,8 @@ export interface AuctionFilters {
   parishTokens: string[]
   species: string[]
   loggingTypes: string[]
+  /** Raietähtaeg (aasta); matches the indexed auctions.cut_deadline_year. */
+  cutDeadlineYear: number | undefined
   /** Free-text quick-search term; empty string disables the filter. */
   q: string
   area: AuctionRangeFilter
@@ -128,6 +131,25 @@ function rangeParams(
   }
 }
 
+/** Same bounds the archive endYear chips accept; keeps junk years out. */
+const MIN_CUT_DEADLINE_YEAR = 1970
+const MAX_CUT_DEADLINE_YEAR = 2100
+
+function cutDeadlineYearParam(params: URLSearchParams): number | undefined {
+  const raw = params.get('cutDeadlineYear')
+  if (raw === null || raw.trim() === '') return undefined
+  const value = Number(raw)
+  if (
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < MIN_CUT_DEADLINE_YEAR ||
+    value > MAX_CUT_DEADLINE_YEAR
+  ) {
+    throw new AuctionQueryError('Vale raietähtaeg')
+  }
+  return value
+}
+
 export function parseAuctionSearchParams(params: URLSearchParams): AuctionFilters {
   const rawSort = (params.get('sort') ?? '').trim()
   const sortDescending = rawSort.startsWith('-')
@@ -154,7 +176,7 @@ export function parseAuctionSearchParams(params: URLSearchParams): AuctionFilter
   return {
     objectTypes: enumTokens(
       csvTokens(params, 'objectType'),
-      ['raieoigus', 'kinnistu', 'kiire', 'pakett'],
+      auctionObjectTypes,
       'Vale objektitüübi filter',
     ),
     statuses: enumTokens(
@@ -166,6 +188,7 @@ export function parseAuctionSearchParams(params: URLSearchParams): AuctionFilter
     parishTokens: csvTokens(params, 'parish'),
     species: csvTokens(params, 'species'),
     loggingTypes: csvTokens(params, 'loggingType'),
+    cutDeadlineYear: cutDeadlineYearParam(params),
     q: (params.get('q') ?? '').trim(),
     area: rangeParams(params, 'areaMin', 'areaMax', 'Vale pindala'),
     volume: rangeParams(params, 'volumeMin', 'volumeMax', 'Vale maht'),
@@ -313,22 +336,25 @@ function storedLoggingCodes(stored: unknown): Set<string> {
   if (!Array.isArray(stored)) return codes
   for (const entry of stored) {
     if (typeof entry === 'string') {
-      codes.add(entry.toLowerCase())
+      codes.add(entry.toUpperCase())
       continue
     }
     if (typeof entry === 'object' && entry !== null) {
       const code = (entry as Record<string, unknown>).code
-      if (typeof code === 'string') codes.add(code.toLowerCase())
+      if (typeof code === 'string') codes.add(code.toUpperCase())
     }
   }
   return codes
 }
 
+// Design D2: both sides normalize to uppercase so the panel chips (which
+// send lowercase vr/hr/sr/lr/rd) match canonical stored codes (VR/HR/SR/LR/RD)
+// in any casing.
 function matchesLoggingTypes(stored: unknown, tokens: string[]): boolean {
   if (tokens.length === 0) return true
   const codes = storedLoggingCodes(stored)
   if (codes.size === 0) return false
-  return tokens.some((token) => codes.has(token))
+  return tokens.some((token) => codes.has(token.toUpperCase()))
 }
 
 function matchesRange(value: number | null, range: AuctionRangeFilter): boolean {
@@ -556,6 +582,10 @@ async function collectAuctionDocs(
   if (filters.objectTypes.length > 0) {
     where.objectType = { in: filters.objectTypes }
   }
+  if (filters.cutDeadlineYear !== undefined) {
+    // Server-side on the indexed cut_deadline_year column (design D1).
+    where.cutDeadlineYear = { equals: filters.cutDeadlineYear }
+  }
   if (countyIds !== null && countyIds.length === 0) return []
   if (countyIds !== null) {
     where.county = { in: countyIds }
@@ -643,6 +673,26 @@ export async function activeStatsByObjectType(
     bucket.minBidEur += centsToEuros(doc.minBidCents)
   }
   return stats
+}
+
+/**
+ * Distinct cutting-deadline years over status='active' auctions, ascending.
+ * Reads the indexed cut_deadline_year column directly (the repository find
+ * API cannot express DISTINCT), so the Raietähtaeg select offers exactly
+ * the years the active set holds. Empty when no active auction carries a
+ * deadline; the filter panel then falls back to its demo window.
+ */
+export async function activeCutDeadlineYears(): Promise<number[]> {
+  const { results } = await db.query<{ cut_deadline_year: number | null }>(
+    `SELECT DISTINCT cut_deadline_year FROM auctions
+     WHERE status = 'active' AND cut_deadline_year IS NOT NULL
+     ORDER BY cut_deadline_year`,
+  )
+  return results.flatMap((row) =>
+    typeof row.cut_deadline_year === 'number' && Number.isInteger(row.cut_deadline_year)
+      ? [row.cut_deadline_year]
+      : [],
+  )
 }
 
 // ── Archive lists and statistics (portal /ajalugu) ──────────────────────

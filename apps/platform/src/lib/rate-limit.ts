@@ -143,3 +143,5 @@ export const consentRateLimiter = new RateLimiter({ tokensPerInterval: 5, interv
 // Events are click-level traffic: higher ceiling than form endpoints.
 export const eventsRateLimiter = new RateLimiter({ tokensPerInterval: 30, intervalMs: 60_000 })
 export const newsletterRateLimiter = new RateLimiter({ tokensPerInterval: 5, intervalMs: 60_000 })
+// Sample notification test sends: one per user per minute.
+export const notificationsTestRateLimiter = new RateLimiter({ tokensPerInterval: 1, intervalMs: 60_000 })

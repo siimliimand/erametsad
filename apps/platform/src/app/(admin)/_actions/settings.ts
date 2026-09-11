@@ -13,6 +13,12 @@ import {
   integrationKeyDefinitions,
 } from '../admin/settings/_components/integration-keys'
 import type { IntegrationCheckState, IntegrationProbe } from '../admin/settings/_components/integration-keys'
+import {
+  parseSocialLinkUrls,
+  readSocialLinkUrls,
+  socialLinkFields,
+  type SocialLinkUrls,
+} from '../admin/settings/_components/social-links'
 
 import { verifyAccessToken } from '@/lib/auth/jwt'
 import { computeIpHash } from '@/lib/bidding/place-bid'
@@ -387,6 +393,63 @@ export async function rotateIntegrationKeyAction(
     context: await auditRequestContext(),
   })
 
+  return { ok: true }
+}
+
+/**
+ * "Sotsiaalsed lingid" (task 5.1): the three social URL settings keys for
+ * the portal footer. Stored at the top level of the featureFlags JSON like
+ * the other additive settings; empty values are legal and unset the footer
+ * icon. Validation runs here, never only in the browser.
+ */
+export interface SaveSocialLinksResult {
+  ok: boolean
+  error?: string
+}
+
+export async function saveSocialLinksAction(input: {
+  facebookUrl: string
+  instagramUrl: string
+  youtubeUrl: string
+  reason: string
+}): Promise<SaveSocialLinksResult> {
+  const { session, repositories } = await requireAdminRepositories()
+  assertCan(session.role, 'settings:write')
+
+  const reason = input.reason.trim()
+  if (!isValidReason(reason)) {
+    return { ok: false, error: 'Põhjendus peab olema vähemalt 5 tähemärki.' }
+  }
+
+  const parsed = parseSocialLinkUrls({
+    facebook: input.facebookUrl,
+    instagram: input.instagramUrl,
+    youtube: input.youtubeUrl,
+  })
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error }
+  }
+
+  const current = await findSettingsRow(repositories)
+  const before = readSocialLinkUrls(settingsFlags(current))
+  const next: SocialLinkUrls = parsed.value
+  const flags = settingsFlags(current)
+  for (const field of socialLinkFields) {
+    flags[field.key] = next[field.network]
+  }
+  await persistFeatureFlags(repositories, current, flags)
+
+  await writeAudit(repositories, {
+    actorId: session.userId,
+    action: 'settings.change',
+    entityId: current?.id ?? 'settings',
+    before: { socialLinks: before, reason },
+    after: { socialLinks: next, reason },
+    reason,
+    context: await auditRequestContext(),
+  })
+
+  revalidatePath(settingsPath)
   return { ok: true }
 }
 
