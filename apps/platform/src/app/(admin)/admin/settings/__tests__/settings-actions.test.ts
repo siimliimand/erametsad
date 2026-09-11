@@ -39,6 +39,7 @@ vi.mock('../../../_lib/admin', () => ({
 
 import {
   revealIntegrationKeyAction,
+  saveSocialLinksAction,
   setMaintenanceModeAction,
 } from '../../../_actions/settings'
 import { PermissionDeniedError } from '../../../_lib/permissions'
@@ -291,5 +292,124 @@ describe('revealIntegrationKeyAction', () => {
       PermissionDeniedError,
     )
     expect(auditEntries()).toEqual([])
+  })
+})
+
+describe('saveSocialLinksAction', () => {
+  let repos: Repos
+
+  beforeEach(() => {
+    state.session = { userId: 'superadmin-1', role: 'superadmin' }
+    repos = makeRepos({
+      id: 'settings-1',
+      featureFlags: {
+        requireFrameworkContract: true,
+        auctionDefaults: { sealedApproverRole: 'admin' },
+      },
+    })
+    state.repositories = repos
+  })
+
+  function auditEntries(): CreateArgs[] {
+    return repos.creates.filter((entry) => entry.collection === 'audit-entry')
+  }
+
+  const input = (
+    overrides: Partial<{
+      facebookUrl: string
+      instagramUrl: string
+      youtubeUrl: string
+      reason: string
+    }> = {},
+  ) => ({
+    facebookUrl: 'https://facebook.com/erametsad',
+    instagramUrl: '',
+    youtubeUrl: '',
+    reason: 'kanalite seadistamine',
+    ...overrides,
+  })
+
+  it('denies roles without settings:write, including admin (D-6 read-only tier)', async () => {
+    for (const role of ['admin', 'specialist'] as const) {
+      state.session = { userId: `${role}-1`, role }
+      await expect(
+        saveSocialLinksAction(input({ reason: 'puuduv õigus' })),
+      ).rejects.toBeInstanceOf(PermissionDeniedError)
+    }
+
+    expect(repos.updates).toEqual([])
+    expect(repos.creates).toEqual([])
+  })
+
+  it('refuses a short reason without writing', async () => {
+    const result = await saveSocialLinksAction(input({ reason: 'ei' }))
+
+    expect(result).toEqual({ ok: false, error: 'Põhjendus peab olema vähemalt 5 tähemärki.' })
+    expect(repos.updates).toEqual([])
+    expect(auditEntries()).toEqual([])
+  })
+
+  it('rejects a value that is not a URL', async () => {
+    const result = await saveSocialLinksAction(input({ facebookUrl: 'mitte-url' }))
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('Facebooki link')
+    expect(repos.updates).toEqual([])
+    expect(auditEntries()).toEqual([])
+  })
+
+  it('rejects javascript: URLs', async () => {
+    const result = await saveSocialLinksAction(input({ instagramUrl: 'javascript:alert(1)' }))
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('Instagrami link')
+    expect(repos.updates).toEqual([])
+    expect(auditEntries()).toEqual([])
+  })
+
+  it('merges the three keys into the existing flags, trimmed, and audits the change', async () => {
+    const result = await saveSocialLinksAction(
+      input({
+        facebookUrl: '  https://facebook.com/erametsad  ',
+        youtubeUrl: 'https://youtube.com/@erametsad',
+      }),
+    )
+
+    expect(result).toEqual({ ok: true })
+    expect(repos.updates[0]).toMatchObject({ collection: 'settings', id: 'settings-1' })
+    const flags = repos.updates[0]?.data.featureFlags as Record<string, unknown>
+    expect(flags.requireFrameworkContract).toBe(true)
+    expect(flags.auctionDefaults).toMatchObject({ sealedApproverRole: 'admin' })
+    expect(flags['social.facebook_url']).toBe('https://facebook.com/erametsad')
+    expect(flags['social.instagram_url']).toBe('')
+    expect(flags['social.youtube_url']).toBe('https://youtube.com/@erametsad')
+    expect(auditEntries()[0]?.data).toMatchObject({
+      actorId: 'superadmin-1',
+      action: 'settings.change',
+      entityType: 'settings',
+      entityId: 'settings-1',
+      before: { socialLinks: { facebook: '', instagram: '', youtube: '' } },
+      after: {
+        socialLinks: {
+          facebook: 'https://facebook.com/erametsad',
+          instagram: '',
+          youtube: 'https://youtube.com/@erametsad',
+        },
+      },
+    })
+  })
+
+  it('creates the settings row when none exists yet', async () => {
+    repos = makeRepos(null)
+    state.repositories = repos
+
+    const result = await saveSocialLinksAction(input())
+
+    expect(result).toEqual({ ok: true })
+    expect(repos.updates).toEqual([])
+    expect(repos.creates[0]).toMatchObject({ collection: 'settings' })
+    expect(repos.creates[0]?.data.featureFlags).toMatchObject({
+      'social.facebook_url': 'https://facebook.com/erametsad',
+    })
   })
 })

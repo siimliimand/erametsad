@@ -5,6 +5,8 @@ import { IntegrationKeys } from './IntegrationKeys'
 import { MaintenanceMode } from './MaintenanceMode'
 import { RoleMatrix } from './RoleMatrix'
 import { SettingsSaveForm } from './SettingsSaveForm'
+import { SocialLinks } from './SocialLinks'
+import { readSocialLinkUrls } from './social-links'
 import {
   FormField,
   FormSelectField,
@@ -161,6 +163,7 @@ export function SettingsForm({
                 Oksjonite vaikesätted (auctionDefaults) hallatakse Oksjonite reeglite rubriigis.
               </p>
             </SettingsSaveForm>
+            <SocialLinks urls={readSocialLinkUrls(settings?.featureFlags)} />
           </SettingsSection>
 
           <SettingsSection id="sec-reeglid" title="Oksjonite reeglid">

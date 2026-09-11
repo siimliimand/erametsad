@@ -1,12 +1,10 @@
-'use client'
-
 import Link from 'next/link'
 import type { ReactElement, SVGProps } from 'react'
 
-import { marketingUrl } from '@/app/(marketing)/_lib/base-url'
+import { CookieSettingsButton } from './CookieSettingsButton'
 
-// CookieBanner (task 1.4) reopens when this event fires on document.
-const OPEN_COOKIE_SETTINGS_EVENT = 'erametsad:open-cookie-settings'
+import { marketingUrl } from '@/app/(marketing)/_lib/base-url'
+import { getRepositories } from '@/lib/data/runtime'
 
 // Lucide removed its brand icons, so the Facebook/Instagram/YouTube geometry
 // ships inline (ISC), same as MarketingFooter.
@@ -108,16 +106,46 @@ const columns: FooterColumn[] = [
   },
 ]
 
-// Demo social targets; the CMS social columns do not exist yet.
-const socialLinks: { label: string; href: string; icon: SocialIcon }[] = [
-  { label: 'Facebook', href: 'https://facebook.com/erametsad', icon: FacebookIcon },
-  {
-    label: 'Instagram',
-    href: 'https://instagram.com/erametsad',
-    icon: InstagramIcon,
-  },
-  { label: 'YouTube', href: 'https://youtube.com/@erametsad', icon: YoutubeIcon },
-]
+// D8: the "Jälgi meid" column reads the social URL settings keys (top-level
+// entries of the settings featureFlags JSON, same additive pattern as
+// auctionDefaults). An unset or blank key drops its icon and the whole
+// column hides when none is set, so the footer never shows fabricated
+// targets. Admin editing happens in the Sotsiaalsed lingid settings card.
+const SOCIAL_FIELDS = [
+  { key: 'social.facebook_url', label: 'Facebook', icon: FacebookIcon },
+  { key: 'social.instagram_url', label: 'Instagram', icon: InstagramIcon },
+  { key: 'social.youtube_url', label: 'YouTube', icon: YoutubeIcon },
+] as const
+
+function socialUrl(flags: Record<string, unknown>, key: string): string {
+  const value = flags[key]
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : ''
+}
+
+/**
+ * Portal pages are dynamic, so the read happens on every render; a failed
+ * settings read degrades to an empty column instead of crashing the layout
+ * (same per-section degrade the DB-backed marketing sections use).
+ */
+async function loadSocialLinks(): Promise<
+  { label: string; href: string; icon: SocialIcon }[]
+> {
+  try {
+    const repositories = await getRepositories()
+    const { docs } = await repositories.find({ collection: 'settings', limit: 1 })
+    const flags = docs[0]?.featureFlags
+    const flagObject =
+      typeof flags === 'object' && flags !== null && !Array.isArray(flags)
+        ? (flags as Record<string, unknown>)
+        : {}
+    return SOCIAL_FIELDS.flatMap((field) => {
+      const href = socialUrl(flagObject, field.key)
+      return href.length > 0 ? [{ label: field.label, href, icon: field.icon }] : []
+    })
+  } catch {
+    return []
+  }
+}
 
 // Demo .footer-grid a: 15px links at 72% white, hover to full white.
 const columnLinkClass =
@@ -131,10 +159,8 @@ const socialLinkClass =
 const bottomLinkClass =
   'transition-colors duration-hover ease-hover hover:text-white'
 
-export function PortalFooter() {
-  const openCookieSettings = () => {
-    document.dispatchEvent(new CustomEvent(OPEN_COOKIE_SETTINGS_EVENT))
-  }
+export async function PortalFooter() {
+  const socialLinks = await loadSocialLinks()
 
   return (
     <footer className="bg-primaryDark pt-16 pb-8 text-inkInverse">
@@ -168,28 +194,30 @@ export function PortalFooter() {
               </nav>
             </div>
           ))}
-          <div>
-            <h2 className="mb-3.5 font-heading text-body font-bold text-white">
-              Jälgi meid
-            </h2>
-            <div className="flex gap-2.5">
-              {socialLinks.map((social) => {
-                const Icon = social.icon
-                return (
-                  <a
-                    key={social.label}
-                    href={social.href}
-                    target="_blank"
-                    rel="noopener"
-                    aria-label={social.label}
-                    className={socialLinkClass}
-                  >
-                    <Icon aria-hidden="true" className="h-[18px] w-[18px]" />
-                  </a>
-                )
-              })}
+          {socialLinks.length > 0 ? (
+            <div>
+              <h2 className="mb-3.5 font-heading text-body font-bold text-white">
+                Jälgi meid
+              </h2>
+              <div className="flex gap-2.5">
+                {socialLinks.map((social) => {
+                  const Icon = social.icon
+                  return (
+                    <a
+                      key={social.label}
+                      href={social.href}
+                      target="_blank"
+                      rel="noopener"
+                      aria-label={social.label}
+                      className={socialLinkClass}
+                    >
+                      <Icon aria-hidden="true" className="h-[18px] w-[18px]" />
+                    </a>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-white/15 pt-6 text-bodySm text-white/70">
@@ -206,13 +234,7 @@ export function PortalFooter() {
             >
               Privaatsuspoliitika
             </a>
-            <button
-              type="button"
-              onClick={openCookieSettings}
-              className={bottomLinkClass}
-            >
-              Küpsisesätted
-            </button>
+            <CookieSettingsButton className={bottomLinkClass} />
           </nav>
         </div>
       </div>
