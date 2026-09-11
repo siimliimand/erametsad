@@ -126,7 +126,7 @@ describe('auctions area/volume columns (migration 0018)', () => {
   it('backfills area_ha/volume_m3 from legacy deadlines JSON without touching the JSON', () => {
     const staged = new Database(':memory:')
     try {
-      for (const fileName of migrationFileNames().filter((name) => !name.startsWith('0018_'))) {
+      for (const fileName of migrationFileNames().filter((name) => name < '0018_')) {
         for (const statement of migrationStatements(fileName)) {
           staged.exec(statement)
         }
