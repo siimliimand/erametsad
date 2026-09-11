@@ -99,7 +99,13 @@ a verified phone), covering the domain event set including the
 auction-published event; the channel note about e-post as the main
 channel and the SMS thresholds; the persistence note "Muudatused
 rakenduvad kohe.", the link "Privaatsuspoliitika ja nõusolekute logi",
-and the "Saada test-teavitus" action. The matrix SHALL persist per user
+and the "Saada test-teavitus" action. The "Saada test-teavitus" action
+SHALL call `POST /api/v1/my/notifications/test`, which SHALL require a
+session, rate-limit per user to one request per minute, build a sample
+notification from a transactional template, and deliver it to the
+user's own email through the production email sender. The button SHALL
+report the real outcome: a success state on delivery and the error
+message on failure or rate-limit. The matrix SHALL persist per user
 through the profiles PATCH (`notificationPreferences`); the dispatcher
 SHALL consult it before sending on a channel, and a disabled channel
 SHALL produce no notification. Panel "Otsingute tellimused": the saved
@@ -108,6 +114,19 @@ a modal, delete with confirm, and delete-all with typed count.
 "Märgi loetuks" SHALL clear all visible unread. Unsubscribe token links
 SHALL open the confirm flow without a session and land on the saved
 searches panel.
+
+#### Scenario: Test notification sends an email
+
+- **WHEN** the user clicks "Saada test-teavitus"
+- **THEN** the endpoint sends one sample email to the user's own
+  address and the button shows a success state
+
+#### Scenario: Test notification is rate-limited
+
+- **WHEN** the user clicks "Saada test-teavitus" twice within one
+  minute
+- **THEN** the second request is refused with a 429 and the button
+  shows the rate-limit message
 
 #### Scenario: Muted channel sends nothing
 - **WHEN** the user disables email for the outbid event and another
@@ -148,15 +167,45 @@ refused while a request is pending. "Turve": the Parool row with "Muuda
 parooli", the eID row with "Vaheta", the "Aktiivsed sessioonid" list
 with the "See seanss" pill and per-session "Lõpeta", and "Logi välja
 teistest seanssidest". "Privaatsus ja andmed": "Ekspordi mu andmed
-(ZIP)" and the danger "Kustuta konto" button opening the confirm modal
-"Kustuta konto?" with the Kustutame/Säilitame lists and the 7-year
-retention note; the consents log with withdrawal for optional consents
-SHALL render in this card group.
+(ZIP)" SHALL call `GET /api/v1/my/export`, which SHALL require a
+session, rate-limit per user, gather the user's records (user row
+without ciphertext fields, profiles, bids, autobidders, auction rights,
+consent log entries, notification preference state, session metadata,
+own service requests and rights requests), and stream the ZIP
+`erametsad-andmed-<date>.zip`; the danger "Kustuta konto" button opens
+the confirm modal "Kustuta konto?" with the Kustutame/Säilitame lists
+and the 7-year retention note, and confirming with the typed word
+`KUSTUTA` SHALL call `POST /api/v1/my/delete-account`: the endpoint
+SHALL refuse while the user holds active participation (active auction
+bids, live autobidders, pending contracts), and otherwise anonymize the
+user (tombstone email, wipe name, phone, isikukood fields, and password
+material), revoke all sessions, and write an audit entry with reason
+`user-self-deletion`; the browser SHALL then end on the signed-out
+state. The consents log with withdrawal for optional consents SHALL
+render in this card group.
 
 #### Scenario: Isikukood reveal logs to audit
 - **WHEN** the user clicks "Näita" on the masked isikukood
 - **THEN** the full value shows, the audit note flips to "Vaatamine
   logitud auditisse.", and the access is recorded
+
+#### Scenario: Export downloads a real ZIP
+- **WHEN** the user clicks "Ekspordi mu andmed (ZIP)"
+- **THEN** the browser downloads `erametsad-andmed-<date>.zip` whose
+  entries cover the user's bids, consents, and profile data
+
+#### Scenario: Deletion refuses while bids are active
+- **WHEN** the user confirms deletion while holding a bid on an active
+  auction
+- **THEN** the endpoint refuses with the active-participation reason
+  and the account stays intact
+
+#### Scenario: Deletion anonymizes and signs out
+- **WHEN** the user with no active participation types `KUSTUTA` and
+  confirms
+- **THEN** the personal fields are wiped, sessions are revoked, an
+  audit entry is written, and the browser lands on the signed-out
+  state
 
 #### Scenario: Rights request creates pending state
 - **WHEN** the user requests property rights
