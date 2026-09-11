@@ -14,7 +14,9 @@ export const userRoles = [
 ] as const
 export type UserRole = (typeof userRoles)[number]
 
-export const userStatuses = ['active', 'suspended'] as const
+// 'deleted' marks a self-deleted account (D7): the row stays for
+// bid/contract/consent-log/audit integrity while personal fields are wiped.
+export const userStatuses = ['active', 'suspended', 'deleted'] as const
 export type UserStatus = (typeof userStatuses)[number]
 
 export const authMethods = ['eid', 'password'] as const

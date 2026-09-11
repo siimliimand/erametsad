@@ -70,6 +70,7 @@ export const userRoleLabels: Record<UserRole, string> = {
 export const userStatusLabels: Record<UserStatus, string> = {
   active: 'Aktiivne',
   suspended: 'Peatatud',
+  deleted: 'Kustutatud',
 }
 
 export const authMethodLabels: Record<AuthMethod, string> = {
@@ -131,6 +132,7 @@ export const statusChipLabels: Record<StatusChipVariant, string> = {
   ending: 'Lõpeb',
   'user:active': userStatusLabels.active,
   'user:suspended': userStatusLabels.suspended,
+  'user:deleted': userStatusLabels.deleted,
   'user:banned': 'Keelatud',
   'contract:prepared': contractStatusLabels.prepared,
   'contract:sent': contractStatusLabels.sent,

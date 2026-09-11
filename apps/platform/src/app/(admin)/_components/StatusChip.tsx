@@ -13,6 +13,7 @@ export type StatusChipVariant =
   | 'ending'
   | 'user:active'
   | 'user:suspended'
+  | 'user:deleted'
   | 'user:banned'
   | 'contract:prepared'
   | 'contract:sent'
@@ -48,6 +49,9 @@ const variantChipClass: Record<StatusChipVariant, string> = {
   // Demo 06-users: Peatatud wears the ended amber triad, Keelatud danger red.
   'user:active': 'bg-[var(--st-active-bg)] text-[color:var(--st-active-text)]',
   'user:suspended': 'bg-[var(--st-ended-bg)] text-[color:var(--st-ended-text)]',
+  // No demo triad exists for a self-deleted account; archived grey is the
+  // nearest neutral match, matching the appraised treatment above.
+  'user:deleted': 'bg-[var(--st-archived-bg)] text-[color:var(--st-archived-text)]',
   'user:banned': 'bg-danger-light text-danger',
   // Demo 08-contracts glyph states; spec admin-commerce-ops pins the sent
   // state to the blue (info) triad.
@@ -93,6 +97,7 @@ const variantDotClass: Record<StatusChipVariant, string | null> = {
   archived: 'bg-[var(--st-archived-dot)]',
   'user:active': 'bg-[var(--st-active-dot)]',
   'user:suspended': 'bg-[var(--st-ended-dot)]',
+  'user:deleted': 'bg-[var(--st-archived-dot)]',
   'user:banned': 'bg-danger',
   'contract:prepared': null,
   'contract:sent': null,

@@ -6,6 +6,7 @@ import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 import { can, type GuardContext, type GuardOperation } from '../guards'
 import type * as schema from '../schema'
 import { chainAuditEntry } from './audit-chain'
+import { syncCutDeadlineYear } from './cut-deadline-year'
 import { DocumentNotFoundError, GuardAccessError, UnknownFieldError } from './errors'
 import { applyIsikukoodOnRead, applyIsikukoodOnWrite, shouldDeactivateOtherTemplates, type IsikukoodCodec } from './hooks'
 import { decodeJsonFields, encodeJsonFields } from './json-fields'
@@ -214,6 +215,9 @@ export function createCoreRepositories(db: CoreDatabase, options: RepositoryOpti
       }
       out[field] = value
     }
+    // The derived cut-deadline year must be set before encodeJsonFields
+    // serializes `deadlines` into its stored TEXT form.
+    syncCutDeadlineYear(collection, out)
     let encoded = encodeJsonFields(out, config.jsonFields)
     if (config.isikukood) {
       encoded = applyIsikukoodOnWrite(encoded, options.isikukoodCodec)

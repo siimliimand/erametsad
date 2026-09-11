@@ -1,5 +1,7 @@
 export * from '../guards'
+export * from './anonymize-user'
 export * from './audit-chain'
+export * from './cut-deadline-year'
 export * from './errors'
 export * from './hooks'
 export * from './json-fields'

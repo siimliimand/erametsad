@@ -33,7 +33,7 @@ export interface UserActionState {
   banned: boolean
   /** Active shill flag exists (latest user.shill_flag phase is 'flagged'). */
   flagged: boolean
-  status: 'active' | 'suspended'
+  status: 'active' | 'suspended' | 'deleted'
 }
 
 /**
