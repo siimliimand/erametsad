@@ -1,7 +1,7 @@
 'use client'
 
 import { Accordion, Drawer } from '@erametsad/ui'
-import { ExternalLink, Menu } from 'lucide-react'
+import { Menu } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -23,12 +23,11 @@ function isActive(pathname: string, href: string): boolean {
 
 interface MobileNavProps {
   categories: HeaderFaqCategory[]
-  uhistuUrl: string
   portalUrl: string
   ctaClassName: string
 }
 
-export function MobileNav({ categories, uhistuUrl, portalUrl, ctaClassName }: MobileNavProps) {
+export function MobileNav({ categories, portalUrl, ctaClassName }: MobileNavProps) {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
 
@@ -40,7 +39,7 @@ export function MobileNav({ categories, uhistuUrl, portalUrl, ctaClassName }: Mo
   const trackNavClick = (item: string) => () => {
     track('nav_click', { item })
   }
-  const trackOutbound = (target: 'portal' | 'uhistu') => () => {
+  const trackOutbound = (target: 'portal') => () => {
     track('outbound_click', { target })
   }
 
@@ -154,16 +153,6 @@ export function MobileNav({ categories, uhistuUrl, portalUrl, ctaClassName }: Mo
           </nav>
 
           <div className="sticky bottom-0 -mx-4 -mb-4 mt-auto border-t border-border bg-bgPage px-4 py-3">
-            <a
-              href={uhistuUrl}
-              target="_blank"
-              rel="noopener"
-              onClick={trackOutbound('uhistu')}
-              className="mb-xs flex items-center justify-center gap-1 text-bodySm font-semibold text-ink transition-colors duration-hover hover:text-primary"
-            >
-              Metsaühistu
-              <ExternalLink className="h-4 w-4" aria-hidden="true" />
-            </a>
             <a
               href={portalUrl}
               target="_blank"

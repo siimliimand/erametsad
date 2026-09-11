@@ -3,7 +3,6 @@
 import {
   ChevronDown,
   ClipboardList,
-  ExternalLink,
   FileText,
   Map,
   Ruler,
@@ -33,9 +32,9 @@ export interface NavLeafLink {
   separated?: boolean
 }
 
-// Prototype host mirrors the PORTAL_HOSTNAME pattern; production cutover
-// is metsauhistu.erametsad.ee.
-const UHISTU_URL = 'https://metsauhistu.erametsad.ww0.dev'
+// The Metsaühistu subdomain (production: metsauhistu.erametsad.ee) is a
+// Phase 5 delivery and has no prototype host yet, so the header offers no
+// link to it — a link to an unresolvable host would dead-end visitors.
 const PORTAL_URL = `https://${PORTAL_HOSTNAME}`
 
 export const SERVICE_LINKS: NavLeafLink[] = [
@@ -74,9 +73,6 @@ interface NavGroupSpec {
 
 const CTA_CLASS =
   'inline-flex h-10 items-center justify-center rounded-button bg-cta px-4 font-label text-bodySm font-semibold text-ink transition-all duration-hover ease-hover hover:bg-cta-hover motion-reduce:transition-none'
-
-const EXTERNAL_CLASS =
-  'inline-flex items-center gap-1 font-heading text-body font-semibold text-ink transition-colors duration-hover hover:text-primary'
 
 function Logo() {
   return (
@@ -163,11 +159,11 @@ export function HeaderDropdown({ categories }: { categories: HeaderFaqCategory[]
   ]
 
   // Shell analytics (design 00 §SEO): nav_click{item} on menu links,
-  // outbound_click{portal|uhistu} on external targets.
+  // outbound_click{portal} on the external portal target.
   const trackNavClick = (item: string) => () => {
     track('nav_click', { item })
   }
-  const trackOutbound = (target: 'portal' | 'uhistu') => () => {
+  const trackOutbound = (target: 'portal') => () => {
     track('outbound_click', { target })
   }
 
@@ -327,16 +323,6 @@ export function HeaderDropdown({ categories }: { categories: HeaderFaqCategory[]
 
           <div className="flex items-center gap-md">
             <a
-              href={UHISTU_URL}
-              target="_blank"
-              rel="noopener"
-              onClick={trackOutbound('uhistu')}
-              className={EXTERNAL_CLASS}
-            >
-              Metsaühistu
-              <ExternalLink className="h-4 w-4" aria-hidden="true" />
-            </a>
-            <a
               href={PORTAL_URL}
               target="_blank"
               rel="noopener"
@@ -350,7 +336,6 @@ export function HeaderDropdown({ categories }: { categories: HeaderFaqCategory[]
 
         <MobileNav
           categories={categories}
-          uhistuUrl={UHISTU_URL}
           portalUrl={PORTAL_URL}
           ctaClassName={CTA_CLASS}
         />

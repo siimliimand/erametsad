@@ -38,10 +38,11 @@ export const metadata = buildMetadata({
 })
 
 // Draft copy from docs/design/marketing/02-teenused-raieoiguse-muuk.md until
-// the Page block builder lands in the CMS. Portal CTA paths follow the design
-// doc; the host comes from routing/host-areas.ts (prototype host today).
-const PORTAL_RAIE_URL = `https://${PORTAL_HOSTNAME}/raie`
-const PORTAL_KINNISTUD_URL = `https://${PORTAL_HOSTNAME}/kinnistud`
+// the Page block builder lands in the CMS. Portal CTAs target the listing
+// tabs on the portal home (the portal has no per-type paths); the host
+// comes from routing/host-areas.ts (prototype host today).
+const PORTAL_RAIE_URL = `https://${PORTAL_HOSTNAME}/?tab=raieoigused`
+const PORTAL_KINNISTUD_URL = `https://${PORTAL_HOSTNAME}/?tab=metskinnistud`
 
 const PROCESS_GROUPS: ProcessStepGroup[] = [
   {

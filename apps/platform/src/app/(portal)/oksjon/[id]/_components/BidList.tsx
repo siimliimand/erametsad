@@ -223,9 +223,13 @@ export function BidList({ auctionId, initialView }: BidListProps) {
         </p>
         <p className="text-bodySm text-inkMuted">
           Viimane pakkumise aeg:{' '}
-          {view.latestBidAt !== null
-            ? relativeTime(view.latestBidAt, now)
-            : '—'}
+          {/* `now` starts as server Date.now() and hydrates with the client
+              clock, so the label may legitimately differ by a tick. */}
+          <span suppressHydrationWarning>
+            {view.latestBidAt !== null
+              ? relativeTime(view.latestBidAt, now)
+              : '—'}
+          </span>
         </p>
         <p className="text-bodySm text-inkMuted">
           Summad ja pakkujate arv on nähtavad sisseloginud kasutajatele.
@@ -296,6 +300,7 @@ export function BidList({ auctionId, initialView }: BidListProps) {
                             ? 'shadow-[inset_3px_0_0_var(--color-primary)]'
                             : ''
                         }`}
+                        suppressHydrationWarning
                       >
                         {relativeTime(row.createdAt, now)}
                       </td>

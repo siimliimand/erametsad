@@ -1,5 +1,8 @@
-'use client';
-
+// No 'use client': the component is presentational, so it renders in
+// whatever graph imports it. Keeping it directive-free lets server
+// components pass icon component references and action elements without
+// crossing a serialization boundary (Lucide components are functions and
+// would throw "Functions cannot be passed directly to Client Components").
 import type { ReactNode, ElementType } from 'react';
 
 export interface EmptyStateProps {
