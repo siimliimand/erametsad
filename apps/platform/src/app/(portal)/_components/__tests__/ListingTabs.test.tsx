@@ -61,13 +61,15 @@ describe('ListingTabs tab resolution', () => {
     expect(koikDef.objectTypes).toEqual([])
   })
 
-  it('keeps polumaad without allTypes and without objectTypes', () => {
+  it('queries polumaad through the pollumaa objectType bucket', () => {
     const polumaad = listingTabDef('polumaad')
-    expect(polumaad.objectTypes).toEqual([])
+    expect(polumaad.objectTypes).toEqual(['pollumaa'])
     expect(polumaad.allTypes).toBeUndefined()
-    // The page gate `allTypes || objectTypes.length > 0` stays false, so
-    // Põllumaad skips the listing query and renders its empty state.
-    expect(polumaad.allTypes === true || polumaad.objectTypes.length > 0).toBe(false)
+    // The page gate `allTypes || objectTypes.length > 0` stays true, so the
+    // Põllumaad tab runs its listing query instead of the empty state.
+    expect(polumaad.allTypes === true || polumaad.objectTypes.length > 0).toBe(true)
+    // The query the page builds filters on the tab's object types.
+    expect(polumaad.objectTypes.join(',')).toBe('pollumaa')
   })
 })
 

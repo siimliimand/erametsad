@@ -211,6 +211,13 @@
       "when": 1789111554865,
       "tag": "0029_user_status_deleted",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1789119600000,
+      "tag": "0030_auction_logging_type_legacy_pairs",
+      "breakpoints": true
     }
   ]
 }

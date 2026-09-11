@@ -10,13 +10,12 @@ export interface ListingTabDef {
   heading: string
   /** Kõik tab only: totals and queries cover every objectType bucket. */
   allTypes?: boolean
-  /** objectType filters backing the tab; Põllumaad stays empty until wired. */
+  /** objectType filters backing the tab; empty only on the Kõik tab. */
   objectTypes: readonly AuctionObjectType[]
 }
 
-// The Põllumaad tab keeps empty objectTypes so it renders its empty state:
-// the 'pollumaa' schema value exists now, but the tab query itself is wired
-// later (task 3.1). Only Kõik is all-types, via its explicit flag.
+// Every non-Kõik tab maps to its objectType bucket; the page skips the
+// listing query only for Kõik, via its explicit allTypes flag.
 // Kiiroksjonid maps to objectType 'kiire'; the design doc's isQuickAuction
 // union is a later refinement once the parser exposes the flag.
 export const DEFAULT_LISTING_TAB_DEF: ListingTabDef = {
@@ -31,7 +30,7 @@ export const LISTING_TABS: readonly ListingTabDef[] = [
   DEFAULT_LISTING_TAB_DEF,
   { id: 'raieoigused', label: 'Raieõigused', heading: 'Raieõiguste oksjonid', objectTypes: ['raieoigus'] },
   { id: 'metskinnistud', label: 'Metskinnistud', heading: 'Metskinnistute oksjonid', objectTypes: ['kinnistu'] },
-  { id: 'polumaad', label: 'Põllumaad', heading: 'Põllumaade oksjonid', objectTypes: [] },
+  { id: 'polumaad', label: 'Põllumaad', heading: 'Põllumaade oksjonid', objectTypes: ['pollumaa'] },
   { id: 'paketid', label: 'Paketid', heading: 'Kinnistute paketid', objectTypes: ['pakett'] },
   { id: 'kiiroksjonid', label: 'Kiiroksjonid', heading: 'Kiiroksjonid', objectTypes: ['kiire'] },
 ]
