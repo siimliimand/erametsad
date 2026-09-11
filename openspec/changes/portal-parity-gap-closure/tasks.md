@@ -3,8 +3,8 @@
 ## 1. Schema and taxonomy foundations
 
 - [x] 1.1 Add the `pollumaa` auction object type: extend `auctionObjectTypes` in `schema/shared.ts`, generate the CHECK migration, and sweep the label maps and type ripples (`PortalLotCard` OBJECT_TYPE_LABELS, admin object-type label maps, `ListingTabs` comment only) until typecheck passes <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/lib/data/schema/shared.ts, apps/platform/drizzle/**, apps/platform/src/app/(portal)/_components/PortalLotCard.tsx] -->
-- [ ] 1.2 Add the `cut_deadline_year` INTEGER column to `auctions` with an index, a migration that backfills it from the `deadlines` JSON (`loggingDeadline`, `logging`, `raie` keys), and repository write-path sync that recomputes it on auction create/update <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/data/schema/auctions.ts, apps/platform/drizzle/**, apps/platform/src/lib/data/repositories/**] -->
-- [ ] 1.3 Add `deleted` to `userStatuses` (CHECK migration) and implement the PII-anonymization repository helper (email tombstone, name/phone/isikukood/password wipe) used by account deletion <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/data/schema/users.ts, apps/platform/drizzle/**, apps/platform/src/lib/data/repositories/**] -->
+- [x] 1.2 Add the `cut_deadline_year` INTEGER column to `auctions` with an index, a migration that backfills it from the `deadlines` JSON (`loggingDeadline`, `logging`, `raie` keys), and repository write-path sync that recomputes it on auction create/update <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/data/schema/auctions.ts, apps/platform/drizzle/**, apps/platform/src/lib/data/repositories/**] -->
+- [x] 1.3 Add `deleted` to `userStatuses` (CHECK migration) and implement the PII-anonymization repository helper (email tombstone, name/phone/isikukood/password wipe) used by account deletion <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/data/schema/users.ts, apps/platform/drizzle/**, apps/platform/src/lib/data/repositories/**] -->
 
 ## 2. Seed data
 
@@ -13,7 +13,7 @@
 ## 3. Query and filter wiring
 
 - [ ] 3.1 Wire the listing filters: accept and apply `cutDeadlineYear` in `parseAuctionSearchParams` against the new column, offer the Raietähtaeg options from years present in the active set (fallback to the current-year window when empty), normalize logging-code matching to case-insensitive, and point the `polumaad` tab at `objectTypes: ['pollumaa']`; unit tests for the year filter, code matching, and pollumaa tab query <!-- agent: fullstack-engineer.build, depends_on: [1.1, 1.2], touches: [apps/platform/src/lib/auction/queries.ts, apps/platform/src/app/(portal)/_components/ListingTabs.tsx, apps/platform/src/app/(portal)/_components/ListingFilters.tsx, apps/platform/src/app/(portal)/page.tsx, apps/platform/src/lib/auction/__tests__/**, apps/platform/src/app/(portal)/_components/__tests__/**] -->
-- [ ] 3.2 Wire the archive Põllumaa chip: filter `pollumaa` auctions when selected, update the chip comment and the empty-state copy, and add a unit test <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/auction/queries.ts, apps/platform/src/app/(portal)/ajalugu/page.tsx, apps/platform/src/app/(portal)/ajalugu/__tests__/**] -->
+- [x] 3.2 Wire the archive Põllumaa chip: filter `pollumaa` auctions when selected, update the chip comment and the empty-state copy, and add a unit test <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/lib/auction/queries.ts, apps/platform/src/app/(portal)/ajalugu/page.tsx, apps/platform/src/app/(portal)/ajalugu/__tests__/**] -->
 
 ## 4. Self-service actions
 
