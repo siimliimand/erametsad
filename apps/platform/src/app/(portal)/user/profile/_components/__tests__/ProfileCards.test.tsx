@@ -17,7 +17,6 @@ vi.mock('next/navigation', () => ({
 }))
 
 import { DataCard } from '../DataCard'
-import { DeleteAccountModal } from '../DeleteAccountModal'
 import { ProfilesCard } from '../ProfilesCard'
 import { maskIsikukood } from '../format'
 import type { ProfileView, UserAccount } from '../types'
@@ -197,28 +196,5 @@ describe('ProfilesCard', () => {
   })
 })
 
-describe('DeleteAccountModal', () => {
-  it('lists deleted and kept data with the 7-year retention note', async () => {
-    await mount(
-      createElement(DeleteAccountModal, { isOpen: true, onClose: vi.fn() }),
-    )
-    const body = document.body
-    expect(body.textContent).toContain('Kustuta konto?')
-    expect(body.textContent).toContain('Kustutame: konto ja profiilid')
-    expect(body.textContent).toContain(
-      'Säilitame: lõppenud oksjonite pakkumised',
-    )
-    expect(body.textContent).toContain('7 aastat')
-  })
-
-  it('keeps the confirm honest while no portal endpoint exists', async () => {
-    await mount(
-      createElement(DeleteAccountModal, { isOpen: true, onClose: vi.fn() }),
-    )
-    await act(async () => {
-      clickButton(document.body, 'Jätka kustutamist')
-      await Promise.resolve()
-    })
-    expect(document.body.textContent).toContain('toe kaudu')
-  })
-})
+// DeleteAccountModal flows live in DeleteAccountModal.test.tsx (task 4.3:
+// the confirm now POSTs /api/v1/my/delete-account and signs the user out).
