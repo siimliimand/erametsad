@@ -1077,6 +1077,7 @@ const SUMMARY_OBJECT_TYPE_LABELS: Record<AuctionObjectType, string> = {
   kinnistu: 'Metskinnistu',
   pakett: 'Pakett',
   kiire: 'Kiire oksjon',
+  pollumaa: 'Põllumaa',
 }
 
 const SUMMARY_AUCTION_TYPE_LABELS: Record<AuctionTypeValue, string> = {

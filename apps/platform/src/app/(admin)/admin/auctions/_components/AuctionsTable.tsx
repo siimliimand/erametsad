@@ -35,6 +35,7 @@ import {
   PackageIcon,
   PencilIcon,
   TreePineIcon,
+  WheatIcon,
   XIcon,
   ZapIcon,
 } from '../../../_components/icons'
@@ -111,6 +112,7 @@ const typeChipClass: Record<AuctionObjectType, string> = {
   kinnistu: 'bg-[var(--st-scheduled-bg)] text-[color:var(--st-scheduled-text)]',
   pakett: 'bg-[var(--st-draft-bg)] text-[color:var(--st-draft-text)]',
   kiire: 'bg-[var(--st-draft-bg)] text-[color:var(--st-draft-text)]',
+  pollumaa: 'bg-[var(--st-draft-bg)] text-[color:var(--st-draft-text)]',
 }
 
 const typeChipIcons: Record<
@@ -121,6 +123,7 @@ const typeChipIcons: Record<
   kinnistu: MapPinHouseIcon,
   pakett: PackageIcon,
   kiire: ZapIcon,
+  pollumaa: WheatIcon,
 }
 
 const raBtnClass =

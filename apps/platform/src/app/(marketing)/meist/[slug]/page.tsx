@@ -38,6 +38,7 @@ const OBJECT_TYPE_LABELS: Record<AuctionObjectType, string> = {
   kinnistu: 'Metskinnistu',
   kiire: 'Kiiroksjon',
   pakett: 'Pakett',
+  pollumaa: 'Põllumaa',
 }
 
 async function loadSpecialist(slug: string): Promise<Specialist | null> {

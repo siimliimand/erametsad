@@ -61,6 +61,7 @@ const objectTypeLabels: Record<AuctionObjectType, string> = {
   kinnistu: 'Metskinnistu',
   pakett: 'Pakett',
   kiire: 'Kiiroksjon',
+  pollumaa: 'Põllumaa',
 }
 
 function csvCell(value: string): string {

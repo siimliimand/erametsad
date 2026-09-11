@@ -13,6 +13,7 @@ const OBJECT_TYPE_LABELS: Record<AuctionObjectType, string> = {
   kinnistu: 'Kinnistu',
   kiire: 'Kiire oksjon',
   pakett: 'Pakett',
+  pollumaa: 'Põllumaa',
 }
 
 const OBJECT_TYPES = Object.keys(OBJECT_TYPE_LABELS) as AuctionObjectType[]

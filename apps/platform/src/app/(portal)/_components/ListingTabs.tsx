@@ -10,12 +10,13 @@ export interface ListingTabDef {
   heading: string
   /** Kõik tab only: totals and queries cover every objectType bucket. */
   allTypes?: boolean
-  /** objectType filters backing the tab; empty until the schema supports it. */
+  /** objectType filters backing the tab; Põllumaad stays empty until wired. */
   objectTypes: readonly AuctionObjectType[]
 }
 
-// Empty objectTypes keeps its "no schema value yet" meaning (Põllumaad
-// renders its empty state); only Kõik is all-types, via its explicit flag.
+// The Põllumaad tab keeps empty objectTypes so it renders its empty state:
+// the 'pollumaa' schema value exists now, but the tab query itself is wired
+// later (task 3.1). Only Kõik is all-types, via its explicit flag.
 // Kiiroksjonid maps to objectType 'kiire'; the design doc's isQuickAuction
 // union is a later refinement once the parser exposes the flag.
 export const DEFAULT_LISTING_TAB_DEF: ListingTabDef = {

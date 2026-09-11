@@ -3,7 +3,7 @@ import type { ComponentType } from 'react'
 
 import { WorkspaceCard } from './WorkspaceCard'
 import { AdminLink } from '../../_components/AdminLink'
-import { MapPinHouseIcon, PackageIcon, TreePineIcon, ZapIcon } from '../../_components/icons'
+import { MapPinHouseIcon, PackageIcon, TreePineIcon, WheatIcon, ZapIcon } from '../../_components/icons'
 import { EmptyRow } from '../../_components/ui/EmptyRow'
 import { auctionObjectTypeLabels, auctionTypeLabels, formatEur } from '../../_lib/labels'
 import { workspaceCardLabels } from '../_lib/workspace'
@@ -33,6 +33,10 @@ const typeChipMeta: Record<
   kiire: {
     className: 'bg-[var(--st-draft-bg)] text-[color:var(--st-draft-text)]',
     Icon: ZapIcon,
+  },
+  pollumaa: {
+    className: 'bg-[var(--st-draft-bg)] text-[color:var(--st-draft-text)]',
+    Icon: WheatIcon,
   },
 }
 

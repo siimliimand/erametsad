@@ -60,6 +60,7 @@ export const OBJECT_TYPE_LABELS: Record<string, string> = {
   kinnistu: 'Kinnistu',
   kiire: 'Kiire müük',
   pakett: 'Pakett',
+  pollumaa: 'Põllumaa',
 }
 
 /** Fixed donut palette order so segment colors never shuffle between renders. */

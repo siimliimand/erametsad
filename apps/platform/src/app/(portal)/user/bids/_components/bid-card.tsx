@@ -24,6 +24,7 @@ const OBJECT_TYPE_LABELS: Record<AuctionObjectType, string> = {
   kinnistu: 'Metskinnistu',
   pakett: 'Pakett',
   kiire: 'Kiiroksjon',
+  pollumaa: 'Põllumaa',
 }
 
 const ACTION_CLASSES = {

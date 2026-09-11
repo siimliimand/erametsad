@@ -2,7 +2,7 @@ export type ProfileTypeView = 'private' | 'company'
 
 export type ApprovalStatusView = 'pending' | 'approved' | 'rejected'
 
-export type ObjectTypeView = 'raieoigus' | 'kinnistu' | 'kiire' | 'pakett'
+export type ObjectTypeView = 'raieoigus' | 'kinnistu' | 'kiire' | 'pakett' | 'pollumaa'
 
 export type AuthMethodView = 'eid' | 'password'
 

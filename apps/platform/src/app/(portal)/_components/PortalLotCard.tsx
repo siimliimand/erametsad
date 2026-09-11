@@ -13,6 +13,7 @@ const OBJECT_TYPE_LABELS: Record<AuctionObjectType, string> = {
   kinnistu: 'Metskinnistu',
   pakett: 'Pakett',
   kiire: 'Kiiroksjon',
+  pollumaa: 'Põllumaa',
 }
 
 // CSP allows only 'self' data: blob: for images, so lots without media get

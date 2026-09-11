@@ -14,6 +14,7 @@ const OBJECT_TYPE_LABELS: Record<AuctionObjectType, string> = {
   kinnistu: 'Metskinnistu',
   kiire: 'Kiiroksjon',
   pakett: 'Pakett',
+  pollumaa: 'Põllumaa',
 }
 
 // LotCard requires an image; lots without media get the same placeholder

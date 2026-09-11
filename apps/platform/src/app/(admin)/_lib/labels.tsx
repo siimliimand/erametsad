@@ -35,6 +35,7 @@ export const auctionObjectTypeLabels: Record<AuctionObjectType, string> = {
   kinnistu: 'Kinnistu',
   kiire: 'Kiire oksjon',
   pakett: 'Pakett',
+  pollumaa: 'Põllumaa',
 }
 
 export const auctionTypeLabels: Record<'open' | 'sealed', string> = {
