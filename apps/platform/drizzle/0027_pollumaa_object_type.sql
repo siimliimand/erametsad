@@ -187,4 +187,4 @@ CREATE INDEX `autobidders_auction_idx` ON `autobidders` (`auction_id`);--> state
 CREATE UNIQUE INDEX `autobidders_user_auction_active_unique` ON `autobidders` (`user_id`,`auction_id`) WHERE "autobidders"."status" = 'active';--> statement-breakpoint
 CREATE INDEX `auction_rights_user_object_idx` ON `auction_rights` (`user_id`,`object_type`);--> statement-breakpoint
 CREATE UNIQUE INDEX `statistics_snapshots_date_object_type_unique` ON `statistics_snapshots` (`date`,`object_type`);--> statement-breakpoint
-CREATE INDEX `rights_requests_user_object_status_idx` ON `rights_requests` (`user_id`,`object_type`,`status`)
+CREATE INDEX `rights_requests_user_object_status_idx` ON `rights_requests` (`user_id`,`object_type`,`status`);

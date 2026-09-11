@@ -377,4 +377,4 @@ CREATE UNIQUE INDEX `notification_templates_active_idx` ON `notification_templat
 CREATE INDEX `notification_templates_event_channel_idx` ON `notification_templates` (`event`,`channel`);--> statement-breakpoint
 CREATE INDEX `notifications_user_read_idx` ON `notifications` (`user_id`,`read_at`);--> statement-breakpoint
 CREATE UNIQUE INDEX `auction_subscriptions_unsubscribe_token_unique` ON `auction_subscriptions` (`unsubscribe_token`);--> statement-breakpoint
-CREATE INDEX `auction_subscriptions_user_idx` ON `auction_subscriptions` (`user_id`)
+CREATE INDEX `auction_subscriptions_user_idx` ON `auction_subscriptions` (`user_id`);
