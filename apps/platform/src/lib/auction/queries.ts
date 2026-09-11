@@ -1,5 +1,4 @@
 import type { AccessTokenPayload } from '@/lib/auth/jwt'
-import { db } from '@/lib/db'
 import type { AuctionDoc, CoreRepositories, WhereField } from '@/lib/data/repositories'
 import { centsToEuros, eurosToCents } from '@/lib/data/repositories'
 import type {
@@ -10,6 +9,7 @@ import type {
   BidSource,
 } from '@/lib/data/schema'
 import { auctionObjectTypes, auctionStatuses } from '@/lib/data/schema'
+import { db } from '@/lib/db'
 
 // Shared read-side shaping for the public auction APIs. Server components
 // (tasks 3.1, 4.1, 5.1) and the REST routes import the same helpers so role
