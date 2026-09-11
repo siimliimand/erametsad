@@ -154,7 +154,7 @@ export function parseAuctionSearchParams(params: URLSearchParams): AuctionFilter
   return {
     objectTypes: enumTokens(
       csvTokens(params, 'objectType'),
-      ['raieoigus', 'kinnistu', 'kiire', 'pakett'],
+      auctionObjectTypes,
       'Vale objektitüübi filter',
     ),
     statuses: enumTokens(
