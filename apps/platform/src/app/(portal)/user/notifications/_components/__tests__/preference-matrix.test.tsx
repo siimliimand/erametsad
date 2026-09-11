@@ -48,7 +48,7 @@ async function unmountMatrix(): Promise<void> {
 
 function testButton(): HTMLButtonElement {
   const button = [...container.querySelectorAll('button')].find((element) => {
-    const label = element.textContent ?? ''
+    const label = element.textContent
     return label.includes('Saada test-teavitus') || label.includes('Saadame…')
   })
   if (button === undefined) throw new Error('test notification button not found')
@@ -66,7 +66,8 @@ beforeEach(() => {
   postTestNotification = () => jsonResponse({ status: 'ok', transport: 'email-binding' })
   fetchMock.mockReset()
   fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input)
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     const method = init?.method ?? 'GET'
     if (method === 'GET' && url.includes('/api/v1/profiles')) {
       return jsonResponse({ profiles: [{ notificationPreferences: {} }] })

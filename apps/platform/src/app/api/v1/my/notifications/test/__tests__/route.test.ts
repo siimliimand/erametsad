@@ -76,9 +76,9 @@ function testNotificationRequest(accessToken: string): NextRequest {
 
 function successBinding(): EmailSenderBinding {
   return {
-    send: async (message) => {
+    send: (message) => {
       sentMessages.push({ to: message.to, subject: message.subject, html: message.html })
-      return { messageId: 'test-binding-1' }
+      return Promise.resolve({ messageId: 'test-binding-1' })
     },
   }
 }
