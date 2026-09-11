@@ -27,4 +27,4 @@
 
 ## 6. Verification and docs
 
-- [ ] 6.1 Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`; run `pnpm seed:reset` and screenshot the listing, a lot detail, and the archive against the demo; update the DESIGN.md deviations list (remove the gaps this change closes, keep the functional deviations) <!-- agent: fullstack-engineer.fast, depends_on: [2.1, 3.1, 3.2, 4.1, 4.2, 4.3, 5.1], touches: [DESIGN.md] -->
+- [x] 6.1 Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`; run `pnpm seed:reset` and screenshot the listing, a lot detail, and the archive against the demo; update the DESIGN.md deviations list (remove the gaps this change closes, keep the functional deviations) <!-- agent: fullstack-engineer.fast, depends_on: [2.1, 3.1, 3.2, 4.1, 4.2, 4.3, 5.1], touches: [DESIGN.md] -->
