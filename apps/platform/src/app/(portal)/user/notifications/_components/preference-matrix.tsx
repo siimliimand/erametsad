@@ -129,6 +129,7 @@ export function PreferenceMatrix() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
+  const [testSending, setTestSending] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -170,6 +171,30 @@ export function PreferenceMatrix() {
       setError(saveError instanceof Error ? saveError.message : 'Salvestamine ebaõnnestus.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  // Real outcome only: the toast reports what the endpoint answered
+  // (success message, send-failure detail, or the 429 rate-limit text).
+  async function sendTestNotification() {
+    if (testSending) return
+    setTestSending(true)
+    try {
+      await apiJson<{ status: string }>('/api/v1/my/notifications/test', { method: 'POST' })
+      setToast({
+        message: 'Test-teavitus saadetud — kontrolli oma e-posti postkasti.',
+        key: Date.now(),
+      })
+    } catch (sendError) {
+      setToast({
+        message:
+          sendError instanceof Error
+            ? sendError.message
+            : 'Test-teavituse saatmine ebaõnnestus.',
+        key: Date.now(),
+      })
+    } finally {
+      setTestSending(false)
     }
   }
 
@@ -317,16 +342,14 @@ export function PreferenceMatrix() {
         </a>
         <button
           type="button"
+          disabled={testSending}
           onClick={() => {
-            setToast({
-              message: 'Test-teavitus saadetud — kontrolli oma e-posti postkasti.',
-              key: Date.now(),
-            })
+            void sendTestNotification()
           }}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-button border border-primary bg-transparent px-4 text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:bg-primaryLight motion-reduce:transition-none"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-button border border-primary bg-transparent px-4 text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:bg-primaryLight motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Send size={14} aria-hidden="true" />
-          Saada test-teavitus
+          {testSending ? 'Saadame…' : 'Saada test-teavitus'}
         </button>
       </div>
 
