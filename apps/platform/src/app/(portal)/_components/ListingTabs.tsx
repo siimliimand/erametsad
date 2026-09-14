@@ -79,8 +79,8 @@ export function ListingTabs({ activeTab, counts, params }: ListingTabsProps) {
     // Full-width strip under the page-head band: the negative margins cancel
     // the (portal) layout main padding (px-md md:px-lg), mirroring the demo
     // .tabs-wrap that spans the viewport with .container-aligned content.
-    <div className="-mx-md border-b border-border bg-white px-md md:-mx-lg md:px-lg">
-      <nav aria-label="Oksjonite tüübid" className="flex gap-2 overflow-x-auto py-4">
+    <div className="-mx-4 border-b border-border bg-white px-4 sm:-mx-6 sm:px-6 md:-mx-lg md:px-lg">
+      <nav aria-label="Oksjonite tüübid" className="flex gap-2 overflow-x-auto py-3 md:py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {LISTING_TABS.map((tab) => {
           const isActive = tab.id === activeTab
           return (

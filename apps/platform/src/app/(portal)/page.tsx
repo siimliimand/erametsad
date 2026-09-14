@@ -123,9 +123,9 @@ function ListingPageHead({ heading, summary }: { heading: string; summary: strin
   return (
     <section
       aria-labelledby="page-title"
-      className="-mx-md -mt-lg bg-bgMist px-md pb-[28px] pt-[32px] md:-mx-lg md:px-lg md:pb-[40px] md:pt-[48px]"
+      className="-mx-4 -mt-6 bg-bgMist px-4 pb-6 pt-7 sm:-mx-6 sm:px-6 md:-mx-lg md:-mt-lg md:px-lg md:pb-[40px] md:pt-[48px]"
     >
-      <h1 id="page-title" className="mb-[10px] font-heading text-h1 font-extrabold text-ink">
+      <h1 id="page-title" className="mb-2 font-heading text-2xl font-extrabold text-ink sm:text-3xl md:mb-[10px] md:text-h1">
         {heading}
       </h1>
       <p className="max-w-[52em] font-body text-body text-inkMuted md:text-[18px]">{summary}</p>
@@ -143,7 +143,7 @@ const PAGE_LINK_CLASS =
 function ListingPagination({ tab, page, totalPages, params }: ListingPaginationProps) {
   if (totalPages <= 1) return null
   return (
-    <nav aria-label="Leheküljed" className="mt-2 flex items-center justify-center gap-[6px]">
+    <nav aria-label="Leheküljed" className="mt-2 flex flex-wrap items-center justify-center gap-[6px]">
       {page > 1 ? (
         <Link href={buildListingHref(tab, params, page - 1)} aria-label="Eelmine leht" className={PAGE_LINK_CLASS}>
           <ChevronLeft size={14} aria-hidden="true" />
@@ -232,7 +232,7 @@ export default async function PortalListingPage({ searchParams }: PortalListingP
 
       <ListingTabs activeTab={tab} counts={counts} params={params} />
 
-      <div className="grid grid-cols-12 gap-lg pt-lg">
+      <div className="grid grid-cols-12 gap-y-6 pt-6 lg:gap-lg lg:pt-lg">
         <ListingResultsBar
           tab={tab}
           total={result.total}

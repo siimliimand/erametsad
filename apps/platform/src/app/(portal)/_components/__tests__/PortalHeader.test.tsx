@@ -129,6 +129,11 @@ describe('PortalHeader guest actions', () => {
     expect(render(null)).toContain('href="/login?next=%2Foksjon%2Fabc"')
     currentPathname = '/'
   })
+
+  it('hides the header Paku oma metsa CTA on small mobile viewports', () => {
+    const html = render(null)
+    expect(html).toMatch(/href="https:\/\/erametsad\.ww0\.dev\/teenused\/raieoiguse-muuk"[^>]*class="[^"]*\bhidden\b[^"]*\bsm:inline-flex\b/)
+  })
 })
 
 describe('PortalHeader authed state', () => {

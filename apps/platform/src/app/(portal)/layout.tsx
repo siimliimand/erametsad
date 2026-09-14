@@ -33,11 +33,11 @@ export default async function PortalLayout({ children }: { children: React.React
   const auth = await getPortalAuthState()
 
   return (
-    <div className={`portal-scope ${manrope.variable} flex min-h-screen flex-col bg-bgMist`}>
+    <div className={`portal-scope ${manrope.variable} flex min-h-screen flex-col overflow-x-clip bg-bgMist`}>
       <PortalHeader auth={auth} />
       <ImpersonationBanner auth={auth} />
       {auth ? <AccountDeletionNotice /> : null}
-      <main className="mx-auto w-full max-w-container-xl flex-1 px-md py-lg md:px-lg">
+      <main className="mx-auto w-full max-w-container-xl flex-1 px-4 py-6 sm:px-6 md:px-lg md:py-lg">
         {children}
       </main>
       <PortalFooter />

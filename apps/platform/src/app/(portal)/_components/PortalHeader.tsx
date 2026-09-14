@@ -308,15 +308,15 @@ export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
           scrolled ? 'h-[60px] shadow-card' : 'h-[72px]'
         }`}
       >
-        <div className="mx-auto flex h-full w-full max-w-container-xl items-center gap-7 px-md md:px-lg">
+        <div className="mx-auto flex h-full w-full max-w-container-xl items-center gap-3 px-4 sm:gap-6 sm:px-6 md:px-lg lg:gap-7">
           <Link
             href="/"
             aria-label="Erametsad Oksjonid — avaleht"
-            className="flex shrink-0 items-center gap-2.5 whitespace-nowrap font-heading text-[22px] font-extrabold tracking-[-0.01em] text-primaryDark"
+            className="flex shrink-0 items-center gap-2 whitespace-nowrap font-heading text-lg font-extrabold tracking-[-0.01em] text-primaryDark sm:gap-2.5 sm:text-[22px]"
           >
             <TreePine
               aria-hidden="true"
-              className="h-[26px] w-[26px] text-primary"
+              className="h-[22px] w-[22px] text-primary sm:h-[26px] sm:w-[26px]"
             />
             Erametsad Oksjonid
           </Link>
@@ -348,7 +348,7 @@ export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
               )
             })}
           </nav>
-          <div className="ml-auto flex items-center gap-3.5">
+          <div className="ml-auto flex items-center gap-2 sm:gap-3.5">
             {auth === null ? (
               <>
                 <Link
@@ -359,7 +359,7 @@ export function PortalHeader({ auth }: { auth: PortalAuthState | null }) {
                 </Link>
                 <a
                   href={sellHref}
-                  className={`${guestButtonClass} bg-cta text-ink hover:bg-ctaHover`}
+                  className={`${guestButtonClass} hidden bg-cta text-ink hover:bg-ctaHover sm:inline-flex`}
                 >
                   Paku oma metsa
                 </a>
