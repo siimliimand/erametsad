@@ -18,6 +18,7 @@ export function Card({
   image,
   content,
   actions,
+  children,
   hover = true,
   as: Component = 'article',
   className = '',
@@ -34,6 +35,7 @@ export function Card({
     >
       {image && <div className="w-full">{image}</div>}
       {content && <div className="p-6">{content}</div>}
+      {children}
       {actions && (
         <div className="flex justify-end gap-2 px-6 pb-6">{actions}</div>
       )}

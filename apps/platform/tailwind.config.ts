@@ -59,6 +59,7 @@ const config: Config = {
         xl: '64px',
         '2xl': '96px',
         '3xl': '128px',
+        gutter: '24px',
       },
       borderRadius: {
         card: 'var(--radius-card)',
@@ -79,9 +80,9 @@ const config: Config = {
           'var(--shadow-modal, 0 4px 16px rgba(22, 56, 42, 0.12), 0 16px 48px rgba(22, 56, 42, 0.1))',
       },
       fontSize: {
-        h1: ['48px', { lineHeight: '1.15' }],
-        h2: ['36px', { lineHeight: '1.2' }],
-        h3: ['24px', { lineHeight: '1.25' }],
+        h1: ['clamp(28px, 4vw + 8px, 40px)', { lineHeight: '1.2' }],
+        h2: ['clamp(22px, 2.5vw + 8px, 32px)', { lineHeight: '1.25' }],
+        h3: ['clamp(18px, 1.5vw + 10px, 24px)', { lineHeight: '1.3' }],
         h4: ['var(--font-size-h4)', { lineHeight: 'var(--line-height-h4)' }],
         body: [
           'var(--font-size-body)',

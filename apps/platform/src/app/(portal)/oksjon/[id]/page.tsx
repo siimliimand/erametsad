@@ -820,7 +820,7 @@ export default async function AuctionPage({
               {auction.isQuickAuction && <QuickAuctionBadge />}
             </div>
           </nav>
-          <div className="-mx-md mt-sm border-b border-border bg-bgPage px-md md:-mx-lg md:px-lg">
+          <div className="-mx-4 mt-sm border-b border-border bg-white px-4 sm:-mx-6 sm:px-6 md:-mx-lg md:px-lg">
             <AnchorTabs items={anchorTabs} />
           </div>
         </>

@@ -7,6 +7,8 @@ export interface AnchorTabItem {
   label: string
 }
 
+import { ScrollableTabNav } from '@/app/(portal)/_components/ScrollableTabNav'
+
 // Demo anchor tab row (docs/design/demo/portal/02-lot-detail-open.html .tabs):
 // pill buttons that smooth-scroll to their section; an IntersectionObserver
 // tracks which section is in view and marks the tab active.
@@ -42,33 +44,31 @@ export function AnchorTabs({ items }: { items: AnchorTabItem[] }) {
   }, [items, itemKey])
 
   return (
-    <nav aria-label="Lehe osad">
-      <div className="flex gap-2 overflow-x-auto py-4 [scrollbar-width:thin]">
-        {items.map((item) => {
-          const isActive = item.id === activeId
-          return (
-            <button
-              key={item.id}
-              type="button"
-              aria-current={isActive ? 'true' : undefined}
-              className={`inline-flex flex-none items-center rounded-pill border px-4 py-[9px] text-bodySm font-semibold transition-colors duration-hover ${
-                isActive
-                  ? 'border-primary bg-primary text-white'
-                  : 'border-border bg-bgPage text-ink hover:border-primary hover:text-primary'
-              }`}
-              onClick={() => {
-                setActiveId(item.id)
-                const target = document.getElementById(item.id)
-                if (target !== null) {
-                  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                }
-              }}
-            >
-              {item.label}
-            </button>
-          )
-        })}
-      </div>
-    </nav>
+    <ScrollableTabNav ariaLabel="Lehe osad" activeKey={activeId}>
+      {items.map((item) => {
+        const isActive = item.id === activeId
+        return (
+          <button
+            key={item.id}
+            type="button"
+            aria-current={isActive ? 'true' : undefined}
+            className={`inline-flex flex-none items-center rounded-pill border px-3.5 py-2 text-sm sm:px-4 sm:py-[9px] sm:text-bodySm font-semibold transition-colors duration-hover ${
+              isActive
+                ? 'border-primary bg-primary text-white'
+                : 'border-border bg-white text-ink hover:border-primary hover:text-primary'
+            }`}
+            onClick={() => {
+              setActiveId(item.id)
+              const target = document.getElementById(item.id)
+              if (target !== null) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }
+            }}
+          >
+            {item.label}
+          </button>
+        )
+      })}
+    </ScrollableTabNav>
   )
 }

@@ -5,6 +5,7 @@ import Link from 'next/link'
 
 import {
   LISTING_TAB_IDS,
+  ListingTabs,
   listingTabDef,
   resolveListingTab,
   type RawSearchParams,
@@ -427,42 +428,13 @@ interface ArchiveTabsProps {
 
 function ArchiveTabs({ activeTab, counts, params }: ArchiveTabsProps) {
   return (
-    // Demo .tabs-wrap: full-width white strip right under the mist page-head
-    // band; negative margins cancel the (portal) layout main padding, same
-    // pill language as the listing tab bar (ListingTabs).
-    <div className="-mx-md border-b border-border bg-white px-md md:-mx-lg md:px-lg">
-      <nav
-        aria-label="Arhiivi oksjonite tüübid"
-        className="flex gap-2 overflow-x-auto py-4"
-      >
-        {LISTING_TAB_IDS.map((tab) => {
-          const isActive = tab === activeTab
-          return (
-            <Link
-              key={tab}
-              href={archiveHref(tab, params)}
-              aria-current={isActive ? 'page' : undefined}
-              className={`inline-flex flex-none items-center gap-2 rounded-pill border px-4 py-[9px] text-[15px] font-semibold whitespace-nowrap transition-colors duration-hover ease-hover ${
-                isActive
-                  ? 'border-primary bg-primary text-white'
-                  : 'border-border bg-white text-ink hover:border-primary hover:text-primary'
-              }`}
-            >
-              {listingTabDef(tab).label}
-              <span
-                className={`rounded-pill px-[9px] py-px font-mono text-xs font-medium ${
-                  isActive
-                    ? 'bg-white/20 text-white'
-                    : 'bg-bgMist text-inkMuted'
-                }`}
-              >
-                {counts[tab]}
-              </span>
-            </Link>
-          )
-        })}
-      </nav>
-    </div>
+    <ListingTabs
+      activeTab={activeTab}
+      counts={counts}
+      params={params}
+      buildHref={archiveHref}
+      ariaLabel="Arhiivi oksjonite tüübid"
+    />
   )
 }
 

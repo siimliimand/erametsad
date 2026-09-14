@@ -52,7 +52,7 @@ export function CompanyCard(props: CompanyCardProps) {
         <Landmark className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
         {props.orgName && <h2 className="font-heading text-h3 text-ink">{props.orgName}</h2>}
       </div>
-      {rows.length > 0 && (
+      {rows.length > 0 ? (
         <dl className="mt-md flex flex-col gap-xs">
           {rows.map((row) => (
             <div key={row.label} className="flex flex-col gap-0.5 sm:flex-row sm:gap-md">
@@ -76,6 +76,10 @@ export function CompanyCard(props: CompanyCardProps) {
             </div>
           ))}
         </dl>
+      ) : (
+        <p className="mt-sm font-body text-bodySm text-inkMuted">
+          Ametlikud registri- ja kontaktandmed täpsustamisel.
+        </p>
       )}
     </div>
   )

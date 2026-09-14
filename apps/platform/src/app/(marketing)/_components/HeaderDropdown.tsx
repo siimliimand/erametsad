@@ -76,11 +76,11 @@ const CTA_CLASS =
 
 function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-xs" aria-label="Erametsad — avaleht">
-      <svg viewBox="0 0 24 24" className="h-7 w-7 text-primaryDark" fill="currentColor" aria-hidden="true">
+    <Link href="/" className="flex shrink-0 items-center gap-xs" aria-label="Erametsad — avaleht">
+      <svg viewBox="0 0 24 24" className="h-7 w-7 shrink-0 text-primaryDark" fill="currentColor" aria-hidden="true">
         <path d="M12 1.5 5.5 10.5h3.7L4 17.5h6.2v4h3.6v-4H20l-5.2-7h3.7L12 1.5z" />
       </svg>
-      <span className="font-heading text-h4 font-extrabold text-primaryDark">Erametsad</span>
+      <span className="whitespace-nowrap font-heading text-h4 font-extrabold text-primaryDark">Erametsad</span>
     </Link>
   )
 }

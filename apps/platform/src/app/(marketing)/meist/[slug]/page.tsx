@@ -208,7 +208,7 @@ export default async function SpecialistProfilePage({
   const bits = subtitleBits(specialist)
 
   return (
-    <main className="mx-auto w-full max-w-container-xl px-md py-xl lg:px-lg">
+    <div className="mx-auto w-full max-w-container-xl px-md py-lg sm:py-xl lg:px-lg">
       <Link
         href="/meist/metsaspetsialistid"
         className="text-bodySm text-inkMuted transition-colors duration-hover ease-hover hover:text-ink"
@@ -231,7 +231,9 @@ export default async function SpecialistProfilePage({
           </div>
         )}
         <div>
-          <h1 className="font-heading text-h1 text-ink">{specialist.name}</h1>
+          <h1 className="break-words font-heading text-h1 text-ink">
+            {specialist.name}
+          </h1>
           {bits.length > 0 && (
             <p className="mt-xs font-body text-body text-inkMuted">{bits.join(' · ')}</p>
           )}
@@ -329,6 +331,6 @@ export default async function SpecialistProfilePage({
           <LeadForm slug={`spetsialist-${specialist.slug}`} />
         </div>
       </section>
-    </main>
+    </div>
   )
 }

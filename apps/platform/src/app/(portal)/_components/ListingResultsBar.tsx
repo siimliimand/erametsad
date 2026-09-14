@@ -106,7 +106,7 @@ export function ListingResultsBar({
   }
 
   const viewButtonClass = (pressed: boolean): string =>
-    `inline-flex items-center gap-1.5 px-3 py-2 font-body text-sm font-semibold transition-colors duration-hover ease-hover motion-reduce:transition-none sm:gap-[7px] sm:px-4 sm:py-[9px] sm:text-[15px] ${
+    `inline-flex items-center justify-center gap-1.5 px-3 py-2 font-body text-sm font-semibold transition-colors duration-hover ease-hover motion-reduce:transition-none sm:gap-[7px] sm:px-4 sm:py-[9px] sm:text-[15px] ${
       pressed ? 'bg-primary text-inkInverse' : 'bg-white text-inkMuted'
     }`
 
@@ -170,18 +170,24 @@ export function ListingResultsBar({
               <button
                 type="button"
                 aria-pressed={mapView}
+                aria-label="Kaardivaade"
+                title="Kaardivaade"
                 onClick={() => { changeView('kaart'); }}
                 className={viewButtonClass(mapView)}
               >
-                <Map size={15} aria-hidden="true" /> Kaardivaade
+                <Map size={15} aria-hidden="true" />
+                <span className="hidden sm:inline">Kaardivaade</span>
               </button>
               <button
                 type="button"
                 aria-pressed={!mapView}
+                aria-label="Loendivaade"
+                title="Loendivaade"
                 onClick={() => { changeView('loend'); }}
                 className={viewButtonClass(!mapView)}
               >
-                <List size={15} aria-hidden="true" /> Loendivaade
+                <List size={15} aria-hidden="true" />
+                <span className="hidden sm:inline">Loendivaade</span>
               </button>
             </div>
 
