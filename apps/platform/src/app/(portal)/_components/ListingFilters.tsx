@@ -417,8 +417,13 @@ export function ListingFilters({ tab, cutDeadlineYears = [] }: ListingFiltersPro
             />
           </div>
 
-          <div className="flex flex-col gap-sm sm:flex-row sm:items-center">
-            <Btn type="button" variant="outline" onClick={clear} className="sm:self-start">
+          <div className="flex flex-col gap-sm pt-xs border-t border-border">
+            <Btn
+              type="button"
+              variant="outline"
+              onClick={clear}
+              className="w-full justify-center"
+            >
               <RotateCcw size={15} aria-hidden="true" /> Tühjenda
             </Btn>
             <Btn
@@ -426,6 +431,7 @@ export function ListingFilters({ tab, cutDeadlineYears = [] }: ListingFiltersPro
               onClick={toggleSubscribe}
               aria-expanded={subFormOpen}
               aria-controls="subForm"
+              className="w-full justify-center"
             >
               <Bell size={15} aria-hidden="true" /> Telli teavitus
             </Btn>
