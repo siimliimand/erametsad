@@ -234,8 +234,10 @@ describe('PageBlocks per-type rendering', () => {
   })
 
   it('renders the form paigutus select with both placements', () => {
+    // Assert the panel class, not the whole markup: form inputs legitimately
+    // reuse the mist token in their disabled state (disabled:bg-bgMist).
     const card = renderHtml([parsedView('form', 'form-kaardil')])
-    expect(card).toContain('bg-bgMist')
+    expect(card).toContain('rounded-card bg-bgMist p-lg')
 
     const light = renderHtml([
       view(
@@ -244,7 +246,8 @@ describe('PageBlocks per-type rendering', () => {
         'form-heledal',
       ),
     ])
-    expect(light).not.toContain('bg-bgMist')
+    expect(light).not.toContain('rounded-card bg-bgMist p-lg')
+    expect(light).toContain('border-border bg-bgPage p-lg')
     expect(light).toContain('data-form-type="pohivorm"')
   })
 

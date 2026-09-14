@@ -19,7 +19,7 @@ export interface ContactBandProps {
 export function ContactBand({ title, description, contacts }: ContactBandProps) {
   return (
     <section className="bg-bgMist py-xl">
-      <div className="mx-auto max-w-container-xl px-gutter">
+      <div className="mx-auto max-w-container-xl px-md lg:px-lg">
         <div className="mb-lg">
           <h2 className="font-heading text-h2 text-ink">{title}</h2>
           {description && (

@@ -109,6 +109,9 @@ export class RateLimiter {
   }
 
   private reconcile(key: string): void {
+    // Internal DOs are not exported by the dev worker proxy; skip remote sync in dev.
+    if (process.env.NODE_ENV === 'development') return
+
     const context = workersContext()
     const namespace = context?.env?.RATE_LIMITER
     if (!namespace) return

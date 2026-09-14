@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { ScrollableTabNav } from './ScrollableTabNav'
 import type { ListingTabId } from '../_lib/summary'
 
 import type { AuctionObjectType } from '@/lib/data/schema'
@@ -68,27 +69,35 @@ export function buildListingHref(
   return qs === '' ? '/' : `/?${qs}`
 }
 
-interface ListingTabsProps {
+export interface ListingTabsProps {
   activeTab: ListingTabId
   counts: Record<ListingTabId, number>
   params: RawSearchParams
+  buildHref?: (tab: ListingTabId, params: RawSearchParams) => string
+  ariaLabel?: string
 }
 
-export function ListingTabs({ activeTab, counts, params }: ListingTabsProps) {
+export function ListingTabs({
+  activeTab,
+  counts,
+  params,
+  buildHref = buildListingHref,
+  ariaLabel = 'Oksjonite tüübid',
+}: ListingTabsProps) {
   return (
     // Full-width strip under the page-head band: the negative margins cancel
-    // the (portal) layout main padding (px-md md:px-lg), mirroring the demo
+    // the (portal) layout main padding (px-4 sm:px-6 md:px-lg), mirroring the demo
     // .tabs-wrap that spans the viewport with .container-aligned content.
-    <div className="-mx-md border-b border-border bg-white px-md md:-mx-lg md:px-lg">
-      <nav aria-label="Oksjonite tüübid" className="flex gap-2 overflow-x-auto py-4">
+    <div className="-mx-4 border-b border-border bg-white px-4 sm:-mx-6 sm:px-6 md:-mx-lg md:px-lg">
+      <ScrollableTabNav ariaLabel={ariaLabel} activeKey={activeTab}>
         {LISTING_TABS.map((tab) => {
           const isActive = tab.id === activeTab
           return (
             <Link
               key={tab.id}
-              href={buildListingHref(tab.id, params)}
+              href={buildHref(tab.id, params)}
               aria-current={isActive ? 'page' : undefined}
-              className={`inline-flex flex-none items-center gap-2 rounded-pill border px-4 py-[9px] text-[15px] font-semibold whitespace-nowrap transition-colors duration-hover ease-hover ${
+              className={`inline-flex flex-none items-center gap-1.5 sm:gap-2 rounded-pill border px-3.5 py-2 text-sm sm:px-4 sm:py-[9px] sm:text-[15px] font-semibold whitespace-nowrap transition-colors duration-hover ease-hover ${
                 isActive
                   ? 'border-primary bg-primary text-white'
                   : 'border-border bg-white text-ink hover:border-primary hover:text-primary'
@@ -96,7 +105,7 @@ export function ListingTabs({ activeTab, counts, params }: ListingTabsProps) {
             >
               {tab.label}
               <span
-                className={`rounded-pill px-[9px] py-px font-mono text-xs font-medium ${
+                className={`rounded-pill px-2 sm:px-[9px] py-px font-mono text-xs font-medium ${
                   isActive ? 'bg-white/20 text-white' : 'bg-bgMist text-inkMuted'
                 }`}
               >
@@ -105,7 +114,7 @@ export function ListingTabs({ activeTab, counts, params }: ListingTabsProps) {
             </Link>
           )
         })}
-      </nav>
+      </ScrollableTabNav>
     </div>
   )
 }

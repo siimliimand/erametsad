@@ -67,7 +67,7 @@ export const Btn = forwardRef<HTMLButtonElement, BtnProps>(
     },
     ref,
   ) => {
-    const classes = `inline-flex items-center justify-center gap-2 rounded-button font-label font-semibold transition-all duration-hover ease-hover motion-reduce:transition-none w-full md:w-auto ${variantStyles[variant]} ${sizeStyles[size]} ${className}`;
+    const classes = `inline-flex items-center justify-center gap-2 rounded-button font-label font-semibold whitespace-nowrap transition-all duration-hover ease-hover motion-reduce:transition-none w-full md:w-auto ${variantStyles[variant]} ${sizeStyles[size]} ${className}`;
 
     if (asChild) {
       return <>{children}</>;
@@ -77,7 +77,7 @@ export const Btn = forwardRef<HTMLButtonElement, BtnProps>(
       <button
         ref={ref}
         className={classes}
-        disabled={disabled || isLoading}
+        disabled={disabled === true || isLoading}
         {...rest}
       >
         {isLoading && <Spinner />}

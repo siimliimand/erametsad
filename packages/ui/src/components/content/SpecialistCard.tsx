@@ -1,6 +1,5 @@
 'use client';
 
-import { type ReactNode } from 'react';
 import { Card } from '../Card';
 
 export interface SpecialistCardProps {
@@ -37,15 +36,15 @@ function FullCard({
 
   return (
     <Card image={imageEl}>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 p-6">
         <h3 className="font-heading text-h4 text-ink">{name}</h3>
         <p className="font-body text-bodySm text-inkMuted">{role}</p>
-        {(phone || email) && (
+        {(phone ?? email) && (
           <div className="mt-2 flex flex-col gap-1">
             {phone && (
               <a
-                href={`tel:${phone}`}
-                className="font-body text-bodySm text-primary hover:text-primaryHover transition-colors duration-hover"
+                href={`tel:${phone.replace(/\s+/g, '')}`}
+                className="font-body text-bodySm text-primary hover:text-primaryHover transition-colors duration-hover whitespace-nowrap"
               >
                 {phone}
               </a>
@@ -53,7 +52,7 @@ function FullCard({
             {email && (
               <a
                 href={`mailto:${email}`}
-                className="font-body text-bodySm text-primary hover:text-primaryHover transition-colors duration-hover"
+                className="font-body text-bodySm text-primary hover:text-primaryHover transition-colors duration-hover min-w-0 truncate max-w-full"
               >
                 {email}
               </a>
@@ -96,12 +95,12 @@ function MiniCard({
         <span className="font-body text-label text-inkMuted truncate">
           {role}
         </span>
-        {(phone || email) && (
-          <div className="flex gap-2 mt-0.5">
+        {(phone ?? email) && (
+          <div className="flex flex-col gap-0.5 mt-0.5 sm:flex-row sm:items-center sm:gap-x-3">
             {phone && (
               <a
-                href={`tel:${phone}`}
-                className="font-body text-label text-primary hover:text-primaryHover transition-colors duration-hover"
+                href={`tel:${phone.replace(/\s+/g, '')}`}
+                className="font-body text-label text-primary hover:text-primaryHover transition-colors duration-hover whitespace-nowrap"
               >
                 {phone}
               </a>
@@ -109,7 +108,7 @@ function MiniCard({
             {email && (
               <a
                 href={`mailto:${email}`}
-                className="font-body text-label text-primary hover:text-primaryHover transition-colors duration-hover"
+                className="font-body text-label text-primary hover:text-primaryHover transition-colors duration-hover min-w-0 truncate max-w-full"
               >
                 {email}
               </a>

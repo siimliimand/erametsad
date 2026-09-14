@@ -52,13 +52,15 @@ export default async function MetsaspetsialistidPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-container-xl px-md py-xl lg:px-lg">
-      <h1 className="font-heading text-h1 text-ink">Meie metsaspetsialistid</h1>
+    <div className="mx-auto w-full max-w-container-xl px-md py-lg sm:py-xl lg:px-lg">
+      <h1 className="break-words font-heading text-h1 text-ink">
+        Meie metsaspetsialistid
+      </h1>
       <p className="mt-sm max-w-container-sm font-body text-body text-inkMuted">
         Igas maakonnas oma inimene — helista või kirjuta otse.
       </p>
 
-      <ul className="mt-xl grid gap-lg sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="mt-lg grid gap-lg sm:mt-xl sm:grid-cols-2 lg:grid-cols-3">
         {specialists.map((specialist) => {
           const image = specialist.photoId
             ? imageUrlByPhotoId.get(specialist.photoId)
@@ -79,13 +81,16 @@ export default async function MetsaspetsialistidPage() {
         })}
       </ul>
 
-      <section className="mt-xl max-w-container-sm">
+      <section className="mt-lg max-w-container-sm sm:mt-xl">
         <CompanyCard
-          orgName={settings?.orgName ?? undefined}
+          orgName={settings?.orgName ?? 'Erametsad OÜ'}
           orgRegCode={settings?.orgRegCode ?? undefined}
+          vatNumber={settings?.orgVatCode ?? undefined}
           orgAddress={settings?.orgAddress ?? undefined}
+          phone={settings?.supportPhone ?? undefined}
+          email={settings?.supportEmail ?? undefined}
         />
       </section>
-    </main>
+    </div>
   )
 }

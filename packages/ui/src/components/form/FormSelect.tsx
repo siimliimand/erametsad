@@ -1,7 +1,7 @@
 'use client';
 
-import { type SelectHTMLAttributes, useId, useState, type ReactNode } from 'react';
 import { AlertCircle, ChevronDown } from 'lucide-react';
+import { type SelectHTMLAttributes, useId, useState, type ReactNode } from 'react';
 
 export interface FormSelectOption {
   value: string;
@@ -38,13 +38,6 @@ export function FormSelect({
   const hintId = `${id}-hint`;
   const [focused, setFocused] = useState(false);
 
-  const hasSelection =
-    value !== undefined
-      ? value !== '' && value !== undefined
-      : defaultValue !== undefined && defaultValue !== '';
-
-  const float = focused || hasSelection;
-
   return (
     <div className="flex flex-col gap-1">
       <div className="relative">
@@ -68,7 +61,7 @@ export function FormSelect({
           }}
           value={value}
           defaultValue={defaultValue}
-          className={`peer h-14 w-full appearance-none rounded-input border bg-bgPage px-4 pt-5 text-body outline-none transition-all duration-hover ease-hover motion-reduce:transition-none ${
+          className={`peer h-14 w-full appearance-none rounded-input border bg-bgPage px-4 pr-10 pt-5 text-body outline-none transition-all duration-hover ease-hover motion-reduce:transition-none disabled:bg-bgMist disabled:text-ink-muted ${
             error
               ? 'border-danger focus:border-danger focus:ring-2 focus:ring-danger/20'
               : 'border-border focus:border-primary focus:ring-2 focus:ring-primary/20'
@@ -94,11 +87,9 @@ export function FormSelect({
 
         <label
           htmlFor={id}
-          className={`pointer-events-none absolute left-4 transition-all duration-hover ease-hover motion-reduce:transition-none ${
-            float
-              ? 'top-2 text-label font-semibold text-primary'
-              : 'top-4 text-body text-ink-muted'
-          } ${error ? 'text-danger' : ''}`}
+          className={`pointer-events-none absolute left-4 top-2 text-label font-semibold transition-colors duration-hover ease-hover motion-reduce:transition-none ${
+            focused ? 'text-primary' : 'text-ink-muted'
+          } ${error ? 'text-danger' : ''} ${rest.disabled ? 'opacity-60' : ''}`}
         >
           {label}
           {required && (

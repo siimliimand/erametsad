@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RateLimiter, apiRateLimiter, authRateLimiter, leadsRateLimiter } from '@/lib/rate-limit'
 
@@ -45,6 +45,7 @@ async function flush(): Promise<void> {
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs()
   removeWorkersContext()
   calls.length = 0
   captured.length = 0
@@ -132,6 +133,17 @@ describe('RateLimiter delegating to RateLimiterDO', () => {
     limiter.check('ip')
 
     expect(captured).toHaveLength(1)
+  })
+
+  it('skips DO reconciliation in development mode', async () => {
+    vi.stubEnv('NODE_ENV', 'development')
+    installWorkersContext()
+    const limiter = new RateLimiter({ tokensPerInterval: 5, intervalMs: 60_000 })
+
+    limiter.check('ip')
+    await flush()
+
+    expect(calls).toHaveLength(0)
   })
 })
 

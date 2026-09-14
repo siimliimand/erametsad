@@ -164,7 +164,7 @@ export async function PortalFooter() {
 
   return (
     <footer className="bg-primaryDark pt-16 pb-8 text-inkInverse">
-      <div className="mx-auto w-full max-w-container-xl px-md md:px-lg">
+      <div className="mx-auto w-full max-w-container-xl px-4 sm:px-6 md:px-lg">
         <div className="mb-12 grid grid-cols-2 gap-8 md:grid-cols-4">
           {columns.map((column) => (
             <div key={column.title}>
