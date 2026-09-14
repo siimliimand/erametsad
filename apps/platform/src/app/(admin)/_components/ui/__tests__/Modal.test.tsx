@@ -253,6 +253,22 @@ describe('Modal', () => {
     }
   })
 
+  it('does not yank focus already inside the dialog when the retry lands late', async () => {
+    // The deferred focusPanel retry fires a frame after open; focus placed
+    // inside the panel before then must survive it (regression: the retry
+    // unconditionally pulled focus back to the first focusable).
+    const restore = stubVisibleElements()
+    try {
+      await mount(modalNode())
+      const panel = dialog()
+      panel.focus()
+      await nextFrame()
+      expect(document.activeElement).toBe(panel)
+    } finally {
+      restore()
+    }
+  })
+
   it('Escape closes only the topmost overlay in the shared stack', async () => {
     await mount(createElement(DrawerWithConfirm))
     expect(dialogs()).toHaveLength(1)

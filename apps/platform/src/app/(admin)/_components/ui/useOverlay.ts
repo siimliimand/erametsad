@@ -107,6 +107,9 @@ export function useDialogFocus(open: boolean, panelRef: RefObject<HTMLElement | 
         timer = schedule(focusPanel)
         return
       }
+      // The retry lands a frame after open; never steal focus the user (or a
+      // programmatic focus call) has already placed inside the dialog.
+      if (panel.contains(document.activeElement)) return
       const target = getFocusableElements(panel)[0] ?? panel
       target.focus()
     }
