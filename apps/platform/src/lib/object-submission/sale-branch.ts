@@ -1,12 +1,13 @@
-import type { AuctionDoc } from '@/lib/data/repositories/registry'
-import { getRepositories } from '@/lib/data/runtime'
-import type { CoreRepositories } from '@/lib/data/repositories'
-import type { Lead } from '@/lib/data/schema'
+import { slugifyTitle } from '@/app/(admin)/admin/auctions/_lib/auction-schema'
 import {
   countyRoundRobinPick,
   type CountyRoundRobinCandidate,
 } from '@/app/(admin)/admin/leads/_components/lead-flow'
-import { slugifyTitle } from '@/app/(admin)/admin/auctions/_lib/auction-schema'
+import type { CoreRepositories } from '@/lib/data/repositories'
+import type { AuctionDoc } from '@/lib/data/repositories/registry'
+import { getRepositories } from '@/lib/data/runtime'
+import type { Lead } from '@/lib/data/schema'
+import { eventBus, type DomainEvent } from '@/lib/notifications/event-bus'
 import { deriveSaleCounty, type SaleObjectType, type SaleSubmission } from '@/lib/object-submission'
 
 /**
@@ -70,10 +71,15 @@ export async function resolveCountyId(
 
 export interface SaleBranchServices {
   repositories: CoreRepositories
+  /**
+   * Notification sink; defaults to the shared event bus so tests can inject
+   * a spy and assert the emissions without a real dispatcher.
+   */
+  notifications?: { emit(event: DomainEvent): void }
 }
 
 async function defaultServices(): Promise<SaleBranchServices> {
-  return { repositories: await getRepositories() }
+  return { repositories: await getRepositories(), notifications: eventBus }
 }
 
 export interface IngestSaleSubmissionResult {
@@ -123,7 +129,7 @@ export async function ingestSaleSubmission(
   sellerId: string,
   services?: SaleBranchServices,
 ): Promise<IngestSaleSubmissionResult> {
-  const { repositories } = services ?? (await defaultServices())
+  const { repositories, notifications = eventBus } = services ?? (await defaultServices())
 
   // The derived code wins over the (optional, wizard-prefilled) payload
   // county; the payload value only backs the derivation up when the first
@@ -215,6 +221,22 @@ export async function ingestSaleSubmission(
       },
     },
   })
+
+  // Emitted only after every row succeeded (same as place-bid). Dispatch
+  // errors are swallowed inside the notification service, so a failed
+  // notification never fails the submission.
+  notifications.emit({
+    type: 'submission.received',
+    userId: sellerId,
+    payload: { objectTitle: title },
+  })
+  if (assignedSpecialistId !== null) {
+    notifications.emit({
+      type: 'submission.new',
+      userId: assignedSpecialistId,
+      payload: { objectTitle: title, submitterName: input.contact.name },
+    })
+  }
 
   return { auction, lead, assignedSpecialistId }
 }

@@ -13,8 +13,22 @@ import {
 import * as schema from '../data/schema'
 import { getD1Database } from '../db'
 import { validateHoneypot } from '../leads/ingestion'
+import { eventBus, type DomainEvent } from '../notifications/event-bus'
 
 const DUPLICATE_WINDOW_MS = 10 * 60 * 1000
+
+const SERVICE_TYPE_LABELS: Record<ServiceRequestPayload['type'], string> = {
+  kava: 'Metsamajanduskava',
+  hooldusraie: 'Hooldusraie',
+  istutamine: 'Istutamine',
+}
+
+/** Confirmation-title convention matching the sale branch: label + cadastre. */
+function serviceRequestTitle(payload: ServiceRequestPayload): string {
+  const label = SERVICE_TYPE_LABELS[payload.type]
+  const cadastre = payload.cadastres[0]
+  return cadastre === undefined ? label : `${label} ${cadastre}`
+}
 
 /** Honeypot hit: callers answer with a neutral success, never a row. */
 export class HoneypotTriggeredError extends Error {
@@ -62,6 +76,11 @@ export interface IngestServiceRequestResult {
 export interface ServiceRequestServices {
   serviceRequests: ServiceRequestsRepository
   partners: PartnersRepository
+  /**
+   * Notification sink; defaults to the shared event bus so tests can inject
+   * a spy and assert the emissions without a real dispatcher.
+   */
+  notifications?: { emit(event: DomainEvent): void }
 }
 
 // Same widening as runtime.ts: the D1 drizzle instance satisfies CoreDatabase.
@@ -71,6 +90,7 @@ async function defaultServices(): Promise<ServiceRequestServices> {
   return {
     serviceRequests: createServiceRequestsRepository(database),
     partners: createPartnersRepository(database),
+    notifications: eventBus,
   }
 }
 
@@ -83,6 +103,7 @@ export async function ingestServiceRequest(
   }
 
   const repos = services ?? (await defaultServices())
+  const { notifications = eventBus } = repos
 
   if (!validateHoneypot(input.body)) {
     throw new HoneypotTriggeredError()
@@ -127,6 +148,19 @@ export async function ingestServiceRequest(
     pageSlug: input.pageSlug ?? '',
     ipHash: input.requestIp ? computeIpHash(input.requestIp) : null,
   })
+
+  // Fire-and-forget submitter confirmation, only for portal submissions
+  // with a session user. Partner delivery stays with the admin routing
+  // flow (Erametsa päring email); inbox delivery is Phase 5.5. Dispatch
+  // errors are swallowed inside the notification service, so a failed
+  // notification never fails the request.
+  if (input.userId) {
+    notifications.emit({
+      type: 'submission.received',
+      userId: input.userId,
+      payload: { objectTitle: serviceRequestTitle(payload) },
+    })
+  }
 
   return { request, routedCount: matched.length }
 }

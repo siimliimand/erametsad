@@ -60,7 +60,7 @@ export async function resetAndSeed(): Promise<void> {
       batch: (statements) => handle.batch(statements),
     })
 
-    await seed(repos)
+    await seed(repos, handle.db)
 
     logTableCounts(handle.raw, tables)
   } finally {

@@ -8,6 +8,8 @@ export type DomainEventType =
   | 'auction.won'
   | 'bid.approved'
   | 'bid.rejected'
+  | 'submission.received'
+  | 'submission.new'
 
 export interface DomainEvent {
   type: DomainEventType
