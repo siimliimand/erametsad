@@ -91,6 +91,11 @@ export default async function LeadDetailPage({
     ? (counties.find((county) => county.id === lead.countyId)?.name ?? null)
     : null
 
+  // Portal submissions link the lead to its auction; null means no auction.
+  const auction = lead.auctionId
+    ? await repositories.findByID({ collection: 'auctions', id: lead.auctionId })
+    : null
+
   // Consent record: the latest cookie-consent decision tied to the lead's
   // stored IP hash; a marketing rejection marks contact as forbidden.
   let consentWithdrawn: string | null = null
@@ -282,6 +287,13 @@ export default async function LeadDetailPage({
         </Field>
         <Field label="Maakond">{countyName ?? '—'}</Field>
         <Field label="Allikas">{lead.source ?? '—'}</Field>
+        {lead.auctionId ? (
+          <Field label="Seotud oksjon">
+            <AdminLink href={`/auctions/${lead.auctionId}`} className="text-primary underline">
+              {auction?.title ?? `#${lead.auctionId.slice(0, 8)}`}
+            </AdminLink>
+          </Field>
+        ) : null}
         <Field label="Nõusolek turunduseks">
           {consentWithdrawn
             ? `tagasi võetud ${formatDateTime(consentWithdrawn)}`
