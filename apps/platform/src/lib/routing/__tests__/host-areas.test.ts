@@ -61,6 +61,7 @@ describe('resolvePathArea', () => {
     expect(resolvePathArea('/login')).toBe('portal')
     expect(resolvePathArea('/oksjon/123')).toBe('portal')
     expect(resolvePathArea('/user/bids')).toBe('portal')
+    expect(resolvePathArea('/user/objects/paku')).toBe('portal')
     expect(resolvePathArea('/lepingud/raamleping')).toBe('portal')
     expect(resolvePathArea('/administrator')).toBe('portal')
   })
@@ -100,6 +101,7 @@ describe('resolveHostRedirect', () => {
   it('serves portal paths on the portal host without redirecting', () => {
     expect(resolveHostRedirect(PORTAL_HOSTNAME, '/')).toBeNull()
     expect(resolveHostRedirect(PORTAL_HOSTNAME, '/oksjon/9', '?ref=list')).toBeNull()
+    expect(resolveHostRedirect(PORTAL_HOSTNAME, '/user/objects/paku')).toBeNull()
     expect(resolveHostRedirect(PORTAL_HOSTNAME, '/api/v1/auctions')).toBeNull()
   })
 
@@ -137,6 +139,9 @@ describe('resolveHostRedirect', () => {
     )
     expect(resolveHostRedirect(DEFAULT_HOSTNAME, '/lepingud/raamleping')).toBe(
       `https://${PORTAL_HOSTNAME}/lepingud/raamleping`,
+    )
+    expect(resolveHostRedirect(DEFAULT_HOSTNAME, '/user/objects/paku', '?ref=cta')).toBe(
+      `https://${PORTAL_HOSTNAME}/user/objects/paku?ref=cta`,
     )
   })
 

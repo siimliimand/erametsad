@@ -1,7 +1,7 @@
 import { getTableColumns } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 
-import { auctions, bids, users } from '../../schema'
+import { leads, serviceRequests, auctions, bids, users } from '../../schema'
 import { UnknownCollectionError } from '../errors'
 import { coreCollections, getCollectionConfig } from '../registry'
 
@@ -48,6 +48,14 @@ describe('coreCollections registry', () => {
     const auctionColumns = getTableColumns(auctions)
     for (const alias of Object.values(coreCollections.auctions.aliases)) {
       expect(alias in auctionColumns, alias).toBe(true)
+    }
+    const leadsColumns = getTableColumns(leads)
+    for (const alias of Object.values(coreCollections.leads.aliases)) {
+      expect(alias in leadsColumns, alias).toBe(true)
+    }
+    const serviceRequestColumns = getTableColumns(serviceRequests)
+    for (const alias of Object.values(coreCollections['service-requests'].aliases)) {
+      expect(alias in serviceRequestColumns, alias).toBe(true)
     }
   })
 

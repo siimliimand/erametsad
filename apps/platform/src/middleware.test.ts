@@ -368,4 +368,19 @@ describe('middleware portal paths on the default host', () => {
     expect(response.headers.get('location')).toBeNull()
     expect(response.headers.get('x-middleware-rewrite')).toBeNull()
   })
+
+  it('serves the submission wizard on the portal host and 308s it from the default host', () => {
+    const portalResponse = middleware(requestFor(PORTAL_HOSTNAME, '/user/objects/paku'))
+
+    expect(portalResponse.status).toBe(200)
+    expect(portalResponse.headers.get('location')).toBeNull()
+    expect(portalResponse.headers.get('x-middleware-rewrite')).toBeNull()
+
+    const defaultResponse = middleware(requestFor(DEFAULT_HOSTNAME, '/user/objects/paku?ref=cta'))
+
+    expect(defaultResponse.status).toBe(308)
+    expect(defaultResponse.headers.get('location')).toBe(
+      `https://${PORTAL_HOSTNAME}/user/objects/paku?ref=cta`,
+    )
+  })
 })
