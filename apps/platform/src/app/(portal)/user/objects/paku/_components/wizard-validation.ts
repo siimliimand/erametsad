@@ -62,7 +62,8 @@ function numberOrRaw(value: string): number | string | undefined {
   return Number.isNaN(parsed) ? trimmed : parsed
 }
 
-function salePayload(data: ObjectWizardData): Record<string, unknown> {
+/** Shared with submit.ts so the wire payload cannot drift from validation. */
+export function salePayload(data: ObjectWizardData): Record<string, unknown> {
   const { sale, contact } = data
   const county = sale.county.trim()
   const address = sale.address.trim()
@@ -87,7 +88,8 @@ function salePayload(data: ObjectWizardData): Record<string, unknown> {
   return payload
 }
 
-function servicePayload(data: ObjectWizardData): Record<string, unknown> {
+/** Shared with submit.ts; note `branch` is portal-only and stripped before POST. */
+export function servicePayload(data: ObjectWizardData): Record<string, unknown> {
   const { service, contact } = data
   const payload: Record<string, unknown> = {
     branch: 'service',

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 
-import { ObjectWizard } from './_components/ObjectWizard'
+import { ObjectWizardSubmitter } from './_components/ObjectWizardSubmitter'
 import { requirePortalSession } from '../../../_lib/session'
 import { UserPageHead } from '../../_components/UserPageHead'
 
@@ -46,14 +46,11 @@ export default async function ObjectSubmissionWizardPage() {
         summary="Viige objekt samm-sammult müüki või tellige teenus — kava, hooldusraie või istutamine."
       />
       <section className="px-md py-lg md:px-lg">
-        <ObjectWizard
+        <ObjectWizardSubmitter
           contactPrefill={{
             name: profile ? profileName(profile) : null,
             email: readEmail(user),
             phone: profile?.phone ?? null,
-          }}
-          onSubmit={() => {
-            // Submission wiring lands with task 3.3.
           }}
         />
       </section>
