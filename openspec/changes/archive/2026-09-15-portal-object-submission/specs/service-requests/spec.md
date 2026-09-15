@@ -2,10 +2,10 @@
 
 ### Requirement: Portal-authenticated submissions
 
-When `POST /api/v1/service-requests` is called with a valid portal session, the
-route SHALL stamp the created `service_requests` row with the session user's
-id. The existing payload validation, consent requirement, per-IP rate limits,
-honeypot handling, attachment rules (one PDF/JPG/PNG up to 10 MB,
+The route SHALL stamp the created `service_requests` row with the session
+user's id when `POST /api/v1/service-requests` is called with a valid portal
+session. The existing payload validation, consent requirement, per-IP rate
+limits, honeypot handling, attachment rules (one PDF/JPG/PNG up to 10 MB,
 hooldusraie only), and duplicate throttle SHALL apply to authenticated
 submissions unchanged. Requests without a session SHALL continue to store no
 user id, keeping the anonymous marketing funnel intact.
