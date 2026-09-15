@@ -35,8 +35,8 @@ function firstParam(value: string | string[] | undefined): string | null {
   return raw
 }
 
-// The prepare endpoint is auction-scoped, so the framework flow derives its
-// auction context from ?next=/oksjon/:id (the bid-gate round trip).
+// The framework flow works without auction context; ?next=/oksjon/:id only
+// adds the post-signing return trip to that auction (the bid-gate round trip).
 function auctionIdFromNext(next: string): string | null {
   const match = /^\/oksjon\/([^/?#]+)$/.exec(next)
   return match?.[1] ?? null

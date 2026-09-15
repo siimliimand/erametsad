@@ -133,7 +133,12 @@ export default async function AdminContractsPage({
 
   // Enrichment for filtering (titles, party names) runs on every fetched
   // contract; D1 caps bound parameters at 100, so id lists go in chunks.
-  const lotIds = [...new Set(contracts.map((contract) => contract.lotId))]
+  // Framework contracts have no lot; only auction contracts join to auctions.
+  const lotIds = [
+    ...new Set(
+      contracts.flatMap((contract) => (contract.lotId === null ? [] : [contract.lotId])),
+    ),
+  ]
   const auctions = (
     await Promise.all(
       chunkIds(lotIds).map((chunk) =>
@@ -189,13 +194,14 @@ export default async function AdminContractsPage({
     const template = templateById.get(contract.templateId)
     if (filters.type && template?.type !== filters.type) return false
     if (!contractInDateRange(contract.createdAt, filters)) return false
-    const auction = auctionById.get(contract.lotId)
+    const auction =
+      contract.lotId !== null ? auctionById.get(contract.lotId) : undefined
     const winningBid = auction?.winningBid ? bidById.get(auction.winningBid) : undefined
     return matchesContractSearch(
       {
         id: contract.id,
         contentHash: contract.contentHash,
-        auctionTitle: auction?.title ?? contract.lotId,
+        auctionTitle: auction?.title ?? contract.lotId ?? '',
         sellerName: auction?.sellerId
           ? (userLabel.get(auction.sellerId) ?? auction.sellerId)
           : '',
@@ -242,7 +248,8 @@ export default async function AdminContractsPage({
   const now = Date.now()
   const rows: ContractRow[] = pageRows.map((contract) => {
     const template = templateById.get(contract.templateId)
-    const auction = auctionById.get(contract.lotId)
+    const auction =
+      contract.lotId !== null ? auctionById.get(contract.lotId) : undefined
     const winningBid = auction?.winningBid ? bidById.get(auction.winningBid) : undefined
     const resends = resendsByContract.get(contract.id)
     const lastResendAt = resends?.lastAt ?? null
@@ -255,7 +262,7 @@ export default async function AdminContractsPage({
       signedAt: contract.signedAt,
       type: template?.type ?? 'auction',
       templateLabel: template ? `${template.name} (v${template.version})` : contract.templateId,
-      auctionTitle: auction?.title ?? contract.lotId,
+      auctionTitle: auction?.title ?? contract.lotId ?? '—',
       auctionStatus: auction?.status ?? '',
       sellerName: auction?.sellerId ? (userLabel.get(auction.sellerId) ?? auction.sellerId) : '—',
       sellerId: auction?.sellerId ?? null,

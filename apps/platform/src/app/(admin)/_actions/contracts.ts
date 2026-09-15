@@ -189,15 +189,19 @@ export async function voidContractAction(formData: FormData): Promise<void> {
     return redirectWithError(`${contractsPath}/${id}`, 'Leping on juba tühistatud.')
   }
 
-  const auction = await repositories.findByID({ collection: 'auctions', id: contract.lotId })
   let auctionReverted = false
-  if (outcome === 'contract-and-result' && auction?.status === 'contract') {
-    await repositories.update({
-      collection: 'auctions',
-      id: contract.lotId,
-      data: { status: 'ended', winningBid: null, finalPriceCents: null },
-    })
-    auctionReverted = true
+  const lotId = contract.lotId
+  // Framework contracts have no lot, so there is no auction result to revert.
+  if (outcome === 'contract-and-result' && lotId !== null) {
+    const auction = await repositories.findByID({ collection: 'auctions', id: lotId })
+    if (auction?.status === 'contract') {
+      await repositories.update({
+        collection: 'auctions',
+        id: lotId,
+        data: { status: 'ended', winningBid: null, finalPriceCents: null },
+      })
+      auctionReverted = true
+    }
   }
 
   let failure: string | null = null

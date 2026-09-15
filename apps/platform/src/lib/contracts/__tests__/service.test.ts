@@ -25,6 +25,16 @@ const activeTemplate = {
   htmlContent: '<p>{{auctionTitle}}</p>',
 }
 
+const frameworkTemplate = {
+  id: 'template-framework-1',
+  name: 'Raamleping',
+  type: 'framework',
+  version: '1.0.0',
+  placeholders: [{ key: 'auction.title' }],
+  active: true,
+  htmlContent: '<p>Raamleping {{auction.title}}{{auctionTitle}}</p>',
+}
+
 const auction = { id: AUCTION_ID, title: 'Testioksjon' }
 
 function contractRow(overrides: Record<string, unknown> = {}) {
@@ -87,6 +97,60 @@ describe('prepareContract', () => {
     )
     expect(contract.signedBy).toBe(OWNER_ID)
     expect(contract.status).toBe('prepared')
+  })
+})
+
+describe('prepareContract without an auction (framework)', () => {
+  it('prepares a framework contract with a null auctionId', async () => {
+    // Framework contracts must be preparable from /lepingud without an auction context.
+    const row = contractRow({ lotId: null })
+    mockFindDocs({ 'contract-templates': [frameworkTemplate] })
+    mockRepos.create.mockResolvedValueOnce(row)
+
+    const contract = await prepareContract(null, 'framework', OWNER_ID)
+
+    expect(mockRepos.find).not.toHaveBeenCalledWith(
+      expect.objectContaining({ collection: 'auctions' }),
+    )
+    expect(mockRepos.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'contracts',
+        data: expect.objectContaining({
+          lot: null,
+          status: 'prepared',
+          signedBy: OWNER_ID,
+        }) as unknown,
+      }),
+    )
+    expect(contract.lot).toBeNull()
+  })
+
+  it('fills auction.-prefixed placeholders with empty strings', async () => {
+    const row = contractRow({ lotId: null })
+    mockFindDocs({ 'contract-templates': [frameworkTemplate] })
+    mockRepos.create.mockResolvedValueOnce(row)
+
+    await prepareContract(null, 'framework', OWNER_ID)
+
+    const firstCreateCall = mockRepos.create.mock.calls[0]
+    if (!firstCreateCall) {
+      throw new Error('expected prepareContract to create a contract row')
+    }
+    const createArgs = firstCreateCall[0] as {
+      data: { renderedHtml: string }
+    }
+    expect(createArgs.data.renderedHtml).toContain('Raamleping ')
+    expect(createArgs.data.renderedHtml).not.toContain('{{auction.')
+    // auctionTitle stays unresolved because no auction is bound.
+    expect(createArgs.data.renderedHtml).toContain('{{auctionTitle}}')
+  })
+
+  it('throws when an auction contract is prepared with a null auctionId', async () => {
+    await expect(prepareContract(null, 'auction', OWNER_ID)).rejects.toThrow(
+      'auctionId is required',
+    )
+    expect(mockRepos.find).not.toHaveBeenCalled()
+    expect(mockRepos.create).not.toHaveBeenCalled()
   })
 })
 

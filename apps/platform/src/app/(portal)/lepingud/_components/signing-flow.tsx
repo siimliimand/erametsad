@@ -212,7 +212,7 @@ export function SigningFlow({
   const [error, setError] = useState<string | null>(null)
 
   async function handlePrepare() {
-    if (auctionId === null) return
+    if (kind === 'auction' && auctionId === null) return
     setBusy(true)
     setError(null)
     const result = await prepareContract(kind, auctionId)
@@ -489,11 +489,15 @@ export function SigningFlow({
                 </p>
               )}
               <div className="mt-sm">
-                <Btn onClick={() => void handlePrepare()} isLoading={busy} disabled={auctionId === null}>
+                <Btn
+                  onClick={() => void handlePrepare()}
+                  isLoading={busy}
+                  disabled={kind === 'auction' && auctionId === null}
+                >
                   Koosta leping
                 </Btn>
               </div>
-              {auctionId === null && (
+              {kind === 'auction' && auctionId === null && (
                 <p className="mt-sm font-body text-bodySm text-inkMuted">
                   Raamlepingut saab allkirjastada oksjoni juurest: ava oksjon ja proovi pakkumist
                   esitada.

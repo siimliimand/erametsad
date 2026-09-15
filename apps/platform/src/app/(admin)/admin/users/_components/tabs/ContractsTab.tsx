@@ -4,7 +4,8 @@ import { ContractStatusPill, formatDateTime } from '../../../../_lib/labels'
 
 export interface ContractRow {
   id: string
-  auctionId: string
+  /** Null for framework contracts, which bind no auction. */
+  auctionId: string | null
   auctionTitle: string
   status: React.ComponentProps<typeof ContractStatusPill>['status']
   createdAt: string
@@ -22,14 +23,17 @@ export function ContractsTab({ rows }: { rows: ContractRow[] }) {
           {
             key: 'auctionTitle',
             label: 'Oksjon',
-            render: (row) => (
-              <AdminLink
-                href={`/auctions/${row.auctionId}`}
-                className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
-              >
-                {row.auctionTitle}
-              </AdminLink>
-            ),
+            render: (row) =>
+              row.auctionId === null ? (
+                row.auctionTitle
+              ) : (
+                <AdminLink
+                  href={`/auctions/${row.auctionId}`}
+                  className="text-label font-semibold text-primary transition-colors duration-hover ease-hover hover:text-primaryHover"
+                >
+                  {row.auctionTitle}
+                </AdminLink>
+              ),
           },
           {
             key: 'status',

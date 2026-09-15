@@ -53,7 +53,10 @@ export default async function ContractDetailPage({
 
   const [template, auction] = await Promise.all([
     repositories.findByID({ collection: 'contract-templates', id: contract.templateId }),
-    repositories.findByID({ collection: 'auctions', id: contract.lotId }),
+    // Framework contracts have no lot, so there is no auction row to join.
+    contract.lotId !== null
+      ? repositories.findByID({ collection: 'auctions', id: contract.lotId })
+      : Promise.resolve(null),
   ])
 
   const winningBid = auction?.winningBid
@@ -92,7 +95,7 @@ export default async function ContractDetailPage({
           <Field label="Mall">
             {template ? `${template.name} (v${template.version})` : contract.templateId}
           </Field>
-          <Field label="Oksjon">{auction?.title ?? contract.lotId}</Field>
+          <Field label="Oksjon">{auction?.title ?? contract.lotId ?? '—'}</Field>
           <Field label="Müüja">
             {auction?.sellerId ? (
               <AdminLink

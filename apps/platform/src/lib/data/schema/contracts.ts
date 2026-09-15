@@ -16,9 +16,9 @@ export const contracts = sqliteTable(
     templateId: text('template_id')
       .notNull()
       .references(() => contractTemplates.id),
-    lotId: text('lot_id')
-      .notNull()
-      .references(() => auctions.id),
+    // Null lot: framework contract signed outside any auction context
+    // (the /lepingud entry). Auction contracts always bind their lot.
+    lotId: text('lot_id').references(() => auctions.id),
     status: text('status', { enum: contractStatuses }).notNull().default('prepared'),
     signedAt: text('signed_at'),
     signedBy: text('signed_by').references(() => users.id),

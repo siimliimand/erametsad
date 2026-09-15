@@ -122,7 +122,8 @@ export interface StatisticsSnapshotSlice {
 }
 
 export interface StatisticsContractSlice {
-  lotId: string
+  // Null lotId marks a framework contract; it counts as voided data like any other.
+  lotId: string | null
   status: string
   /** Void time for the tühistatud month bucket. */
   updatedAt: string

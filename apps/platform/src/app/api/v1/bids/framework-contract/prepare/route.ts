@@ -22,10 +22,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const auctionId = body.auctionId as string | undefined
-  if (!auctionId || typeof auctionId !== 'string') {
-    return NextResponse.json({ error: 'auctionId is required' }, { status: 400 })
-  }
+  // auctionId is optional: framework contracts are signable from /lepingud
+  // without an auction context.
+  const raw = body.auctionId
+  const auctionId = typeof raw === 'string' && raw !== '' ? raw : null
 
   try {
     const contract = await prepareContract(auctionId, 'framework', tokenPayload.userId)

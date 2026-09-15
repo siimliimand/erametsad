@@ -79,7 +79,13 @@ export default async function LepingudPage() {
       : { docs: [] as ContractTemplate[] }
   const templateById = new Map(templates.docs.map((template) => [template.id, template]))
 
-  const lotIds = [...new Set(contracts.map((contract) => contract.lotId))]
+  const lotIds = [
+    ...new Set(
+      contracts
+        .map((contract) => contract.lotId)
+        .filter((lotId): lotId is string => lotId !== null),
+    ),
+  ]
   const auctions =
     lotIds.length > 0
       ? await systemRepos.find({
@@ -98,12 +104,14 @@ export default async function LepingudPage() {
       type,
       typeLabel: typeLabelOf(template?.type ?? 'auction'),
       lotId: contract.lotId,
-      auctionTitle: auctionTitleById.get(contract.lotId) ?? null,
+      auctionTitle:
+        contract.lotId !== null ? (auctionTitleById.get(contract.lotId) ?? null) : null,
       version: template?.version ?? null,
       status: contract.status,
       signedAt: contract.signedAt,
+      // Auction contracts always bind a lot; the null branch only satisfies the nullable schema.
       href:
-        type === 'framework'
+        type === 'framework' || contract.lotId === null
           ? FRAMEWORK_HREF
           : `/lepingud/oksjonileping/${contract.lotId}`,
     }

@@ -54,7 +54,7 @@ function localizeError(message: string): string {
 /** POST /api/v1/bids/{framework-contract|contract}/prepare — 201 returns the rendered contract. */
 export async function prepareContract(
   kind: 'framework' | 'auction',
-  auctionId: string,
+  auctionId: string | null,
 ): Promise<ContractCallResult> {
   const path = kind === 'framework' ? 'framework-contract' : 'contract'
   let response: Response
@@ -62,7 +62,8 @@ export async function prepareContract(
     response = await apiFetch(`/api/v1/bids/${path}/prepare`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ auctionId }),
+      // The framework prepare route accepts a body without auctionId.
+      body: JSON.stringify(auctionId !== null ? { auctionId } : {}),
     })
   } catch {
     return { ok: false, httpStatus: 0, message: 'Võrguühendus ei ole saadaval. Proovi uuesti.' }

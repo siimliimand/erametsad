@@ -154,7 +154,12 @@ export async function fetchUserTabPayload(
         sort: '-createdAt',
         pagination: false,
       })
-      const lotIds = [...new Set(contracts.map((contract) => contract.lotId))]
+      // Framework contracts have no lot; only auction contracts join to auctions.
+      const lotIds = [
+        ...new Set(
+          contracts.flatMap((contract) => (contract.lotId === null ? [] : [contract.lotId])),
+        ),
+      ]
       const lots =
         lotIds.length > 0
           ? (
@@ -168,16 +173,18 @@ export async function fetchUserTabPayload(
       const lotTitles = new Map(lots.map((lot) => [lot.id, lot.title]))
       return {
         tab,
-        contracts: contracts.map(
-          (contract): ContractRow => ({
+        contracts: contracts.map((contract): ContractRow => {
+          const auctionTitle =
+            contract.lotId !== null ? (lotTitles.get(contract.lotId) ?? contract.lotId) : null
+          return {
             id: contract.id,
             auctionId: contract.lotId,
-            auctionTitle: lotTitles.get(contract.lotId) ?? contract.lotId,
+            auctionTitle: auctionTitle ?? '—',
             status: contract.status,
             createdAt: contract.createdAt,
             signedAt: contract.signedAt,
-          }),
-        ),
+          }
+        }),
       }
     }
 

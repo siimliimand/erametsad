@@ -7,7 +7,7 @@ import { getRepositories } from '../data/runtime'
 export interface Contract {
   id: string
   template: string
-  lot: string
+  lot: string | null
   status: 'prepared' | 'sent' | 'signed' | 'voided'
   signedAt?: string | undefined
   signedBy?: string | undefined
@@ -18,7 +18,7 @@ export interface Contract {
 interface ContractRow {
   id: string
   templateId: string
-  lotId: string
+  lotId: string | null
   status: Contract['status']
   signedAt: string | null
   signedBy: string | null
@@ -44,10 +44,16 @@ function toContract(row: ContractRow): Contract {
 const SIGNING_EXPIRY_MS = 15 * 60 * 1000
 
 export async function prepareContract(
-  auctionId: string,
+  auctionId: string | null,
   type: 'framework' | 'auction',
   userId: string,
 ): Promise<Contract> {
+  // Auction contracts are always prepared from an auction context; the
+  // auction route already enforces this, this guard protects other callers.
+  if (type === 'auction' && auctionId === null) {
+    throw new Error('auctionId is required')
+  }
+
   const repos = await getRepositories()
 
   const templateResult = await repos.find({
@@ -66,14 +72,19 @@ export async function prepareContract(
     throw new Error(`No active ${type} contract template found`)
   }
 
-  const auctionResult = await repos.find({
-    collection: 'auctions',
-    where: { id: { equals: auctionId } },
-    limit: 1,
-  })
-  const auction = auctionResult.docs[0] as Record<string, unknown> | undefined
-  if (!auction) {
-    throw new Error('Auction not found')
+  // Framework contracts can be signed from /lepingud without an auction
+  // context, so the auction lookup only happens when one is bound.
+  let auction: Record<string, unknown> | undefined
+  if (auctionId !== null) {
+    const auctionResult = await repos.find({
+      collection: 'auctions',
+      where: { id: { equals: auctionId } },
+      limit: 1,
+    })
+    auction = auctionResult.docs[0]
+    if (!auction) {
+      throw new Error('Auction not found')
+    }
   }
 
   const placeholders = (templateDoc.placeholders as { key: string }[] | undefined) ?? []
@@ -82,14 +93,18 @@ export async function prepareContract(
     const key = ph.key
     if (key.startsWith('auction.')) {
       const field = key.slice('auction.'.length)
-      data[key] = (auction[field] as string | undefined) ?? ''
+      data[key] = auction ? ((auction[field] as string | undefined) ?? '') : ''
     } else {
       data[key] = `[${key}]`
     }
   }
-  data.auctionTitle = (auction.title as string | undefined) ?? `Auction ${auctionId}`
+  if (auction && auctionId !== null) {
+    data.auctionTitle = (auction.title as string | undefined) ?? `Auction ${auctionId}`
+  }
   data.date = new Date().toISOString().split('T')[0] ?? ''
-  data.auctionId = auctionId
+  if (auctionId !== null) {
+    data.auctionId = auctionId
+  }
 
   const template: ContractTemplate = {
     name: templateDoc.name as string,

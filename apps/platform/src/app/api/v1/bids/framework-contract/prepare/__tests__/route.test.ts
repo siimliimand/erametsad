@@ -32,11 +32,11 @@ const activeTemplate = {
 
 const auction = { id: AUCTION_ID, title: 'Testioksjon' }
 
-function createdContractRow(signedBy: string) {
+function createdContractRow(signedBy: string, lotId: string | null = AUCTION_ID) {
   return {
     id: 'contract-1',
     templateId: 'template-framework-1',
-    lotId: AUCTION_ID,
+    lotId,
     status: 'prepared',
     signedAt: null,
     signedBy,
@@ -73,7 +73,7 @@ function prepareRequest(body: Record<string, unknown>, cookie?: string): NextReq
 }
 
 // Mock order mirrors prepareContract reads: template lookup, then auction.
-function mockPrepareRepos(signedBy: string): void {
+function mockPrepareRepos(signedBy: string, lotId: string | null = AUCTION_ID): void {
   mockRepos.find.mockImplementation((args: { collection: string }) => {
     if (args.collection === 'contract-templates') {
       return Promise.resolve({ docs: [activeTemplate] })
@@ -81,7 +81,7 @@ function mockPrepareRepos(signedBy: string): void {
     if (args.collection === 'auctions') return Promise.resolve({ docs: [auction] })
     return Promise.resolve({ docs: [] })
   })
-  mockRepos.create.mockResolvedValueOnce(createdContractRow(signedBy))
+  mockRepos.create.mockResolvedValueOnce(createdContractRow(signedBy, lotId))
 }
 
 describe('POST /api/v1/bids/framework-contract/prepare', () => {
@@ -156,6 +156,45 @@ describe('POST /api/v1/bids/framework-contract/prepare', () => {
         where: {
           and: [{ type: { equals: 'framework' } }, { active: { equals: true } }],
         },
+      }),
+    )
+  })
+
+  it('answers 201 for an empty body without auctionId', async () => {
+    vi.mocked(verifyAccessToken).mockReturnValueOnce({ userId: CALLER_ID, role: 'private' })
+    mockPrepareRepos(CALLER_ID, null)
+
+    const response = await prepareRoute(prepareRequest({}, `access_token=t.${CALLER_ID}.x`))
+
+    expect(response.status).toBe(201)
+    expect(mockRepos.find).not.toHaveBeenCalledWith(
+      expect.objectContaining({ collection: 'auctions' }),
+    )
+    expect(mockRepos.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'contracts',
+        data: expect.objectContaining({ lot: null }) as unknown,
+      }),
+    )
+  })
+
+  it('answers 201 treating an empty auctionId as absent', async () => {
+    // '' must normalize to null; it must never reach the service as a lookup key.
+    vi.mocked(verifyAccessToken).mockReturnValueOnce({ userId: CALLER_ID, role: 'private' })
+    mockPrepareRepos(CALLER_ID, null)
+
+    const response = await prepareRoute(
+      prepareRequest({ auctionId: '' }, `access_token=t.${CALLER_ID}.x`),
+    )
+
+    expect(response.status).toBe(201)
+    expect(mockRepos.find).not.toHaveBeenCalledWith(
+      expect.objectContaining({ collection: 'auctions' }),
+    )
+    expect(mockRepos.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'contracts',
+        data: expect.objectContaining({ lot: null }) as unknown,
       }),
     )
   })
