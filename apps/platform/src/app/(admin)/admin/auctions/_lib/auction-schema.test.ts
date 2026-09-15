@@ -372,6 +372,7 @@ describe('publish readiness gates', () => {
     specialistId: 'specialist-1',
     startsAt: new Date(Date.now() + 60 * 60_000).toISOString(),
     areaHa: 12.4,
+    minBidCents: 300000,
     deadlines: null,
     packageRows: null,
     ...overrides,
@@ -418,6 +419,19 @@ describe('publish readiness gates', () => {
         readinessSubject({ areaHa: null, packageRows: [{ area: 2.5 }, { areaHa: 3 }] }),
       ),
     ).toHaveLength(0)
+  })
+
+  it('blocks a starting price that is missing, zero or negative', () => {
+    for (const minBidCents of [null, undefined, 0, -100]) {
+      const gates = collectPublishReadinessFailures(readinessSubject({ minBidCents }))
+      expect(gates.some((gate) => gate.field === 'minBid' && gate.step === 'Hind')).toBe(true)
+    }
+  })
+
+  it('accepts a positive starting price without a minBid gate', () => {
+    const gates = collectPublishReadinessFailures(readinessSubject({ minBidCents: 1 }))
+    expect(gates.some((gate) => gate.field === 'minBid')).toBe(false)
+    expect(gates).toHaveLength(0)
   })
 })
 

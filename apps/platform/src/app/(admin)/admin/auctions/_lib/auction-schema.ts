@@ -522,6 +522,7 @@ export interface PublishReadinessSubject {
   specialistId?: string | null
   startsAt: string | null
   areaHa?: number | null
+  minBidCents?: number | null | undefined
   deadlines?: unknown
   packageRows?: unknown
 }
@@ -529,9 +530,9 @@ export interface PublishReadinessSubject {
 /**
  * Publish-only readiness gates evaluated against the stored lot (spec
  * admin-auction-management): specialist assigned, start at least 10 minutes
- * in the future, area greater than zero. Drafts save without them; the
- * Ajasta intent applies the start gate, Avalda kohe and the publish action
- * apply all three.
+ * in the future, area greater than zero, starting price greater than zero
+ * (missing price fails closed). Drafts save without them; the Ajasta intent
+ * applies the start gate, Avalda kohe and the publish action apply all four.
  */
 export function collectPublishReadinessFailures(subject: PublishReadinessSubject): PublishGateFailure[] {
   const blocking: PublishGateFailure[] = []
@@ -561,6 +562,10 @@ export function collectPublishReadinessFailures(subject: PublishReadinessSubject
     extractNumberTotal(subject.packageRows, AREA_KEYS)
   if (area === null || area <= 0) {
     blocking.push({ step: 'Maa ja mets', field: 'areaHa', message: 'Pindala (ha) peab olema suurem kui 0.' })
+  }
+
+  if (subject.minBidCents === null || subject.minBidCents === undefined || subject.minBidCents <= 0) {
+    blocking.push({ step: 'Hind', field: 'minBid', message: 'Määra alghind enne avaldamist.' })
   }
 
   return blocking
