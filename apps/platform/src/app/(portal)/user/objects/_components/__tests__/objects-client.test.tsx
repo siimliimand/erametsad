@@ -62,7 +62,8 @@ describe('ObjectsClient', () => {
     expect(html).toContain('Lõppenud')
     expect(html).toContain('Mustandid')
     expect(html).toContain('Paku oma objekti')
-    expect(html).toContain('href="https://')
+    expect(html).toContain('href="/user/objects/paku"')
+    expect(html).not.toContain('teenused/raieoiguse-muuk')
     expect(html).toContain('aria-pressed="true"')
   })
 
