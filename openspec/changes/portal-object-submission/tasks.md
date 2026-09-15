@@ -27,4 +27,4 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run pnpm lint, typecheck, test, build; fix fallout <!-- agent: fullstack-engineer.fast, depends_on: [2.5, 2.6, 3.3, 3.4, 4.1], touches: [] -->
+- [x] 5.1 Run pnpm lint, typecheck, test, build; fix fallout <!-- agent: fullstack-engineer.fast, depends_on: [2.5, 2.6, 3.3, 3.4, 4.1], touches: [] -->

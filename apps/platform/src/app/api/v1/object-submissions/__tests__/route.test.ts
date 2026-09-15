@@ -1,14 +1,22 @@
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const state = vi.hoisted(() => ({
-  payload: { userId: 'seller-1', role: 'private', sessionId: 'sess-1' } as {
-    userId: string
-    role: string
-    sessionId?: string
-  } | null,
-  sessionState: 'live' as 'live' | 'revoked',
-  ingest: vi.fn(),
+interface AuthPayload {
+  userId: string
+  role: string
+  sessionId?: string
+}
+
+interface RouteTestState {
+  payload: AuthPayload | null
+  sessionState: 'live' | 'revoked'
+  ingest: ReturnType<typeof vi.fn<(...args: unknown[]) => Promise<unknown>>>
+}
+
+const state = vi.hoisted<RouteTestState>(() => ({
+  payload: { userId: 'seller-1', role: 'private', sessionId: 'sess-1' },
+  sessionState: 'live',
+  ingest: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 }))
 
 vi.mock('@/lib/auth/jwt', () => ({

@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  generateSaleTitle,
+  generateAliasEmail,
+  ingestSaleSubmission,
+  saleAuctionType,
+} from '../sale-branch'
+
+import {
   createSqliteTestDb,
   sqliteBatchRunner,
   type SqliteTestDb,
@@ -10,13 +17,6 @@ import {
   nodeIsikukoodCodec,
   type CoreRepositories,
 } from '@/lib/data/repositories'
-
-import {
-  generateSaleTitle,
-  generateAliasEmail,
-  ingestSaleSubmission,
-  saleAuctionType,
-} from '../sale-branch'
 import type { SaleSubmission } from '@/lib/object-submission'
 
 /**

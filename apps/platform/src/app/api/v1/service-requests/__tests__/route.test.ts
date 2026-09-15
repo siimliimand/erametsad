@@ -206,7 +206,7 @@ function rawUserId(id: string): string | null {
 }
 
 // sessions.user_id references users.id, so a session needs a user row.
-async function seedUser(id: string): Promise<void> {
+function seedUser(id: string): void {
   const now = new Date().toISOString()
   testDb.raw
     .prepare(
@@ -493,7 +493,7 @@ describe('POST /api/v1/service-requests rate limit', () => {
 
 describe('POST /api/v1/service-requests portal session stamping', () => {
   it('stamps user_id with the session user and keeps status new for an authenticated submission', async () => {
-    await seedUser('user-1')
+    seedUser('user-1')
     const { accessToken } = await createSession('user-1', 'private')
 
     const result = await post(jsonRequestWithCookie(validKava(), '10.8.0.1', accessToken))
@@ -521,7 +521,7 @@ describe('POST /api/v1/service-requests portal session stamping', () => {
   })
 
   it('keeps user_id null when the access token session is revoked', async () => {
-    await seedUser('user-2')
+    seedUser('user-2')
     const { accessToken, sessionId } = await createSession('user-2', 'private')
     await revokeSession(sessionId)
 
@@ -533,7 +533,7 @@ describe('POST /api/v1/service-requests portal session stamping', () => {
   })
 
   it('still validates the payload for authenticated submissions', async () => {
-    await seedUser('user-3')
+    seedUser('user-3')
     const { accessToken } = await createSession('user-3', 'private')
 
     const result = await post(
