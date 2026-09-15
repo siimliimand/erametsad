@@ -23,6 +23,8 @@ export const leads = sqliteTable(
     ipHash: text('ip_hash'),
     // FK lands in task 2.3 when the specialists table exists.
     assignedSpecialistId: text('assigned_specialist_id'),
+    userId: text('user_id'),
+    auctionId: text('auction_id'),
     internalComment: text('internal_comment'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),

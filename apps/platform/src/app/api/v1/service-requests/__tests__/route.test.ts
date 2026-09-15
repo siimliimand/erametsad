@@ -3,10 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type * as MediaUpload from '@/app/(admin)/admin/media/_lib/media-upload'
 import { POST } from '@/app/api/v1/service-requests/route'
+import { createSession, revokeSession } from '@/lib/auth/session'
 import { createSqliteTestDb, type SqliteTestDb } from '@/lib/data/__tests__/sqlite'
 import { createPartnersRepository } from '@/lib/data/repositories'
 import { setD1ForTests } from '@/lib/db'
 import { MAX_ATTACHMENT_BYTES } from '@/lib/service-requests/attachments'
+
+process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'service-requests-route-test-jwt-secret'
 
 const { getMediaBucketMock, putMock } = vi.hoisted(() => ({
   getMediaBucketMock: vi.fn(),
@@ -64,6 +67,22 @@ function jsonRequest(body: Record<string, unknown>, ip: string): NextRequest {
     method: 'POST',
     body: JSON.stringify(body),
     headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
+  })
+}
+
+function jsonRequestWithCookie(
+  body: Record<string, unknown>,
+  ip: string,
+  accessToken: string,
+): NextRequest {
+  return new NextRequest(BASE, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: {
+      'content-type': 'application/json',
+      'x-forwarded-for': ip,
+      cookie: `access_token=${accessToken}`,
+    },
   })
 }
 
@@ -177,6 +196,23 @@ function rawRow(id: string): { payload: string; routed_to: string | null; status
     status: string
     attachments: string | null
   }
+}
+
+function rawUserId(id: string): string | null {
+  const row = testDb.raw
+    .prepare('SELECT user_id FROM service_requests WHERE id = ?')
+    .get(id) as { user_id: string | null } | undefined
+  return row?.user_id ?? null
+}
+
+// sessions.user_id references users.id, so a session needs a user row.
+function seedUser(id: string): void {
+  const now = new Date().toISOString()
+  testDb.raw
+    .prepare(
+      "INSERT INTO users (id, email, role, status, auth_method, created_at, updated_at) VALUES (?, ?, 'private', 'active', 'eid', ?, ?)",
+    )
+    .run(id, `${id}@example.ee`, now, now)
 }
 
 async function seedPartner(
@@ -452,5 +488,66 @@ describe('POST /api/v1/service-requests rate limit', () => {
 
     const otherIp = await post(jsonRequest(validKava(), '10.7.0.2'))
     expect(otherIp.status).toBe(201)
+  })
+})
+
+describe('POST /api/v1/service-requests portal session stamping', () => {
+  it('stamps user_id with the session user and keeps status new for an authenticated submission', async () => {
+    seedUser('user-1')
+    const { accessToken } = await createSession('user-1', 'private')
+
+    const result = await post(jsonRequestWithCookie(validKava(), '10.8.0.1', accessToken))
+
+    expect(result.status).toBe(201)
+    const id = (result.body.request as { id: string }).id
+    expect(rawUserId(id)).toBe('user-1')
+    expect(rawRow(id).status).toBe('new')
+  })
+
+  it('keeps user_id null for an anonymous submission', async () => {
+    const result = await post(jsonRequest(validKava(), '10.8.0.2'))
+
+    expect(result.status).toBe(201)
+    const id = (result.body.request as { id: string }).id
+    expect(rawUserId(id)).toBeNull()
+  })
+
+  it('keeps user_id null and answers 201 for an invalid access token', async () => {
+    const result = await post(jsonRequestWithCookie(validKava(), '10.8.0.3', 'not-a-jwt'))
+
+    expect(result.status).toBe(201)
+    const id = (result.body.request as { id: string }).id
+    expect(rawUserId(id)).toBeNull()
+  })
+
+  it('keeps user_id null when the access token session is revoked', async () => {
+    seedUser('user-2')
+    const { accessToken, sessionId } = await createSession('user-2', 'private')
+    await revokeSession(sessionId)
+
+    const result = await post(jsonRequestWithCookie(validKava(), '10.8.0.4', accessToken))
+
+    expect(result.status).toBe(201)
+    const id = (result.body.request as { id: string }).id
+    expect(rawUserId(id)).toBeNull()
+  })
+
+  it('still validates the payload for authenticated submissions', async () => {
+    seedUser('user-3')
+    const { accessToken } = await createSession('user-3', 'private')
+
+    const result = await post(
+      jsonRequestWithCookie(
+        validKava({ contact: { ...CONTACT, phone: '123' } }),
+        '10.8.0.5',
+        accessToken,
+      ),
+    )
+
+    expect(result.status).toBe(422)
+    expect(errorsOf(result)['contact.phone']).toBe(
+      'Sisestage kehtiv Eesti telefoninumber (nt +37251234567)',
+    )
+    expect(serviceRequestCount()).toBe(0)
   })
 })

@@ -183,6 +183,15 @@ export const GUARD_RULES: Readonly<
   notifications: { create: deny, read: ownRecord('user'), update: deny, delete: deny },
   'audit-entry': { read: adminOnly, create: adminOnly, update: adminOnly, delete: adminOnly },
   leads: { read: adminOnly, create: adminOnly, update: adminOnly, delete: adminOnly },
+  // Anonymous marketing-funnel rows carry user_id NULL, so the ownRecord
+  // filter keeps them out of portal reads; ingestion writes run as system
+  // context and are unaffected.
+  'service-requests': {
+    read: ownRecord('user'),
+    create: adminOnly,
+    update: adminOnly,
+    delete: adminOnly,
+  },
   settings: payloadDefault,
   'statistics-snapshots': publicReadAdminWrite,
   media: { read: allow, create: authenticated, update: authenticated, delete: authenticated },

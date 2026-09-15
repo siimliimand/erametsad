@@ -225,6 +225,13 @@
       "when": 1789472830500,
       "tag": "0031_simple_sleepwalker",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1789480506558,
+      "tag": "0032_fixed_sunspot",
+      "breakpoints": true
     }
   ]
 }

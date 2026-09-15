@@ -466,14 +466,14 @@ export const coreCollections: Readonly<Record<CoreCollectionSlug, RepositoryColl
   },
   leads: {
     table: leads,
-    aliases: { assignedSpecialist: 'assignedSpecialistId' },
+    aliases: { assignedSpecialist: 'assignedSpecialistId', user: 'userId', auction: 'auctionId' },
     jsonFields: {},
     isikukood: false,
     templateActivation: false,
   },
   'service-requests': {
     table: serviceRequests,
-    aliases: {},
+    aliases: { user: 'userId' },
     jsonFields: serviceRequestsJsonFields,
     isikukood: false,
     templateActivation: false,

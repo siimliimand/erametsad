@@ -374,9 +374,10 @@ export function AuctionWizard({
 
   /**
    * Publish-readiness gates mirrored from the server actions: Ajasta checks
-   * the start lead time, Avalda kohe also specialist and area. Drafts save
-   * without these so unfinished lots stay savable. Package rows mirror the
-   * model's row payload: only non-empty cadastres and numeric areas travel.
+   * the start lead time, Avalda kohe also specialist, area and min bid.
+   * Drafts save without these so unfinished lots stay savable. Package rows
+   * mirror the model's row payload: only non-empty cadastres and numeric
+   * areas travel.
    */
   function readinessFailuresFor(
     wizardState: AuctionWizardState,
@@ -391,10 +392,12 @@ export function AuctionWizard({
               ...(parseDecimal(row.areaHa) !== undefined ? { areaHa: parseDecimal(row.areaHa) } : {}),
             }))
         : []
+    const minBid = parseDecimal(wizardState.minBidEur)
     return collectPublishReadinessFailures({
       specialistId: wizardState.specialistId,
       startsAt: tallinnWallTimeToUtcIso(wizardState.startsAt),
       areaHa: parseDecimal(wizardState.areaHa) ?? null,
+      minBidCents: minBid !== undefined && minBid >= 0 ? Math.round(minBid * 100) : 0,
       packageRows,
     }).filter((gate) => intent === 'publish' || gate.field === 'startsAt')
   }

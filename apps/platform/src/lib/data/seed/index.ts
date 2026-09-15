@@ -1,11 +1,12 @@
 /* eslint-disable no-console */
-import type { CoreRepositories } from '../repositories'
+import type { CoreDatabase, CoreRepositories } from '../repositories'
 import { seedAuctions } from './auctions'
 import { seedBids } from './bids'
 import { seedCms } from './cms'
 import { seedContractTemplates } from './contracts'
 import { seedLeads } from './leads'
 import { seedMedia } from './media'
+import { seedNotificationTemplates } from './notification-templates'
 import { seedPartners } from './partners'
 import { seedServiceRequests } from './service-requests'
 import { seedSpecialists } from './specialists'
@@ -35,7 +36,7 @@ async function seedSettings(repos: CoreRepositories): Promise<void> {
   console.log('Seeded settings (featureFlags.requireFrameworkContract: true)')
 }
 
-export async function seed(repos: CoreRepositories): Promise<void> {
+export async function seed(repos: CoreRepositories, db: CoreDatabase): Promise<void> {
   console.log('Seeding database…')
 
   await seedSettings(repos)
@@ -52,6 +53,9 @@ export async function seed(repos: CoreRepositories): Promise<void> {
   await seedLeads(repos)
   await seedPartners(repos)
   await seedServiceRequests(repos)
+  // notification_templates is not in the repository registry, so it needs
+  // the raw drizzle handle instead of the repositories.
+  await seedNotificationTemplates(db)
 
   console.log('Seeding complete')
 }

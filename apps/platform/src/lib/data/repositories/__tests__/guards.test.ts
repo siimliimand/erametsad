@@ -196,6 +196,28 @@ describe('can: own-record collections', () => {
   })
 })
 
+describe('can: service-requests', () => {
+  it('lets users read only their own rows; anonymous users are denied', () => {
+    expect(can(privateUser, 'service-requests', 'read').where).toEqual({
+      user: { equals: 'u-1' },
+    })
+    expect(can(privateUser, 'service-requests', 'read', { user: 'u-1' }).allowed).toBe(true)
+    expect(can(privateUser, 'service-requests', 'read', { user: 'u-2' }).allowed).toBe(false)
+    // Anonymous ingestion rows have user_id NULL and never match the filter.
+    expect(can(privateUser, 'service-requests', 'read', { user: null }).allowed).toBe(false)
+    expect(can(publicContext, 'service-requests', 'read').allowed).toBe(false)
+    expect(can(admin, 'service-requests', 'read')).toEqual({ allowed: true })
+  })
+
+  it('restricts writes to admins', () => {
+    expect(can(privateUser, 'service-requests', 'create').allowed).toBe(false)
+    expect(can(publicContext, 'service-requests', 'create').allowed).toBe(false)
+    expect(can(admin, 'service-requests', 'create').allowed).toBe(true)
+    expect(can(privateUser, 'service-requests', 'update').allowed).toBe(false)
+    expect(can(privateUser, 'service-requests', 'delete').allowed).toBe(false)
+  })
+})
+
 describe('can: admin-only and public-read collections', () => {
   const adminOnlyCollections = ['leads', 'audit-entry']
 

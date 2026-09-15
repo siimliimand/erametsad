@@ -98,7 +98,7 @@ async function seedRequest(data: SeedRequest): Promise<void> {
   })
 }
 
-function ingest(body: Record<string, unknown>, requestIp?: string) {
+function ingest(body: Record<string, unknown>, requestIp?: string, userId?: string) {
   return ingestServiceRequest(
     {
       body,
@@ -106,6 +106,7 @@ function ingest(body: Record<string, unknown>, requestIp?: string) {
       pageSlug: '/paringud/metsamajanduskava',
       consentAt: '2026-01-01T00:00:00Z',
       ...(requestIp !== undefined ? { requestIp } : {}),
+      ...(userId !== undefined ? { userId } : {}),
     },
     services,
   )
@@ -275,6 +276,36 @@ describe('ingestServiceRequest', () => {
         .prepare('select ip_hash from service_requests where id = ?')
         .get(request.id) as { ip_hash: string | null }
       expect(raw.ip_hash).toBeNull()
+    })
+  })
+
+  describe('user stamping', () => {
+    it('stores the session user id on the row when provided', async () => {
+      const { request } = await ingest(kavaBody, undefined, 'user-1')
+
+      expect(request.userId).toBe('user-1')
+      expect(request.status).toBe('new')
+      const raw = testDb.raw
+        .prepare('select user_id from service_requests where id = ?')
+        .get(request.id) as { user_id: string | null }
+      expect(raw.user_id).toBe('user-1')
+    })
+
+    it('leaves user_id null without a userId', async () => {
+      const { request } = await ingest(kavaBody)
+
+      expect(request.userId).toBeNull()
+      const raw = testDb.raw
+        .prepare('select user_id from service_requests where id = ?')
+        .get(request.id) as { user_id: string | null }
+      expect(raw.user_id).toBeNull()
+    })
+
+    it('keeps validation in front of the stamp for supplied user ids', async () => {
+      await expect(
+        ingest({ ...kavaBody, contact: { ...contact, phone: '123' } }, undefined, 'user-1'),
+      ).rejects.toBeInstanceOf(ServiceRequestValidationError)
+      expect(await services.serviceRequests.list()).toHaveLength(0)
     })
   })
 })

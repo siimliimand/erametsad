@@ -134,6 +134,7 @@ function readinessSubjectOfAuction(auction: AuctionDoc): PublishReadinessSubject
     specialistId: typeof auction.specialistId === 'string' ? auction.specialistId : null,
     startsAt: typeof auction.startsAt === 'string' ? auction.startsAt : null,
     areaHa: typeof auction.areaHa === 'number' ? auction.areaHa : null,
+    minBidCents: typeof auction.minBidCents === 'number' ? auction.minBidCents : null,
     deadlines: auction.deadlines,
     packageRows: auction.packageRows,
   }

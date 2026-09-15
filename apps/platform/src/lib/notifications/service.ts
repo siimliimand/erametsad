@@ -31,6 +31,10 @@ const eventChannels: Record<DomainEventType, (keyof ChannelOverride | 'inApp')[]
   // No email templates exist for seller decisions yet; in-app only.
   'bid.approved': ['inApp'],
   'bid.rejected': ['inApp'],
+  'submission.received': ['email', 'inApp'],
+  // The assigned specialist is not a portal user, so no notifications row
+  // (user FK) and no in-app copy are possible; email is the only channel.
+  'submission.new': ['email'],
 }
 
 const eventTitles: Record<DomainEventType, string> = {
@@ -43,6 +47,8 @@ const eventTitles: Record<DomainEventType, string> = {
   'auction.won': 'Te võitsite oksjoni',
   'bid.approved': 'Teie pakkumus on kinnitatud',
   'bid.rejected': 'Teie pakkumus on tagasi lükatud',
+  'submission.received': 'Teie pakkumine on meile jõudnud',
+  'submission.new': 'Uus objektipakkumine on teile määratud',
 }
 
 // Missing stored keys keep the historical behavior: email on, SMS off.
@@ -117,6 +123,12 @@ function getTemplate(eventType: DomainEventType, payload: Record<string, unknown
         ? `${rejected} Põhjus: ${payload.reason}`
         : rejected
     }
+    case 'submission.received':
+      return `Teie pakkumine "${String(payload.objectTitle)}" on edukalt esitatud. Meie spetsialist vaatab selle läbi ja võtab teiega peagi ühendust.`
+    case 'submission.new':
+      return `Teile on määratud uus objektipakkumine "${String(payload.objectTitle)}" (esitaja: ${String(
+        payload.submitterName,
+      )}). Palun vaadake see haldusliideses üle.`
     default:
       return null
   }
@@ -164,8 +176,25 @@ async function lookupEmail(repos: CoreRepositories, userId: string | number): Pr
   }
 }
 
+// Specialists live in their own collection (not users); their email is the
+// only way to reach them.
+async function lookupSpecialistEmail(repos: CoreRepositories, specialistId: string | number): Promise<string | undefined> {
+  try {
+    const specialist = await repos.findByID({
+      collection: 'specialists',
+      id: specialistId,
+    })
+    return (specialist as { email?: string | null } | null)?.email ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
 async function dispatchEmail(userId: string | number, event: DomainEvent, body: string, repos: CoreRepositories): Promise<void> {
-  const to = await lookupEmail(repos, userId)
+  const specialistEvent = event.type === 'submission.new'
+  const to = specialistEvent
+    ? await lookupSpecialistEmail(repos, userId)
+    : await lookupEmail(repos, userId)
   let result: SendResult | undefined
   let recipients: RecipientResult[] = []
   let errorCode: string | null = null
@@ -190,6 +219,10 @@ async function dispatchEmail(userId: string | number, event: DomainEvent, body: 
       )
     }
   }
+
+  // Specialist events have no portal user to attach a row to (user FK), so
+  // the transport result stays in the logs only.
+  if (specialistEvent) return
 
   await repos.create({
     collection: 'notifications',
@@ -294,4 +327,6 @@ export function startListening(bus: EventBus): void {
   bus.on('auction.won', (event) => { void handleSafely(event) })
   bus.on('bid.approved', (event) => { void handleSafely(event) })
   bus.on('bid.rejected', (event) => { void handleSafely(event) })
+  bus.on('submission.received', (event) => { void handleSafely(event) })
+  bus.on('submission.new', (event) => { void handleSafely(event) })
 }

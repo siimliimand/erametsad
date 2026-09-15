@@ -26,6 +26,8 @@ function makeLead(overrides: Partial<Lead>): Lead {
     status: 'new',
     ipHash: 'hash-1',
     assignedSpecialistId: null,
+    userId: null,
+    auctionId: null,
     internalComment: null,
     createdAt: '2026-08-26T09:12:00.000Z',
     updatedAt: '2026-08-26T09:12:00.000Z',

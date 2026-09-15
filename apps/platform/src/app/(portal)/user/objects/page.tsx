@@ -7,6 +7,10 @@ import {
   loadSellerOverview,
   parseStatusTab,
 } from './_components/seller-data'
+import {
+  ServiceRequestsSection,
+  type ServiceRequestRow,
+} from './_components/service-requests-section'
 import { requirePortalSession } from '../../_lib/session'
 
 export const dynamic = 'force-dynamic'
@@ -39,6 +43,23 @@ export default async function UserObjectsPage({ searchParams }: ObjectsPageProps
       count: row.pendingApprovalCount,
     }))
 
+  // Guard adds the same own-record filter; the query keeps it explicit so the
+  // listing reads as one bounded find. Rows expose only display fields, so
+  // routing details never reach the client.
+  const serviceRequestRows: ServiceRequestRow[] = (
+    await repositories.find({
+      collection: 'service-requests',
+      where: { user: { equals: session.userId } },
+      sort: '-createdAt',
+      pagination: false,
+    })
+  ).docs.map((doc) => ({
+    id: doc.id,
+    type: doc.type,
+    status: doc.status,
+    createdAt: doc.createdAt,
+  }))
+
   return (
     <>
       <UserPageHead
@@ -46,6 +67,7 @@ export default async function UserObjectsPage({ searchParams }: ObjectsPageProps
         summary="Ülevaade sinu objektidest oksjonitel — olek, huvi ja tulemused. Pakkujad jäävad anonüümseteks kuni lepingu allkirjastamiseni."
       />
       <ObjectsClient status={status} rows={rows} pendingGroups={pendingGroups} />
+      <ServiceRequestsSection rows={serviceRequestRows} />
     </>
   )
 }

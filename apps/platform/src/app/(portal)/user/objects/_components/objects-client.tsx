@@ -12,8 +12,6 @@ import { LotDrawer } from './lot-drawer'
 import { ObjectCard } from './object-card'
 import type { PendingBannerGroup, SellerAuctionRow, StatusTab } from './seller-data'
 
-import { marketingUrl } from '@/app/(marketing)/_lib/base-url'
-
 // Demo chips (10-user-objects.html): Kõik / Käimasolevad / Lõppenud /
 // Mustandid. 'ongoing' is the composite pre-end filter (design D9).
 const OBJECT_CHIPS: readonly { id: Exclude<StatusTab, 'scheduled' | 'active'>; label: string }[] = [
@@ -27,7 +25,7 @@ function chipIdForStatus(status: StatusTab): Exclude<StatusTab, 'scheduled' | 'a
   return status === 'scheduled' || status === 'active' ? 'ongoing' : status
 }
 
-const SELL_HREF = marketingUrl('/teenused/raieoiguse-muuk')
+const SELL_HREF = '/user/objects/paku'
 
 const chipClass = (active: boolean) =>
   `inline-flex flex-none items-center rounded-pill border px-3 py-1 text-[13px] font-semibold transition-colors duration-hover ease-hover motion-reduce:transition-none ${

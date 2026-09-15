@@ -1,10 +1,13 @@
 import { serviceRequestPayloadSchema, type ServiceRequestType } from '@erametsad/types'
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import type { ZodError } from 'zod'
 
 import {
   getMediaBucket,
 } from '@/app/(admin)/admin/media/_lib/media-upload'
+import { verifyAccessToken } from '@/lib/auth/jwt'
+import { resolveAccessTokenSession } from '@/lib/auth/session'
 import { validateHoneypot } from '@/lib/leads/ingestion'
 import { serviceRequestsRateLimiter } from '@/lib/rate-limit'
 import { storeAttachment, validateAttachment } from '@/lib/service-requests/attachments'
@@ -26,6 +29,23 @@ function extractIp(request: Request): string {
   const raw = request.headers.get('x-forwarded-for')
   const first = raw?.split(',')[0]?.trim()
   return first && first.length > 0 ? first : 'unknown'
+}
+
+// Optional portal stamp (same resolution as my-auctions): a valid session
+// yields the user id, anything else yields none. A bad token or a session
+// lookup failure must never fail the anonymous marketing funnel.
+async function resolveOptionalUserId(request: NextRequest): Promise<string | undefined> {
+  const token = request.cookies.get('access_token')?.value
+  if (!token) return undefined
+  const payload = verifyAccessToken(token)
+  if (!payload) return undefined
+  try {
+    const ref = await resolveAccessTokenSession(token)
+    if (ref.state === 'revoked') return undefined
+    return payload.userId
+  } catch {
+    return undefined
+  }
 }
 
 /** First message per dotted field path (contact.phone, services, ...). */
@@ -83,7 +103,7 @@ function multipartToPayload(form: FormData): { body: Record<string, unknown>; fi
   return { body, file }
 }
 
-export async function POST(request: Request): Promise<NextResponse> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   const ip = extractIp(request)
   const rateCheck = serviceRequestsRateLimiter.check(`service-requests:${ip}`)
   if (!rateCheck.allowed) {
@@ -178,12 +198,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       : undefined
 
   try {
+    const userId = await resolveOptionalUserId(request)
     const { request: stored, routedCount } = await ingestServiceRequest({
       body,
       formName,
       ...(pageSlug ? { pageSlug } : {}),
       consentAt,
       requestIp: ip,
+      ...(userId ? { userId } : {}),
       ...(attachmentKey ? { attachments: [attachmentKey] } : {}),
     })
 

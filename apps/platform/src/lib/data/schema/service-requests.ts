@@ -17,6 +17,7 @@ export const serviceRequests = sqliteTable(
     payload: text('payload').notNull(),
     attachments: text('attachments'),
     routedTo: text('routed_to'),
+    userId: text('user_id'),
     status: text('status', { enum: serviceRequestStatuses }).notNull().default('new'),
     consentAt: text('consent_at').notNull(),
     formName: text('form_name').notNull(),
