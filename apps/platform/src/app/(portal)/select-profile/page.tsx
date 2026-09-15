@@ -85,9 +85,11 @@ export default async function SelectProfilePage({
   const { docs } = await repositories.find({ collection: 'profile' })
 
   // Single-profile users never see this page — resolve server-side so the
-  // client never flashes the card grid.
+  // client never flashes the card grid. Without a destination, continue into
+  // the logged-in user area: on the default host `/` is the marketing home,
+  // which shows no session state and reads like a logout.
   if (docs.length <= 1) {
-    redirect(next ?? '/')
+    redirect(next ?? '/user/profile')
   }
 
   const rightsResult = await repositories.find({

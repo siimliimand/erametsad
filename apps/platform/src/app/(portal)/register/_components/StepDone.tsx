@@ -56,20 +56,19 @@ export function StepDone({ next, displayName, profileType, approvalStatus }: Ste
       </p>
 
       <p className="font-body text-bodySm text-inkMuted">
-        Konto on avatud ajutise parooliga. Määra endale püsiv parool{' '}
-        <Link
-          href="/update-password?first=1"
-          className="font-semibold text-primary underline-offset-2 hover:underline"
-        >
-          parooli määramise lehel
-        </Link>
-        .
+        Konto on loodud paroolita. Määra püsiv parool, et saad hiljem sisse
+        logida ka parooliga.
       </p>
 
       <div className="mt-4 grid w-full max-w-[340px] gap-2.5">
-        <Link href={selectProfileHref} className={ctaLinkClass}>
-          Vali profiil ja jätka
+        {/* Password first: registration is passwordless, so the issued
+            session is the only window to set the first credential. */}
+        <Link href="/update-password?first=1" className={ctaLinkClass}>
+          Määra püsiv parool
           <ArrowRightIcon className="h-5 w-5" aria-hidden="true" />
+        </Link>
+        <Link href={selectProfileHref} className={ghostLinkClass}>
+          Vali profiil ja jätka
         </Link>
         <Link href={backHref} className={ghostLinkClass}>
           Tagasi oksjonitele
