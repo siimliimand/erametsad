@@ -50,6 +50,8 @@ export interface ServiceRequestInput {
   requestIp?: string
   /** R2 object keys of uploaded attachments, persisted to the row. */
   attachments?: string[]
+  /** Portal session user id; absent on anonymous marketing-funnel submissions. */
+  userId?: string
 }
 
 export interface IngestServiceRequestResult {
@@ -116,6 +118,7 @@ export async function ingestServiceRequest(
     payload: { ...payload, phone: payload.contact.phone },
     routedTo: matched.map((partner) => partner.id),
     status: matched.length > 0 ? 'routed' : 'new',
+    ...(input.userId ? { userId: input.userId } : {}),
     ...(input.attachments && input.attachments.length > 0
       ? { attachments: input.attachments }
       : {}),
