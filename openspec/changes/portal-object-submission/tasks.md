@@ -11,19 +11,19 @@
 - [x] 2.2 Service branch: stamp session user_id on authenticated POST /api/v1/service-requests, keeping validation, consent, rate limits, and the single-file rule; route tests <!-- agent: fullstack-engineer.build, depends_on: [1.1, 1.2], touches: [apps/platform/src/app/api/v1/service-requests/route.ts, apps/platform/src/lib/service-requests/ingestion.ts] -->
 - [x] 2.3 Multi-file upload endpoint for sale drafts in R2 (max 10 files, 10 MB each, enforced server-side before the write), reusing media bucket helpers; tests <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [apps/platform/src/lib/object-submission/uploads.ts, apps/platform/src/app/api/v1/object-submissions/files/route.ts] -->
 - [x] 2.4 Add `minBidCents > 0` to publish readiness gates with a gate test <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(admin)/admin/auctions/_lib/auction-schema.ts] -->
-- [ ] 2.5 Notification templates for submission-received (submitter) and new-submission (assigned specialist) plus dispatcher wiring <!-- agent: fullstack-engineer.build, depends_on: [2.1, 2.2], touches: [apps/platform/src/lib/notifications/**, apps/platform/src/lib/data/seed/**] -->
-- [ ] 2.6 Lead detail page shows the linked auction reference with a link to the admin auction <!-- agent: fullstack-engineer.fast, depends_on: [1.1], touches: [apps/platform/src/app/(admin)/admin/leads/[id]/page.tsx] -->
+- [x] 2.5 Notification templates for submission-received (submitter) and new-submission (assigned specialist) plus dispatcher wiring <!-- agent: fullstack-engineer.build, depends_on: [2.1, 2.2], touches: [apps/platform/src/lib/notifications/**, apps/platform/src/lib/data/seed/**] -->
+- [x] 2.6 Lead detail page shows the linked auction reference with a link to the admin auction <!-- agent: fullstack-engineer.fast, depends_on: [1.1], touches: [apps/platform/src/app/(admin)/admin/leads/[id]/page.tsx] -->
 
 ## 3. Portal wizard
 
 - [x] 3.1 Create the /user/objects/paku route with page shell and session guard; register the route in the portal host allowlist (host-areas + middleware) <!-- agent: fullstack-engineer.build, depends_on: [], touches: [apps/platform/src/app/(portal)/user/objects/paku/page.tsx, apps/platform/src/lib/routing/host-areas.ts, apps/platform/src/middleware.ts] -->
 - [x] 3.2 Build the wizard step components: service selector, location (cadastres, auto county), sale object data, service-branch details, file uploads, description with prefilled contact, summary; client-side validation against the shared schema <!-- agent: fullstack-engineer.build, depends_on: [1.2, 3.1], touches: [apps/platform/src/app/(portal)/user/objects/paku/_components/**] -->
-- [ ] 3.3 Wire submission: sale branch posts to /api/v1/object-submissions with uploaded file keys, service branch posts to /api/v1/service-requests; success redirects to /user/objects <!-- agent: fullstack-engineer.build, depends_on: [2.1, 2.2, 2.3, 3.2], touches: [apps/platform/src/app/(portal)/user/objects/paku/_components/**] -->
+- [x] 3.3 Wire submission: sale branch posts to /api/v1/object-submissions with uploaded file keys, service branch posts to /api/v1/service-requests; success redirects to /user/objects <!-- agent: fullstack-engineer.build, depends_on: [2.1, 2.2, 2.3, 3.2], touches: [apps/platform/src/app/(portal)/user/objects/paku/_components/**] -->
 - [x] 3.4 Swap the "Paku oma objekti" CTA href from marketingUrl to the internal route and update the objects-client tests <!-- agent: fullstack-engineer.fast, depends_on: [3.1], touches: [apps/platform/src/app/(portal)/user/objects/_components/objects-client.tsx, apps/platform/src/app/(portal)/user/objects/_components/__tests__/objects-client.test.tsx] -->
 
 ## 4. Portal lists
 
-- [ ] 4.1 Add the Teenused section to /user/objects listing the user's own service requests (type label, status pill, created date) with an empty state <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/user/objects/page.tsx, apps/platform/src/app/(portal)/user/objects/_components/service-requests-section.tsx] -->
+- [x] 4.1 Add the Teenused section to /user/objects listing the user's own service requests (type label, status pill, created date) with an empty state <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [apps/platform/src/app/(portal)/user/objects/page.tsx, apps/platform/src/app/(portal)/user/objects/_components/service-requests-section.tsx] -->
 
 ## 5. Verification
 
