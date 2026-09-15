@@ -64,14 +64,16 @@ export function LeadForm({ slug, onSuccess }: LeadFormProps) {
       setIsSubmitting(true);
       setToast(null);
 
+      // POST /api/leads contract: camelCase keys, consentAt as ISO timestamp.
       const payload = {
-        name: name.trim(),
+        contactName: name.trim(),
         phone: phone.trim(),
         email: email.trim(),
-        cadastre: cadastre.trim() || undefined,
-        consent,
+        cadastr: cadastre.trim() || undefined,
+        consentAt: new Date().toISOString(),
         company_website: '',
-        form_name: formNameRef.current,
+        formName: formNameRef.current,
+        pageSlug: slug,
       };
 
       try {
