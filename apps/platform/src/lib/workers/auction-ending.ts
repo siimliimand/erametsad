@@ -3,9 +3,10 @@ import type { DurableObjectNamespace } from 'cloudflare:workers'
 import type { DbDatabase } from '../db'
 
 /**
- * Cron safety net for auction ending (task 6.2). AuctionDO alarms are the
- * primary end mechanism; this sweep only wakes the DO for auctions that are
- * due but whose alarm was lost (object evicted before hydration or a missed
+ * Cron safety net for auction deadlines (tasks 6.2 and 1.2): ends of active
+ * auctions and starts of scheduled ones. AuctionDO alarms are the primary
+ * mechanism for both; this sweep only wakes the DO for auctions that are due
+ * but whose alarm was lost (object evicted before hydration or a missed
  * re-arm). The sweep never writes auction state: every transition runs
  * inside the DO through the same serialized path as alarm().
  */
@@ -19,7 +20,7 @@ export interface SweepExecutionContext {
 }
 
 export interface SweepResult {
-  /** Rows the D1 query returned as due. */
+  /** Rows the D1 queries returned as due. */
   due: number
   /** Wakes the DO acknowledged. */
   woken: number
@@ -34,15 +35,22 @@ export async function sweepDueAuctions(
   _ctx: SweepExecutionContext,
 ): Promise<SweepResult> {
   const now = new Date().toISOString()
-  const due = await env.DB.prepare(
+  // Disjoint statuses: a row due to start can never also be due to end, so
+  // the two result sets need no dedup before waking.
+  const dueEnds = await env.DB.prepare(
     `select id from auctions where status = ? and ends_at <= ? limit ${String(SWEEP_LIMIT)}`,
   )
     .bind('active', now)
     .all<{ id: unknown }>()
+  const dueStarts = await env.DB.prepare(
+    `select id from auctions where status = ? and starts_at <= ? limit ${String(SWEEP_LIMIT)}`,
+  )
+    .bind('scheduled', now)
+    .all<{ id: unknown }>()
 
   let woken = 0
   let failed = 0
-  for (const row of due.results) {
+  for (const row of [...dueEnds.results, ...dueStarts.results]) {
     const auctionId = row.id
     if (typeof auctionId !== 'string' || auctionId.length === 0) continue
     try {
@@ -61,7 +69,7 @@ export async function sweepDueAuctions(
       console.error(`[auction-sweep] wake for ${auctionId} failed`, error)
     }
   }
-  return { due: due.results.length, woken, failed }
+  return { due: dueEnds.results.length + dueStarts.results.length, woken, failed }
 }
 
 export interface CronController {
@@ -71,9 +79,9 @@ export interface CronController {
 }
 
 /**
- * Cron trigger entry (task 6.2): the every-minute sweep that wakes due
- * auctions whose DO alarm was lost to eviction. The DO alarm owns the end
- * transition; this handler only wakes objects. Exported from here so tests
+ * Cron trigger entry (task 6.2): the every-minute sweep that wakes auctions
+ * due to end or start whose DO alarm was lost to eviction. The DO owns the
+ * transitions; this handler only wakes objects. Exported from here so tests
  * can reach it without loading the built OpenNext worker (the wrangler shim
  * re-exports it as the Worker's `scheduled` handler).
  */
