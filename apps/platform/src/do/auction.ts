@@ -252,6 +252,17 @@ function insertAuditStatement(
   }
 }
 
+function auctionActivatedStatement(
+  auctionId: string,
+  activatedAt: string,
+  now: string,
+): SqlStatement {
+  return {
+    sql: 'update auctions set status = ?, activated_at = ?, updated_at = ? where id = ? and status = ?',
+    params: ['active', activatedAt, now, auctionId, 'scheduled'],
+  }
+}
+
 function auctionEndStatement(auctionId: string, endedAt: string, now: string): SqlStatement {
   return {
     sql: 'update auctions set status = ?, ended_at = ?, updated_at = ? where id = ? and status = ?',
@@ -487,6 +498,10 @@ export class AuctionDO extends DurableObject<Env> {
   }
 
   private async runAlarmTick(state: AuctionState): Promise<void> {
+    if (state.status === 'scheduled') {
+      await this.activateAuction(state.auctionId)
+      return
+    }
     if (state.status !== 'active') return
     const endsAtMs = state.endsAt !== null ? Date.parse(state.endsAt) : Number.NaN
     if (!Number.isFinite(endsAtMs)) return
@@ -495,6 +510,59 @@ export class AuctionDO extends DurableObject<Env> {
       return
     }
     await this.endAuction(state.auctionId)
+  }
+
+  /**
+   * `scheduled -> active` promotion at `startsAt`, mirroring `endAuction`.
+   * The hot state carries no `startsAt`, so the D1 row decides: an admin
+   * may have moved the start after the alarm was armed, and a stale alarm
+   * then re-arms instead of promoting early. The status-guarded statement
+   * makes retried alarms no-ops.
+   */
+  private async activateAuction(auctionId: string): Promise<void> {
+    const repos = this.repositories()
+    const auction = await findDoc(repos, 'auctions', { id: { equals: auctionId } })
+    if (!auction) return
+    if (auction.status !== 'scheduled') return
+    const startsAt = auction.startsAt as string | undefined
+    if (startsAt !== undefined && Date.now() < Date.parse(startsAt)) {
+      await this.ctx.storage.setAlarm(Date.parse(startsAt))
+      return
+    }
+
+    const now = new Date().toISOString()
+    await this.runBatch([
+      auctionActivatedStatement(auctionId, now, now),
+      insertAuditStatement(
+        crypto.randomUUID(),
+        'auction_activated',
+        'auction',
+        auctionId,
+        undefined,
+        { status: 'scheduled' },
+        { status: 'active', activatedAt: now },
+        now,
+      ),
+    ])
+    await this.updateHotState({ status: 'active' })
+    const endsAt = auction.endsAt as string | undefined
+    await this.broadcast('auction:published', {
+      auctionId,
+      endsAt: endsAt ?? undefined,
+      objectType: auction.objectType as string,
+    })
+    // The end transition follows the promotion off the same alarm: arm it
+    // at the row's end time, or run it now when the end already passed.
+    if (endsAt !== undefined) {
+      const endsAtMs = Date.parse(endsAt)
+      if (Number.isFinite(endsAtMs)) {
+        if (Date.now() < endsAtMs) {
+          await this.ctx.storage.setAlarm(endsAtMs)
+        } else {
+          await this.endAuction(auctionId)
+        }
+      }
+    }
   }
 
   /**
@@ -1440,6 +1508,14 @@ export class AuctionDO extends DurableObject<Env> {
         // First touch owns the end time; a later anti-snipe extension
         // re-arms at admission.
         await this.ctx.storage.setAlarm(endsAtMs)
+      }
+    } else if (state.status === 'scheduled' && auction.startsAt !== null) {
+      const startsAtMs = Date.parse(auction.startsAt)
+      const current = await this.ctx.storage.getAlarm()
+      if (Number.isFinite(startsAtMs) && (current === null || current < startsAtMs)) {
+        // First touch owns the start time; the alarm tick re-reads the row
+        // and re-arms when an admin moves it.
+        await this.ctx.storage.setAlarm(startsAtMs)
       }
     }
     return state

@@ -50,6 +50,8 @@ async function seedAuction(
     bidderStatus?: 'active' | 'suspended'
     withBidderRight?: boolean
     endsAt?: string
+    startsAt?: string
+    auctionStatus?: 'scheduled'
     auctionType?: 'open' | 'sealed'
     reservePriceCents?: number
   } = {},
@@ -60,6 +62,8 @@ async function seedAuction(
     bidderStatus = 'active',
     withBidderRight = true,
     endsAt,
+    startsAt,
+    auctionStatus,
     auctionType,
     reservePriceCents,
   } = options
@@ -87,12 +91,13 @@ async function seedAuction(
     sellerId,
     title: `${prefix} metsatükk`,
     slug: `${prefix}-${crypto.randomUUID()}`,
-    status: 'active',
+    status: auctionStatus ?? 'active',
     objectType: 'raieoigus',
     ...(auctionType !== undefined ? { type: auctionType } : {}),
     minBidCents: 10_000,
     ...(bidStepCents !== null ? { bidStepCents } : {}),
     ...(reservePriceCents !== undefined ? { reservePriceCents } : {}),
+    ...(startsAt !== undefined ? { startsAt } : {}),
     endsAt: endsAt ?? '2026-12-31T12:00:00.000Z',
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -987,6 +992,111 @@ test('an anti-snipe bid reschedules the near-due alarm and the end transition ru
     'auction_ended',
     'auction_outcome_computed',
   ])
+})
+
+test('hydration arms the alarm at startsAt for a scheduled auction', async () => {
+  const startsAt = new Date(Date.now() + 10 * 60_000).toISOString()
+  const { auctionId } = await seedAuction('scheduled-arm', {
+    auctionStatus: 'scheduled',
+    startsAt,
+  })
+
+  await fetchRoute(auctionId, '/state')
+
+  expect(await storedAlarm(auctionId)).toBe(Date.parse(startsAt))
+  expect((await auctionRow(auctionId))?.status).toBe('scheduled')
+})
+
+test('a late alarm promotes a scheduled auction to active and arms the end alarm', async () => {
+  fetchMock.activate()
+  fetchMock.disableNetConnect()
+  const deliveries: string[] = []
+  fetchMock
+    .get('https://start-sub.example')
+    .intercept({ path: () => true, method: 'POST' })
+    .reply((options) => {
+      deliveries.push(typeof options.body === 'string' ? options.body : '')
+      return { statusCode: 200 }
+    })
+    .persist()
+
+  // The start already passed: hydration arms an overdue alarm, so the
+  // runtime may fire it before the explicit fireAlarm call; either path
+  // runs the same promotion, so only the outcome is asserted.
+  const startsAt = new Date(Date.now() - 60_000).toISOString()
+  const endsAt = new Date(Date.now() + 10 * 60_000).toISOString()
+  const { auctionId } = await seedAuction('start-promote', {
+    auctionStatus: 'scheduled',
+    startsAt,
+    endsAt,
+  })
+  await subscribe(auctionId, 'https://start-sub.example/callback')
+  await fetchRoute(auctionId, '/state')
+
+  await fireAlarm(auctionId)
+
+  const row = await auctionRow(auctionId)
+  expect(row?.status).toBe('active')
+  expect(row?.activatedAt).not.toBeNull()
+  expect(await auditActions(auctionId)).toEqual(['auction_activated'])
+  expect(await storedAlarm(auctionId)).toBe(Date.parse(endsAt))
+
+  const state = await readState(await fetchRoute(auctionId, '/state'))
+  expect(state.status).toBe('active')
+
+  const published = deliveries
+    .map((body) => JSON.parse(body) as { type: string; data: Record<string, unknown> })
+    .filter((event) => event.type === 'auction:published')
+  expect(published).toHaveLength(1)
+  expect(published[0]?.data).toEqual({
+    auctionId,
+    endsAt,
+    objectType: 'raieoigus',
+  })
+})
+
+test('an early alarm re-arms at the admin-moved startsAt instead of promoting', async () => {
+  const startsAt = new Date(Date.now() + 60_000).toISOString()
+  const { auctionId } = await seedAuction('start-early', {
+    auctionStatus: 'scheduled',
+    startsAt,
+  })
+  await fetchRoute(auctionId, '/state')
+
+  // The admin pushes the start back after the alarm was armed; the hot
+  // state carries no startsAt, so the tick must re-read the row.
+  const moved = new Date(Date.now() + 30 * 60_000).toISOString()
+  await db
+    .update(schema.auctions)
+    .set({ startsAt: moved })
+    .where(eq(schema.auctions.id, auctionId))
+
+  await fireAlarm(auctionId)
+
+  expect(await storedAlarm(auctionId)).toBe(Date.parse(moved))
+  expect((await auctionRow(auctionId))?.status).toBe('scheduled')
+  expect((await auctionRow(auctionId))?.activatedAt).toBeNull()
+  expect(await auditActions(auctionId)).toHaveLength(0)
+})
+
+test('promotion of a scheduled auction whose end already passed runs the end transition immediately', async () => {
+  const { auctionId } = await seedAuction('start-late-end', {
+    auctionStatus: 'scheduled',
+    startsAt: '2025-06-01T00:00:00.000Z',
+    endsAt: '2025-06-02T00:00:00.000Z',
+  })
+  await fetchRoute(auctionId, '/state')
+
+  await fireAlarm(auctionId)
+
+  const row = await auctionRow(auctionId)
+  expect(row?.status).toBe('unsold')
+  expect(row?.activatedAt).not.toBeNull()
+  expect(row?.endedAt).not.toBeNull()
+  expect(row?.winningBid).toBeNull()
+  expect(await auditActions(auctionId)).toEqual(
+    expect.arrayContaining(['auction_activated', 'auction_ended', 'auction_outcome_computed']),
+  )
 })
 
 // Ports of the legacy place-bid.ts validation-chain intents (task 8.1):
