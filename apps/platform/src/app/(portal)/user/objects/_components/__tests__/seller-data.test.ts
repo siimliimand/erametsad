@@ -1,5 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { createElement, type ReactNode } from 'react'
+import { renderToString } from 'react-dom/server'
+import { describe, expect, it, vi } from 'vitest'
 
+vi.mock('next/link', () => ({
+  default: (props: { href: string; children: ReactNode }) =>
+    createElement('a', { href: props.href }, props.children),
+}))
+
+import { formatDate } from '../format'
+import { ObjectCard } from '../object-card'
 import {
   filterRowsByStatus,
   parseStatusTab,
@@ -88,5 +97,44 @@ describe('STATUS_TABS', () => {
       'active',
       'ended',
     ])
+  })
+})
+
+function renderCard(row: SellerAuctionRow): string {
+  return renderToString(
+    createElement(ObjectCard, {
+      row,
+      busy: false,
+      reviewSent: false,
+      relistSent: false,
+      feedback: null,
+      onOpenBids: vi.fn(),
+      onPreview: vi.fn(),
+      onReview: vi.fn(),
+      onRelist: vi.fn(),
+    }),
+  )
+}
+
+describe('ObjectCard scheduled row', () => {
+  it('shows the Algab side note and the Plaanis pill for a scheduled row', () => {
+    const html = renderCard(
+      makeRow({
+        id: 'sched-card',
+        status: 'scheduled',
+        startsAt: '2026-10-01T10:00:00Z',
+        leadingPrice: null,
+      }),
+    )
+    expect(html).toContain('Plaanis')
+    expect(html).toContain(`Algab ${formatDate('2026-10-01T10:00:00Z')}`)
+  })
+
+  it('omits the side note when a scheduled row has no start time', () => {
+    const html = renderCard(
+      makeRow({ id: 'sched-card', status: 'scheduled', leadingPrice: null }),
+    )
+    expect(html).toContain('Plaanis')
+    expect(html).not.toContain('Algab')
   })
 })

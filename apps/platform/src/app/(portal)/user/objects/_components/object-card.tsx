@@ -85,6 +85,9 @@ function sideNote(row: SellerAuctionRow): string | null {
   if (row.status === 'draft') {
     return 'Muudatused tehakse koos metsaspetsialistiga — enne avaldamist vaatab ta objekti üle.'
   }
+  if (row.status === 'scheduled') {
+    return row.startsAt !== null ? `Algab ${formatDate(row.startsAt)}` : null
+  }
   if (row.status === 'ended' || row.status === 'sealed-opening-pending') {
     return row.endsAt !== null ? `Lõppenud ${formatDate(row.endsAt)}.` : null
   }
