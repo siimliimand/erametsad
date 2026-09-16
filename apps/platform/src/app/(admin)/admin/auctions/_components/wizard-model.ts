@@ -26,12 +26,19 @@ import type { AuctionObjectType } from '@/lib/data/schema'
 
 export type AuctionTypeValue = 'open' | 'sealed'
 
-/** Image row the editor owns; uploads and focal points land in task 2.6. */
+/**
+ * Image row the editor owns; uploads and focal points land in task 2.6.
+ * `id`/`filename`/`mimeType` persist from the upload response so the public
+ * page can classify the entry as an image without guessing from the URL.
+ */
 export interface AuctionMediaItemState {
   url: string
   alt: string
   focalX?: number
   focalY?: number
+  id?: string
+  filename?: string
+  mimeType?: string
 }
 
 /** PDF attachment row (docs 03 step 5 files[]): PDF-only with a tag. */
@@ -396,6 +403,9 @@ export function buildAuctionPayload(
     alt: item.alt,
     ...(item.focalX !== undefined ? { focalX: item.focalX } : {}),
     ...(item.focalY !== undefined ? { focalY: item.focalY } : {}),
+    ...(item.id !== undefined ? { id: item.id } : {}),
+    ...(item.filename !== undefined ? { filename: item.filename } : {}),
+    ...(item.mimeType !== undefined ? { mimeType: item.mimeType } : {}),
   }))
   // `files` travels only once MediaStep owns the list; a save from a session
   // that never touched attachments stays absent and cannot wipe stored rows.
@@ -478,6 +488,13 @@ export function mediaStateFrom(value: unknown): AuctionMediaItemState[] {
       alt: typeof record.alt === 'string' ? record.alt : '',
       ...(typeof record.focalX === 'number' ? { focalX: record.focalX } : {}),
       ...(typeof record.focalY === 'number' ? { focalY: record.focalY } : {}),
+      ...(typeof record.id === 'string' && record.id !== '' ? { id: record.id } : {}),
+      ...(typeof record.filename === 'string' && record.filename !== ''
+        ? { filename: record.filename }
+        : {}),
+      ...(typeof record.mimeType === 'string' && record.mimeType !== ''
+        ? { mimeType: record.mimeType }
+        : {}),
     })
   }
   return items
@@ -896,6 +913,13 @@ function draftMedia(value: unknown): AuctionMediaItemState[] | null {
       alt,
       ...(typeof focalX === 'number' && Number.isFinite(focalX) ? { focalX } : {}),
       ...(typeof focalY === 'number' && Number.isFinite(focalY) ? { focalY } : {}),
+      ...(draftString(record.id) !== null ? { id: record.id as string } : {}),
+      ...(draftString(record.filename) !== null
+        ? { filename: record.filename as string }
+        : {}),
+      ...(draftString(record.mimeType) !== null
+        ? { mimeType: record.mimeType as string }
+        : {}),
     })
   }
   return items

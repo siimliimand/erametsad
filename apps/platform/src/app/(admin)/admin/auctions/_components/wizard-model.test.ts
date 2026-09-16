@@ -135,6 +135,13 @@ describe('buildAuctionPayload', () => {
         media: [
           { url: 'https://cdn.example/hero.jpg', alt: 'Mets' },
           { url: 'https://cdn.example/g.jpg', alt: '', focalX: 0.5, focalY: 0.25 },
+          {
+            url: '/api/v1/media/abc-123',
+            alt: 'Vaade',
+            id: 'abc-123',
+            filename: 'vaade.jpg',
+            mimeType: 'image/jpeg',
+          },
         ],
       },
       options,
@@ -144,6 +151,13 @@ describe('buildAuctionPayload', () => {
     expect(payload.media).toEqual([
       { url: 'https://cdn.example/hero.jpg', alt: 'Mets' },
       { url: 'https://cdn.example/g.jpg', alt: '', focalX: 0.5, focalY: 0.25 },
+      {
+        url: '/api/v1/media/abc-123',
+        alt: 'Vaade',
+        id: 'abc-123',
+        filename: 'vaade.jpg',
+        mimeType: 'image/jpeg',
+      },
     ])
   })
 
@@ -170,10 +184,26 @@ describe('buildAuctionPayload', () => {
   it('maps stored media and package rows into editable state', () => {
     const media = mediaStateFrom([
       { url: 'https://cdn.example/a.jpg', alt: 'A', focalX: 0.1 },
+      {
+        url: '/api/v1/media/abc-123',
+        alt: 'Vaade',
+        id: 'abc-123',
+        filename: 'vaade.jpg',
+        mimeType: 'image/jpeg',
+      },
       { url: '', alt: 'broken' },
       'junk',
     ])
-    expect(media).toEqual([{ url: 'https://cdn.example/a.jpg', alt: 'A', focalX: 0.1 }])
+    expect(media).toEqual([
+      { url: 'https://cdn.example/a.jpg', alt: 'A', focalX: 0.1 },
+      {
+        url: '/api/v1/media/abc-123',
+        alt: 'Vaade',
+        id: 'abc-123',
+        filename: 'vaade.jpg',
+        mimeType: 'image/jpeg',
+      },
+    ])
 
     const rows = packageRowsStateFrom([
       { cadastre: '34801:001:0217', registryNumber: 150934, areaHa: 5.5, minBidEur: 1000 },
@@ -424,6 +454,34 @@ describe('rendi-/kasutusleping gating (task 5.7)', () => {
     // Unchecked stays absent so the restore stays byte-equal to the server
     // state (the dirty compare must not fire a spurious restore prompt).
     expect(restoredWithoutLease?.state.hasLeaseAgreement).toBeUndefined()
+  })
+
+  it('keeps media upload metadata through a draft round trip', () => {
+    const stored = serializeWizardDraft(
+      {
+        ...baseState,
+        media: [
+          {
+            url: '/api/v1/media/abc-123',
+            alt: 'Vaade',
+            id: 'abc-123',
+            filename: 'vaade.jpg',
+            mimeType: 'image/jpeg',
+          },
+        ],
+      },
+      new Date('2026-09-09T10:00:00.000Z'),
+    )
+    const restored = parseWizardDraft(stored)
+    expect(restored?.state.media).toEqual([
+      {
+        url: '/api/v1/media/abc-123',
+        alt: 'Vaade',
+        id: 'abc-123',
+        filename: 'vaade.jpg',
+        mimeType: 'image/jpeg',
+      },
+    ])
   })
 })
 

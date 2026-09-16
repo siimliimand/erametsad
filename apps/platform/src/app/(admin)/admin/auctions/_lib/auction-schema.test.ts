@@ -69,6 +69,48 @@ describe('cadastral number format', () => {
   })
 })
 
+describe('media item upload metadata', () => {
+  it('keeps id, filename and mimeType on media items', () => {
+    const parsed = auctionInputSchema.safeParse({
+      ...validBase,
+      media: [
+        {
+          url: '/api/v1/media/abc-123',
+          alt: 'Vaade',
+          id: 'abc-123',
+          filename: 'vaade.jpg',
+          mimeType: 'image/jpeg',
+        },
+      ],
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.data.media).toEqual([
+        {
+          url: '/api/v1/media/abc-123',
+          alt: 'Vaade',
+          id: 'abc-123',
+          filename: 'vaade.jpg',
+          mimeType: 'image/jpeg',
+        },
+      ])
+    }
+  })
+
+  it('accepts legacy media items without upload metadata', () => {
+    const parsed = auctionInputSchema.safeParse({
+      ...validBase,
+      media: [{ url: 'https://cdn.example/hero.jpg', alt: 'Mets' }],
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.data.media).toEqual([
+        { url: 'https://cdn.example/hero.jpg', alt: 'Mets' },
+      ])
+    }
+  })
+})
+
 describe('forced sealed for property and package lots', () => {
   it('rejects an open property lot', () => {
     const parsed = auctionInputSchema.safeParse({

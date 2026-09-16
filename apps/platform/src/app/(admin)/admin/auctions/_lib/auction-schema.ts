@@ -54,6 +54,12 @@ export const mediaItemSchema = z.object({
   alt: z.string().max(500, 'Alternatiivtekst on liiga pikk.').default(''),
   focalX: z.number().min(0).max(1).optional(),
   focalY: z.number().min(0).max(1).optional(),
+  // Upload metadata from POST /api/v1/media; the public page classifies
+  // gallery vs document entries by mimeType, falling back to the URL
+  // extension. Entries persisted before these fields existed omit them.
+  id: z.string().optional(),
+  filename: z.string().optional(),
+  mimeType: z.string().optional(),
 })
 
 export const fileItemSchema = z.object({

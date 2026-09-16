@@ -33,6 +33,8 @@ import { apiFetch } from '@/lib/api/client'
 interface UploadedMedia {
   url: string
   filename: string
+  id?: string | undefined
+  mimeType?: string | undefined
 }
 
 /** POSTs the file to the wizard upload endpoint and returns its media URL. */
@@ -65,7 +67,15 @@ async function uploadToMediaLibrary(
     typeof data === 'object' && data !== null && typeof (data as { filename?: unknown }).filename === 'string'
       ? (data as { filename: string }).filename
       : file.name
-  return { url, filename }
+  const id =
+    typeof data === 'object' && data !== null && typeof (data as { id?: unknown }).id === 'string'
+      ? (data as { id: string }).id
+      : undefined
+  const mimeType =
+    typeof data === 'object' && data !== null && typeof (data as { mimeType?: unknown }).mimeType === 'string'
+      ? (data as { mimeType: string }).mimeType
+      : undefined
+  return { url, filename, id, mimeType }
 }
 
 const mediaAltErrorKey = (index: number): [string, string] => [
@@ -202,7 +212,20 @@ export function MediaStep({
         width: String(measured.width),
         height: String(measured.height),
       })
-      patch({ media: [...state.media, { url: uploaded.url, alt: '' }] })
+      // id/filename/mimeType travel with the lot so the public page can tell
+      // image entries from documents; /api/v1/media/<uuid> has no extension.
+      patch({
+        media: [
+          ...state.media,
+          {
+            url: uploaded.url,
+            alt: '',
+            filename: uploaded.filename,
+            ...(uploaded.id !== undefined ? { id: uploaded.id } : {}),
+            ...(uploaded.mimeType !== undefined ? { mimeType: uploaded.mimeType } : {}),
+          },
+        ],
+      })
     } catch (uploadError) {
       setImageUploadError(
         uploadError instanceof Error ? uploadError.message : 'Üleslaadimine ebaõnnestus.',
