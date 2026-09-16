@@ -60,7 +60,7 @@ type GuardRule =
   | { kind: 'admin' }
   | { kind: 'roles'; roles: GuardRole[] }
   | { kind: 'ownRecord'; field: string }
-  | { kind: 'published'; statusField: string; publishedValue: string; ownField?: string }
+  | { kind: 'published'; statusField: string; publishedValue: string; ownFields?: string[] }
 
 const allow: GuardRule = { kind: 'allow' }
 const deny: GuardRule = { kind: 'deny' }
@@ -126,10 +126,17 @@ function evaluate(rule: GuardRule, ctx: GuardContext): GuardDecision {
     case 'published': {
       if (isAdminRole(role)) return { allowed: true }
       const published = { [rule.statusField]: { equals: rule.publishedValue } }
-      if (rule.ownField && role === 'specialist' && user) {
+      // Own-clauses can only match rows the caller owns, so exposing them to
+      // every authenticated non-admin caller adds no cross-user read.
+      if (user && rule.ownFields?.length) {
         return {
           allowed: true,
-          where: { or: [{ [rule.ownField]: { equals: user.id } }, published] },
+          where: {
+            or: [
+              ...rule.ownFields.map((field) => ({ [field]: { equals: user.id } })),
+              published,
+            ],
+          },
         }
       }
       return { allowed: true, where: published }
@@ -155,7 +162,7 @@ export const GUARD_RULES: Readonly<
     delete: adminOnly,
   },
   auctions: {
-    read: { kind: 'published', statusField: 'status', publishedValue: 'active', ownField: 'specialist' },
+    read: { kind: 'published', statusField: 'status', publishedValue: 'active', ownFields: ['specialist', 'seller'] },
     create: { kind: 'roles', roles: ['admin', 'superadmin', 'specialist'] },
     update: ownRecord('specialist'),
     delete: adminOnly,

@@ -45,37 +45,33 @@ chips; the autobidder switch and "Muuda" SHALL validate the max
 
 ### Requirement: Minu müügid
 
-`/user/objects` SHALL render the demo page head with the right-aligned CTA
-"Paku oma objekti" and the filter chips Kõik, Käimasolevad, Lõppenud,
-Mustandid (Käimasolevad covers scheduled and active auctions). The CTA SHALL
-navigate to the in-portal submission wizard `/user/objects/paku` on the portal
-host, not to the marketing site. Lots SHALL render as demo object cards: the
-title with the type badge, the sub line, the stat rows "Hetke hind" or
-"Lõpphind", "Pakkumisi", "Vaatamisi" with the "+N / 24h" chip, and "Jälgijaid";
-the right rail with the status pill ("Aktiivne", "Leping allkirjastatud",
-"Müümata", "Mustand"), the live countdown for active lots, and the actions
-("Vaata oksjonit", "Leping ja PDF", "Proovi uuesti" for unsold, "Muuda" for
-drafts). Unsold and draft cards SHALL render dimmed with their demo notes. A
-draft SHALL keep the preview and the "Saada spetsialistile" review request; an
-unsold lot SHALL keep the relist request. A persistent banner SHALL surface
-pending alapakkumised. The lot drawer SHALL carry the bid log (anonymized,
-newest first, autobid markers) and the alapakkumine queue with approve/reject
-confirms; approval SHALL become leading and reject SHALL notify the bidder; a
-409 race SHALL render the conflict message with follow-up options. Drafts
-created through the portal wizard SHALL appear under Mustandid for the
-submitter immediately after submission.
+`/user/objects` SHALL show the signed-in seller their own auction lots in
+every status: `draft`, `scheduled`, `active`, `ended`, and the post-end
+statuses. Each card SHALL render its status pill for the row's real status
+("Mustand", "Plaanis", "Aktiivne", "Lõppenud", "Müümata", "Leping
+allkirjastatud"), and a `scheduled` card SHALL show an "Algab \<kuupäev\>"
+side note with the start time instead of a countdown. The existing tabs
+(Kõik, Käimasolevad, Lõppenud, Mustandid and the status filters) SHALL
+work over the full status set. Lots that are not `active` SHALL NOT offer
+bid actions; bidding stays gated on `status = 'active'`.
 
-#### Scenario: CTA stays in the portal
+#### Scenario: Scheduled lot is visible to its owner
 
-- **WHEN** a logged-in user clicks "Paku oma objekti"
-- **THEN** navigation goes to `/user/objects/paku` and the marketing host is
-  not loaded
+- **WHEN** the owner opens `/user/objects` while their lot is `scheduled`
+- **THEN** the lot card appears under Käimasolevad with the "Plaanis"
+  pill and the "Algab \<kuupäev\>" note
 
-#### Scenario: Submitted draft shows up
+#### Scenario: Draft lot is visible to its owner
 
-- **WHEN** the wizard completes a sale submission
-- **THEN** the new draft is listed under Mustandid for the submitter with the
-  standard draft card actions
+- **WHEN** the submitter opens `/user/objects` after the wizard created
+  their draft
+- **THEN** the draft appears under Mustandid with the preview and review
+  request actions
+
+#### Scenario: Ended lot stays visible
+
+- **WHEN** the owner opens `/user/objects` after their lot ended
+- **THEN** the lot appears under Lõppenud with the post-end status pill
 
 ### Requirement: Teavitused
 `/user/notifications` SHALL render one page with three stacked panels in
