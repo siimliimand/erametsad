@@ -56,7 +56,7 @@ test('cron sweep handler is a function; consumer ships its own worker', () => {
 // the minimal local ones, hence the one structural cast at the boundary.
 const sweepDb = drizzle(env.DB, { schema })
 const sweepEnv = env as unknown as SweepEnv
-const sweepCtx: SweepExecutionContext = { waitUntil: () => {} }
+const sweepCtx: SweepExecutionContext = { waitUntil: () => undefined }
 
 async function seedSweepAuction(
   prefix: string,

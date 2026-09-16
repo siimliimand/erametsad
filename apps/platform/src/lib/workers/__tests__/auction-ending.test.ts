@@ -9,7 +9,11 @@ interface WakeCall {
 
 type WakeMode = 'ok' | 'http-error' | 'throw'
 
-function createEnv(ids: string[], modes: Record<string, WakeMode> = {}) {
+function createEnv(
+  activeIds: string[],
+  scheduledIds: string[] = [],
+  modes: Record<string, WakeMode> = {},
+) {
   const queries: { sql: string; params: unknown[] }[] = []
   const idNames: string[] = []
   const wakes: WakeCall[] = []
@@ -18,13 +22,16 @@ function createEnv(ids: string[], modes: Record<string, WakeMode> = {}) {
     prepare(sql: string) {
       const entry = { sql, params: [] as unknown[] }
       queries.push(entry)
+      const results = sql.includes('starts_at')
+        ? scheduledIds.map((id) => ({ id }))
+        : activeIds.map((id) => ({ id }))
       const statement = {
         bind: (...params: unknown[]) => {
           entry.params = params
           return statement
         },
         all: () => ({
-          results: ids.map((id) => ({ id })),
+          results,
           success: true,
           meta: {},
         }),
@@ -55,22 +62,28 @@ function createEnv(ids: string[], modes: Record<string, WakeMode> = {}) {
 }
 
 describe('sweepDueAuctions', () => {
-  it('queries due active auctions capped at 50 rows', async () => {
-    const { env, ctx, queries } = createEnv(['auction-1', 'auction-2'])
+  it('queries due active and scheduled auctions capped at 50 rows each', async () => {
+    const { env, ctx, queries } = createEnv(['auction-1'], ['auction-2'])
 
     await sweepDueAuctions(env, ctx)
 
-    expect(queries).toHaveLength(1)
+    expect(queries).toHaveLength(2)
     expect(queries[0]?.sql).toContain('from auctions')
     expect(queries[0]?.sql).toContain('status = ?')
     expect(queries[0]?.sql).toContain('ends_at <= ?')
     expect(queries[0]?.sql).toContain('limit 50')
     expect(queries[0]?.params[0]).toBe('active')
     expect(Number.isNaN(Date.parse(String(queries[0]?.params[1])))).toBe(false)
+    expect(queries[1]?.sql).toContain('from auctions')
+    expect(queries[1]?.sql).toContain('status = ?')
+    expect(queries[1]?.sql).toContain('starts_at <= ?')
+    expect(queries[1]?.sql).toContain('limit 50')
+    expect(queries[1]?.params[0]).toBe('scheduled')
+    expect(Number.isNaN(Date.parse(String(queries[1]?.params[1])))).toBe(false)
   })
 
   it('wakes each due auction DO with POST /:auctionId/due', async () => {
-    const { env, ctx, idNames, wakes } = createEnv(['auction-1', 'auction-2'])
+    const { env, ctx, idNames, wakes } = createEnv(['auction-1'], ['auction-2'])
 
     const result = await sweepDueAuctions(env, ctx)
 
@@ -83,7 +96,7 @@ describe('sweepDueAuctions', () => {
   })
 
   it('counts a non-ok wake response as failed and still wakes the rest', async () => {
-    const { env, ctx, wakes } = createEnv(['auction-1', 'auction-2'], {
+    const { env, ctx, wakes } = createEnv(['auction-1'], ['auction-2'], {
       'auction-1': 'http-error',
     })
 
@@ -94,7 +107,7 @@ describe('sweepDueAuctions', () => {
   })
 
   it('survives a wake fetch that throws and reports it as failed', async () => {
-    const { env, ctx } = createEnv(['auction-1', 'auction-2'], { 'auction-2': 'throw' })
+    const { env, ctx } = createEnv(['auction-1'], ['auction-2'], { 'auction-2': 'throw' })
 
     const result = await sweepDueAuctions(env, ctx)
 
