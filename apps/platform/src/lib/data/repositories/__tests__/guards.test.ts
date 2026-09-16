@@ -37,7 +37,9 @@ describe('can: system context', () => {
 describe('can: auctions', () => {
   const activeRow = { id: 'a-1', status: 'active', specialistId: 'sp-9' }
   const draftRow = { id: 'a-2', status: 'draft', specialistId: 'sp-9' }
-  const ownDraft = { id: 'a-3', status: 'draft', specialistId: 'sp-1', specialist: 'sp-1' }
+  const ownDraft = { id: 'a-3', status: 'draft', specialist: 'sp-1' }
+  const company = userContext('co-1', 'company')
+  const seller = userContext('se-1', 'seller')
 
   it('limits anonymous reads to active auctions via a row filter', () => {
     const decision = can(publicContext, 'auctions', 'read')
@@ -48,16 +50,53 @@ describe('can: auctions', () => {
     expect(matchesWhere(draftRow, where)).toBe(false)
   })
 
-  it('limits authenticated non-specialist reads to active auctions', () => {
-    const where = whereOf(can(privateUser, 'auctions', 'read'))
-    expect(where).toEqual({ status: { equals: 'active' } })
-    expect(matchesWhere(ownDraft, where)).toBe(false)
+  it('lets private and company callers read active rows plus their own rows in any status', () => {
+    for (const [ctx, id] of [
+      [privateUser, 'u-1'],
+      [company, 'co-1'],
+    ] as const) {
+      const where = whereOf(can(ctx, 'auctions', 'read'))
+      expect(where).toEqual({
+        or: [
+          { specialist: { equals: id } },
+          { seller: { equals: id } },
+          { status: { equals: 'active' } },
+        ],
+      })
+      expect(matchesWhere({ status: 'draft', specialist: id }, where)).toBe(true)
+      expect(matchesWhere({ status: 'scheduled', seller: id }, where)).toBe(true)
+      expect(matchesWhere({ status: 'draft', specialist: 'someone-else' }, where)).toBe(false)
+      expect(matchesWhere({ status: 'scheduled', seller: 'someone-else' }, where)).toBe(false)
+      expect(can(ctx, 'auctions', 'read', { status: 'scheduled', seller: id }).allowed).toBe(true)
+      expect(can(ctx, 'auctions', 'read', draftRow).allowed).toBe(false)
+    }
+  })
+
+  it('lets a seller read scheduled and draft auctions they own but not foreign drafts', () => {
+    const ownScheduled = { id: 'a-4', status: 'scheduled', seller: 'se-1' }
+    const ownSealed = { id: 'a-5', status: 'sealed-opening-pending', seller: 'se-1' }
+    const where = whereOf(can(seller, 'auctions', 'read'))
+    expect(matchesWhere(ownScheduled, where)).toBe(true)
+    expect(matchesWhere(ownSealed, where)).toBe(true)
+    expect(matchesWhere(draftRow, where)).toBe(false)
+    expect(can(seller, 'auctions', 'read', ownScheduled).allowed).toBe(true)
+    expect(can(seller, 'auctions', 'read', ownSealed).allowed).toBe(true)
+    expect(can(seller, 'auctions', 'read', draftRow).allowed).toBe(false)
+  })
+
+  it('denies a seller updates on their own auction (writes stay specialist-only)', () => {
+    const ownScheduled = { id: 'a-4', status: 'scheduled', seller: 'se-1' }
+    expect(can(seller, 'auctions', 'update', ownScheduled).allowed).toBe(false)
   })
 
   it('lets specialists read their own drafts or any active auction', () => {
     const where = whereOf(can(specialist, 'auctions', 'read'))
     expect(where).toEqual({
-      or: [{ specialist: { equals: 'sp-1' } }, { status: { equals: 'active' } }],
+      or: [
+        { specialist: { equals: 'sp-1' } },
+        { seller: { equals: 'sp-1' } },
+        { status: { equals: 'active' } },
+      ],
     })
     expect(matchesWhere(ownDraft, where)).toBe(true)
     expect(matchesWhere({ ...activeRow, specialistId: 'sp-other' }, where)).toBe(true)
@@ -67,6 +106,7 @@ describe('can: auctions', () => {
   it('gives admins unfiltered reads', () => {
     const decision = can(admin, 'auctions', 'read')
     expect(decision).toEqual({ allowed: true })
+    expect(can(superadmin, 'auctions', 'read')).toEqual({ allowed: true })
   })
 
   it('restricts create to admin, superadmin, and specialist', () => {
